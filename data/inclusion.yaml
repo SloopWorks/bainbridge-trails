@@ -1,0 +1,30 @@
+# Island-total inclusion rule (spec §3). Evaluated at build/run time against segment
+# classification; changing it never requires re-collecting or re-classifying data.
+#
+# A segment counts toward the island total when:
+#   public_access not in exclude_public_access, AND
+#   (category in categories, OR
+#    category == connector AND connector.count_named AND
+#      (it belongs to a trail grouping OR it has a name not matching road_name_pattern))
+#
+# Categories: agency_trail, preserve_trail, multi_use_path, connector, beach_access,
+#   easement, informal, seasonal_closed, planned (Sound to Olympics alignment, not built).
+# Classification notes (controller-accepted, see bitrails/classify.py docstring):
+#   - easement = >= 50% inside a Land Trust polygon whose Cons_Type is a Conservation
+#     Easement (private land); cobi_easements is not cached. Fee-owned/assisted/other
+#     Land Trust polygons -> preserve_trail.
+#   - access=no with foot=yes|designated|permissive is NOT seasonal_closed (open to walkers).
+#   - Trail grouping (bitrails/trails.py): same-name pieces within 50 m, or in the same
+#     agency park, form one trail (1 m contiguity split real trails at agency-match gaps).
+# Geometry redistributability does NOT affect inclusion; trails.json reports both
+# island_total_m (this rule) and island_total_shippable_m (this rule + shippable geometry).
+categories:
+  - agency_trail
+  - preserve_trail
+  - multi_use_path
+connector:
+  count_named: true
+  # names like "Madison Avenue North", "NE Bergman Road", "Highway 305" are roads, not trails
+  road_name_pattern: '\b(road|rd|avenue|ave|way|street|st|drive|dr|lane|ln|boulevard|blvd|place|pl|court|ct|circle|terrace)\.?(\s+(ne|nw|se|sw|n|s|e|w|north|south|east|west|northeast|northwest|southeast|southwest))?$|\b(highway|hwy|sr)[\s-]*\d+'
+exclude_public_access:
+  - "no"

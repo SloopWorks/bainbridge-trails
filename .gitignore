@@ -1,0 +1,18 @@
+.superpowers/
+.DS_Store
+.idea/
+*.iml
+local.properties
+.gradle/
+build/
+.venv/
+__pycache__/
+.pytest_cache/
+
+# built artifacts: distribution decided in a later task
+data/dist/*
+!data/dist/README.md
+
+# map data copied into the app by scripts/sync-app-assets.sh
+app/composeApp/src/commonMain/composeResources/files/*.pmtiles
+app/composeApp/src/commonMain/composeResources/files/trails.json

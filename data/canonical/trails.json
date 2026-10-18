@@ -1,0 +1,2766 @@
+{
+  "dataset": {
+    "categories": {
+      "agency_trail": {
+        "included_m": 82752.5,
+        "m": 85890.7,
+        "segments": 1204,
+        "shippable_m": 77186.5
+      },
+      "beach_access": {
+        "included_m": 0.0,
+        "m": 121.9,
+        "segments": 6,
+        "shippable_m": 121.9
+      },
+      "connector": {
+        "included_m": 1432.4,
+        "m": 58889.0,
+        "segments": 2747,
+        "shippable_m": 58889.0
+      },
+      "easement": {
+        "included_m": 0.0,
+        "m": 479.7,
+        "segments": 13,
+        "shippable_m": 479.7
+      },
+      "informal": {
+        "included_m": 0.0,
+        "m": 113235.5,
+        "segments": 3137,
+        "shippable_m": 113235.5
+      },
+      "multi_use_path": {
+        "included_m": 26158.9,
+        "m": 26158.9,
+        "segments": 434,
+        "shippable_m": 26158.9
+      },
+      "planned": {
+        "included_m": 0.0,
+        "m": 15388.6,
+        "segments": 34,
+        "shippable_m": 0.0
+      },
+      "preserve_trail": {
+        "included_m": 3756.5,
+        "m": 5133.6,
+        "segments": 68,
+        "shippable_m": 5133.6
+      },
+      "seasonal_closed": {
+        "included_m": 0.0,
+        "m": 3700.7,
+        "segments": 37,
+        "shippable_m": 3700.7
+      }
+    },
+    "length_m": 308998.8,
+    "public_access": {
+      "no": 1483,
+      "unknown": 3866,
+      "yes": 2331
+    },
+    "segments": 7680,
+    "segments_included": 1698,
+    "segments_shippable": 7537,
+    "trails": 127
+  },
+  "island_total_m": 114100.2,
+  "island_total_mi": 70.9,
+  "island_total_shippable_m": 105396.0,
+  "island_total_shippable_mi": 65.49,
+  "notes": {
+    "elevation": "trail gain_m/loss_m: segments are oriented along the trail's walking order, 20 m DEM profiles concatenated and 2 m hysteresis applied once per chain (new chain piece at gaps > 50 m; pieces summed). climb_total_m = gain_m + loss_m, direction-free. Agency-only segments contribute to trail totals.",
+    "island_total": "island_total_m counts every included segment, including agency-only segments whose geometry is not redistributable (kept in data/canonical/private/, gitignored). island_total_shippable_m counts only segments whose geometry ships in segments.geojson."
+  },
+  "rule": {
+    "categories": [
+      "agency_trail",
+      "multi_use_path",
+      "preserve_trail"
+    ],
+    "count_named_connectors": true,
+    "exclude_public_access": [
+      "no"
+    ],
+    "road_name_pattern": "\\b(road|rd|avenue|ave|way|street|st|drive|dr|lane|ln|boulevard|blvd|place|pl|court|ct|circle|terrace)\\.?(\\s+(ne|nw|se|sw|n|s|e|w|north|south|east|west|northeast|northwest|southeast|southwest))?$|\\b(highway|hwy|sr)[\\s-]*\\d+"
+  },
+  "trails": [
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.015,
+      "gain_m": 0.0,
+      "id": "trail-allans-alley",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Allan's Alley",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-002497"
+      ],
+      "trailheads": [
+        {
+          "coordinates": [
+            -122.518786,
+            47.624748
+          ],
+          "type": "Point"
+        }
+      ]
+    },
+    {
+      "climb_total_m": 12.8,
+      "computed_length_mi": 0.282,
+      "gain_m": 6.4,
+      "id": "trail-arbor-trail",
+      "loss_m": 6.4,
+      "manager": null,
+      "name": "Arbor Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006755"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 6.7,
+      "computed_length_mi": 0.191,
+      "gain_m": 2.1,
+      "id": "trail-bainbridge-island-japanese-american-memorial-trail",
+      "loss_m": 4.6,
+      "manager": "BIMPRD",
+      "name": "Bainbridge Island Japanese American Memorial Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/52/638894530550170000",
+      "park": "Pritchard Park",
+      "segment_ids": [
+        "seg-000693",
+        "seg-000692",
+        "seg-000725",
+        "seg-000726",
+        "seg-000729",
+        "seg-000730",
+        "seg-000743"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 38.5,
+      "computed_length_mi": 3.077,
+      "gain_m": 23.9,
+      "id": "trail-battle-point",
+      "loss_m": 14.6,
+      "manager": "BIMPRD",
+      "name": "Battle Point",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/48/638894530544230000",
+      "park": "Battle Point Park",
+      "segment_ids": [
+        "seg-007421",
+        "seg-007425",
+        "seg-007434",
+        "seg-007455",
+        "seg-007460",
+        "seg-007452",
+        "seg-007446",
+        "seg-007430",
+        "seg-007631",
+        "seg-007625",
+        "seg-007472",
+        "seg-007435",
+        "seg-007444",
+        "seg-007462",
+        "seg-007447",
+        "seg-007504",
+        "seg-007494",
+        "seg-007495",
+        "seg-007509",
+        "seg-007555",
+        "seg-007569",
+        "seg-007584",
+        "seg-007602",
+        "seg-007585",
+        "seg-007521",
+        "seg-007539",
+        "seg-007550",
+        "seg-007552",
+        "seg-007570",
+        "seg-007598",
+        "seg-007599",
+        "seg-007603",
+        "seg-007617",
+        "seg-007615",
+        "seg-007627",
+        "seg-007630",
+        "seg-007622",
+        "seg-007623",
+        "seg-007629",
+        "seg-007634",
+        "seg-007632",
+        "seg-007567",
+        "seg-007568"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 9.3,
+      "computed_length_mi": 0.2,
+      "gain_m": 4.7,
+      "id": "trail-battle-point-equestrial-trail",
+      "loss_m": 4.6,
+      "manager": "BIMPRD",
+      "name": "Battle Point Equestrial Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/48/638894530544230000",
+      "park": "Battle Point Park",
+      "segment_ids": [
+        "seg-007436",
+        "seg-007492",
+        "seg-007535",
+        "seg-007601"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.026,
+      "gain_m": 0.0,
+      "id": "trail-battle-point-park-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Battle Point Park Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/48/638894530544230000",
+      "park": "Battle Point Park",
+      "segment_ids": [
+        "seg-007442"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 9.2,
+      "computed_length_mi": 0.687,
+      "gain_m": 9.2,
+      "id": "trail-blakely-harbor-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Blakely Harbor Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Blakely Harbor Park",
+      "segment_ids": [
+        "seg-001644",
+        "seg-001780",
+        "seg-001793",
+        "seg-002210",
+        "seg-001795",
+        "seg-001807",
+        "seg-001814",
+        "seg-001823",
+        "seg-001812",
+        "seg-001861",
+        "seg-002511",
+        "seg-002848",
+        "seg-002915",
+        "seg-003025"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 72.8,
+      "computed_length_mi": 0.969,
+      "gain_m": 57.2,
+      "id": "trail-blakely-hills-trail",
+      "loss_m": 15.6,
+      "manager": "BIMPRD",
+      "name": "Blakely Hills Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/64/638894530567570000",
+      "park": null,
+      "segment_ids": [
+        "seg-001298",
+        "seg-001439",
+        "seg-001440",
+        "seg-001699",
+        "seg-001700",
+        "seg-001723",
+        "seg-001705",
+        "seg-001555",
+        "seg-001556",
+        "seg-001759",
+        "seg-001745",
+        "seg-001727",
+        "seg-001762",
+        "seg-001767"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 25.2,
+      "computed_length_mi": 0.443,
+      "gain_m": 17.0,
+      "id": "trail-blakely-to-eagledale-trail",
+      "loss_m": 8.2,
+      "manager": "BIMPRD",
+      "name": "Blakely to Eagledale Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-002646",
+        "seg-002943",
+        "seg-002999",
+        "seg-003017",
+        "seg-003147",
+        "seg-003462",
+        "seg-003484",
+        "seg-003491"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 10.0,
+      "computed_length_mi": 0.384,
+      "gain_m": 2.5,
+      "id": "trail-blakely-trail",
+      "loss_m": 7.5,
+      "manager": "BIMPRD",
+      "name": "Blakely Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Blakely Harbor Park",
+      "segment_ids": [
+        "seg-001351",
+        "seg-001422",
+        "seg-001720",
+        "seg-001781",
+        "seg-002514",
+        "seg-003000",
+        "seg-002916",
+        "seg-002534",
+        "seg-002515"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 66.5,
+      "computed_length_mi": 0.35,
+      "gain_m": 66.5,
+      "id": "trail-blakley-cemetary-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Blakley Cemetary Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-002553",
+        "seg-002649",
+        "seg-002650"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 65.5,
+      "computed_length_mi": 0.843,
+      "gain_m": 21.4,
+      "id": "trail-bluff-trail",
+      "loss_m": 44.1,
+      "manager": "BIMPRD",
+      "name": "Bluff Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-000418",
+        "seg-000424",
+        "seg-000427",
+        "seg-000428",
+        "seg-000451",
+        "seg-000457",
+        "seg-000459",
+        "seg-000468",
+        "seg-000481",
+        "seg-000551",
+        "seg-000640"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 7.0,
+      "computed_length_mi": 0.228,
+      "gain_m": 0.0,
+      "id": "trail-bristle-ridge-trail",
+      "loss_m": 7.0,
+      "manager": "BIMPRD",
+      "name": "Bristle Ridge Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-000890",
+        "seg-001021",
+        "seg-001386"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 15.8,
+      "computed_length_mi": 0.118,
+      "gain_m": 0.0,
+      "id": "trail-cambridge-crest-trail",
+      "loss_m": 15.8,
+      "manager": "BIMPRD",
+      "name": "Cambridge Crest Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005669"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 7.8,
+      "computed_length_mi": 0.215,
+      "gain_m": 7.8,
+      "id": "trail-camelia-trail",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Camelia Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006293",
+        "seg-006294"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.115,
+      "gain_m": 0.0,
+      "id": "trail-camp-yeomalt-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Camp Yeomalt Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Camp Yeomalt",
+      "segment_ids": [
+        "seg-000118",
+        "seg-000121",
+        "seg-000123",
+        "seg-000138",
+        "seg-000137"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 8.1,
+      "computed_length_mi": 0.117,
+      "gain_m": 0.0,
+      "id": "trail-cave-ave-to-curtis-loop-trail",
+      "loss_m": 8.1,
+      "manager": "City of Bainbridge Island",
+      "name": "Cave Ave to Curtis Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-001131",
+        "seg-001252"
+      ],
+      "trailheads": [
+        {
+          "coordinates": [
+            -122.511756,
+            47.629705
+          ],
+          "type": "Point"
+        }
+      ]
+    },
+    {
+      "climb_total_m": 9.0,
+      "computed_length_mi": 0.096,
+      "gain_m": 9.0,
+      "id": "trail-city-hall-trail",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "City Hall Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-003049",
+        "seg-003051",
+        "seg-003052",
+        "seg-003054",
+        "seg-003056",
+        "seg-003058",
+        "seg-003060",
+        "seg-003061"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 138.0,
+      "computed_length_mi": 0.67,
+      "gain_m": 17.4,
+      "id": "trail-close-trail",
+      "loss_m": 120.6,
+      "manager": "BIMPRD",
+      "name": "Close Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007315",
+        "seg-007340",
+        "seg-007363",
+        "seg-007394",
+        "seg-007482",
+        "seg-007513",
+        "seg-007516",
+        "seg-007527",
+        "seg-007528",
+        "seg-007530",
+        "seg-007531"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 4.2,
+      "computed_length_mi": 0.047,
+      "gain_m": 2.0,
+      "id": "trail-creek-to-305-trail",
+      "loss_m": 2.2,
+      "manager": "BIMPRD",
+      "name": "Creek to 305 Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
+      "park": "Sakai Park",
+      "segment_ids": [
+        "seg-001792"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.002,
+      "gain_m": 0.0,
+      "id": "trail-dock-street-road-end",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Dock Street road end",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-007117"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.062,
+      "gain_m": 0.0,
+      "id": "trail-east-bridge-to-lookout-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "East Bridge to Lookout Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
+      "park": "Sakai Park",
+      "segment_ids": [
+        "seg-001832",
+        "seg-001891"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.014,
+      "gain_m": 0.0,
+      "id": "trail-fairview-avenue-path",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Fairview Avenue Path",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-000099"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 32.2,
+      "computed_length_mi": 0.332,
+      "gain_m": 32.2,
+      "id": "trail-fairy-dell-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Fairy Dell Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-007562",
+        "seg-007560",
+        "seg-007557",
+        "seg-007558",
+        "seg-007581",
+        "seg-007583",
+        "seg-007578",
+        "seg-007577",
+        "seg-007575",
+        "seg-007576",
+        "seg-007574",
+        "seg-007572",
+        "seg-007554",
+        "seg-007548",
+        "seg-007549",
+        "seg-007571",
+        "seg-007573",
+        "seg-007594"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.007,
+      "gain_m": 0.0,
+      "id": "trail-farm-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Farm Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005618",
+        "seg-005631"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 11.4,
+      "computed_length_mi": 0.107,
+      "gain_m": 3.8,
+      "id": "trail-farm-trail-2",
+      "loss_m": 7.6,
+      "manager": "BIMPRD",
+      "name": "Farm Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005625",
+        "seg-005626"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 8.8,
+      "computed_length_mi": 0.119,
+      "gain_m": 0.0,
+      "id": "trail-farm-trail-grace-church",
+      "loss_m": 8.8,
+      "manager": "BIMPRD",
+      "name": "Farm Trail Grace Church",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005628",
+        "seg-005629",
+        "seg-005641"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 6.3,
+      "computed_length_mi": 0.035,
+      "gain_m": 6.3,
+      "id": "trail-farm-trail-north",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Farm Trail North",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005627"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 21.4,
+      "computed_length_mi": 0.161,
+      "gain_m": 21.4,
+      "id": "trail-farm-trail-south",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Farm Trail South",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005619"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.015,
+      "gain_m": 0.0,
+      "id": "trail-fletcher-landing-road-end",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Fletcher Landing Road End",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-007587",
+        "seg-007588",
+        "seg-007611"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 79.7,
+      "computed_length_mi": 0.851,
+      "gain_m": 36.9,
+      "id": "trail-forest-to-sky-trail",
+      "loss_m": 42.8,
+      "manager": "BIMPRD",
+      "name": "Forest to Sky Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
+      "park": "Grand Forest",
+      "segment_ids": [
+        "seg-007086",
+        "seg-007187",
+        "seg-007201",
+        "seg-007204",
+        "seg-007232",
+        "seg-007259",
+        "seg-007309",
+        "seg-007310",
+        "seg-007314",
+        "seg-007320",
+        "seg-007324",
+        "seg-007327",
+        "seg-007348",
+        "seg-007352",
+        "seg-007371",
+        "seg-007373",
+        "seg-007379",
+        "seg-007388",
+        "seg-007419",
+        "seg-007415",
+        "seg-007422"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 13.6,
+      "computed_length_mi": 0.116,
+      "gain_m": 13.6,
+      "id": "trail-fort-ward-fence-line-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Fort Ward Fence Line Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
+      "park": "Fort Ward Park",
+      "segment_ids": [
+        "seg-004758",
+        "seg-004861"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 41.4,
+      "computed_length_mi": 0.643,
+      "gain_m": 16.4,
+      "id": "trail-fort-ward-to-blakely-harbor-trail",
+      "loss_m": 25.0,
+      "manager": "BIMPRD",
+      "name": "Fort Ward to Blakely Harbor Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
+      "park": "Blakely Harbor Park",
+      "segment_ids": [
+        "seg-003043",
+        "seg-003776",
+        "seg-004043",
+        "seg-004516",
+        "seg-004543",
+        "seg-004570",
+        "seg-004691",
+        "seg-004731"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 14.8,
+      "computed_length_mi": 0.253,
+      "gain_m": 0.0,
+      "id": "trail-fort-ward-trail",
+      "loss_m": 14.8,
+      "manager": "BIMPRD",
+      "name": "Fort Ward Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
+      "park": null,
+      "segment_ids": [
+        "seg-004478"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 14.0,
+      "computed_length_mi": 0.354,
+      "gain_m": 3.3,
+      "id": "trail-fort-ward-trail-2",
+      "loss_m": 10.7,
+      "manager": "BIMPRD",
+      "name": "Fort Ward Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
+      "park": null,
+      "segment_ids": [
+        "seg-004645"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 137.3,
+      "computed_length_mi": 1.777,
+      "gain_m": 42.1,
+      "id": "trail-fort-ward-trail-fort-ward-park",
+      "loss_m": 95.2,
+      "manager": "BIMPRD",
+      "name": "Fort Ward Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
+      "park": "Fort Ward Park",
+      "segment_ids": [
+        "seg-004081",
+        "seg-004350",
+        "seg-004470",
+        "seg-004648",
+        "seg-004649",
+        "seg-004781",
+        "seg-004780",
+        "seg-004741",
+        "seg-004730",
+        "seg-004732",
+        "seg-005072",
+        "seg-005175",
+        "seg-005592",
+        "seg-004816",
+        "seg-004956",
+        "seg-005066",
+        "seg-005089",
+        "seg-005069",
+        "seg-005117",
+        "seg-005155",
+        "seg-005362"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 36.1,
+      "computed_length_mi": 0.648,
+      "gain_m": 18.8,
+      "id": "trail-gazzam-lake-loop-trail",
+      "loss_m": 17.3,
+      "manager": "BIMPRD",
+      "name": "Gazzam Lake Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007146",
+        "seg-007147"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 79.7,
+      "computed_length_mi": 1.672,
+      "gain_m": 41.7,
+      "id": "trail-gazzam-lake-main-trail",
+      "loss_m": 38.0,
+      "manager": "BIMPRD",
+      "name": "Gazzam Lake Main Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007169",
+        "seg-007186",
+        "seg-007280",
+        "seg-007288",
+        "seg-007293",
+        "seg-007294",
+        "seg-007319",
+        "seg-007360",
+        "seg-007359",
+        "seg-007330",
+        "seg-007313",
+        "seg-007270",
+        "seg-007188",
+        "seg-007231",
+        "seg-007234",
+        "seg-007295"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 68.9,
+      "computed_length_mi": 0.428,
+      "gain_m": 28.8,
+      "id": "trail-gazzam-to-veterane",
+      "loss_m": 40.1,
+      "manager": "BIMPRD",
+      "name": "Gazzam to Veterane",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007263",
+        "seg-007329",
+        "seg-007370",
+        "seg-007391"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 4.7,
+      "computed_length_mi": 0.092,
+      "gain_m": 2.4,
+      "id": "trail-gideon-park-trail",
+      "loss_m": 2.3,
+      "manager": "BIMPRD",
+      "name": "Gideon Park Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Gideon Park",
+      "segment_ids": [
+        "seg-004295",
+        "seg-004333",
+        "seg-004367",
+        "seg-004336",
+        "seg-004427"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.007,
+      "gain_m": 0.0,
+      "id": "trail-gideon-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Gideon Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Gideon Park",
+      "segment_ids": [
+        "seg-004332"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 98.9,
+      "computed_length_mi": 1.409,
+      "gain_m": 45.9,
+      "id": "trail-grand-forest-east-trail",
+      "loss_m": 53.0,
+      "manager": "BIMPRD",
+      "name": "Grand Forest East Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
+      "park": "Grand Forest",
+      "segment_ids": [
+        "seg-006151",
+        "seg-006168",
+        "seg-006175",
+        "seg-006215",
+        "seg-006236",
+        "seg-006243",
+        "seg-006324",
+        "seg-006291",
+        "seg-006296",
+        "seg-006325",
+        "seg-006355",
+        "seg-006360",
+        "seg-006372",
+        "seg-006389",
+        "seg-006467",
+        "seg-006493",
+        "seg-006393",
+        "seg-006461",
+        "seg-006520",
+        "seg-006468",
+        "seg-006499",
+        "seg-006557"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 26.4,
+      "computed_length_mi": 0.246,
+      "gain_m": 2.4,
+      "id": "trail-grand-forest-north",
+      "loss_m": 24.0,
+      "manager": "BIMPRD",
+      "name": "Grand Forest North",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
+      "park": "Grand Forest",
+      "segment_ids": [
+        "seg-006890",
+        "seg-006959",
+        "seg-006979"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 49.4,
+      "computed_length_mi": 0.635,
+      "gain_m": 14.2,
+      "id": "trail-grand-forest-north-loop-trail",
+      "loss_m": 35.2,
+      "manager": "BIMPRD",
+      "name": "Grand Forest North Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
+      "park": "Grand Forest",
+      "segment_ids": [
+        "seg-006874",
+        "seg-006889",
+        "seg-006901",
+        "seg-006953",
+        "seg-006952"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 7.3,
+      "computed_length_mi": 0.046,
+      "gain_m": 0.0,
+      "id": "trail-grand-forest-to-miller-connection",
+      "loss_m": 7.3,
+      "manager": "BIMPRD",
+      "name": "Grand Forest to Miller connection",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
+      "park": "Grand Forest",
+      "segment_ids": [
+        "seg-007154"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 93.0,
+      "computed_length_mi": 1.843,
+      "gain_m": 51.3,
+      "id": "trail-grand-forest-west",
+      "loss_m": 41.7,
+      "manager": "BIMPRD",
+      "name": "Grand Forest West",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
+      "park": "Grand Forest",
+      "segment_ids": [
+        "seg-006872",
+        "seg-006887",
+        "seg-007019",
+        "seg-007045",
+        "seg-007046",
+        "seg-007057",
+        "seg-007059",
+        "seg-007054",
+        "seg-007055",
+        "seg-007064",
+        "seg-007106",
+        "seg-007087",
+        "seg-007060",
+        "seg-007058",
+        "seg-007062",
+        "seg-007063",
+        "seg-007072",
+        "seg-007080",
+        "seg-007065",
+        "seg-007123",
+        "seg-007119",
+        "seg-007118",
+        "seg-007073",
+        "seg-007109",
+        "seg-007125",
+        "seg-007141"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 9.9,
+      "computed_length_mi": 0.16,
+      "gain_m": 5.8,
+      "id": "trail-grand-foreste-east-trail",
+      "loss_m": 4.1,
+      "manager": "BIMPRD",
+      "name": "Grand Foreste East Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
+      "park": "Grand Forest",
+      "segment_ids": [
+        "seg-006230",
+        "seg-006376"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 17.8,
+      "computed_length_mi": 0.229,
+      "gain_m": 0.0,
+      "id": "trail-hawley-cove-trail",
+      "loss_m": 17.8,
+      "manager": "BIMPRD",
+      "name": "Hawley Cove Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/42/638894530535930000",
+      "park": "Hawley Cove Park",
+      "segment_ids": [
+        "seg-000315",
+        "seg-000316",
+        "seg-000321",
+        "seg-000327"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 23.6,
+      "computed_length_mi": 0.269,
+      "gain_m": 11.1,
+      "id": "trail-hayano-trail",
+      "loss_m": 12.5,
+      "manager": "BIMPRD",
+      "name": "Hayano Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/50/638894530547330000",
+      "park": "Moritani Preserve",
+      "segment_ids": [
+        "seg-005009",
+        "seg-005082",
+        "seg-005071",
+        "seg-005083"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 3.2,
+      "computed_length_mi": 0.127,
+      "gain_m": 3.2,
+      "id": "trail-heyday-farm-trail",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Heyday Farm Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-002981",
+        "seg-003092"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 29.2,
+      "computed_length_mi": 0.419,
+      "gain_m": 6.6,
+      "id": "trail-hidden-cove-loop-trail",
+      "loss_m": 22.6,
+      "manager": "BIMPRD",
+      "name": "Hidden Cove Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/60/638894530560930000",
+      "park": null,
+      "segment_ids": [
+        "seg-005815",
+        "seg-005816",
+        "seg-005864"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 8.1,
+      "computed_length_mi": 0.066,
+      "gain_m": 0.0,
+      "id": "trail-hidden-cove-to-spargur-trail",
+      "loss_m": 8.1,
+      "manager": "BIMPRD",
+      "name": "Hidden Cove to Spargur Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/60/638894530560930000",
+      "park": null,
+      "segment_ids": [
+        "seg-005634"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 112.9,
+      "computed_length_mi": 1.425,
+      "gain_m": 62.8,
+      "id": "trail-hidden-cove-trails",
+      "loss_m": 50.1,
+      "manager": "BIMPRD",
+      "name": "Hidden Cove Trails",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/60/638894530560930000",
+      "park": null,
+      "segment_ids": [
+        "seg-005203",
+        "seg-005764",
+        "seg-005751",
+        "seg-005778",
+        "seg-005813",
+        "seg-005879",
+        "seg-005948",
+        "seg-005962",
+        "seg-005966",
+        "seg-006022",
+        "seg-005968",
+        "seg-006023",
+        "seg-006042",
+        "seg-006024",
+        "seg-006025"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.016,
+      "gain_m": 0.0,
+      "id": "trail-hidden-cove-trails-2",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Hidden Cove Trails",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/60/638894530560930000",
+      "park": null,
+      "segment_ids": [
+        "seg-005682"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 7.4,
+      "computed_length_mi": 0.202,
+      "gain_m": 2.1,
+      "id": "trail-hilltop-loop-trail",
+      "loss_m": 5.3,
+      "manager": "BIMPRD",
+      "name": "Hilltop Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006739",
+        "seg-006738",
+        "seg-006743",
+        "seg-006795"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 83.2,
+      "computed_length_mi": 0.92,
+      "gain_m": 21.7,
+      "id": "trail-hilltop-trail",
+      "loss_m": 61.5,
+      "manager": "BIMPRD",
+      "name": "Hilltop Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
+      "park": "Grand Forest",
+      "segment_ids": [
+        "seg-006414",
+        "seg-006424",
+        "seg-006560",
+        "seg-006700",
+        "seg-006749",
+        "seg-006802",
+        "seg-006796",
+        "seg-006756",
+        "seg-006840",
+        "seg-006866",
+        "seg-006856",
+        "seg-006875",
+        "seg-006876",
+        "seg-006878"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 26.0,
+      "computed_length_mi": 0.159,
+      "gain_m": 13.7,
+      "id": "trail-himalayan-birch-trail",
+      "loss_m": 12.3,
+      "manager": null,
+      "name": "Himalayan Birch Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006129",
+        "seg-006128",
+        "seg-006130"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 5.1,
+      "computed_length_mi": 0.038,
+      "gain_m": 2.5,
+      "id": "trail-horseshoe-trail",
+      "loss_m": 2.6,
+      "manager": null,
+      "name": "Horseshoe Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006183"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.018,
+      "gain_m": 0.0,
+      "id": "trail-howley-cove-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Howley Cove Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/42/638894530535930000",
+      "park": "Hawley Cove Park",
+      "segment_ids": [
+        "seg-000390"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 3.6,
+      "computed_length_mi": 0.063,
+      "gain_m": 3.6,
+      "id": "trail-ihland-way-trail",
+      "loss_m": 0.0,
+      "manager": "City of Bainbridge Island",
+      "name": "Ihland Way Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-003488",
+        "seg-003552"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 21.3,
+      "computed_length_mi": 0.324,
+      "gain_m": 12.5,
+      "id": "trail-john-nelson-trail",
+      "loss_m": 8.8,
+      "manager": "BIMPRD",
+      "name": "John Nelson Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/62/638894530564470000",
+      "park": "John Nelson Park",
+      "segment_ids": [
+        "seg-001521",
+        "seg-001517",
+        "seg-001519",
+        "seg-001584",
+        "seg-001601",
+        "seg-001717",
+        "seg-001738",
+        "seg-001764"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 20.6,
+      "computed_length_mi": 0.174,
+      "gain_m": 0.0,
+      "id": "trail-kallgren-trail",
+      "loss_m": 20.6,
+      "manager": "BIMPRD",
+      "name": "Kallgren Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/56/638894530555600000",
+      "park": "Ted Olson Nature Preserve",
+      "segment_ids": [
+        "seg-001743"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 168.2,
+      "computed_length_mi": 0.868,
+      "gain_m": 14.3,
+      "id": "trail-knudsen-trail",
+      "loss_m": 153.9,
+      "manager": "BIMPRD",
+      "name": "Knudsen Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007331",
+        "seg-007390",
+        "seg-007339",
+        "seg-007374",
+        "seg-007385",
+        "seg-007393",
+        "seg-007412",
+        "seg-007458",
+        "seg-007477"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 43.9,
+      "computed_length_mi": 0.304,
+      "gain_m": 41.0,
+      "id": "trail-kojima-trail",
+      "loss_m": 2.9,
+      "manager": "BIMPRD",
+      "name": "Kojima Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006781",
+        "seg-006870"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 3.8,
+      "computed_length_mi": 0.121,
+      "gain_m": 0.0,
+      "id": "trail-koura-to-yukio-trail",
+      "loss_m": 3.8,
+      "manager": "BIMPRD",
+      "name": "Koura to Yukio Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006572"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 8.6,
+      "computed_length_mi": 0.062,
+      "gain_m": 5.6,
+      "id": "trail-liz-orr-meditation-trail",
+      "loss_m": 3.0,
+      "manager": null,
+      "name": "Liz Orr Meditation Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005927",
+        "seg-005950"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 46.8,
+      "computed_length_mi": 0.321,
+      "gain_m": 46.8,
+      "id": "trail-lost-valley-trail",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Lost Valley Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006121",
+        "seg-006125",
+        "seg-006140",
+        "seg-006145",
+        "seg-006191",
+        "seg-006267"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 5.2,
+      "computed_length_mi": 0.439,
+      "gain_m": 3.0,
+      "id": "trail-lower-fort-ward-trail",
+      "loss_m": 2.2,
+      "manager": "BIMPRD",
+      "name": "Lower Fort Ward Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
+      "park": "Fort Ward Park",
+      "segment_ids": [
+        "seg-004740",
+        "seg-004880",
+        "seg-005166",
+        "seg-005378"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 7.2,
+      "computed_length_mi": 0.031,
+      "gain_m": 7.2,
+      "id": "trail-lower-veterane-trail",
+      "loss_m": 0.0,
+      "manager": "City of Bainbridge Island",
+      "name": "Lower Veterane Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007380"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 118.5,
+      "computed_length_mi": 1.514,
+      "gain_m": 59.5,
+      "id": "trail-main-loop-trail",
+      "loss_m": 59.0,
+      "manager": "BIMPRD",
+      "name": "Main Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
+      "park": "Grand Forest",
+      "segment_ids": [
+        "seg-006213",
+        "seg-006214",
+        "seg-006235",
+        "seg-006242",
+        "seg-006244",
+        "seg-006348",
+        "seg-006415",
+        "seg-006338",
+        "seg-006339",
+        "seg-006460",
+        "seg-006423",
+        "seg-006422",
+        "seg-006448",
+        "seg-006463",
+        "seg-006506",
+        "seg-006504",
+        "seg-006501",
+        "seg-006500",
+        "seg-006497",
+        "seg-006482",
+        "seg-006337",
+        "seg-006290",
+        "seg-006217"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 115.5,
+      "computed_length_mi": 1.452,
+      "gain_m": 51.9,
+      "id": "trail-manzanita-park",
+      "loss_m": 63.6,
+      "manager": "BIMPRD",
+      "name": "Manzanita Park",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/44/638894530538700000",
+      "park": "Manzanita Park",
+      "segment_ids": [
+        "seg-006512",
+        "seg-006525",
+        "seg-006573",
+        "seg-006707",
+        "seg-006719",
+        "seg-006721",
+        "seg-006757",
+        "seg-006819",
+        "seg-006758",
+        "seg-006728",
+        "seg-006816",
+        "seg-006733",
+        "seg-006734",
+        "seg-006735",
+        "seg-006742",
+        "seg-006725",
+        "seg-006587",
+        "seg-006586",
+        "seg-006592",
+        "seg-006737",
+        "seg-006740",
+        "seg-006745",
+        "seg-006817"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 12.9,
+      "computed_length_mi": 0.407,
+      "gain_m": 0.0,
+      "id": "trail-manzanita-trail",
+      "loss_m": 12.9,
+      "manager": "BIMPRD",
+      "name": "Manzanita Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/44/638894530538700000",
+      "park": "Manzanita Park",
+      "segment_ids": [
+        "seg-006585",
+        "seg-006720",
+        "seg-006724",
+        "seg-006729",
+        "seg-006777"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 50.3,
+      "computed_length_mi": 0.333,
+      "gain_m": 47.5,
+      "id": "trail-mcredmond-trail",
+      "loss_m": 2.8,
+      "manager": "BIMPRD",
+      "name": "McRedmond Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005975",
+        "seg-006008",
+        "seg-006011",
+        "seg-006135",
+        "seg-006153",
+        "seg-006169"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 69.4,
+      "computed_length_mi": 1.326,
+      "gain_m": 26.7,
+      "id": "trail-meigs-trail",
+      "loss_m": 42.7,
+      "manager": "BIMPRD",
+      "name": "Meigs Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Meigs Park",
+      "segment_ids": [
+        "seg-004515",
+        "seg-004518",
+        "seg-004534",
+        "seg-004555",
+        "seg-004576",
+        "seg-004640",
+        "seg-004658",
+        "seg-004878",
+        "seg-004885",
+        "seg-004519",
+        "seg-004535",
+        "seg-004639",
+        "seg-004660",
+        "seg-004698",
+        "seg-004599",
+        "seg-004517",
+        "seg-004512",
+        "seg-004503",
+        "seg-004505",
+        "seg-004565",
+        "seg-004513",
+        "seg-004699",
+        "seg-004899"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 30.8,
+      "computed_length_mi": 0.14,
+      "gain_m": 0.0,
+      "id": "trail-morgan-road-path",
+      "loss_m": 30.8,
+      "manager": null,
+      "name": "Morgan Road Path",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-004507",
+        "seg-004755"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 4.8,
+      "computed_length_mi": 0.086,
+      "gain_m": 2.1,
+      "id": "trail-moss-garden",
+      "loss_m": 2.7,
+      "manager": null,
+      "name": "Moss Garden",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006297"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 9.2,
+      "computed_length_mi": 0.105,
+      "gain_m": 9.2,
+      "id": "trail-north-loop-to-boardwalk-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "North Loop to Boardwalk Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
+      "park": "Sakai Park",
+      "segment_ids": [
+        "seg-002343",
+        "seg-002444",
+        "seg-002540"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 4.6,
+      "computed_length_mi": 0.166,
+      "gain_m": 4.6,
+      "id": "trail-north-loop-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "North Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
+      "park": "Sakai Park",
+      "segment_ids": [
+        "seg-002704",
+        "seg-002691",
+        "seg-002692",
+        "seg-003028",
+        "seg-003248"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 15.4,
+      "computed_length_mi": 0.471,
+      "gain_m": 6.7,
+      "id": "trail-nutes-pond-trails",
+      "loss_m": 8.7,
+      "manager": "BIMPRD",
+      "name": "Nutes Pond Trails",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Nute's Pond",
+      "segment_ids": [
+        "seg-000546",
+        "seg-000610",
+        "seg-000716",
+        "seg-000628",
+        "seg-000718",
+        "seg-000731",
+        "seg-001028"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 39.9,
+      "computed_length_mi": 0.364,
+      "gain_m": 0.0,
+      "id": "trail-nutes-to-sunny-hill-trail",
+      "loss_m": 39.9,
+      "manager": "Bainbridge Island Parks & Trails Foundation",
+      "name": "Nutes to Sunny Hill Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-001053",
+        "seg-001164",
+        "seg-001165",
+        "seg-001166",
+        "seg-001167",
+        "seg-001169",
+        "seg-001168",
+        "seg-001170",
+        "seg-001171",
+        "seg-001173",
+        "seg-001141"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 5.9,
+      "computed_length_mi": 0.227,
+      "gain_m": 2.2,
+      "id": "trail-nutes-trail",
+      "loss_m": 3.7,
+      "manager": "BIMPRD",
+      "name": "Nutes Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Nute's Pond",
+      "segment_ids": [
+        "seg-000476",
+        "seg-000609",
+        "seg-000719"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 10.8,
+      "computed_length_mi": 0.342,
+      "gain_m": 3.9,
+      "id": "trail-oddfellows-trail",
+      "loss_m": 6.9,
+      "manager": "BIMPRD",
+      "name": "Oddfellow's Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-004949",
+        "seg-004983"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 24.2,
+      "computed_length_mi": 0.46,
+      "gain_m": 14.1,
+      "id": "trail-old-mill-trail",
+      "loss_m": 10.1,
+      "manager": "BIMPRD",
+      "name": "Old Mill Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005531"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 17.7,
+      "computed_length_mi": 0.551,
+      "gain_m": 11.6,
+      "id": "trail-opal-ridge-trail",
+      "loss_m": 6.1,
+      "manager": "BIMPRD",
+      "name": "Opal Ridge Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007015",
+        "seg-007016",
+        "seg-007050"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 2.1,
+      "computed_length_mi": 0.078,
+      "gain_m": 2.1,
+      "id": "trail-penny-place-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Penny Place Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006286",
+        "seg-006287"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 164.1,
+      "computed_length_mi": 1.041,
+      "gain_m": 151.7,
+      "id": "trail-peters-trail",
+      "loss_m": 12.4,
+      "manager": "BIMPRD",
+      "name": "Peter's Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-006869",
+        "seg-007179",
+        "seg-006871",
+        "seg-006918",
+        "seg-006951",
+        "seg-006991",
+        "seg-007051",
+        "seg-007066",
+        "seg-007112",
+        "seg-007191"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 7.7,
+      "computed_length_mi": 0.116,
+      "gain_m": 5.3,
+      "id": "trail-port-madison-water-company-trail-1",
+      "loss_m": 2.4,
+      "manager": null,
+      "name": "Port Madison Water Company Trail #1",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-004094"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 16.8,
+      "computed_length_mi": 0.387,
+      "gain_m": 14.1,
+      "id": "trail-port-madison-water-company-trail-2",
+      "loss_m": 2.7,
+      "manager": null,
+      "name": "Port Madison Water Company Trail #2",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-004144",
+        "seg-004145"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 84.7,
+      "computed_length_mi": 1.027,
+      "gain_m": 57.9,
+      "id": "trail-pritchard-trail",
+      "loss_m": 26.8,
+      "manager": "BIMPRD",
+      "name": "Pritchard Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/52/638894530550170000",
+      "park": "Pritchard Park",
+      "segment_ids": [
+        "seg-000206",
+        "seg-000223",
+        "seg-000219",
+        "seg-000252",
+        "seg-000259",
+        "seg-000287",
+        "seg-000298",
+        "seg-000299",
+        "seg-000309",
+        "seg-000429",
+        "seg-000335",
+        "seg-000432",
+        "seg-000483",
+        "seg-000511",
+        "seg-000624",
+        "seg-000643",
+        "seg-000662",
+        "seg-000607",
+        "seg-000463"
+      ],
+      "trailheads": [
+        {
+          "coordinates": [
+            -122.500725,
+            47.615609
+          ],
+          "type": "Point"
+        }
+      ]
+    },
+    {
+      "climb_total_m": 16.8,
+      "computed_length_mi": 0.279,
+      "gain_m": 12.9,
+      "id": "trail-ridge-trail",
+      "loss_m": 3.9,
+      "manager": "BIMPRD",
+      "name": "Ridge Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
+      "park": "Fort Ward Park",
+      "segment_ids": [
+        "seg-004990",
+        "seg-005101",
+        "seg-005242"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.035,
+      "gain_m": 0.0,
+      "id": "trail-rotary-park-trails",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Rotary Park Trails",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Rotary Park",
+      "segment_ids": [
+        "seg-005231",
+        "seg-005308"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 9.3,
+      "computed_length_mi": 0.1,
+      "gain_m": 0.0,
+      "id": "trail-rotary-trail",
+      "loss_m": 9.3,
+      "manager": "BIMPRD",
+      "name": "Rotary Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Rotary Park",
+      "segment_ids": [
+        "seg-005156",
+        "seg-005274",
+        "seg-005197"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 2.3,
+      "computed_length_mi": 0.058,
+      "gain_m": 2.3,
+      "id": "trail-sakai-bridge-to-small-bridge-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Sakai Bridge to Small Bridge Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
+      "park": "Sakai Park",
+      "segment_ids": [
+        "seg-002141",
+        "seg-002254",
+        "seg-002290"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 14.4,
+      "computed_length_mi": 0.083,
+      "gain_m": 14.4,
+      "id": "trail-sakai-forest-learning-trail",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Sakai Forest Learning Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
+      "park": null,
+      "segment_ids": [
+        "seg-005227",
+        "seg-005279",
+        "seg-005291"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.019,
+      "gain_m": 0.0,
+      "id": "trail-sakai-salmon-stream-amphitheater",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Sakai Salmon Stream Amphitheater",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
+      "park": null,
+      "segment_ids": [
+        "seg-005243",
+        "seg-005248",
+        "seg-005253",
+        "seg-005257",
+        "seg-005272",
+        "seg-005280",
+        "seg-005282",
+        "seg-005245"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 4.4,
+      "computed_length_mi": 0.204,
+      "gain_m": 4.4,
+      "id": "trail-schel-chelb-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Schel Chelb Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006765",
+        "seg-006774",
+        "seg-006791",
+        "seg-006794",
+        "seg-006810",
+        "seg-006807",
+        "seg-006808",
+        "seg-006811",
+        "seg-006813",
+        "seg-006831",
+        "seg-006834",
+        "seg-006809"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 52.1,
+      "computed_length_mi": 0.851,
+      "gain_m": 38.7,
+      "id": "trail-sound-to-olympics-trail",
+      "loss_m": 13.4,
+      "manager": null,
+      "name": "Sound to Olympics Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-001446",
+        "seg-001441",
+        "seg-001437",
+        "seg-001438",
+        "seg-001447",
+        "seg-001571",
+        "seg-001633",
+        "seg-001647",
+        "seg-001682",
+        "seg-001733",
+        "seg-001775",
+        "seg-001730",
+        "seg-001713",
+        "seg-001710",
+        "seg-001693",
+        "seg-001692",
+        "seg-001694",
+        "seg-001690",
+        "seg-001756",
+        "seg-001771",
+        "seg-001772",
+        "seg-001778",
+        "seg-001791"
+      ],
+      "trailheads": [
+        {
+          "coordinates": [
+            -122.51572,
+            47.63589
+          ],
+          "type": "Point"
+        },
+        {
+          "coordinates": [
+            -122.51529,
+            47.63579
+          ],
+          "type": "Point"
+        }
+      ]
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.024,
+      "gain_m": 0.0,
+      "id": "trail-sound-to-olympics-trail-2",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Sound to Olympics Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-004394"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 5.1,
+      "computed_length_mi": 0.166,
+      "gain_m": 5.1,
+      "id": "trail-south-loop-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "South Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
+      "park": "Sakai Park",
+      "segment_ids": [
+        "seg-002636"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 23.2,
+      "computed_length_mi": 0.427,
+      "gain_m": 11.5,
+      "id": "trail-springridge-trail",
+      "loss_m": 11.7,
+      "manager": "BIMPRD",
+      "name": "Springridge Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007335",
+        "seg-007338",
+        "seg-007346",
+        "seg-007350"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 49.8,
+      "computed_length_mi": 0.485,
+      "gain_m": 37.6,
+      "id": "trail-sunny-hill-trail",
+      "loss_m": 12.2,
+      "manager": "BIMPRD",
+      "name": "Sunny Hill Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-000536",
+        "seg-000537",
+        "seg-000617",
+        "seg-000635",
+        "seg-000679",
+        "seg-000739",
+        "seg-001142"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 31.8,
+      "computed_length_mi": 0.384,
+      "gain_m": 3.5,
+      "id": "trail-tani-creek-trail",
+      "loss_m": 28.3,
+      "manager": "BIMPRD",
+      "name": "Tani Creek Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-004982"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 14.6,
+      "computed_length_mi": 0.287,
+      "gain_m": 12.4,
+      "id": "trail-taylor-trail",
+      "loss_m": 2.2,
+      "manager": "BIMPRD",
+      "name": "Taylor Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-000600"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 2.8,
+      "computed_length_mi": 0.037,
+      "gain_m": 0.0,
+      "id": "trail-tchookwop-park-trail",
+      "loss_m": 2.8,
+      "manager": "BIMPRD",
+      "name": "T'Chookwop Park Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "T'Chookwop Park",
+      "segment_ids": [
+        "seg-005576"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 13.3,
+      "computed_length_mi": 0.212,
+      "gain_m": 13.3,
+      "id": "trail-ted-olson-nature-preserve",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Ted Olson Nature Preserve",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/56/638894530555600000",
+      "park": "Ted Olson Nature Preserve",
+      "segment_ids": [
+        "seg-002535",
+        "seg-002633",
+        "seg-002910",
+        "seg-002939",
+        "seg-003035"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 22.9,
+      "computed_length_mi": 0.222,
+      "gain_m": 8.8,
+      "id": "trail-ted-olson-trail",
+      "loss_m": 14.1,
+      "manager": "BIMPRD",
+      "name": "Ted Olson Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/56/638894530555600000",
+      "park": "Ted Olson Nature Preserve",
+      "segment_ids": [
+        "seg-002816",
+        "seg-002815",
+        "seg-002909"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 2.5,
+      "computed_length_mi": 0.016,
+      "gain_m": 2.5,
+      "id": "trail-to-the-learning-tree",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "To The Learning Tree",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005485"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 80.5,
+      "computed_length_mi": 0.911,
+      "gain_m": 40.4,
+      "id": "trail-trillium-trail",
+      "loss_m": 40.1,
+      "manager": "BIMPRD",
+      "name": "Trillium Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
+      "park": "Grand Forest",
+      "segment_ids": [
+        "seg-006897",
+        "seg-006905",
+        "seg-007042",
+        "seg-007044",
+        "seg-006898"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.022,
+      "gain_m": 0.0,
+      "id": "trail-upper-veterane-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Upper Veterane Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-007376"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 50.7,
+      "computed_length_mi": 0.325,
+      "gain_m": 3.9,
+      "id": "trail-upper-veterane-trail-gazzam-lake-preserve",
+      "loss_m": 46.8,
+      "manager": "BIMPRD",
+      "name": "Upper Veterane Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007285",
+        "seg-007316",
+        "seg-007321",
+        "seg-007337",
+        "seg-007351",
+        "seg-007358",
+        "seg-007369"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 83.6,
+      "computed_length_mi": 0.698,
+      "gain_m": 7.7,
+      "id": "trail-veterane-trail",
+      "loss_m": 75.9,
+      "manager": "BIMPRD",
+      "name": "Veterane Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007281",
+        "seg-007301",
+        "seg-007325",
+        "seg-007375",
+        "seg-007384"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 29.8,
+      "computed_length_mi": 0.452,
+      "gain_m": 23.1,
+      "id": "trail-vincent-road-to-gazzam-lake-trail",
+      "loss_m": 6.7,
+      "manager": "BIMPRD",
+      "name": "Vincent Road to Gazzam Lake Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-006944"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.049,
+      "gain_m": 0.0,
+      "id": "trail-wagon-wheel",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Wagon Wheel",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-004580",
+        "seg-004611",
+        "seg-004633",
+        "seg-004582"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 8.2,
+      "computed_length_mi": 0.091,
+      "gain_m": 8.2,
+      "id": "trail-wardwell-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Wardwell Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Meigs Park",
+      "segment_ids": [
+        "seg-005470",
+        "seg-005476"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.001,
+      "gain_m": 0.0,
+      "id": "trail-waterfront-trail",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "Waterfront Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-004289"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 21.2,
+      "computed_length_mi": 0.247,
+      "gain_m": 10.5,
+      "id": "trail-waypoint-woods-trail",
+      "loss_m": 10.7,
+      "manager": "BIMPRD",
+      "name": "Waypoint Woods Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "Waypoint Woods",
+      "segment_ids": [
+        "seg-001396",
+        "seg-001495",
+        "seg-001491",
+        "seg-001542",
+        "seg-001590"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 0.0,
+      "computed_length_mi": 0.029,
+      "gain_m": 0.0,
+      "id": "trail-west-bridge-to-creek-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "West Bridge to Creek Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
+      "park": "Sakai Park",
+      "segment_ids": [
+        "seg-001870"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 2.2,
+      "computed_length_mi": 0.104,
+      "gain_m": 0.0,
+      "id": "trail-west-loop-trail",
+      "loss_m": 2.2,
+      "manager": null,
+      "name": "West Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-003212",
+        "seg-003214",
+        "seg-003473",
+        "seg-003638",
+        "seg-003713",
+        "seg-003788",
+        "seg-003838",
+        "seg-003837"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 6.2,
+      "computed_length_mi": 0.05,
+      "gain_m": 0.0,
+      "id": "trail-west-loop-trail-2",
+      "loss_m": 6.2,
+      "manager": null,
+      "name": "West Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-004255",
+        "seg-004280",
+        "seg-004338",
+        "seg-004331",
+        "seg-004321",
+        "seg-004306",
+        "seg-004292",
+        "seg-004275"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 4.6,
+      "computed_length_mi": 0.171,
+      "gain_m": 4.6,
+      "id": "trail-west-loop-trail-3",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "West Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005159",
+        "seg-005173",
+        "seg-005191",
+        "seg-005318",
+        "seg-005385",
+        "seg-005386"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 3.1,
+      "computed_length_mi": 0.089,
+      "gain_m": 3.1,
+      "id": "trail-west-loop-trail-4",
+      "loss_m": 0.0,
+      "manager": null,
+      "name": "West Loop Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005692",
+        "seg-005730"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 6.5,
+      "computed_length_mi": 0.117,
+      "gain_m": 2.5,
+      "id": "trail-west-port-madison-nature-preserve",
+      "loss_m": 4.0,
+      "manager": "BIMPRD",
+      "name": "West Port Madison Nature Preserve",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "West Port Madison Nature Preserve",
+      "segment_ids": [
+        "seg-005971",
+        "seg-005978",
+        "seg-005987",
+        "seg-005990",
+        "seg-006001"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 9.6,
+      "computed_length_mi": 0.284,
+      "gain_m": 2.4,
+      "id": "trail-west-port-madison-trail",
+      "loss_m": 7.2,
+      "manager": "BIMPRD",
+      "name": "West Port Madison Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": "West Port Madison Nature Preserve",
+      "segment_ids": [
+        "seg-005960",
+        "seg-005970",
+        "seg-005977",
+        "seg-005984",
+        "seg-005995",
+        "seg-006003",
+        "seg-005985",
+        "seg-005986",
+        "seg-005989"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 4.9,
+      "computed_length_mi": 0.192,
+      "gain_m": 4.9,
+      "id": "trail-westwood-link-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Westwood Link Trail",
+      "official_length_mi": null,
+      "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
+      "park": "Gazzam Lake Preserve",
+      "segment_ids": [
+        "seg-007389"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 3.6,
+      "computed_length_mi": 0.029,
+      "gain_m": 0.0,
+      "id": "trail-wharf-street-road-end",
+      "loss_m": 3.6,
+      "manager": null,
+      "name": "Wharf Street road end",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005809"
+      ],
+      "trailheads": []
+    },
+    {
+      "climb_total_m": 9.8,
+      "computed_length_mi": 0.03,
+      "gain_m": 0.0,
+      "id": "trail-woodland-drive-road-end",
+      "loss_m": 9.8,
+      "manager": null,
+      "name": "Woodland Drive road end",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-007103"
+      ],
+      "trailheads": [
+        {
+          "coordinates": [
+            -122.561117,
+            47.673802
+          ],
+          "type": "Point"
+        }
+      ]
+    },
+    {
+      "climb_total_m": 9.4,
+      "computed_length_mi": 0.112,
+      "gain_m": 9.4,
+      "id": "trail-wyatt-to-shepard-trail",
+      "loss_m": 0.0,
+      "manager": "BIMPRD",
+      "name": "Wyatt to Shepard Trail",
+      "official_length_mi": null,
+      "official_map_url": null,
+      "park": null,
+      "segment_ids": [
+        "seg-005182",
+        "seg-005183"
+      ],
+      "trailheads": []
+    }
+  ]
+}

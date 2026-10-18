@@ -1,0 +1,13 @@
+{
+  "id": "kitsap_park_locations",
+  "file": "latest.geojson",
+  "fetched_at": "2026-10-18T18:30:24Z",
+  "sha256": "440a124e39f2ace15b8f8fb07d416f88eea7be41e23e8b14cebe4d1c95bbb54e",
+  "bytes": 31544,
+  "history": [
+    {
+      "fetched_at": "2026-10-18T18:30:24Z",
+      "sha256": "440a124e39f2ace15b8f8fb07d416f88eea7be41e23e8b14cebe4d1c95bbb54e"
+    }
+  ]
+}

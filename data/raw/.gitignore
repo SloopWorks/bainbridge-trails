@@ -1,0 +1,10 @@
+# Raw cache: commit only redistribution: yes sources (see data/sources.yaml); ignore everything else.
+*
+!.gitignore
+!osm_overpass_trails/
+!osm_island_boundary/
+!kitsap_park_locations/
+!*/manifest.json
+!osm_overpass_trails/*
+!osm_island_boundary/*
+!kitsap_park_locations/*

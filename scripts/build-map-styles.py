@@ -1,0 +1,457 @@
+#!/usr/bin/env python3
+"""Generate the app's MapLibre style templates (topo, minimal-light, dark).
+
+Output: app/composeApp/src/commonMain/composeResources/files/styles/{topo,minimal-light,dark}.json
+Edit palettes / layers here and re-run; the JSON files are committed generated output.
+
+    python3 scripts/build-map-styles.py
+
+Templates use double-brace placeholders (basemap, trails, contours, hillshade) that the app replaces
+with local pmtiles:// URLs (StyleTemplate.kt). Never emit a double-brace token anywhere else: an unknown
+placeholder is a hard error at runtime.
+
+Spike only: trail completion `status` is faked in the style from the numeric part of the segment id
+(see STATUS). Real status will come from app state (feature-state or a client-side GeoJSON overlay).
+See docs/spikes/map-render/styles.md.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT / "app/composeApp/src/commonMain/composeResources/files/styles"
+
+GLYPHS = "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf"
+FONT_REGULAR = ["Noto Sans Regular"]
+FONT_MEDIUM = ["Noto Sans Medium"]
+FONT_ITALIC = ["Noto Sans Italic"]
+
+STATUSES = ["not_started", "partway", "nearly_done", "complete"]
+
+# --- fake status (spike) -------------------------------------------------------------------------
+# seg-000123 -> 123 -> floor(123 / 7) % 4 -> status. Runs of 7 consecutive ids share a status, so
+# connected stretches read as one state instead of flickering segment by segment.
+_SEG_NUM = ["to-number", ["slice", ["get", "id"], 4], 0]
+STATUS = [
+    "match",
+    ["%", ["floor", ["/", _SEG_NUM, 7]], 4],
+    0, "complete",
+    1, "partway",
+    2, "not_started",
+    "nearly_done",
+]
+COUNTED = ["==", ["get", "included"], True]
+NOT_COUNTED = ["!=", ["get", "included"], True]
+
+
+def with_status(status: str) -> list:
+    return ["all", COUNTED, ["==", STATUS, status]]
+
+
+# --- status encoding (shared by all styles; colors per style) --------------------------------------
+# Width stops (zoom -> px). Encoding never relies on color alone:
+#   complete     solid, thickest
+#   nearly_done  solid, medium, dark casing
+#   partway      long dash, medium-thin
+#   not_started  round dots, thin
+WIDTH = {
+    "complete": {11: 1.8, 13: 3.2, 15: 5.6, 17: 9.0},
+    "nearly_done": {11: 1.3, 13: 2.3, 15: 3.8, 17: 6.2},
+    "partway": {11: 1.2, 13: 2.0, 15: 3.2, 17: 5.0},
+    "not_started": {11: 1.1, 13: 1.7, 15: 2.6, 17: 4.0},
+}
+DASH = {"partway": [2.6, 1.4], "not_started": [0.01, 1.9]}
+CASING_EXTRA = 2.2  # nearly_done casing (px beyond line width)
+HALO_EXTRA = 3.0  # land-colored halo under every counted trail
+
+
+def interp(stops: dict[float, float | list], curve: list | None = None) -> list:
+    expr: list = ["interpolate", curve or ["linear"], ["zoom"]]
+    for z, v in stops.items():
+        expr += [z, v]
+    return expr
+
+
+def width(status: str, extra: float = 0.0) -> list:
+    return interp({z: round(w + extra, 2) for z, w in WIDTH[status].items()})
+
+
+def halo_width() -> list:
+    # One halo layer for all counted segments: per-zoom match on status.
+    zooms = list(WIDTH["complete"].keys())
+    stops = {}
+    for z in zooms:
+        m: list = ["match", STATUS]
+        for s in STATUSES[:-1]:
+            m += [s, round(WIDTH[s][z] + HALO_EXTRA, 2)]
+        m.append(round(WIDTH["complete"][z] + HALO_EXTRA, 2))
+        stops[z] = m
+    return interp(stops)
+
+
+def road_width(stops: dict[float, float]) -> list:
+    return interp(stops, ["exponential", 1.6])
+
+
+def line(id_, source, source_layer, paint, filter_=None, layout=None, minzoom=None, maxzoom=None) -> dict:
+    layer = {"id": id_, "type": "line", "source": source}
+    if source_layer:
+        layer["source-layer"] = source_layer
+    if minzoom is not None:
+        layer["minzoom"] = minzoom
+    if maxzoom is not None:
+        layer["maxzoom"] = maxzoom
+    if filter_ is not None:
+        layer["filter"] = filter_
+    layer["layout"] = {"line-cap": "round", "line-join": "round", **(layout or {})}
+    layer["paint"] = paint
+    return layer
+
+
+def fill(id_, source_layer, color, filter_=None, opacity=None, minzoom=None) -> dict:
+    layer = {"id": id_, "type": "fill", "source": "basemap", "source-layer": source_layer}
+    if minzoom is not None:
+        layer["minzoom"] = minzoom
+    if filter_ is not None:
+        layer["filter"] = filter_
+    paint = {"fill-color": color}
+    if opacity is not None:
+        paint["fill-opacity"] = opacity
+    layer["paint"] = paint
+    return layer
+
+
+POLYGON = ["match", ["geometry-type"], ["Polygon", "MultiPolygon"], True, False]
+
+
+def kind_in(*kinds) -> list:
+    return ["in", ["get", "kind"], ["literal", list(kinds)]]
+
+
+WOODLAND = ("forest", "wood", "nature_reserve", "national_park", "protected_area", "park")
+OPEN_GREEN = ("grass", "meadow", "golf_course", "recreation_ground", "playground", "garden", "cemetery",
+              "village_green", "allotments")
+SAND = ("beach", "sand")
+WETLAND = ("wetland", "marsh", "swamp", "bog")
+FARMLAND = ("farmland", "orchard", "vineyard", "farmyard")
+
+
+def build(p: dict) -> dict:
+    """p: palette + feature switches for one style."""
+    sources = {
+        "basemap": {"type": "vector", "url": "{{basemap}}"},
+        "trails": {"type": "vector", "url": "{{trails}}"},
+    }
+    if p.get("contours"):
+        sources["contours"] = {"type": "vector", "url": "{{contours}}"}
+    if p.get("hillshade"):
+        sources["hillshade"] = {"type": "raster", "url": "{{hillshade}}", "tileSize": 256}
+
+    L: list[dict] = []
+    L.append({"id": "background", "type": "background", "paint": {"background-color": p["water"]}})
+    L.append(fill("earth", "earth", p["land"]))
+    L.append(fill("landuse-farm", "landuse", p["farm"], kind_in(*FARMLAND)))
+    L.append(fill("landuse-open", "landuse", p["open_green"], kind_in(*OPEN_GREEN)))
+    L.append(fill("landuse-wood", "landuse", p["wood"], kind_in(*WOODLAND)))
+    L.append(fill("landuse-wetland", "landuse", p["wetland"], kind_in(*WETLAND)))
+    L.append(fill("landuse-sand", "landuse", p["sand"], kind_in(*SAND)))
+
+    if p.get("hillshade"):
+        hs = p["hillshade"]
+        L.append({
+            "id": "hillshade", "type": "raster", "source": "hillshade",
+            "paint": {
+                "raster-opacity": interp(hs["opacity"]),
+                "raster-brightness-min": hs.get("bmin", 0.0),
+                "raster-brightness-max": hs.get("bmax", 1.0),
+                "raster-contrast": hs.get("contrast", 0.0),
+                "raster-fade-duration": 0,
+            },
+        })
+
+    L.append(fill("water", "water", p["water"], POLYGON))
+    # Coastline = outline of the land polygons (water-polygon outlines include extract/tile edges).
+    L.append(line("shore", "basemap", "earth", {
+        "line-color": p["shore"],
+        "line-width": interp({10: 0.4, 14: 0.9, 18: 1.6}),
+    }, POLYGON, minzoom=10))
+
+    # Signature: nautical-chart "water lines" - concentric offsets of the coastline into the water.
+    for i, (offset, opacity) in enumerate(p.get("ripples", {}).get("lines", [])):
+        L.append(line(f"shore-ripple-{i}", "basemap", "earth", {
+            "line-color": p["ripples"]["color"],
+            "line-opacity": opacity,
+            "line-width": interp({10: 0.5, 15: 0.8}),
+            "line-offset": interp({10: offset * 0.6, 14: offset, 17: offset * 1.4}),
+        }, POLYGON, minzoom=10))
+
+    if p.get("contours"):
+        c = p["contours"]
+        L.append(line("contour-minor", "contours", "contours", {
+            "line-color": c["color"],
+            "line-opacity": interp({13: 0.0, 13.5: c["minor_opacity"]}),
+            "line-width": interp({13: 0.4, 17: 0.8}),
+        }, ["all", ["!=", ["get", "index"], True], [">", ["get", "elev_m"], 0]], minzoom=13))
+        L.append(line("contour-index", "contours", "contours", {
+            "line-color": c["color"],
+            "line-opacity": c["index_opacity"],
+            "line-width": interp({11: 0.5, 14: 1.0, 17: 1.6}),
+        }, ["all", ["==", ["get", "index"], True], [">", ["get", "elev_m"], 0]]))
+
+    if p.get("buildings"):
+        L.append(fill("buildings", "buildings", p["buildings"], minzoom=13,
+                      opacity=interp({13: 0.0, 14: 1.0})))
+
+    r = p["roads"]
+    minor = ("minor_road", "other")
+    major = ("major_road",)
+    hwy = ("highway",)
+    if r.get("casing"):
+        L.append(line("roads-minor-casing", "basemap", "roads", {
+            "line-color": r["casing"],
+            "line-width": road_width({12: 0.8, 15: 3.2, 18: 13}),
+        }, kind_in(*minor), minzoom=12))
+        L.append(line("roads-major-casing", "basemap", "roads", {
+            "line-color": r["casing"],
+            "line-width": road_width({10: 1.2, 15: 5.0, 18: 17}),
+        }, kind_in(*major, *hwy)))
+    L.append(line("roads-minor", "basemap", "roads", {
+        "line-color": r["minor"],
+        "line-width": road_width({12: 0.4, 15: 2.0, 18: 10}),
+    }, kind_in(*minor), minzoom=11))
+    L.append(line("roads-major", "basemap", "roads", {
+        "line-color": r["major"],
+        "line-width": road_width({10: 0.7, 15: 3.6, 18: 14}),
+    }, kind_in(*major)))
+    L.append(line("roads-highway", "basemap", "roads", {
+        "line-color": r["highway"],
+        "line-width": road_width({10: 0.9, 15: 3.8, 18: 14}),
+    }, kind_in(*hwy)))
+    L.append(line("ferry", "basemap", "roads", {
+        "line-color": p["ferry"],
+        "line-width": interp({10: 0.6, 15: 1.4}),
+        "line-dasharray": [3, 2.5],
+    }, kind_in("ferry")))
+
+    # ---- trails -----------------------------------------------------------------------------------
+    t = p["trails"]
+    nc = t["not_counted"]
+    # Not counted (included == false): quiet hairlines, styled by category so the owner can still
+    # read the network; never confused with the four status treatments (no dots/dashes at status
+    # widths, low contrast).
+    L.append(line("trails-nc-other", "trails", "segments", {
+        "line-color": nc["color"],
+        "line-opacity": nc["opacity"],
+        "line-width": interp({12: 0.4, 15: 1.0, 18: 1.8}),
+    }, ["all", NOT_COUNTED,
+        ["!", ["in", ["get", "category"], ["literal", ["seasonal_closed", "beach_access", "easement"]]]]],
+        minzoom=12))
+    L.append(line("trails-nc-easement", "trails", "segments", {
+        "line-color": nc["color"],
+        "line-opacity": nc["opacity"],
+        "line-width": interp({12: 0.5, 15: 1.1, 18: 2.0}),
+        "line-dasharray": [4, 3],
+    }, ["all", NOT_COUNTED, ["==", ["get", "category"], "easement"]], layout={"line-cap": "butt"}, minzoom=12))
+    L.append(line("trails-nc-beach", "trails", "segments", {
+        "line-color": nc["beach"],
+        "line-opacity": 0.9,
+        "line-width": interp({12: 0.6, 15: 1.2, 18: 2.2}),
+    }, ["all", NOT_COUNTED, ["==", ["get", "category"], "beach_access"]], minzoom=12))
+    L.append(line("trails-nc-closed", "trails", "segments", {
+        "line-color": nc["closed"],
+        "line-opacity": 0.9,
+        "line-width": interp({12: 0.6, 15: 1.2, 18: 2.2}),
+        "line-dasharray": [1.5, 2],
+    }, ["all", NOT_COUNTED, ["==", ["get", "category"], "seasonal_closed"]], layout={"line-cap": "butt"},
+        minzoom=12))
+
+    # Counted segments.
+    # multi_use_path: paved shared path gets a wide pale "bed" underneath (category cue).
+    L.append(line("trails-mup-bed", "trails", "segments", {
+        "line-color": t["mup_bed"],
+        "line-width": interp({12: 2.5, 15: 9.0, 18: 15.0}),
+        "line-opacity": t.get("mup_bed_opacity", 1.0),
+    }, ["all", COUNTED, ["==", ["get", "category"], "multi_use_path"]], minzoom=12))
+    L.append(line("trails-halo", "trails", "segments", {
+        "line-color": t["halo"],
+        "line-width": halo_width(),
+        "line-opacity": t.get("halo_opacity", 1.0),
+    }, COUNTED))
+    s = t["status"]
+    L.append(line("trails-not-started", "trails", "segments", {
+        "line-color": s["not_started"],
+        "line-width": width("not_started"),
+        "line-dasharray": DASH["not_started"],
+    }, with_status("not_started")))
+    L.append(line("trails-partway", "trails", "segments", {
+        "line-color": s["partway"],
+        "line-width": width("partway"),
+        "line-dasharray": DASH["partway"],
+    }, with_status("partway"), layout={"line-cap": "butt"}))
+    L.append(line("trails-nearly-done-casing", "trails", "segments", {
+        "line-color": t["casing"],
+        "line-width": width("nearly_done", CASING_EXTRA),
+    }, with_status("nearly_done")))
+    L.append(line("trails-nearly-done", "trails", "segments", {
+        "line-color": s["nearly_done"],
+        "line-width": width("nearly_done"),
+    }, with_status("nearly_done")))
+    if t.get("complete_glow"):
+        L.append(line("trails-complete-glow", "trails", "segments", {
+            "line-color": s["complete"],
+            "line-opacity": t["complete_glow"],
+            "line-width": width("complete", 7.0),
+            "line-blur": interp({11: 3.0, 15: 6.0}),
+        }, with_status("complete")))
+    L.append(line("trails-complete", "trails", "segments", {
+        "line-color": s["complete"],
+        "line-width": width("complete"),
+    }, with_status("complete")))
+
+    # ---- labels (online glyphs; offline -> labels silently absent, map unaffected) ----------------
+    lab = p["labels"]
+    if p.get("contours"):
+        L.append({
+            "id": "contour-label", "type": "symbol", "source": "contours", "source-layer": "contours",
+            "minzoom": 14, "filter": ["all", ["==", ["get", "index"], True], [">", ["get", "elev_m"], 0]],
+            "layout": {
+                "symbol-placement": "line",
+                "text-field": ["concat", ["to-string", ["get", "elev_m"]], " m"],
+                "text-font": FONT_ITALIC,
+                "text-size": 10,
+                "symbol-spacing": 320,
+            },
+            "paint": {"text-color": p["contours"]["label"], "text-halo-color": p["land"], "text-halo-width": 1.4},
+        })
+    L.append({
+        "id": "water-label", "type": "symbol", "source": "basemap", "source-layer": "water",
+        "filter": ["all", ["==", ["geometry-type"], "Point"], ["has", "name"]],
+        "layout": {
+            "text-field": ["get", "name"],
+            "text-font": FONT_ITALIC,
+            "text-size": interp({10: 11, 15: 14}),
+            "text-letter-spacing": 0.08,
+            "text-max-width": 7,
+        },
+        "paint": {"text-color": lab["water"], "text-halo-color": p["water"], "text-halo-width": 1.0},
+    })
+    L.append({
+        "id": "trail-label", "type": "symbol", "source": "trails", "source-layer": "segments",
+        "minzoom": 14, "filter": ["all", COUNTED, ["has", "name"]],
+        "layout": {
+            "symbol-placement": "line",
+            "text-field": ["get", "name"],
+            "text-font": FONT_MEDIUM,
+            "text-size": interp({14: 11, 17: 13}),
+            "symbol-spacing": 420,
+            "text-max-angle": 25,
+            "text-padding": 6,
+            "text-offset": [0, 1.0],
+        },
+        "paint": {"text-color": lab["trail"], "text-halo-color": lab["halo"], "text-halo-width": 1.6},
+    })
+    L.append({
+        "id": "place-label", "type": "symbol", "source": "basemap", "source-layer": "places",
+        # Towns/hamlets/neighbourhoods only (OSM farms are tagged as localities), at their min_zoom.
+        "filter": ["all", kind_in("locality", "neighbourhood", "macrohood"),
+                   ["!", ["in", ["get", "kind_detail"], ["literal", ["farm", "isolated_dwelling", "allotments"]]]],
+                   ["<=", ["get", "min_zoom"], ["+", ["zoom"], 0.5]]],
+        "layout": {
+            "text-field": ["get", "name"],
+            "text-font": FONT_MEDIUM,
+            "text-size": ["match", ["get", "kind_detail"], ["town", "city"], 14, ["village", "suburb"], 12, 11],
+            "symbol-sort-key": ["get", "sort_key"],
+            "text-letter-spacing": 0.04,
+            "text-max-width": 8,
+        },
+        "paint": {"text-color": lab["place"], "text-halo-color": lab["halo"], "text-halo-width": 1.4},
+    })
+
+    return {
+        "version": 8,
+        "name": f"Bainbridge Trails - {p['name']}",
+        "metadata": {
+            "bainbridgetrails:generated": "scripts/build-map-styles.py - edit there, not here",
+            "bainbridgetrails:status": "spike: status faked from segment id; real status comes from app state",
+        },
+        "glyphs": GLYPHS,
+        "sources": sources,
+        "layers": L,
+    }
+
+
+# --- palettes ------------------------------------------------------------------------------------
+# Status ramp (all styles): cool/quiet -> hot/saturated as completion rises.
+#   not_started warm-gray dots, partway gold dashes, nearly_done tangerine + dark casing, complete violet.
+#   Violet (blue-heavy) stays a vivid blue under deutan/protan simulation, so "done" keeps its pop.
+
+TOPO = {
+    "name": "topo",
+    "land": "#ECEFE6", "water": "#9EBFC7", "shore": "#7FA2AB",
+    "wood": "#D4E0C6", "open_green": "#E2E9D7", "farm": "#ECEFE6", "wetland": "#CFDDD2", "sand": "#E9E4D0",
+    "buildings": "#D9DCD2",
+    "hillshade": {"opacity": {10: 0.36, 15: 0.26}, "bmin": 0.12, "bmax": 1.0, "contrast": 0.15},
+    "contours": {"color": "#9C845C", "minor_opacity": 0.32, "index_opacity": 0.55, "label": "#86704C"},
+    "roads": {"casing": "#C3C7BC", "minor": "#FFFFFF", "major": "#FFFFFF", "highway": "#F4E7C0"},
+    "ferry": "#5E8691",
+    "ripples": {"color": "#6F97A2", "lines": [(-3.0, 0.75), (-6.5, 0.5), (-11.0, 0.28)]},
+    "trails": {
+        "status": {"not_started": "#6E6A64", "partway": "#C98A00", "nearly_done": "#E2562A",
+                   "complete": "#9B1FA8"},
+        "casing": "#5A1F0C", "halo": "#ECEFE6", "halo_opacity": 0.85, "mup_bed": "#FFFFFF",
+        "mup_bed_opacity": 0.85,
+        "not_counted": {"color": "#7D8679", "opacity": 0.75, "beach": "#4F8797", "closed": "#A6564A"},
+    },
+    "labels": {"water": "#4C7682", "trail": "#2F3A33", "place": "#46504A", "halo": "#ECEFE6"},
+}
+
+MINIMAL_LIGHT = {
+    "name": "minimal-light",
+    # Chart inversion: white water, soft gray land - the island reads as a shape, trails as the ink.
+    "land": "#E8EBE7", "water": "#FBFCFC", "shore": "#9DB5BF",
+    "wood": "#E1E6DE", "open_green": "#E4E8E1", "farm": "#E8EBE7", "wetland": "#E0E6E3", "sand": "#ECEBE5",
+    "buildings": "#DEE1DC",
+    "roads": {"minor": "#F7F8F6", "major": "#FFFFFF", "highway": "#FFFFFF"},
+    "ferry": "#9DB5BF",
+    "ripples": {"color": "#9DB5BF", "lines": [(-4.0, 0.45), (-9.0, 0.22)]},
+    "trails": {
+        "status": {"not_started": "#66625C", "partway": "#C08300", "nearly_done": "#DE4F22",
+                   "complete": "#931B9F"},
+        "casing": "#4A1A09", "halo": "#E8EBE7", "mup_bed": "#FFFFFF",
+        "not_counted": {"color": "#9AA19A", "opacity": 0.85, "beach": "#7FA6B3", "closed": "#BB8077"},
+    },
+    "labels": {"water": "#6F8E9A", "trail": "#3A4247", "place": "#5F676C", "halo": "#E8EBE7"},
+}
+
+DARK = {
+    "name": "dark",
+    "land": "#1D2925", "water": "#0E1F27", "shore": "#2C4450",
+    "wood": "#21312A", "open_green": "#22302A", "farm": "#212B26", "wetland": "#1F302C", "sand": "#2A2F29",
+    "buildings": "#26322D",
+    "hillshade": {"opacity": {10: 0.30, 15: 0.22}, "bmin": 0.0, "bmax": 0.55, "contrast": 0.1},
+    "contours": {"color": "#5F7A6B", "minor_opacity": 0.22, "index_opacity": 0.4, "label": "#7D978A"},
+    "roads": {"minor": "#34413B", "major": "#46544D", "highway": "#56625A"},
+    "ferry": "#3D6372",
+    "ripples": {"color": "#2E5564", "lines": [(-3.0, 0.7), (-6.5, 0.42), (-11.0, 0.22)]},
+    "trails": {
+        "status": {"not_started": "#A9A49B", "partway": "#F0B43C", "nearly_done": "#FF7B47",
+                   "complete": "#D45CFF"},
+        "casing": "#0B1410", "halo": "#1D2925", "halo_opacity": 0.8, "mup_bed": "#33413B",
+        "complete_glow": 0.35,
+        "not_counted": {"color": "#5E6E66", "opacity": 0.8, "beach": "#3F7486", "closed": "#8A5048"},
+    },
+    "labels": {"water": "#5F8694", "trail": "#DCE6E1", "place": "#A9B8B1", "halo": "#1D2925"},
+}
+
+
+def main() -> None:
+    OUT.mkdir(parents=True, exist_ok=True)
+    for palette, name in ((TOPO, "topo"), (MINIMAL_LIGHT, "minimal-light"), (DARK, "dark")):
+        text = json.dumps(build(palette), indent=1) + "\n"
+        (OUT / f"{name}.json").write_text(text)
+        print(f"wrote {OUT.relative_to(ROOT)}/{name}.json ({len(text) // 1024} KB)")
+
+
+if __name__ == "__main__":
+    main()

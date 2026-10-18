@@ -1,0 +1,755 @@
+# Bainbridge Island trail data sources (survey 2026-10-18). Top-level key: sources.
+# Required per entry: id, name, url, kind (overpass|arcgis_rest|geojson|pdf_map|elevation|reference_only),
+#   endpoint, license, redistribution (yes|no|unknown), attribution.
+# endpoint: exactly ONE bare http(s) URL, or null for pure reference entries. Prose belongs in notes.
+# Optional: geometry_rank (int, lower = preferred geometry), notes,
+#   format (geojson|json|shapefile_zip|pdf|html|tiff) = response/download format of endpoint,
+#   query = for kind overpass: Overpass QL sent as the POST body (form field data=); otherwise a percent-encoded URL query string
+#           to append to endpoint after '?' ({lon}/{lat} are literal placeholders to substitute).
+sources:
+- id: osm_overpass_trails
+  name: OpenStreetMap trails/paths via Overpass API
+  url: https://www.openstreetmap.org/copyright
+  kind: overpass
+  endpoint: https://overpass-api.de/api/interpreter
+  license: 'ODbL 1.0. osm.org/copyright: "You are free to copy, distribute, transmit and adapt our data,
+    as long as you credit OpenStreetMap and its contributors." Derived databases must stay under ODbL
+    (share-alike).'
+  redistribution: 'yes'
+  attribution: (c) OpenStreetMap contributors, ODbL 1.0 - https://www.openstreetmap.org/copyright
+  geometry_rank: 1
+  notes: 'Query is the minimum set: also decide downstream about highway=service/living_street/residential
+    footways and sidewalks (footway=sidewalk|crossing); trailheads/parking: nwr["amenity"="parking"],
+    nwr["highway"="trailhead"], leisure=park|nature_reserve. POST form field data= with a User-Agent header
+    (default curl UA gets 406). Public instance often returns 502 "at capacity": retry with backoff or
+    use mirror https://maps.mail.ru/osm/tools/overpass/api/interpreter. Area id = 3600000000 + relation
+    id = 3603148366. Query: [out:json][timeout:90];rel(3148366);map_to_area->.a;(way["highway"~"^(path|footway|track|bridleway|cycleway|steps|pedestrian)$"](area.a););out
+    geom tags; Tested 2026-10-18: 4978 ways (path|footway|track|bridleway|cycleway|steps) in island area
+    (many are sidewalks/driveways; classify via tags highway, footway=sidewalk/crossing, access, foot,
+    bicycle, surface, name, operator). Also pull route relations: rel["route"~"hiking|foot|bicycle"](area.a);
+    and trailheads/parking: nwr["amenity"="parking"], nwr["leisure"="park|nature_reserve"], nwr["highway"="trailhead"].
+    Mixed ODbL share-alike: keep OSM-derived layer attributable; do not blend into a combined derived
+    DB without ODbL review.'
+  query: '[out:json][timeout:180];rel(3148366);map_to_area->.a;(way["highway"~"^(path|footway|track|bridleway|cycleway|steps|pedestrian)$"](area.a);rel["route"~"^(hiking|foot)$"](area.a););out
+    geom;'
+  format: json
+- id: osm_island_boundary
+  name: Bainbridge Island land boundary (OSM relation 3148366, place=island)
+  url: https://www.openstreetmap.org/relation/3148366
+  kind: overpass
+  endpoint: https://overpass-api.de/api/interpreter
+  license: 'ODbL 1.0 (same as OSM). Verified via Nominatim lookup R3148366: place=island, wikidata Q803903,
+    bbox S47.5740930 N47.7212543 W-122.5928063 E-122.4793619.'
+  redistribution: 'yes'
+  attribution: (c) OpenStreetMap contributors, ODbL 1.0
+  geometry_rank: 1
+  notes: 'PRIMARY island land boundary. Alternates: City of Bainbridge Island jurisdictional boundary
+    = OSM admin relation 237327 (includes water; not land-only) and the City Shoreline shapefile (cobi_shoreline_shp).
+    Island also includes small offshore islands? Only the main island is relation 3148366.'
+  query: '[out:json][timeout:60];rel(3148366);out geom;'
+  format: json
+- id: cobi_public_trails_all
+  name: City of Bainbridge Island - merged public trails (BIMPRD + COBI), layer 0
+  url: https://gis.bainbridgewa.gov/server/rest/services/Landuse/_rd_public_trails_all/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://gis.bainbridgewa.gov/server/rest/services/Landuse/_rd_public_trails_all/FeatureServer/0/query
+  license: 'Layer item description (iteminfo licenseInfo): "This data is for general planning and recreational
+    reference. Not for legal boundary or navigation purposes. Users are responsible for verifying accuracy
+    before use in decision-making." No explicit reuse/redistribution license stated. accessInformation:
+    "BIMPRD, City of Bainbridge Island".'
+  redistribution: unknown
+  attribution: BIMPRD and City of Bainbridge Island (GIS)
+  geometry_rank: 2
+  notes: 'Verified HTTP 200 (ArcGIS Server 11.5). Layer 0 ".rd_public_trails_all", esriGeometryPolyline,
+    has Z (zmin -2.6..zmax 113.3 ft), native SR wkid 103180/6597 (NAD83(2011) WA North ftUS; pass outSR=4326),
+    maxRecordCount 2000, formats JSON/geoJSON/PBF, count=373 (returnCountOnly 2026-10-18). Fields: TRAILNAME,
+    PARK, TRAIL_SYST, REGION, MATERIAL (surface), CONDITION, MANAGING_O (owner), HIKING_ALL, BICYCLES_A,
+    HORSES_ALL, WATER_TRAI, MOTOR_TRAI, ER_ACCESSI, ADA_ACCESS, NATIONAL_T, REGIONAL_T, LOCAL_TRAI, Class,
+    DATA_SOURC (e.g. Catalyst, North Kitsap Trails Association), MERGE_SRC, name, public_, comment, type,
+    system, maintained, Trail_lengthFT, Trail_Number, GIS_ID, CG_ID, GlobalID, DATE/SOURCE_DAT/UPDATE_DAT,
+    Shape__Length (ft). Sum Shape__Length by MANAGING_O: BIMPRD 91,605 ft; COBI 878 ft; PRIVATE 165 ft;
+    null/blank ~36,000 ft. Best structured official trail geometry; Trail_lengthFT mostly null so compute
+    length from geometry. Attribute-only queries (returnCountOnly, returnGeometry=false, outStatistics)
+    work, but full-geometry f=geojson/f=json queries FAILED when tested 2026-10-18 (first call >120 s
+    then killed; later HTTP 500 Web Adaptor error, then HTTP 503 "Wait timeout for the request exceeded"
+    after 60 s) - server was wedged/overloaded, so geometry download from this host is UNVERIFIED. Pipeline:
+    page with resultOffset/resultRecordCount=100, retry with backoff, fall back to bimprd_trails_agol_2022
+    (same schema, hosted AGOL, verified).'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: cobi_bimprd_trails2019
+  name: COBI Landuse - lu_bimprd_trails2019_update (BIMPRD trails 2019)
+  url: https://gis.bainbridgewa.gov/server/rest/services/Landuse/lu_bimprd_trails2019_update/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://gis.bainbridgewa.gov/server/rest/services/Landuse/lu_bimprd_trails2019_update/FeatureServer/0
+  license: 'Sibling layer item description (iteminfo licenseInfo): "This data is for general planning
+    and recreational reference. Not for legal boundary or navigation purposes. Users are responsible for
+    verifying accuracy before use in decision-making." No explicit reuse/redistribution license stated.
+    (not confirmed for this layer: item info not retrievable).'
+  redistribution: unknown
+  attribution: BIMPRD / City of Bainbridge Island (GIS)
+  geometry_rank: 4
+  notes: Listed in Landuse folder directory (FeatureServer + MapServer). Layer metadata/count requests
+    returned empty/HTTP 000 (timeout) in 4 attempts - UNVERIFIED. Probably a predecessor of _rd_public_trails_all
+    (which merges rd_BIMPRD_trails). Pipeline should try, tolerate failure.
+- id: cobi_bimprd_parks
+  name: COBI Landuse - BIMPRD Parks polygons
+  url: https://gis.bainbridgewa.gov/server/rest/services/Landuse/lu_BIMPRD_Parks/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://gis.bainbridgewa.gov/server/rest/services/Landuse/lu_BIMPRD_Parks/FeatureServer/0/query
+  license: 'Layer copyrightText: "Data was recieved from WA DNR, WA State Parks, Kitsap County Parks &
+    Rec., Kitsap County DCD, City of Port Orchard, City of Bainbridge Island, and City of Poulsbo.  All
+    data was verified to 2009 aerial imagery and parcel data." No redistribution license stated.'
+  redistribution: unknown
+  attribution: City of Bainbridge Island GIS / BIMPRD
+  notes: 'Layer 0, esriGeometryPolygon. Fields: NAME, TYPE, OWNERSHIP, AGENCY, CATEGORY, DISTRICT, PARK_ROLE,
+    ACREAGE. Directory + field schema retrieved HTTP 200; count query timed out (503 wait timeout) - feature
+    count unknown. 2009-era data: park names/boundaries may be stale; use for park-to-trail assignment
+    and trailhead context only.'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: cobi_city_parks
+  name: COBI Landuse - City parks polygons (lu_CityParks2)
+  url: https://gis.bainbridgewa.gov/server/rest/services/Landuse/lu_CityParks2/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://gis.bainbridgewa.gov/server/rest/services/Landuse/lu_CityParks2/FeatureServer/0/query
+  license: No license text on layer. City GIS general disclaimer only.
+  redistribution: unknown
+  attribution: City of Bainbridge Island GIS
+  notes: 'Layer 0 "lu_CityParks", polygon. Fields: name, park_name, situs_addr, acres, zoning. Count query
+    timed out (503).'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: cobi_open_space
+  name: COBI Landuse - COBI_OpenSpace polygons
+  url: https://gis.bainbridgewa.gov/server/rest/services/Landuse/COBI_OpenSpace/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://gis.bainbridgewa.gov/server/rest/services/Landuse/COBI_OpenSpace/FeatureServer/0/query
+  license: No license text on layer.
+  redistribution: unknown
+  attribution: City of Bainbridge Island GIS
+  notes: 'Layer 0 "lu_COBI_OpenSpace", polygon, count=10 (verified). Fields: prop_name, acres, situs_addr,
+    comments. City-owned open space (some publicly accessible).'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: cobi_easements
+  name: COBI Landuse - Easements (polyline)
+  url: https://gis.bainbridgewa.gov/server/rest/services/Landuse/lu_Easements/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://gis.bainbridgewa.gov/server/rest/services/Landuse/lu_Easements/FeatureServer/0/query
+  license: No license text on layer.
+  redistribution: unknown
+  attribution: City of Bainbridge Island GIS
+  geometry_rank: 9
+  notes: Layer 0 "lu_Easements", esriGeometryPolyline; fields LAYER, LENGTH, AdMapKey only (no type/name)
+    - likely utility/access easements; may include non-motorized path easements. Count timed out (503).
+    Low priority; use only to flag easement-over-private-land candidates.
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: cobi_bilt_conserved_2024
+  name: COBI Landuse - Land Trust conserved properties Jan 2024 (polygons)
+  url: https://gis.bainbridgewa.gov/server/rest/services/GIS_DBO_lu_BILT_ConservedJan2024/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://gis.bainbridgewa.gov/server/rest/services/GIS_DBO_lu_BILT_ConservedJan2024/FeatureServer/0/query
+  license: No license text on layer. Underlying data is BILT-owned (BILT AGOL copy is marked "For internal
+    use only.").
+  redistribution: unknown
+  attribution: Bainbridge Island Land Trust / City of Bainbridge Island GIS
+  notes: 'Layer 0, polygon, count=114 (verified). Fields: NAME, ACRES, Year_Acqui, Cons_Type, ACCT_NO.
+    NOTE: includes private conservation-easement parcels not open to public; no public-access field here
+    - join to bilt_conserved_properties_agol Public_Access.'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: cobi_sto_alignments
+  name: Sound to Olympics Trail (STO) alignments - Kitsap PSO Transportation
+  url: https://services3.arcgis.com/q5Jezm9AgzqyE7Q6/arcgis/rest/services/STO_Alignments_12132022/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://services3.arcgis.com/q5Jezm9AgzqyE7Q6/arcgis/rest/services/STO_Alignments_12132022/FeatureServer/2/query
+  license: AGOL item public; licenseInfo empty. No license stated.
+  redistribution: unknown
+  attribution: Peninsula Regional Transportation Planning Organization / Kitsap County (STO planning study)
+  geometry_rank: 6
+  notes: 'Layer id 2 (NOT 0) "STO_Alignments_12132022", esriGeometryPolyline, count=19. Fields: AlignmentNumber,
+    Preferred, Vision2045STO, NewSketch. Planned/conceptual alignments (Dec 2022), not built trail - classify
+    category=planned, not counted. Related items: Bainbridge_STO_Opportunities_and_Constraints (item ce930970298846ef87c964bcbd9914b4),
+    KitsapCountyPW hub page "North Sound to Olympics Trail Planning Study" (item 8d9feb51e6c5479e8ffc2d93e17539a3).
+    Built STO segments on Bainbridge are in OSM/COBI trails.'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: bimprd_trails_agol_2022
+  name: BIMPRD ArcGIS Online - Trails_12062022 (with Avg_Slope)
+  url: https://bimprd.maps.arcgis.com/apps/instant/basic/index.html?appid=2c030bc55079414ea95b9e9373c03fdf
+  kind: arcgis_rest
+  endpoint: https://services7.arcgis.com/OZXcQ6GATAEhthSP/arcgis/rest/services/Trails_12062022/FeatureServer/0/query
+  license: 'Feature service item 998b79a1fc0f40a5b19fa5cfc4214a82 has EMPTY licenseInfo. The separate
+    web app item 2c030bc55079414ea95b9e9373c03fdf ("Trails by Slope") says: "All data is owned and managed
+    by the Bainbridge Island Parks & Recreation District. Map is open to public for viewing only." No
+    redistribution grant either way.'
+  redistribution: unknown
+  attribution: Bainbridge Island Metro Park & Recreation District (BIMPRD)
+  geometry_rank: 3
+  notes: 'Official BIMPRD-owned layer (org bimprd.maps.arcgis.com, owner Redford, access public, caps
+    Query,Sync). Layer 0 polyline, count=268 (verified HTTP 200). GeoJSON download VERIFIED: ...query?where=1%3D1&outFields=*&outSR=4326&f=geojson
+    -> HTTP 200 in 0.9 s, 501,807 B, 268 MultiLineString features, EPSG:4326, no exceededTransferLimit;
+    MANAGING_O BIMPRD 246 / COBI 4 / PRIVATE 1 / null 17; MATERIAL mostly null (Dirt 58, Gravel 57); PARK
+    values incl. Grand Forest East/West/North, Battle Point, Manzanita, Blakely Harbor, Gazzam, Fort Ward,
+    West Port Madison, Meigs, Sakai, Hidden Cove, Pritchard, Hilltop, Ted Olson, Moritani, Camp Yeomalt,
+    Gideon, Howley Cove, Rotary, Nutes Pond, John Nelson (40 rows null PARK). Same schema as cobi_public_trails_all
+    plus Avg_Slope (useful for grade). Item id 998b79a1fc0f40a5b19fa5cfc4214a82. No explicit grant: unknown;
+    treat as not-redistributable until BIMPRD confirms in writing. Service appears editable by anonymous
+    users (capabilities include edit ops on sibling Trail_Markers; verifier saw the same): pipeline must
+    snapshot, diff vs previous snapshot and review changes before use.'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: bimprd_trail_markers
+  name: BIMPRD ArcGIS Online - Trail Markers (rescue locators, points)
+  url: https://bimprd.maps.arcgis.com/apps/instant/basic/index.html?appid=ab03f21c00114924aeb98d86e6059d26
+  kind: arcgis_rest
+  endpoint: https://services7.arcgis.com/OZXcQ6GATAEhthSP/arcgis/rest/services/Trail_Markers/FeatureServer/0/query
+  license: 'Web app licenseInfo: "This map is a production of the Bainbridge Island Metro Parks & Recreation
+    District." No reuse license.'
+  redistribution: unknown
+  attribution: Bainbridge Island Metro Park & Recreation District (BIMPRD)
+  notes: 'Layer 0 point, count=92 (verified). Fields: Waypoint, Rescue_Locator, Park, esrignss_altitude,
+    Collection_Date. Good for trailhead/junction/waypoint cross-check. Note service capabilities include
+    Create,Delete,Update (public edit risk) - treat data as possibly modified; never write to it.'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: bimprd_trails_2015_legacy
+  name: BIMPRD AGOL (city account) - BIMPRD_Trails2015 legacy
+  url: https://www.arcgis.com/home/item.html?id=84cdff3b026a476ba2466c82a0e36710
+  kind: arcgis_rest
+  endpoint: https://services5.arcgis.com/0Q6HuHqqcg7Zo8zH/arcgis/rest/services/BIMPRD_Trails2015/FeatureServer/0/query
+  license: 'Item copyrightText: "Bainbridge Island Metropolitan Parks and Recreation District"; licenseInfo
+    empty.'
+  redistribution: unknown
+  attribution: Bainbridge Island Metropolitan Parks and Recreation District
+  geometry_rank: 5
+  notes: 'Layer 0 "AllPark_Trails2015", polyline, count=153 (verified), 2016 upload. Fields: TRAIL_NAME,
+    OWNER, LINK (park website link per trail), MAP, TYPE. Legacy cross-check only; the LINK and TRAIL_NAME
+    fields help name reconciliation. Companion: JohnNelsonTrail (item ccc9bcec346e4264b6e063af60238324,
+    1 polyline) and BIMPRD_Parks (item 04289a03dc0f469c9b46a3168b9b9124).'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: bilt_conserved_properties_agol
+  name: Bainbridge Island Land Trust - Conserved_Properties (points, with Public_Access)
+  url: https://bi-landtrust.maps.arcgis.com/apps/Minimalist/index.html?appid=f16b11cfba3745cf837d5658b36c4d5a
+  kind: arcgis_rest
+  endpoint: https://services7.arcgis.com/RCL0jgMTE9jxfVpk/arcgis/rest/services/Conserved_Properties/FeatureServer/0/query
+  license: 'Item licenseInfo: "For internal use only." (Item is shared public on AGOL.)'
+  redistribution: 'no'
+  attribution: Bainbridge Island Land Trust
+  notes: 'Layer 0 point, count=28 rows (several null). Fields: Property_Name, Property_Type (Land Trust
+    Owned / Public Conservation Easement / Assisted Acquisition), Public_Access (Public|Limited|Educational|Private),
+    ACRES, Year_Conserved, Page_url. Use only as private reference for which preserves are public: names
+    + public status are facts also on bi-landtrust.org; do not ship the layer. Public preserves per layer:
+    Gazzam Lake Preserve, Peters Tree Farm, Ted Olson addn, Meigs Park, Hilltop, Agate Passage Shoreline
+    Preserve, Grand Forest N/W/E, Wildlife Corridor, Pritchard Park, Blakely Harbor Park, Rockaway Beach
+    Park, Hawley Cove Park, Jablonko Preserve, Cougar Creek Preserve. Private: Fletcher Bay Lots, Fort
+    Ward Lot, Heart of the Forest, Miller-Kirkman, Springbrook Creek.'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: bilt_preserve_pages
+  name: Bainbridge Island Land Trust - protected-space preserve pages
+  url: https://www.bi-landtrust.org/protected-space/
+  kind: reference_only
+  endpoint: https://www.bi-landtrust.org/protected-space/
+  license: 'No data license. Site text copyrighted by BILT. Automated requests get HTTP 403 / Cloudflare
+    challenge; pages readable via browser/web archive. Property map: https://www.bi-landtrust.org/protected-spaces/property-map/
+    (embeds the AGOL Minimalist app above).'
+  redistribution: 'no'
+  attribution: Bainbridge Island Land Trust (bi-landtrust.org)
+  notes: 'Per-preserve pages: https://www.bi-landtrust.org/protected-space/<slug>/ (agate-passage-preserve,
+    quitslund-preserve, cougar-creek-preserve, jablonko-preserve, rockaway-bluff-preserve, north-fork-manzanita-creek-preserve,
+    hawley-cove-park, rockaway-beach-park, springbrook-creek-preserve, miller-kirkman-preserve). Use for
+    names, access rules (e.g. Quitslund: open dawn to dusk, no parking), preserve page link-outs. Land
+    Trust preserves with public trails mostly overlap BIMPRD-managed parks (Grand Forest, Gazzam, Pritchard,
+    Blakely Harbor, Hawley Cove, Rockaway Beach). Trail geometry for BILT-owned preserves (Agate Passage,
+    Quitslund, Cougar Creek, Jablonko) not found in any public GIS: rely on OSM + field walks.'
+  format: html
+- id: bilt_thirty_walks_pdf
+  name: Bainbridge Island Land Trust - Thirty Walks on Bainbridge (3rd ed., preview)
+  url: https://www.bi-landtrust.org/wp-content/uploads/2020/07/WalksSneekPreview_FINAL.pdf
+  kind: pdf_map
+  endpoint: https://www.bi-landtrust.org/wp-content/uploads/2020/07/WalksSneekPreview_FINAL.pdf
+  license: Copyrighted publication (all rights reserved by default). HTTP 200 application/pdf.
+  redistribution: 'no'
+  attribution: Bainbridge Island Land Trust
+  notes: Link-out/cross-check of names and mileage only; do not copy maps.
+  format: pdf
+- id: kitsap_open_data_hub
+  name: Kitsap County Open Data hub (ArcGIS Hub)
+  url: https://kitsap-od-kitcowa.hub.arcgis.com/
+  kind: reference_only
+  endpoint: https://kitsap-od-kitcowa.hub.arcgis.com/api/feed/dcat-us/1.1.json
+  license: 'Kitsap County Terms of Use (https://www.arcgis.com/sharing/rest/content/items/194717e70d694549a9e9deb1a6dc3710/data):
+    "you are hereby permitted by Kitsap County to copy, distribute, and otherwise use the information
+    with one exception. No one is permitted to sell this information except in accordance with a written
+    agreement with Kitsap County." Disclaimer: information provided "AS IS". Per-layer overrides apply:
+    Kitsap County Shoreline and Kitsap County Wetlands carry "Non-commercial use only".'
+  redistribution: 'yes'
+  attribution: Kitsap County GIS (KitCoWA)
+  notes: 'NO-SALE clause and per-layer overrides: check each layer item licenseInfo before use (Shoreline,
+    Wetlands: non-commercial only). DCAT catalog; layer service host is https://services6.arcgis.com/qt3UCV9x5kB4CwRA/arcgis/rest/services/<LayerName>/FeatureServer/0
+    . DCAT catalog HTTP 200. NO trails dataset in the 78 layers. Useful: Park_Locations (points, 131,
+    fields NAME/TYPE; lists BI parks), Tax_Parcel_lot_polygons (140,073, APN/PID), Street_Center_Lines,
+    Incorporated City Limit Outlines, Kitsap_County_Shoreline (polygon, 37 features, non-commercial only).
+    Do NOT use Kitsap shoreline as island land boundary because of non-commercial restriction; use OSM
+    rel 3148366 instead. Parcels useful only for matching trail-to-parcel ownership offline.'
+  format: json
+- id: usgs_epqs
+  name: USGS 3DEP Elevation Point Query Service (EPQS)
+  url: https://apps.nationalmap.gov/epqs/
+  kind: elevation
+  endpoint: https://epqs.nationalmap.gov/v1/json
+  license: 'USGS: "USGS-authored or produced data and information are considered to be in the U.S. Public
+    Domain." (usgs.gov/information-policies-and-instructions/copyrights-and-credits); National Map FAQ:
+    "Data from The National Map is free and in the public domain. There are no restrictions on downloaded
+    data".'
+  redistribution: 'yes'
+  attribution: Data available from U.S. Geological Survey, National Geospatial Program.
+  notes: 'Tested HTTP 200: x=-122.5155,y=47.631 -> value 54.443901062 m, resolution 1 m, AcquisitionDate
+    11/4/2017. Point at (-122.5,47.65) was over water -> value 0. One request per point: fine for spot
+    checks, NOT for bulk profiles (use the DEM tiles). Rate-limit politely.'
+  query: x={lon}&y={lat}&units=Meters&wkid=4326&includeDate=true
+  format: json
+- id: usgs_3dep_imageserver
+  name: USGS 3DEP Elevation ImageServer (identify/exportImage/profile)
+  url: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer
+  kind: elevation
+  endpoint: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/identify
+  license: Public domain (see usgs_epqs).
+  redistribution: 'yes'
+  attribution: Data available from U.S. Geological Survey, National Geospatial Program.
+  notes: 'Tested HTTP 200 on 2026-10-18 (description: "USGS 3D Elevation Program (3DEP) Bare Earth DEM
+    Dynamic service ... Hillshade"). identify with geometry JSON including spatialReference wkid 4326
+    returned Pixel value 54.4439 m (a bare lon,lat string is misread as Web Mercator -> NoData). Supports
+    exportImage for hillshade and slope renderingRule.'
+  query: geometry=%7B%22x%22:{lon},%22y%22:{lat},%22spatialReference%22:%7B%22wkid%22:4326%7D%7D&geometryType=esriGeometryPoint&returnGeometry=false&f=json
+  format: json
+- id: usgs_3dep_dem_island
+  name: USGS 3DEP island DEM (ImageServer exportImage, 3 m, EPSG:32610) - pipeline elevation input
+  url: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer
+  kind: elevation
+  endpoint: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage
+  license: Public domain (see usgs_epqs).
+  redistribution: 'yes'
+  attribution: Data available from U.S. Geological Survey, National Geospatial Program.
+  notes: 'Fetched by `bitrails fetch --only usgs_3dep_dem_island`: tiled exportImage requests (service max
+    8000 px, gateway times out on big ones) mosaicked into one float32 GeoTIFF in UTM 10N covering the
+    island. query = bbox minx,miny,maxx,maxy in EPSG:32610 plus res (m/pixel). Underlying data is the 1 m
+    lidar DEM (usgs_3dep_dem_1m_tiles), resampled by the service.'
+  query: bbox=528500,5268500,539800,5286500&res=3
+  format: tiff
+- id: usgs_3dep_dem_1m_tiles
+  name: USGS 1-meter DEM tiles (TNM Access API) - Bainbridge coverage
+  url: https://www.usgs.gov/3d-elevation-program
+  kind: elevation
+  endpoint: https://tnmaccess.nationalmap.gov/api/v1/products
+  license: Public domain (see usgs_epqs).
+  redistribution: 'yes'
+  attribution: Data available from U.S. Geological Survey, National Geospatial Program.
+  notes: 'HTTP 200, total=7 tiles overlapping island bbox. Island tiles x53y527/x53y528/x53y529 exist
+    from project WA_Olympic_Peninsula_1A_2017 (2020, ~226/242/54 MB, e.g. https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/WA_Olympic_Peninsula_1A_2017/TIFF/USGS_1m_x53y528_WA_Olympic_Peninsula_1A_2017.tif)
+    and WA_Olympic_Peninsula_Lidar_2017_B17 (x53y529, 2024); also WA_KingCounty_2021_B21 tiles x53y527-529
+    (2023, newer but only covers the Bainbridge east/southeast edge). EPSG:26910 (UTM 10N). Lidar flown
+    ~Nov 2017 (EPQS AcquisitionDate 11/4/2017). Point cloud (LAZ) for same area: dataset "Lidar Point
+    Cloud (LPC)", 108 items e.g. https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/USGS_LPC_WA_Olympic_Peninsula_1A_2017/laz/USGS_LPC_WA_Olympic_Peninsula_1A_2017_q47122E4101.laz
+    . Use these for contours + hillshade.'
+  query: datasets=Digital%20Elevation%20Model%20%28DEM%29%201%20meter&bbox=-122.59,47.57,-122.48,47.72&max=20&outputFormat=JSON
+  format: json
+- id: wa_dnr_lidar_portal
+  name: Washington Lidar Portal (WA DNR / Washington Geological Survey)
+  url: https://lidarportal.dnr.wa.gov/
+  kind: elevation
+  endpoint: https://lidarportal.dnr.wa.gov/
+  license: 'https://dnr.wa.gov/node/118 : "All of the materials we produce (publications, digital content,
+    posters, videos) are free for you to use in any way you choose, for both commercial and non-commercial
+    purposes, including modifying or adapting anything, as long as you cite us." Separately the DNR service
+    disclaimer (Lidar_Hillshade licenseInfo) is warranty-only: "provided on an ''as is'', ''as available'',
+    and ''with all faults'' basis".'
+  redistribution: 'yes'
+  attribution: 'Washington Geological Survey, [year] [project name] [lidar data]: originally contracted
+    by Washington Dept. of Natural Resources. Accessed [date] at https://lidarportal.dnr.wa.gov'
+  notes: 'DNR hillshade service: https://gis.dnr.wa.gov/site1/rest/services/Public_Geology/Lidar_Hillshade/MapServer
+    . Portal HTTP 200 (Leaflet UI, no public API found). Hillshade MapServer HTTP 200. Same underlying
+    lidar is republished by USGS 3DEP (public domain); pipeline source is usgs_3dep_dem_1m_tiles, DNR
+    portal is a manual cross-check/download. Must cite the dataset (project name/year) in attribution.
+    City of Bainbridge Island also has its own 2015 lidar (Quantum Spatial, flown 2015-07-03) -> cobi_contours_5ft_2015.'
+  format: html
+- id: cobi_contours_5ft_2015
+  name: City of Bainbridge Island - 5 ft contours derived from 2015 LiDAR (shapefile)
+  url: https://www.bainbridgewa.gov/1414/Data-Downloads
+  kind: elevation
+  endpoint: https://apps.bainbridgewa.gov/media/GIS/Contours_5ft_2015Lidar.zip
+  license: 'City Data Downloads page lists the file with credit "City of Bainbridge Island" and no license
+    or usage terms. Related disclaimer: data "may be dated ... provided without warranty". No explicit
+    redistribution grant.'
+  redistribution: unknown
+  attribution: City of Bainbridge Island
+  notes: 'Shapefile ZIP (Line), HTTP 200, 138,038,230 bytes. Not GeoJSON - convert with ogr2ogr. Optional:
+    derive own contours from USGS DEM instead.'
+  format: shapefile_zip
+- id: cobi_shoreline_shp
+  name: City of Bainbridge Island - Shoreline line shapefile
+  url: https://www.bainbridgewa.gov/1414/Data-Downloads
+  kind: geojson
+  endpoint: https://apps.bainbridgewa.gov/media/GIS/Shoreline.zip
+  license: 'City Data Downloads page: credit "City of Bainbridge Island", no license text.'
+  redistribution: unknown
+  attribution: City of Bainbridge Island
+  notes: 'Shapefile ZIP (Line), HTTP 200, 4,054,812 bytes. Secondary land-boundary option. Also COBI_City_Limit.zip
+    (9.6 KB, credited to Washington State OFM): https://apps.bainbridgewa.gov/media/GIS/COBI_City_Limit.zip'
+  format: shapefile_zip
+- id: wa_state_parks_bainbridge
+  name: Washington State Parks - Fay Bainbridge / Fort Ward (no longer state parks)
+  url: https://www.bainbridgereview.com/?p=15653
+  kind: reference_only
+  endpoint: null
+  license: 'n/a - Bainbridge Review: WA State Parks Commission approved transfer of Fay Bainbridge and
+    Fort Ward state parks to Bainbridge Island Metro Park & Recreation District on Nov 19, 2010; ownership
+    transferred spring 2011. No active WA State Parks site remains on the island.'
+  redistribution: 'no'
+  attribution: n/a
+  notes: Spec 3 lists WA State Parks for Fay Bainbridge and Fort Ward; both are now BIMPRD parks, covered
+    by BIMPRD/COBI layers and PDF maps below. Nearest state park data (Kitsap Memorial) is off-island
+    and irrelevant.
+  format: html
+- id: bimprd_pdf_fold_out_all_trails
+  name: BIMPRD printable map - Fold-Out All Trail Map
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/38/638894530530500000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_battle_point
+  name: BIMPRD printable map - Battle Point Park
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/48/638894530544230000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_blakely_hills
+  name: BIMPRD printable map - Blakely Hills Trail Map
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/64/638894530567570000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_cross_island
+  name: BIMPRD printable map - Cross Island Trail
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/66/638894530570530000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_downtown_corridor
+  name: BIMPRD printable map - Downtown Corridor
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/36/638894530527600000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_eagledale_fort_ward
+  name: BIMPRD printable map - Eagledale to Fort Ward Trail
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/68/638894530573630000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_fay_bainbridge
+  name: BIMPRD printable map - Fay Bainbridge Park
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/46/638894530541500000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_fort_ward
+  name: BIMPRD printable map - Fort Ward Park
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/58/638894530558400000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_gazzam_lake
+  name: BIMPRD printable map - Gazzam Lake Nature Preserve
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/70/638894530576500000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_grand_forest
+  name: BIMPRD printable map - Grand Forest Trails
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/40/638894530533130000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_hawley_cove
+  name: BIMPRD printable map - Hawley Cove Trail
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/42/638894530535930000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_hidden_cove
+  name: BIMPRD printable map - Hidden Cove Trails
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/60/638894530560930000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_john_nelson
+  name: BIMPRD printable map - John Nelson Trail
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/62/638894530564470000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_manzanita
+  name: BIMPRD printable map - Manzanita Trail
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/44/638894530538700000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_moritani
+  name: BIMPRD printable map - Moritani Preserve
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/50/638894530547330000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_pritchard
+  name: BIMPRD printable map - Pritchard Park Trail Map
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/52/638894530550170000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_strawberry_hill_bike_park
+  name: BIMPRD printable map - Strawberry Hill Bike Park Map
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/2766/639089256319700000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_sakai
+  name: BIMPRD printable map - Sakai Park Trail Map
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/54/638894530552670000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_pdf_ted_olson
+  name: BIMPRD printable map - Ted Olson Nature Preserve
+  url: https://www.biparks.org/parks-trails/printable-maps
+  kind: pdf_map
+  endpoint: https://www.biparks.org/home/showpublisheddocument/56/638894530555600000
+  license: Official BIMPRD publication; no license stated. Link-out only, do not bundle.
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  format: pdf
+  notes: GET/HEAD from this environment returned HTTP 403 (bot block); URL from Internet Archive snapshot
+    of printable-maps page (2026-06-19); verify in browser. Timestamp suffix changes on republish; /home/showpublisheddocument/<id>
+    is the stable form.
+- id: bimprd_trail_vision_plan
+  name: BIMPRD Trails Vision Plan (Appendix A, planned trails)
+  url: https://www.biparks.org/parks-trails/trail-vision-plan
+  kind: pdf_map
+  endpoint: https://biparks.org/wp-content/uploads/2026/03/Appendix-A.-Trail-Vision-Plan-.1.pdf
+  license: 'Official BIMPRD document; no license stated. Link-out only (not fetched: biparks.org returns
+    403 to automated clients; URL from web search).'
+  redistribution: 'no'
+  attribution: Bainbridge Island Metro Park & Recreation District
+  notes: Planned/proposed trails; not for completion-tracking unless built.
+  format: pdf
+- id: cobi_map_gallery
+  name: City of Bainbridge Island - GIS map gallery & trail PDFs
+  url: https://www.bainbridgewa.gov/196/GIS-mapping-map-gallery
+  kind: pdf_map
+  endpoint: https://www.bainbridgewa.gov/196/GIS-mapping-map-gallery
+  license: No license on page; City publications. Page HTTP 200; direct DocumentCenter/View/507 and /504
+    returned HTTP 404 to HEAD (links likely need the slug form or have moved) - unverified.
+  redistribution: 'no'
+  attribution: City of Bainbridge Island
+  notes: 'PDFs listed on page: Guide to Waterfront Trails /DocumentCenter/View/507; Non-Motorized Transportation
+    Plan /DocumentCenter/View/504; NMTP-Winslow /DocumentCenter/View/503; City Road Ends map; City-owned
+    Properties map; Guide to Walking, Cycling and Paddling front/back. Non-Motorized Transportation Plan
+    is the source for planned/connector routes and road-shoulder classification. City Road Ends = street-end
+    shoreline access candidates (category beach/street-end access).'
+  format: html
+- id: kitsap_transit_bi_ride_map
+  name: Kitsap Transit - Bainbridge Island ride map 2026 (PDF)
+  url: https://www.kitsaptransit.org/uploads/images/bainbridge-island/2026_bi-ride_map-color-web.pdf
+  kind: pdf_map
+  endpoint: https://www.kitsaptransit.org/uploads/images/bainbridge-island/2026_bi-ride_map-color-web.pdf
+  license: Kitsap Transit publication; no license stated. HTTP 200 application/pdf.
+  redistribution: 'no'
+  attribution: Kitsap Transit
+  notes: Shows park names/access points near transit; reference only.
+  format: pdf
+- id: alltrails
+  name: AllTrails
+  url: https://www.alltrails.com/
+  kind: reference_only
+  endpoint: null
+  license: 'AllTrails Terms: s3.5(a) prohibits "software or automated agents or scripts ... to generate
+    automated searches, requests, or queries to (or to strip, scrape, or mine data from) the Products";
+    s5.1(c) materials "may not be copied or distributed, or republished, or transmitted in any way, without
+    our prior written consent." (https://www.alltrails.com/terms)'
+  redistribution: 'no'
+  attribution: n/a
+  notes: Manual cross-checking of trail names/mileage only. No geometry copying, no scraping.
+  format: html
+- id: trailforks
+  name: Trailforks (Pinkbike)
+  url: https://www.trailforks.com/
+  kind: reference_only
+  endpoint: null
+  license: 'Terms page not retrievable (HTTP 403 from help.trailforks.com). Web search summary (secondary,
+    unverified): API data may be used only with registration and credit, not for paid apps. Treat as not
+    redistributable.'
+  redistribution: 'no'
+  attribution: n/a
+  notes: Manual cross-check of mountain-bike trail names only. Needs primary-source check by verifier
+    before any use.
+  format: html
+- id: wta_bainbridge_hikes
+  name: Washington Trails Association hike guides (Grand Forest, Gazzam Lake, etc.)
+  url: https://www.wta.org/go-hiking/hikes/grand-forest
+  kind: reference_only
+  endpoint: null
+  license: WTA site content copyrighted; no data license found.
+  redistribution: 'no'
+  attribution: n/a
+  notes: 'Mileage/description cross-check only. Examples: /go-hiking/hikes/grand-forest, /go-hiking/hikes/gazzam-lake-close-beach'
+  format: html
+- id: bainbridgeisland_com_maps
+  name: Visit Bainbridge Island (bainbridgeisland.com) maps & place pages
+  url: https://www.bainbridgeisland.com/bainbridge-island-maps/
+  kind: reference_only
+  endpoint: https://www.bainbridgeisland.com/bainbridge-island-maps/
+  license: Tourism-board site; no data license found. PDF e.g. https://www.bainbridgeisland.com/wp-content/uploads/2019/11/Bainbridge-Island-Waterfront-Trail-Map.pdf
+  redistribution: 'no'
+  attribution: n/a
+  notes: Link-out/cross-check only. Includes Waterfront Trail map PDF (2019).
+  format: html
+- id: biparks_foundation_trails_map
+  name: Bainbridge Island Parks & Trails Foundation - Trails on Bainbridge Island map
+  url: https://biparksfoundation.org/trails/
+  kind: reference_only
+  endpoint: https://biparksfoundation.org/trails/
+  license: Foundation publication; no license found.
+  redistribution: 'no'
+  attribution: n/a
+  notes: HTTP 403 to automated clients. Community fold-out map ("Trails On Bainbridge Island", new edition
+    announced on biparksfoundation.org). Name/mileage cross-check; link-out candidate.
+  format: html
+- id: kitsap_park_locations
+  name: Kitsap County Park Locations (points)
+  url: https://kitsap-od-kitcowa.hub.arcgis.com/
+  kind: arcgis_rest
+  endpoint: https://services6.arcgis.com/qt3UCV9x5kB4CwRA/arcgis/rest/services/Park_Locations/FeatureServer/0
+  license: 'Kitsap County Terms of Use (https://www.arcgis.com/sharing/rest/content/items/194717e70d694549a9e9deb1a6dc3710/data):
+    "you are hereby permitted by Kitsap County to copy, distribute, and otherwise use the information
+    with one exception. No one is permitted to sell this information except in accordance with a written
+    agreement with Kitsap County." Item 6ef25e67029a4d2fb4853a963c05b402 (Park Locations) licenseInfo
+    is empty (no per-layer override; accessInformation "Copyright (C) 2004 Kitsap County GIS").'
+  redistribution: 'yes'
+  attribution: Kitsap County GIS
+  notes: 'Verified 2026-10-18: HTTP 200, esriGeometryPoint, count=131, fields NAME/TYPE/AGOL_ID, SR 2285
+    (pass outSR=4326), maxRecordCount 2000. Name search for Bainbridge/Gazzam returned rows. Use for park-name
+    cross-check only. Do not sell the data (no-sale clause).'
+  query: where=1=1&outFields=*&outSR=4326&f=geojson
+  format: geojson

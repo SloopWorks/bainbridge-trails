@@ -1,0 +1,595 @@
+# Reconcile conflict report
+
+Canonical segments: 7680 (309.0 km; redistributable geometry 284.9 km)
+
+| kind | count |
+|---|---|
+| name_mismatch | 35 |
+| length_mismatch | 42 |
+| missing_in_osm | 143 |
+| missing_in_agency | 39 |
+| geometry_offset | 310 |
+
+## name_mismatch
+
+- `seg-000206` `seg-000223` — osm_overpass_trails 'Creosote Place Northeast' vs bimprd_trails_agol_2022 'Pritchard Trail'
+- `seg-002553` `seg-002649` `seg-002650` — osm_overpass_trails 'Blakely Cemetery Trail' vs bimprd_trails_2015_legacy 'Blakley Cemetary Trail'
+- `seg-002553` `seg-002649` `seg-002650` — osm_overpass_trails 'Blakely Cemetery Trail' vs bimprd_trails_agol_2022 'Port Blakely Cemetery Trail'
+- `seg-004645` `seg-004731` — osm_overpass_trails 'Fort Ward Hill Trail' vs bimprd_trails_2015_legacy 'Fort Ward Trail'
+- `seg-004645` `seg-004731` — osm_overpass_trails 'Fort Ward Hill Trail' vs bimprd_trails_agol_2022 'Fort Ward to Blakely Harbor Trail'
+- `seg-004658` `seg-004885` — osm_overpass_trails 'Meigs Park Main Trail' vs bimprd_trails_agol_2022 'Meigs Trail'
+- `seg-004983` — osm_overpass_trails 'Oddfellows Trail' vs bimprd_trails_2015_legacy 'Oddfellow's Trail'
+- `seg-005203` `seg-005764` `seg-005778` `seg-005813` `seg-005879` `seg-005948` `seg-005966` `seg-005968` `seg-006022` — osm_overpass_trails 'Hidden Cove Trail #2' vs bimprd_trails_2015_legacy 'Hidden Cove Trails'
+- `seg-005203` `seg-005764` `seg-005778` `seg-005813` `seg-005879` `seg-005948` `seg-005966` `seg-005968` `seg-006022` — osm_overpass_trails 'Hidden Cove Trail #2' vs bimprd_trails_agol_2022 'Hidden Cove Trail'
+- `seg-005619` — osm_overpass_trails 'Farm Trail' vs bimprd_trails_agol_2022 'Farm Trail South'
+- `seg-005627` — osm_overpass_trails 'Farm Trail' vs bimprd_trails_agol_2022 'Farm Trail North'
+- `seg-005628` `seg-005629` `seg-005641` — osm_overpass_trails 'Farm Trail' vs bimprd_trails_agol_2022 'Farm Trail Grace Church'
+- `seg-005669` — osm_overpass_trails 'Hidden Cove Trail #1' vs bimprd_trails_agol_2022 'Cambridge Crest Trail'
+- `seg-005815` — osm_overpass_trails 'Hidden Cove Trail #4' vs bimprd_trails_2015_legacy 'Hidden Cove Trails'
+- `seg-005815` — osm_overpass_trails 'Hidden Cove Trail #4' vs bimprd_trails_agol_2022 'Hidden Cove Loop Trail'
+- `seg-006151` — osm_overpass_trails 'Jim's Trail' vs bimprd_trails_2015_legacy 'Grand Forest East'
+- `seg-006151` — osm_overpass_trails 'Jim's Trail' vs bimprd_trails_agol_2022 'Grand Forest East Trail'
+- `seg-006213` `seg-006214` `seg-006217` `seg-006235` `seg-006242` `seg-006244` `seg-006290` `seg-006338` `seg-006348` `seg-006422` `seg-006423` `seg-006448` `seg-006460` `seg-006463` `seg-006482` — osm_overpass_trails 'Main Loop Trail' vs bimprd_trails_2015_legacy 'Grand Forest East'
+- `seg-006213` `seg-006214` `seg-006217` `seg-006235` `seg-006242` `seg-006244` `seg-006290` `seg-006338` `seg-006348` `seg-006422` `seg-006423` `seg-006448` `seg-006463` `seg-006482` — osm_overpass_trails 'Main Loop Trail' vs bimprd_trails_agol_2022 'Grand Forest East Trail'
+- `seg-006585` `seg-006587` `seg-006592` `seg-006725` `seg-006729` `seg-006737` `seg-006742` `seg-006745` `seg-006777` `seg-006816` `seg-006817` `seg-006819` — osm_overpass_trails 'Manzanita Park Trail' vs bimprd_trails_agol_2022 'Manzanita Trail'
+- `seg-006869` — osm_overpass_trails 'Peters Trail' vs bimprd_trails_2015_legacy 'Peter's Trail'
+- `seg-006889` `seg-006890` `seg-006901` `seg-006953` — osm_overpass_trails 'Grand Forest North Trail System' vs bimprd_trails_2015_legacy 'Grand Forest North'
+- `seg-006889` `seg-006890` `seg-006901` `seg-006953` — osm_overpass_trails 'Grand Forest North Trail System' vs bimprd_trails_agol_2022 'Grand Forest North Loop Trail'
+- `seg-006897` `seg-006898` `seg-006905` `seg-007044` — osm_overpass_trails 'Trillium Trail' vs bimprd_trails_agol_2022 'Ron Williamson Trillium Trail'
+- `seg-006897` `seg-006898` `seg-007044` — osm_overpass_trails 'Trillium Trail' vs bimprd_trails_2015_legacy 'Grand Forest West'
+- `seg-007016` `seg-007050` — osm_overpass_trails 'Opal Ridge Trail' vs bimprd_trails_agol_2022 'Opal Ridge Link'
+- `seg-007146` `seg-007147` — osm_overpass_trails 'Gazzam Lake Loop Trail' vs bimprd_trails_2015_legacy 'Gazzam Loop Trail'
+- `seg-007179` — osm_overpass_trails 'Gazzam Lake Main Trail' vs bimprd_trails_2015_legacy 'Peter's Trail'
+- `seg-007280` `seg-007288` `seg-007293` `seg-007313` `seg-007330` `seg-007359` — osm_overpass_trails 'Gazzam Lake Main Trail' vs bimprd_trails_2015_legacy 'Gazzam Main Trail'
+- `seg-007315` `seg-007340` `seg-007363` `seg-007394` `seg-007482` `seg-007516` — osm_overpass_trails 'Westwood Shore Trail' vs bimprd_trails_2015_legacy 'Close Trail'
+- `seg-007331` `seg-007390` — osm_overpass_trails 'Russ Knudsen Trail' vs bimprd_trails_agol_2022 'Knudsen Trail'
+- `seg-007376` — osm_overpass_trails 'Veterane Trail' vs bimprd_trails_agol_2022 'Upper Veterane Trail'
+- `seg-007380` `seg-007391` — osm_overpass_trails 'Veterane Trail' vs bimprd_trails_2015_legacy 'Gazzam to Veterane'
+- `seg-007380` `seg-007391` — osm_overpass_trails 'Veterane Trail' vs bimprd_trails_agol_2022 'Lower Veterane Trail'
+- `seg-007425` — osm_overpass_trails 'Forest to Sky Trail' vs bimprd_trails_2015_legacy 'Battle Point'
+
+## length_mismatch
+
+- `seg-000118` `seg-000121` `seg-000123` `seg-000137` `seg-000138` — bimprd_trails_2015_legacy 'Camp Yeomalt Trail': agency 215 m vs matched canonical 186 m (-14%)
+- `seg-000138` — bimprd_trails_agol_2022 'Camp Yeomalt Trail': agency 87 m vs matched canonical 45 m (-48%)
+- `seg-000206` `seg-000219` `seg-000223` `seg-000252` `seg-000287` `seg-000298` `seg-000299` `seg-000309` `seg-000335` `seg-000429` `seg-000432` `seg-000463` `seg-000483` `seg-000511` `seg-000607` `seg-000624` `seg-000643` `seg-000662` — bimprd_trails_agol_2022 'Pritchard Trail': agency 2115 m vs matched canonical 1621 m (-23%)
+- `seg-000315` `seg-000321` `seg-000327` `seg-000390` — bimprd_trails_2015_legacy 'Hawley Cove Trail': agency 408 m vs matched canonical 230 m (-44%)
+- `seg-000390` — bimprd_trails_agol_2022 'Howley Cove Trail': agency 97 m vs matched canonical 28 m (-71%)
+- `seg-000424` `seg-000428` `seg-000551` `seg-000640` — bimprd_trails_2015_legacy 'Bluff Trail': agency 1163 m vs matched canonical 500 m (-57%)
+- `seg-001298` `seg-001439` `seg-001440` `seg-001555` `seg-001556` `seg-001705` `seg-001745` `seg-001759` `seg-001762` `seg-001767` — bimprd_trails_agol_2022 'Blakely Hills Trail': agency 1590 m vs matched canonical 1357 m (-15%)
+- `seg-001351` `seg-001422` `seg-001780` `seg-001781` `seg-001793` `seg-001814` `seg-001823` `seg-001861` `seg-002511` `seg-002514` `seg-002534` `seg-002915` `seg-002916` `seg-003000` — bimprd_trails_agol_2022 'Blakely Trail': agency 1683 m vs matched canonical 1235 m (-27%)
+- `seg-001491` `seg-001542` — bimprd_trails_agol_2022 'Waypoint Woods Trail': agency 340 m vs matched canonical 224 m (-34%)
+- `seg-001644` `seg-001720` `seg-001780` `seg-001793` `seg-001795` `seg-001807` `seg-001814` `seg-001823` `seg-001861` `seg-002210` `seg-002511` `seg-002514` `seg-002534` `seg-002848` `seg-002915` `seg-002916` `seg-003000` `seg-003025` — bimprd_trails_2015_legacy 'Blakely Harbor Trail': agency 1770 m vs matched canonical 1464 m (-17%)
+- `seg-001743` `seg-002535` `seg-002633` `seg-002815` `seg-002909` `seg-002910` — bimprd_trails_2015_legacy 'Ted Olson Nature Preserve': agency 896 m vs matched canonical 715 m (-20%)
+- `seg-001792` — bimprd_trails_agol_2022 'Creek to 305 Trail': agency 116 m vs matched canonical 76 m (-34%)
+- `seg-001832` `seg-001891` — bimprd_trails_agol_2022 'East Bridge to Lookout Trail': agency 123 m vs matched canonical 100 m (-19%)
+- `seg-002815` `seg-002816` `seg-002909` `seg-002910` — bimprd_trails_agol_2022 'Ted Olson Trail': agency 422 m vs matched canonical 482 m (+14%)
+- `seg-002999` `seg-003462` `seg-003484` — bimprd_trails_agol_2022 'Blakely to Eagledale Trail': agency 916 m vs matched canonical 120 m (-87%)
+- `seg-003043` `seg-004516` `seg-004645` `seg-004731` — bimprd_trails_agol_2022 'Fort Ward to Blakely Harbor Trail': agency 2083 m vs matched canonical 1405 m (-33%)
+- `seg-004295` `seg-004332` `seg-004333` `seg-004336` `seg-004427` — bimprd_trails_agol_2022 'Gideon Trail': agency 143 m vs matched canonical 116 m (-19%)
+- `seg-004427` — bimprd_trails_agol_2022 'Gideon Park Trail': agency 47 m vs matched canonical 34 m (-27%)
+- `seg-004861` — bimprd_trails_agol_2022 'Fort Ward Fence Line Trail': agency 194 m vs matched canonical 134 m (-31%)
+- `seg-005156` `seg-005197` `seg-005231` `seg-005274` — bimprd_trails_2015_legacy 'Rotary Park Trails': agency 256 m vs matched canonical 192 m (-25%)
+- `seg-005203` `seg-005751` `seg-005764` `seg-005778` `seg-005813` `seg-005815` `seg-005864` `seg-005879` `seg-005948` `seg-005966` `seg-005968` `seg-006022` `seg-006023` `seg-006024` `seg-006025` `seg-006042` — bimprd_trails_2015_legacy 'Hidden Cove Trails': agency 2931 m vs matched canonical 2534 m (-14%)
+- `seg-005470` `seg-005476` — bimprd_trails_agol_2022 'Wardwell Trail': agency 187 m vs matched canonical 147 m (-21%)
+- `seg-005619` — bimprd_trails_agol_2022 'Farm Trail South': agency 203 m vs matched canonical 260 m (+28%)
+- `seg-005627` — bimprd_trails_agol_2022 'Farm Trail North': agency 225 m vs matched canonical 56 m (-75%)
+- `seg-005815` — bimprd_trails_agol_2022 'Hidden Cove Loop Trail': agency 525 m vs matched canonical 147 m (-72%)
+- `seg-006151` `seg-006168` `seg-006169` `seg-006175` `seg-006213` `seg-006214` `seg-006217` `seg-006235` `seg-006242` `seg-006243` `seg-006244` `seg-006290` `seg-006291` `seg-006296` `seg-006324` `seg-006325` `seg-006338` `seg-006348` `seg-006422` `seg-006423` `seg-006448` `seg-006461` `seg-006463` `seg-006482` `seg-006499` `seg-006520` — bimprd_trails_agol_2022 'Grand Forest East Trail': agency 4184 m vs matched canonical 3649 m (-13%)
+- `seg-006286` `seg-006287` — bimprd_trails_agol_2022 'Penny Place Trail': agency 94 m vs matched canonical 125 m (+33%)
+- `seg-006376` — bimprd_trails_agol_2022 'Grand Foreste East Trail': agency 320 m vs matched canonical 98 m (-69%)
+- `seg-006512` `seg-006585` `seg-006586` `seg-006587` `seg-006592` `seg-006707` `seg-006719` `seg-006720` `seg-006721` `seg-006725` `seg-006728` `seg-006729` `seg-006733` `seg-006734` `seg-006735` `seg-006737` `seg-006740` `seg-006742` `seg-006745` `seg-006757` `seg-006758` `seg-006777` `seg-006816` `seg-006817` `seg-006819` — bimprd_trails_2015_legacy 'Manzanita Park': agency 3158 m vs matched canonical 2771 m (-12%)
+- `seg-006560` `seg-006700` `seg-006796` `seg-006802` — bimprd_trails_agol_2022 'Hilltop Trail': agency 1067 m vs matched canonical 330 m (-69%)
+- `seg-006700` `seg-006756` `seg-006802` `seg-006840` — bimprd_trails_2015_legacy 'Hilltop Trail': agency 462 m vs matched canonical 267 m (-42%)
+- `seg-006794` `seg-006808` `seg-006809` `seg-006810` `seg-006811` `seg-006813` `seg-006834` — bimprd_trails_agol_2022 'Schel Chelb Trail': agency 320 m vs matched canonical 262 m (-18%)
+- `seg-006794` `seg-006808` `seg-006811` — bimprd_trails_2015_legacy 'Schel Chelb Trail': agency 290 m vs matched canonical 126 m (-57%)
+- `seg-006869` `seg-006918` `seg-006951` `seg-006991` `seg-007051` `seg-007066` `seg-007112` `seg-007179` `seg-007191` — bimprd_trails_2015_legacy 'Peter's Trail': agency 1296 m vs matched canonical 1473 m (+14%)
+- `seg-006887` `seg-006897` `seg-006898` `seg-007019` `seg-007044` `seg-007045` `seg-007046` `seg-007054` `seg-007055` `seg-007057` `seg-007058` `seg-007059` `seg-007060` `seg-007062` `seg-007063` `seg-007064` `seg-007065` `seg-007073` `seg-007087` `seg-007106` `seg-007109` `seg-007119` `seg-007123` `seg-007125` `seg-007141` — bimprd_trails_2015_legacy 'Grand Forest West': agency 4645 m vs matched canonical 3793 m (-18%)
+- `seg-007186` `seg-007270` `seg-007280` `seg-007288` `seg-007293` `seg-007313` `seg-007330` `seg-007359` — bimprd_trails_agol_2022 'Gazzam Lake Main Trail': agency 2264 m vs matched canonical 1936 m (-14%)
+- `seg-007187` `seg-007204` `seg-007232` `seg-007259` `seg-007310` `seg-007314` `seg-007327` `seg-007352` `seg-007371` `seg-007373` `seg-007379` `seg-007388` `seg-007415` `seg-007419` — bimprd_trails_agol_2022 'Forest to Sky Trail': agency 1419 m vs matched canonical 1046 m (-26%)
+- `seg-007358` `seg-007380` `seg-007391` — bimprd_trails_2015_legacy 'Gazzam to Veterane': agency 977 m vs matched canonical 392 m (-60%)
+- `seg-007376` — bimprd_trails_agol_2022 'Upper Veterane Trail': agency 1110 m vs matched canonical 36 m (-97%)
+- `seg-007430` — bimprd_trails_agol_2022 'Battle Point Equestrian Trail': agency 243 m vs matched canonical 408 m (+68%)
+- `seg-007436` `seg-007444` `seg-007462` `seg-007492` `seg-007521` `seg-007535` `seg-007601` — bimprd_trails_agol_2022 'Battle Point Equestrial Trail': agency 561 m vs matched canonical 473 m (-16%)
+- `seg-007442` — bimprd_trails_agol_2022 'Battle Point Park Trail': agency 50 m vs matched canonical 42 m (-17%)
+
+## missing_in_osm
+
+- `seg-000137` — bimprd_trails_agol_2022 'Camp Yeomalt Trail' 22 m not in osm_overpass_trails
+- `seg-000259` — bimprd_trails_agol_2022 'Pritchard Trail' 31 m not in osm_overpass_trails
+- `seg-000427` — bimprd_trails_2015_legacy 'Bluff Trail' 52 m not in osm_overpass_trails
+- `seg-000451` — bimprd_trails_2015_legacy 'Bluff Trail' 23 m not in osm_overpass_trails
+- `seg-000457` — bimprd_trails_2015_legacy 'Bluff Trail' 25 m not in osm_overpass_trails
+- `seg-000459` — bimprd_trails_2015_legacy 'Bluff Trail' 70 m not in osm_overpass_trails
+- `seg-000468` — bimprd_trails_2015_legacy 'Bluff Trail' 22 m not in osm_overpass_trails
+- `seg-000481` — bimprd_trails_2015_legacy 'Bluff Trail' 29 m not in osm_overpass_trails
+- `seg-000718` — bimprd_trails_2015_legacy 'Nutes Pond Trails' 30 m not in osm_overpass_trails
+- `seg-001396` — bimprd_trails_agol_2022 'Waypoint Woods Trail' 81 m not in osm_overpass_trails
+- `seg-001495` — bimprd_trails_agol_2022 'Waypoint Woods Trail' 61 m not in osm_overpass_trails
+- `seg-001590` — bimprd_trails_agol_2022 'Waypoint Woods Trail' 31 m not in osm_overpass_trails
+- `seg-001699` — bimprd_trails_agol_2022 'Blakely Hills Trail' 95 m not in osm_overpass_trails
+- `seg-001700` — bimprd_trails_agol_2022 'Blakely Hills Trail' 24 m not in osm_overpass_trails
+- `seg-001720` — bimprd_trails_agol_2022 'Blakely Trail' 25 m not in osm_overpass_trails
+- `seg-001723` — bimprd_trails_agol_2022 'Blakely Hills Trail' 21 m not in osm_overpass_trails
+- `seg-001727` — bimprd_trails_agol_2022 'Blakely Hills Trail' 62 m not in osm_overpass_trails
+- `seg-001776` — cobi_sto_alignments 'unnamed' 475 m not in osm_overpass_trails
+- `seg-001812` — bimprd_trails_2015_legacy 'Blakely Harbor Trail' 42 m not in osm_overpass_trails
+- `seg-001860` — cobi_sto_alignments 'unnamed' 255 m not in osm_overpass_trails
+- `seg-001870` — bimprd_trails_agol_2022 'West Bridge to Creek Trail' 47 m not in osm_overpass_trails
+- `seg-001876` — cobi_sto_alignments 'unnamed' 410 m not in osm_overpass_trails
+- `seg-001933` — cobi_sto_alignments 'unnamed' 49 m not in osm_overpass_trails
+- `seg-002515` — bimprd_trails_agol_2022 'Blakely Trail' 26 m not in osm_overpass_trails
+- `seg-002646` — bimprd_trails_agol_2022 'Blakely to Eagledale Trail' 365 m not in osm_overpass_trails
+- `seg-002848` — bimprd_trails_agol_2022 'unnamed' 74 m not in osm_overpass_trails
+- `seg-002939` — bimprd_trails_2015_legacy 'Ted Olson Nature Preserve' 26 m not in osm_overpass_trails
+- `seg-002943` — bimprd_trails_agol_2022 'Blakely to Eagledale Trail' 69 m not in osm_overpass_trails
+- `seg-003017` — bimprd_trails_agol_2022 'Blakely to Eagledale Trail' 27 m not in osm_overpass_trails
+- `seg-003035` — bimprd_trails_2015_legacy 'Ted Olson Nature Preserve' 23 m not in osm_overpass_trails
+- `seg-003095` — cobi_sto_alignments 'unnamed' 1033 m not in osm_overpass_trails
+- `seg-003147` — bimprd_trails_agol_2022 'Blakely to Eagledale Trail' 82 m not in osm_overpass_trails
+- `seg-003491` — bimprd_trails_agol_2022 'Blakely to Eagledale Trail' 50 m not in osm_overpass_trails
+- `seg-003776` — bimprd_trails_agol_2022 'Fort Ward to Blakely Harbor Trail' 42 m not in osm_overpass_trails
+- `seg-004043` — bimprd_trails_agol_2022 'Fort Ward to Blakely Harbor Trail' 49 m not in osm_overpass_trails
+- `seg-004170` — cobi_sto_alignments 'unnamed' 325 m not in osm_overpass_trails
+- `seg-004197` — bimprd_trails_2015_legacy 'unnamed' 284 m not in osm_overpass_trails
+- `seg-004350` — bimprd_trails_agol_2022 'Fort Ward Trail' 22 m not in osm_overpass_trails
+- `seg-004410` — cobi_sto_alignments 'unnamed' 118 m not in osm_overpass_trails
+- `seg-004429` — cobi_sto_alignments 'unnamed' 102 m not in osm_overpass_trails
+- `seg-004440` — cobi_sto_alignments 'unnamed' 182 m not in osm_overpass_trails
+- `seg-004446` — cobi_sto_alignments 'unnamed' 38 m not in osm_overpass_trails
+- `seg-004457` — cobi_sto_alignments 'unnamed' 46 m not in osm_overpass_trails
+- `seg-004462` — cobi_sto_alignments 'unnamed' 874 m not in osm_overpass_trails
+- `seg-004470` — bimprd_trails_agol_2022 'Fort Ward Trail' 97 m not in osm_overpass_trails
+- `seg-004542` — cobi_sto_alignments 'unnamed' 61 m not in osm_overpass_trails
+- `seg-004543` — bimprd_trails_agol_2022 'Fort Ward to Blakely Harbor Trail' 30 m not in osm_overpass_trails
+- `seg-004570` — bimprd_trails_agol_2022 'Fort Ward to Blakely Harbor Trail' 47 m not in osm_overpass_trails
+- `seg-004607` — cobi_sto_alignments 'unnamed' 146 m not in osm_overpass_trails
+- `seg-004691` — bimprd_trails_agol_2022 'Fort Ward to Blakely Harbor Trail' 33 m not in osm_overpass_trails
+- `seg-004758` — bimprd_trails_agol_2022 'Fort Ward Fence Line Trail' 53 m not in osm_overpass_trails
+- `seg-004858` — bimprd_trails_agol_2022 'unnamed' 221 m not in osm_overpass_trails
+- `seg-004990` — bimprd_trails_agol_2022 'Ridge Trail' 120 m not in osm_overpass_trails
+- `seg-005043` — cobi_sto_alignments 'unnamed' 822 m not in osm_overpass_trails
+- `seg-005047` — cobi_sto_alignments 'unnamed' 1056 m not in osm_overpass_trails
+- `seg-005071` — bimprd_trails_agol_2022 'Hayano Trail' 29 m not in osm_overpass_trails
+- `seg-005101` — bimprd_trails_agol_2022 'Ridge Trail' 136 m not in osm_overpass_trails
+- `seg-005155` — bimprd_trails_2015_legacy 'Fort Ward Trail' 71 m not in osm_overpass_trails
+- `seg-005193` — bimprd_trails_2015_legacy 'unnamed' 48 m not in osm_overpass_trails
+- `seg-005194` — bimprd_trails_2015_legacy 'unnamed' 153 m not in osm_overpass_trails
+- `seg-005242` — bimprd_trails_agol_2022 'Ridge Trail' 193 m not in osm_overpass_trails
+- `seg-005308` — bimprd_trails_2015_legacy 'Rotary Park Trails' 25 m not in osm_overpass_trails
+- `seg-005679` — cobi_sto_alignments 'unnamed' 843 m not in osm_overpass_trails
+- `seg-005680` — cobi_sto_alignments 'unnamed' 948 m not in osm_overpass_trails
+- `seg-005682` — bimprd_trails_2015_legacy 'Hidden Cove Trails' 26 m not in osm_overpass_trails
+- `seg-005810` — bimprd_trails_agol_2022 'unnamed' 26 m not in osm_overpass_trails
+- `seg-005864` — bimprd_trails_agol_2022 'Hidden Cove Loop Trail' 101 m not in osm_overpass_trails
+- `seg-006060` — cobi_sto_alignments 'unnamed' 111 m not in osm_overpass_trails
+- `seg-006061` — cobi_sto_alignments 'unnamed' 1485 m not in osm_overpass_trails
+- `seg-006102` — cobi_sto_alignments 'unnamed' 586 m not in osm_overpass_trails
+- `seg-006103` — cobi_sto_alignments 'unnamed' 955 m not in osm_overpass_trails
+- `seg-006190` — cobi_sto_alignments 'unnamed' 143 m not in osm_overpass_trails
+- `seg-006215` — bimprd_trails_agol_2022 'Grand Forest East Trail' 57 m not in osm_overpass_trails
+- `seg-006230` — bimprd_trails_agol_2022 'Grand Foreste East Trail' 160 m not in osm_overpass_trails
+- `seg-006355` — bimprd_trails_agol_2022 'Grand Forest East Trail' 42 m not in osm_overpass_trails
+- `seg-006360` — bimprd_trails_agol_2022 'Grand Forest East Trail' 22 m not in osm_overpass_trails
+- `seg-006372` — bimprd_trails_2015_legacy 'Grand Forest East' 30 m not in osm_overpass_trails
+- `seg-006389` — bimprd_trails_agol_2022 'Grand Forest East Trail' 37 m not in osm_overpass_trails
+- `seg-006393` — bimprd_trails_agol_2022 'Grand Forest East Trail' 101 m not in osm_overpass_trails
+- `seg-006414` — bimprd_trails_agol_2022 'Hilltop Trail' 119 m not in osm_overpass_trails
+- `seg-006425` — bimprd_trails_2015_legacy 'unnamed' 79 m not in osm_overpass_trails
+- `seg-006467` — bimprd_trails_agol_2022 'Grand Forest East Trail' 90 m not in osm_overpass_trails
+- `seg-006468` — bimprd_trails_agol_2022 'Grand Forest East Trail' 39 m not in osm_overpass_trails
+- `seg-006493` — bimprd_trails_agol_2022 'Grand Forest East Trail' 49 m not in osm_overpass_trails
+- `seg-006525` — bimprd_trails_2015_legacy 'Manzanita Park' 36 m not in osm_overpass_trails
+- `seg-006557` — bimprd_trails_2015_legacy 'Grand Forest East' 22 m not in osm_overpass_trails
+- `seg-006573` — bimprd_trails_2015_legacy 'Manzanita Park' 139 m not in osm_overpass_trails
+- `seg-006574` — cobi_sto_alignments 'unnamed' 535 m not in osm_overpass_trails
+- `seg-006756` — bimprd_trails_agol_2022 'Hilltop Trail' 35 m not in osm_overpass_trails
+- `seg-006822` — cobi_sto_alignments 'unnamed' 1174 m not in osm_overpass_trails
+- `seg-006833` — cobi_sto_alignments 'unnamed' 349 m not in osm_overpass_trails
+- `seg-006856` — bimprd_trails_agol_2022 'Hilltop Trail' 84 m not in osm_overpass_trails
+- `seg-006871` — bimprd_trails_2015_legacy 'Peter's Trail' 203 m not in osm_overpass_trails
+- `seg-006872` — bimprd_trails_2015_legacy 'Grand Forest West' 48 m not in osm_overpass_trails
+- `seg-006875` — bimprd_trails_agol_2022 'Hilltop Trail' 105 m not in osm_overpass_trails
+- `seg-006876` — bimprd_trails_agol_2022 'Hilltop Trail' 77 m not in osm_overpass_trails
+- `seg-006878` — bimprd_trails_agol_2022 'Hilltop Trail' 83 m not in osm_overpass_trails
+- `seg-006918` — bimprd_trails_agol_2022 'Peter's Trail' 32 m not in osm_overpass_trails
+- `seg-006946` — cobi_sto_alignments 'unnamed' 569 m not in osm_overpass_trails
+- `seg-006951` — bimprd_trails_agol_2022 'Peter's Trail' 81 m not in osm_overpass_trails
+- `seg-006959` — bimprd_trails_2015_legacy 'Grand Forest North' 28 m not in osm_overpass_trails
+- `seg-006979` — bimprd_trails_2015_legacy 'Grand Forest North' 42 m not in osm_overpass_trails
+- `seg-006991` — bimprd_trails_agol_2022 'Peter's Trail' 56 m not in osm_overpass_trails
+- `seg-007003` — cobi_sto_alignments 'unnamed' 114 m not in osm_overpass_trails
+- `seg-007024` — cobi_sto_alignments 'unnamed' 53 m not in osm_overpass_trails
+- `seg-007041` — cobi_sto_alignments 'unnamed' 235 m not in osm_overpass_trails
+- `seg-007048` — cobi_sto_alignments 'unnamed' 278 m not in osm_overpass_trails
+- `seg-007051` — bimprd_trails_agol_2022 'Peter's Trail' 74 m not in osm_overpass_trails
+- `seg-007052` — bimprd_trails_agol_2022 'unnamed' 478 m not in osm_overpass_trails
+- `seg-007066` — bimprd_trails_agol_2022 'Peter's Trail' 47 m not in osm_overpass_trails
+- `seg-007097` — cobi_sto_alignments 'unnamed' 556 m not in osm_overpass_trails
+- `seg-007099` — cobi_sto_alignments 'unnamed' 102 m not in osm_overpass_trails
+- `seg-007108` — cobi_sto_alignments 'unnamed' 362 m not in osm_overpass_trails
+- `seg-007109` — bimprd_trails_agol_2022 'Grand Forest West Trail' 38 m not in osm_overpass_trails
+- `seg-007112` — bimprd_trails_agol_2022 'Peter's Trail' 46 m not in osm_overpass_trails
+- `seg-007126` — bimprd_trails_agol_2022 'unnamed' 88 m not in osm_overpass_trails
+- `seg-007191` — bimprd_trails_agol_2022 'Peter's Trail' 27 m not in osm_overpass_trails
+- `seg-007231` — bimprd_trails_2015_legacy 'Gazzam Main Trail' 26 m not in osm_overpass_trails
+- `seg-007234` — bimprd_trails_2015_legacy 'Gazzam Main Trail' 41 m not in osm_overpass_trails
+- `seg-007263` — bimprd_trails_2015_legacy 'Gazzam to Veterane' 187 m not in osm_overpass_trails
+- `seg-007285` — bimprd_trails_agol_2022 'Upper Veterane Trail' 125 m not in osm_overpass_trails
+- `seg-007295` — bimprd_trails_agol_2022 'Gazzam Lake Main Trail' 272 m not in osm_overpass_trails
+- `seg-007316` — bimprd_trails_agol_2022 'Upper Veterane Trail' 72 m not in osm_overpass_trails
+- `seg-007321` — bimprd_trails_agol_2022 'Upper Veterane Trail' 92 m not in osm_overpass_trails
+- `seg-007329` — bimprd_trails_2015_legacy 'Gazzam to Veterane' 138 m not in osm_overpass_trails
+- `seg-007337` — bimprd_trails_agol_2022 'Upper Veterane Trail' 74 m not in osm_overpass_trails
+- `seg-007338` — bimprd_trails_agol_2022 'Springridge Trail' 39 m not in osm_overpass_trails
+- `seg-007339` — bimprd_trails_2015_legacy 'Knudsen Trail' 160 m not in osm_overpass_trails
+- `seg-007346` — bimprd_trails_agol_2022 'Springridge Trail' 29 m not in osm_overpass_trails
+- `seg-007350` — bimprd_trails_agol_2022 'Springridge Trail' 117 m not in osm_overpass_trails
+- `seg-007351` — bimprd_trails_agol_2022 'Upper Veterane Trail' 49 m not in osm_overpass_trails
+- `seg-007358` — bimprd_trails_agol_2022 'Upper Veterane Trail' 65 m not in osm_overpass_trails
+- `seg-007369` — bimprd_trails_agol_2022 'Upper Veterane Trail' 46 m not in osm_overpass_trails
+- `seg-007370` — bimprd_trails_2015_legacy 'Gazzam to Veterane' 86 m not in osm_overpass_trails
+- `seg-007374` — bimprd_trails_2015_legacy 'Knudsen Trail' 53 m not in osm_overpass_trails
+- `seg-007385` — bimprd_trails_2015_legacy 'Knudsen Trail' 175 m not in osm_overpass_trails
+- `seg-007393` — bimprd_trails_agol_2022 'Knudsen Trail' 24 m not in osm_overpass_trails
+- `seg-007412` — bimprd_trails_agol_2022 'Knudsen Trail' 62 m not in osm_overpass_trails
+- `seg-007421` — bimprd_trails_2015_legacy 'Battle Point' 566 m not in osm_overpass_trails
+- `seg-007458` — bimprd_trails_agol_2022 'Knudsen Trail' 39 m not in osm_overpass_trails
+- `seg-007477` — bimprd_trails_agol_2022 'Knudsen Trail' 29 m not in osm_overpass_trails
+- `seg-007622` — bimprd_trails_2015_legacy 'Battle Point' 64 m not in osm_overpass_trails
+- `seg-007623` — bimprd_trails_2015_legacy 'Battle Point' 43 m not in osm_overpass_trails
+
+## missing_in_agency
+
+- `seg-000112` `seg-000117` `seg-000119` `seg-000120` `seg-000122` `seg-000124` `seg-000125` `seg-000128` `seg-000129` `seg-000130` `seg-000131` `seg-000133` `seg-000134` `seg-000135` `seg-000136` `seg-000139` `seg-000142` `seg-000143` — park 'Camp Yeomalt': 18 segs, 307 m with no agency trail match
+- `seg-000190` `seg-000203` `seg-000208` `seg-000209` `seg-000210` `seg-000221` `seg-000222` `seg-000229` `seg-000230` `seg-000231` `seg-000251` `seg-000254` `seg-000275` `seg-000276` `seg-000277` `seg-000303` `seg-000304` `seg-000305` `seg-000319` `seg-000322` `seg-000325` `seg-000326` `seg-000332` `seg-000333` `seg-000334` `seg-000336` `seg-000337` `seg-000357` `seg-000375` `seg-000377` `seg-000383` `seg-000394` `seg-000425` `seg-000430` `seg-000431` `seg-000455` `seg-000461` `seg-000472` `seg-000501` `seg-000606` `seg-000623` `seg-000642` `seg-000661` `seg-000664` `seg-000665` `seg-000689` `seg-000727` `seg-000728` `seg-000736` `seg-000761` `seg-000762` `seg-000764` `seg-000765` — park 'Pritchard Park': 53 segs, 1950 m with no agency trail match
+- `seg-000310` `seg-000329` `seg-000330` `seg-000349` `seg-000353` `seg-000354` `seg-000358` `seg-006311` `seg-006312` `seg-006315` `seg-006316` `seg-006317` `seg-006318` `seg-006319` `seg-006328` `seg-006332` `seg-006333` `seg-006336` `seg-006339` `seg-006344` `seg-006345` `seg-006357` `seg-006382` `seg-006415` `seg-006416` `seg-006441` `seg-006449` `seg-006450` `seg-006519` `seg-006526` `seg-006541` `seg-006542` `seg-006543` `seg-006546` `seg-006547` `seg-006554` `seg-006555` `seg-006582` `seg-006583` `seg-006584` `seg-006593` `seg-006594` `seg-006596` `seg-006597` `seg-006599` `seg-006600` `seg-006602` `seg-006603` `seg-006604` `seg-006605` `seg-006608` `seg-006609` `seg-006611` `seg-006612` `seg-006613` `seg-006615` `seg-006616` `seg-006623` `seg-006624` `seg-006625` `seg-006630` `seg-006631` `seg-006660` `seg-006673` `seg-006675` `seg-006679` `seg-006681` `seg-006682` `seg-006683` `seg-006687` `seg-006688` `seg-006691` `seg-006711` `seg-006712` `seg-006713` `seg-006714` `seg-006716` `seg-006717` `seg-006722` `seg-006730` `seg-006731` `seg-006732` `seg-006736` `seg-006741` `seg-006747` `seg-006748` `seg-006786` `seg-006787` `seg-006803` — park '': 89 segs, 3351 m with no agency trail match
+- `seg-000312` `seg-000313` `seg-000314` `seg-000317` `seg-000318` `seg-000320` `seg-000360` `seg-000367` `seg-000368` `seg-000369` `seg-000370` `seg-000371` `seg-000372` `seg-000373` `seg-000380` `seg-000381` `seg-000382` `seg-000384` `seg-000385` `seg-000392` `seg-000393` — park 'Hawley Cove Park': 21 segs, 161 m with no agency trail match
+- `seg-000352` — park 'Aaron Tot Lot': 1 segs, 55 m with no agency trail match
+- `seg-000453` `seg-000462` `seg-000486` `seg-000487` `seg-000512` `seg-000514` `seg-000515` `seg-000522` `seg-000533` `seg-000556` `seg-000557` `seg-000562` `seg-000568` `seg-000570` `seg-000577` `seg-000578` `seg-000598` `seg-000599` `seg-000611` `seg-000615` `seg-000621` `seg-000625` `seg-000630` `seg-000631` `seg-000638` `seg-000639` `seg-000644` `seg-000649` `seg-000670` — park 'Fay Bainbridge Park': 29 segs, 868 m with no agency trail match
+- `seg-000531` `seg-000627` `seg-000655` `seg-000715` `seg-001029` — park 'Nute's Pond': 5 segs, 170 m with no agency trail match
+- `seg-000836` `seg-000857` `seg-000860` `seg-000861` `seg-000862` `seg-000863` `seg-000864` `seg-000874` `seg-000910` `seg-000912` `seg-000913` `seg-000914` `seg-000915` `seg-000920` `seg-000975` `seg-000980` — park 'Cave Family Heritage Park': 16 segs, 225 m with no agency trail match
+- `seg-001328` `seg-001643` `seg-001684` `seg-001691` `seg-001709` `seg-001711` `seg-001712` `seg-001736` `seg-001779` `seg-001787` `seg-001808` `seg-001815` `seg-001816` `seg-001859` `seg-002204` `seg-002476` `seg-002490` `seg-002510` `seg-002529` `seg-002905` `seg-002914` `seg-002933` `seg-003645` `seg-004551` — park 'Blakely Harbor Park': 24 segs, 516 m with no agency trail match
+- `seg-001364` `seg-001370` `seg-001380` `seg-001458` `seg-001492` `seg-001583` — park 'Waypoint Woods': 6 segs, 225 m with no agency trail match
+- `seg-001518` `seg-001522` `seg-001536` `seg-001537` `seg-001544` `seg-001546` `seg-001551` `seg-001717` — park 'John Nelson Park': 8 segs, 164 m with no agency trail match
+- `seg-001623` — park 'BAINBRIDGE ISLAND CITY OF': 1 segs, 13 m with no agency trail match
+- `seg-001831` `seg-001836` `seg-001838` `seg-001839` `seg-001864` `seg-001885` `seg-002139` `seg-002140` `seg-002255` `seg-002368` `seg-002423` `seg-002424` `seg-002445` `seg-002623` `seg-002625` `seg-002630` `seg-002631` `seg-002705` `seg-002707` `seg-002744` `seg-002745` `seg-002821` `seg-002997` `seg-002998` `seg-003023` `seg-003026` `seg-003027` `seg-003032` `seg-003033` `seg-003042` `seg-003063` `seg-003064` `seg-003088` `seg-003097` `seg-003115` `seg-003116` `seg-003246` `seg-003247` — park 'Sakai Park': 38 segs, 801 m with no agency trail match
+- `seg-002560` `seg-002632` `seg-002913` `seg-003122` — park 'Ted Olson Nature Preserve': 4 segs, 269 m with no agency trail match
+- `seg-002845` — park 'Madison Tot Lot': 1 segs, 67 m with no agency trail match
+- `seg-003478` `seg-003536` `seg-003537` `seg-003538` `seg-003569` `seg-003624` `seg-003651` `seg-003657` `seg-003881` `seg-003898` — park 'Parade Grounds': 10 segs, 559 m with no agency trail match
+- `seg-003487` `seg-003859` `seg-004304` `seg-004351` `seg-004352` `seg-004361` `seg-004406` `seg-004435` — park 'Eagledale Park': 8 segs, 348 m with no agency trail match
+- `seg-004063` `seg-004064` `seg-004107` `seg-004127` `seg-004162` `seg-004222` `seg-004251` `seg-004348` `seg-004349` — park 'Bainbridge Island Aquatic Center': 9 segs, 260 m with no agency trail match
+- `seg-004285` `seg-004385` `seg-004386` `seg-004408` `seg-004409` `seg-004509` `seg-004510` — park 'Red Pine Park': 7 segs, 101 m with no agency trail match
+- `seg-004307` `seg-004308` `seg-004309` `seg-004311` `seg-004368` `seg-004395` `seg-004468` `seg-004524` `seg-004526` `seg-004530` `seg-004561` `seg-004562` `seg-004675` `seg-004687` — park 'Gideon Park': 14 segs, 365 m with no agency trail match
+- `seg-004360` `seg-004536` `seg-004733` `seg-004756` `seg-004797` `seg-004809` `seg-004955` `seg-005063` `seg-005068` `seg-005088` `seg-005091` `seg-005095` `seg-005165` `seg-005174` `seg-005208` `seg-005363` `seg-005377` `seg-005379` `seg-005505` `seg-005711` — park 'Fort Ward Park': 20 segs, 1409 m with no agency trail match
+- `seg-004504` `seg-004514` `seg-004556` `seg-004575` `seg-004600` `seg-004641` `seg-004650` `seg-004653` `seg-004700` `seg-004846` `seg-004847` `seg-004878` `seg-004879` `seg-004884` `seg-005452` — park 'Meigs Park': 15 segs, 363 m with no agency trail match
+- `seg-005159` `seg-005173` — park 'Moritani Preserve': 2 segs, 14 m with no agency trail match
+- `seg-005195` `seg-005228` `seg-005232` `seg-005347` `seg-005348` `seg-005365` `seg-005366` `seg-005367` `seg-005368` `seg-005371` `seg-005374` `seg-005376` `seg-005380` `seg-005393` `seg-005394` `seg-005395` `seg-005396` `seg-005397` `seg-005399` `seg-005401` `seg-005418` `seg-005432` `seg-005433` `seg-005434` `seg-005438` `seg-005440` `seg-005441` `seg-005446` `seg-005451` `seg-005454` `seg-005455` `seg-005458` `seg-005464` `seg-005465` `seg-005467` `seg-005468` `seg-005477` `seg-005479` `seg-005481` `seg-005488` `seg-005490` `seg-005492` `seg-005493` `seg-005494` `seg-005507` `seg-005508` `seg-005510` `seg-005511` `seg-005514` `seg-005516` `seg-005517` `seg-005518` `seg-005521` `seg-005523` `seg-005524` `seg-005525` `seg-005527` `seg-005534` `seg-005535` `seg-005536` `seg-005543` `seg-005545` `seg-005546` `seg-005556` `seg-005557` `seg-005558` `seg-005566` `seg-005567` `seg-005575` — park 'Rotary Park': 69 segs, 1307 m with no agency trail match
+- `seg-005702` `seg-005727` `seg-005821` `seg-005823` `seg-005831` `seg-005832` `seg-005835` `seg-005836` `seg-005852` `seg-005853` `seg-005857` `seg-005858` `seg-005862` `seg-005863` `seg-005868` `seg-005872` `seg-005873` — park 'Bainbridge Island Rec Center': 17 segs, 478 m with no agency trail match
+- `seg-005795` `seg-005796` `seg-005799` — park 'Hidden Cove Park': 3 segs, 49 m with no agency trail match
+- `seg-005964` `seg-005965` `seg-005988` `seg-005991` `seg-005994` `seg-005996` `seg-006004` `seg-006007` `seg-006018` `seg-006019` — park 'West Port Madison Nature Preserve': 10 segs, 253 m with no agency trail match
+- `seg-006143` `seg-006144` `seg-006163` `seg-006164` `seg-006166` `seg-006167` `seg-006171` `seg-006172` `seg-006178` `seg-006179` `seg-006209` — park 'Sands Avenue Ballfields': 11 segs, 485 m with no agency trail match
+- `seg-006158` `seg-006159` `seg-006218` `seg-006337` `seg-006375` `seg-006424` `seg-006483` `seg-006497` `seg-006498` `seg-006500` `seg-006501` `seg-006502` `seg-006503` `seg-006504` `seg-006505` `seg-006506` `seg-006865` `seg-006866` `seg-006895` `seg-006993` `seg-007042` `seg-007043` `seg-007049` `seg-007053` `seg-007061` `seg-007067` `seg-007077` `seg-007094` `seg-007098` `seg-007105` `seg-007122` `seg-007131` `seg-007148` `seg-007154` `seg-007201` `seg-007202` `seg-007347` `seg-007348` `seg-007368` — park 'Grand Forest': 39 segs, 2325 m with no agency trail match
+- `seg-006569` `seg-006591` `seg-006723` `seg-006924` `seg-006989` — park 'Manzanita Park': 5 segs, 259 m with no agency trail match
+- `seg-006692` `seg-006694` `seg-006695` `seg-006704` `seg-006749` — park 'Hilltop': 5 segs, 116 m with no agency trail match
+- `seg-006760` `seg-006762` `seg-006763` `seg-006765` `seg-006766` `seg-006773` `seg-006774` `seg-006780` `seg-006782` `seg-006783` `seg-006784` `seg-006785` `seg-006788` `seg-006800` `seg-006801` — park 'Schel Chelb Park': 15 segs, 205 m with no agency trail match
+- `seg-006994` `seg-007009` `seg-007011` `seg-007013` `seg-007014` — park 'Seabold Hall': 5 segs, 75 m with no agency trail match
+- `seg-007004` `seg-007005` `seg-007023` `seg-007027` `seg-007028` `seg-007029` `seg-007032` `seg-007036` `seg-007037` — park 'Rotary Centennial Park': 9 segs, 198 m with no agency trail match
+- `seg-007142` — park 'Island Center Park': 1 segs, 17 m with no agency trail match
+- `seg-007169` `seg-007180` `seg-007245` `seg-007246` `seg-007273` `seg-007281` `seg-007294` `seg-007300` `seg-007301` `seg-007307` `seg-007311` `seg-007312` `seg-007317` `seg-007319` `seg-007325` `seg-007335` `seg-007349` `seg-007360` `seg-007362` `seg-007384` `seg-007479` `seg-007486` `seg-007513` `seg-007514` `seg-007528` `seg-007531` — park 'Gazzam Lake Preserve': 26 segs, 3352 m with no agency trail match
+- `seg-007228` `seg-007264` `seg-007265` `seg-007275` `seg-007276` `seg-007279` `seg-007282` `seg-007283` — park 'Williams-Olson Park': 8 segs, 168 m with no agency trail match
+- `seg-007417` `seg-007424` `seg-007426` `seg-007437` `seg-007439` `seg-007441` `seg-007443` `seg-007445` `seg-007450` `seg-007454` `seg-007457` `seg-007463` `seg-007464` `seg-007465` `seg-007467` `seg-007469` `seg-007470` `seg-007471` `seg-007473` `seg-007480` `seg-007481` `seg-007484` `seg-007485` `seg-007491` `seg-007499` `seg-007502` `seg-007503` `seg-007505` `seg-007506` `seg-007508` `seg-007512` `seg-007519` `seg-007520` `seg-007522` `seg-007523` `seg-007524` `seg-007525` `seg-007526` `seg-007529` `seg-007532` `seg-007533` `seg-007534` `seg-007536` `seg-007537` `seg-007538` `seg-007541` `seg-007542` `seg-007544` `seg-007545` `seg-007546` `seg-007547` `seg-007551` `seg-007553` `seg-007556` `seg-007559` `seg-007561` `seg-007563` `seg-007565` `seg-007566` `seg-007593` `seg-007595` `seg-007596` `seg-007600` `seg-007604` `seg-007605` `seg-007606` `seg-007608` `seg-007609` `seg-007610` `seg-007612` `seg-007613` `seg-007614` `seg-007618` `seg-007619` `seg-007620` `seg-007621` `seg-007624` `seg-007626` `seg-007628` `seg-007633` `seg-007635` `seg-007636` — park 'Battle Point Park': 82 segs, 2259 m with no agency trail match
+- `seg-007548` `seg-007571` — park 'Fairy Dell Trail Park': 2 segs, 5 m with no agency trail match
+
+## geometry_offset
+
+- `seg-000118` — bimprd_trails_2015_legacy:456 (Camp Yeomalt Trail) Hausdorff 10.4 m
+- `seg-000123` — bimprd_trails_2015_legacy:456 (Camp Yeomalt Trail) Hausdorff 10.4 m
+- `seg-000223` — bimprd_trails_agol_2022:66 (Pritchard Trail) Hausdorff 29.0 m
+- `seg-000309` — bimprd_trails_agol_2022:68 (Pritchard Trail) Hausdorff 11.7 m
+- `seg-000327` — bimprd_trails_2015_legacy:314 (Hawley Cove Trail) Hausdorff 12.1 m
+- `seg-000335` — bimprd_trails_agol_2022:66 (Pritchard Trail) Hausdorff 11.8 m
+- `seg-000418` — bimprd_trails_agol_2022:23 (Bluff Trail) Hausdorff 16.1 m
+- `seg-000424` — bimprd_trails_2015_legacy:400 (Bluff Trail) Hausdorff 11.3 m
+- `seg-000424` — bimprd_trails_agol_2022:23 (Bluff Trail) Hausdorff 10.3 m
+- `seg-000428` — bimprd_trails_2015_legacy:400 (Bluff Trail) Hausdorff 14.3 m
+- `seg-000428` — bimprd_trails_agol_2022:23 (Bluff Trail) Hausdorff 13.1 m
+- `seg-000429` — bimprd_trails_agol_2022:67 (Pritchard Trail) Hausdorff 12.7 m
+- `seg-000463` — bimprd_trails_agol_2022:71 (Pritchard Trail) Hausdorff 11.9 m
+- `seg-000600` — bimprd_trails_2015_legacy:1187 (Taylor Trail) Hausdorff 12.2 m
+- `seg-000600` — bimprd_trails_agol_2022:24 (Taylor Trail) Hausdorff 11.4 m
+- `seg-000607` — bimprd_trails_agol_2022:71 (Pritchard Trail) Hausdorff 10.7 m
+- `seg-000610` — bimprd_trails_2015_legacy:876 (Nutes Pond Trails) Hausdorff 15.9 m
+- `seg-000610` — bimprd_trails_agol_2022:21 (Nutes Trail) Hausdorff 16.9 m
+- `seg-000640` — bimprd_trails_2015_legacy:400 (Bluff Trail) Hausdorff 13.7 m
+- `seg-000640` — bimprd_trails_agol_2022:23 (Bluff Trail) Hausdorff 10.6 m
+- `seg-000716` — bimprd_trails_2015_legacy:872 (Nutes Pond Trails) Hausdorff 10.0 m
+- `seg-000719` — bimprd_trails_2015_legacy:874 (Nutes Pond Trails) Hausdorff 13.2 m
+- `seg-000719` — bimprd_trails_agol_2022:20 (Nutes Trail) Hausdorff 11.5 m
+- `seg-000731` — bimprd_trails_2015_legacy:872 (Nutes Pond Trails) Hausdorff 10.0 m
+- `seg-000731` — bimprd_trails_2015_legacy:876 (Nutes Pond Trails) Hausdorff 11.4 m
+- `seg-000731` — bimprd_trails_agol_2022:20 (Nutes Trail) Hausdorff 11.6 m
+- `seg-000890` — bimprd_trails_agol_2022:108 (Bristle Ridge Trail) Hausdorff 18.5 m
+- `seg-001142` — bimprd_trails_agol_2022:81 (Bolero Trail) Hausdorff 12.1 m
+- `seg-001542` — bimprd_trails_agol_2022:35 (Waypoint Woods Trail) Hausdorff 14.7 m
+- `seg-001555` — bimprd_trails_agol_2022:58 (Blakely Hills Trail) Hausdorff 11.9 m
+- `seg-001556` — bimprd_trails_agol_2022:59 (Blakely Hills Trail) Hausdorff 13.7 m
+- `seg-001601` — bimprd_trails_agol_2022:31 (John Nelson Trail) Hausdorff 16.7 m
+- `seg-001705` — bimprd_trails_agol_2022:53 (Blakely Hills Trail) Hausdorff 14.7 m
+- `seg-001743` — bimprd_trails_2015_legacy:690 (Ted Olson Nature Preserve) Hausdorff 10.5 m
+- `seg-001743` — bimprd_trails_2015_legacy:698 (Ted Olson Nature Preserve) Hausdorff 10.1 m
+- `seg-001759` — bimprd_trails_agol_2022:55 (Blakely Hills Trail) Hausdorff 16.4 m
+- `seg-001762` — bimprd_trails_agol_2022:57 (Blakely Hills Trail) Hausdorff 15.2 m
+- `seg-001780` — bimprd_trails_2015_legacy:173 (Blakely Harbor Trail) Hausdorff 10.2 m
+- `seg-001780` — bimprd_trails_2015_legacy:416 (Blakely Harbor Trail) Hausdorff 16.8 m
+- `seg-001780` — bimprd_trails_agol_2022:299 (Blakely Trail) Hausdorff 15.5 m
+- `seg-001780` — bimprd_trails_agol_2022:392 (Blakely Trail) Hausdorff 13.3 m
+- `seg-001781` — bimprd_trails_agol_2022:389 (Blakely Trail) Hausdorff 10.4 m
+- `seg-001781` — bimprd_trails_agol_2022:391 (Blakely Trail) Hausdorff 10.4 m
+- `seg-001792` — bimprd_trails_agol_2022:43 (Creek to 305 Trail) Hausdorff 11.0 m
+- `seg-001793` — bimprd_trails_2015_legacy:122 (Blakely Harbor Trail) Hausdorff 10.4 m
+- `seg-001795` — bimprd_trails_2015_legacy:416 (Blakely Harbor Trail) Hausdorff 11.1 m
+- `seg-001795` — bimprd_trails_2015_legacy:446 (Blakely Harbor Trail) Hausdorff 11.6 m
+- `seg-001807` — bimprd_trails_2015_legacy:175 (Blakely Harbor Trail) Hausdorff 11.1 m
+- `seg-001861` — bimprd_trails_2015_legacy:133 (Blakely Harbor Trail) Hausdorff 10.6 m
+- `seg-001861` — bimprd_trails_2015_legacy:147 (Blakely Harbor Trail) Hausdorff 10.2 m
+- `seg-001861` — bimprd_trails_2015_legacy:267 (Blakely Harbor Trail) Hausdorff 10.6 m
+- `seg-001861` — bimprd_trails_2015_legacy:281 (Blakely Harbor Trail) Hausdorff 10.2 m
+- `seg-001861` — bimprd_trails_agol_2022:386 (Blakely Trail) Hausdorff 17.2 m
+- `seg-001861` — bimprd_trails_agol_2022:388 (Blakely Trail) Hausdorff 13.5 m
+- `seg-001871` — cobi_sto_alignments:27 (unnamed) Hausdorff 13.9 m
+- `seg-002141` — bimprd_trails_agol_2022:46 (Sakai Bridge to Small Bridge Trail) Hausdorff 10.4 m
+- `seg-002210` — bimprd_trails_2015_legacy:427 (Blakely Harbor Trail) Hausdorff 11.0 m
+- `seg-002210` — bimprd_trails_2015_legacy:87 (Blakely Harbor Trail) Hausdorff 11.0 m
+- `seg-002290` — bimprd_trails_agol_2022:46 (Sakai Bridge to Small Bridge Trail) Hausdorff 10.3 m
+- `seg-002343` — bimprd_trails_agol_2022:48 (North Loop to Boardwalk Trail) Hausdorff 11.3 m
+- `seg-002514` — bimprd_trails_agol_2022:379 (Blakely Trail) Hausdorff 14.9 m
+- `seg-002535` — bimprd_trails_agol_2022:29 (Winthers Trail) Hausdorff 10.8 m
+- `seg-002636` — bimprd_trails_agol_2022:41 (South Loop Trail) Hausdorff 16.0 m
+- `seg-002650` — bimprd_trails_2015_legacy:123 (Blakley Cemetary Trail) Hausdorff 16.1 m
+- `seg-002650` — bimprd_trails_2015_legacy:366 (Blakley Cemetary Trail) Hausdorff 10.5 m
+- `seg-002650` — bimprd_trails_2015_legacy:50 (Blakley Cemetary Trail) Hausdorff 10.5 m
+- `seg-002815` — bimprd_trails_2015_legacy:824 (Ted Olson Nature Preserve) Hausdorff 10.3 m
+- `seg-002816` — bimprd_trails_agol_2022:30 (Ted Olson Trail) Hausdorff 12.3 m
+- `seg-003000` — bimprd_trails_agol_2022:379 (Blakely Trail) Hausdorff 14.9 m
+- `seg-003043` — bimprd_trails_2015_legacy:474 (Fort Ward Trail) Hausdorff 21.9 m
+- `seg-003043` — bimprd_trails_agol_2022:164 (Fort Ward to Blakely Harbor Trail) Hausdorff 16.4 m
+- `seg-004081` — bimprd_trails_agol_2022:37 (Fort Ward Trail) Hausdorff 21.1 m
+- `seg-004295` — bimprd_trails_2015_legacy:634 (Gideon Park Trail) Hausdorff 10.6 m
+- `seg-004295` — bimprd_trails_2015_legacy:730 (Gideon Park Trail) Hausdorff 10.6 m
+- `seg-004295` — bimprd_trails_agol_2022:314 (Gideon Trail) Hausdorff 10.8 m
+- `seg-004295` — bimprd_trails_agol_2022:330 (Gideon Trail) Hausdorff 10.8 m
+- `seg-004332` — bimprd_trails_2015_legacy:632 (Gideon Park Trail) Hausdorff 10.4 m
+- `seg-004332` — bimprd_trails_2015_legacy:728 (Gideon Park Trail) Hausdorff 10.4 m
+- `seg-004332` — bimprd_trails_agol_2022:311 (Gideon Trail) Hausdorff 11.0 m
+- `seg-004332` — bimprd_trails_agol_2022:327 (Gideon Trail) Hausdorff 11.0 m
+- `seg-004336` — bimprd_trails_2015_legacy:632 (Gideon Park Trail) Hausdorff 10.4 m
+- `seg-004336` — bimprd_trails_2015_legacy:728 (Gideon Park Trail) Hausdorff 10.4 m
+- `seg-004336` — bimprd_trails_agol_2022:311 (Gideon Trail) Hausdorff 11.0 m
+- `seg-004336` — bimprd_trails_agol_2022:314 (Gideon Trail) Hausdorff 10.7 m
+- `seg-004336` — bimprd_trails_agol_2022:327 (Gideon Trail) Hausdorff 11.0 m
+- `seg-004336` — bimprd_trails_agol_2022:330 (Gideon Trail) Hausdorff 10.7 m
+- `seg-004535` — cobi_sto_alignments:13 (unnamed) Hausdorff 11.1 m
+- `seg-004645` — bimprd_trails_2015_legacy:474 (Fort Ward Trail) Hausdorff 11.1 m
+- `seg-004731` — bimprd_trails_agol_2022:366 (Fort Ward to Blakely Harbor Trail) Hausdorff 16.7 m
+- `seg-004816` — bimprd_trails_agol_2022:78 (Fort Ward Trail) Hausdorff 27.1 m
+- `seg-004880` — bimprd_trails_agol_2022:11 (Lower Fort Ward Trail) Hausdorff 13.2 m
+- `seg-004956` — bimprd_trails_agol_2022:76 (Fort Ward Trail) Hausdorff 11.5 m
+- `seg-004982` — bimprd_trails_agol_2022:25 (Tani Creek Trail) Hausdorff 10.7 m
+- `seg-005156` — bimprd_trails_2015_legacy:1181 (Rotary Park Trails) Hausdorff 14.8 m
+- `seg-005156` — bimprd_trails_agol_2022:340 (Rotary Trail) Hausdorff 13.0 m
+- `seg-005156` — bimprd_trails_agol_2022:343 (Rotary Trail) Hausdorff 13.0 m
+- `seg-005197` — bimprd_trails_2015_legacy:1179 (Rotary Park Trails) Hausdorff 19.0 m
+- `seg-005197` — bimprd_trails_agol_2022:341 (Rotary Trail) Hausdorff 17.9 m
+- `seg-005203` — bimprd_trails_2015_legacy:557 (Hidden Cove Trails) Hausdorff 25.0 m
+- `seg-005203` — bimprd_trails_agol_2022:138 (Hidden Cove Trail) Hausdorff 24.0 m
+- `seg-005231` — bimprd_trails_agol_2022:340 (Rotary Trail) Hausdorff 13.0 m
+- `seg-005231` — bimprd_trails_agol_2022:343 (Rotary Trail) Hausdorff 13.0 m
+- `seg-005274` — bimprd_trails_2015_legacy:1182 (Rotary Park Trails) Hausdorff 14.8 m
+- `seg-005274` — bimprd_trails_agol_2022:344 (Rotary Trail) Hausdorff 13.0 m
+- `seg-005406` — bimprd_trails_agol_2022:131 (unnamed) Hausdorff 14.0 m
+- `seg-005476` — bimprd_trails_agol_2022:107 (Wardwell Trail) Hausdorff 11.1 m
+- `seg-005531` — bimprd_trails_agol_2022:52 (Old Mill Trail) Hausdorff 15.7 m
+- `seg-005619` — bimprd_trails_agol_2022:74 (Farm Trail South) Hausdorff 14.9 m
+- `seg-005669` — bimprd_trails_agol_2022:137 (Cambridge Crest Trail) Hausdorff 10.8 m
+- `seg-005966` — bimprd_trails_agol_2022:179 (Hidden Cove Trail) Hausdorff 13.4 m
+- `seg-005968` — bimprd_trails_2015_legacy:561 (Hidden Cove Trails) Hausdorff 19.3 m
+- `seg-005968` — bimprd_trails_agol_2022:190 (Hidden Cove Trail) Hausdorff 10.2 m
+- `seg-005970` — bimprd_trails_agol_2022:174 (West Port Madison Trail) Hausdorff 11.5 m
+- `seg-005970` — bimprd_trails_agol_2022:198 (West Port Madison Trail) Hausdorff 11.5 m
+- `seg-005971` — bimprd_trails_2015_legacy:1194 (West Port Madison Nature Preserve) Hausdorff 12.5 m
+- `seg-005971` — bimprd_trails_agol_2022:175 (West Port Madison Trail) Hausdorff 11.5 m
+- `seg-005985` — bimprd_trails_2015_legacy:1194 (West Port Madison Nature Preserve) Hausdorff 12.5 m
+- `seg-005985` — bimprd_trails_agol_2022:256 (West Port Madison Trail) Hausdorff 11.2 m
+- `seg-005986` — bimprd_trails_2015_legacy:1193 (West Port Madison Nature Preserve) Hausdorff 10.3 m
+- `seg-005987` — bimprd_trails_agol_2022:132 (West Port Madison Trail) Hausdorff 10.4 m
+- `seg-006003` — bimprd_trails_2015_legacy:1194 (West Port Madison Nature Preserve) Hausdorff 14.6 m
+- `seg-006022` — bimprd_trails_2015_legacy:561 (Hidden Cove Trails) Hausdorff 10.2 m
+- `seg-006023` — bimprd_trails_2015_legacy:629 (Hidden Cove Trails) Hausdorff 11.2 m
+- `seg-006023` — bimprd_trails_agol_2022:241 (Hidden Cove Trail) Hausdorff 12.6 m
+- `seg-006024` — bimprd_trails_agol_2022:197 (Hidden Cove Trails) Hausdorff 13.8 m
+- `seg-006025` — bimprd_trails_agol_2022:201 (Hidden Cove Trail) Hausdorff 13.8 m
+- `seg-006151` — bimprd_trails_2015_legacy:541 (Grand Forest East) Hausdorff 11.8 m
+- `seg-006151` — bimprd_trails_agol_2022:369 (Grand Forest East Trail) Hausdorff 16.1 m
+- `seg-006153` — bimprd_trails_2015_legacy:473 (McRedmond Trail) Hausdorff 11.3 m
+- `seg-006168` — bimprd_trails_2015_legacy:500 (Grand Forest East) Hausdorff 14.8 m
+- `seg-006175` — bimprd_trails_2015_legacy:501 (Grand Forest East) Hausdorff 10.2 m
+- `seg-006215` — bimprd_trails_2015_legacy:477 (Grand Forest East) Hausdorff 11.9 m
+- `seg-006215` — bimprd_trails_2015_legacy:484 (Grand Forest East) Hausdorff 12.2 m
+- `seg-006217` — bimprd_trails_2015_legacy:482 (Grand Forest East) Hausdorff 17.0 m
+- `seg-006217` — bimprd_trails_2015_legacy:483 (Grand Forest East) Hausdorff 11.0 m
+- `seg-006217` — bimprd_trails_agol_2022:292 (Grand Forest East Trail) Hausdorff 14.2 m
+- `seg-006244` — bimprd_trails_2015_legacy:487 (Grand Forest East) Hausdorff 27.4 m
+- `seg-006244` — bimprd_trails_agol_2022:192 (Grand Forest East Trail) Hausdorff 26.1 m
+- `seg-006287` — bimprd_trails_2015_legacy:177 (unnamed) Hausdorff 24.7 m
+- `seg-006287` — bimprd_trails_2015_legacy:502 (unnamed) Hausdorff 27.2 m
+- `seg-006287` — bimprd_trails_agol_2022:362 (Penny Place Trail) Hausdorff 28.1 m
+- `seg-006296` — bimprd_trails_2015_legacy:508 (Grand Forest East) Hausdorff 23.2 m
+- `seg-006296` — bimprd_trails_agol_2022:213 (Grand Forest East Trail) Hausdorff 21.2 m
+- `seg-006325` — bimprd_trails_agol_2022:185 (Grand Forest East Trail) Hausdorff 15.1 m
+- `seg-006338` — bimprd_trails_2015_legacy:488 (Grand Forest East) Hausdorff 16.9 m
+- `seg-006338` — bimprd_trails_agol_2022:265 (Grand Forest East Trail) Hausdorff 15.7 m
+- `seg-006389` — bimprd_trails_2015_legacy:513 (Grand Forest East) Hausdorff 12.7 m
+- `seg-006422` — bimprd_trails_2015_legacy:497 (Grand Forest East) Hausdorff 10.8 m
+- `seg-006422` — bimprd_trails_agol_2022:293 (Grand Forest East Trail) Hausdorff 10.2 m
+- `seg-006448` — bimprd_trails_agol_2022:293 (Grand Forest East Trail) Hausdorff 11.3 m
+- `seg-006460` — bimprd_trails_2015_legacy:498 (Grand Forest East) Hausdorff 13.8 m
+- `seg-006499` — bimprd_trails_2015_legacy:480 (Grand Forest East) Hausdorff 15.5 m
+- `seg-006499` — bimprd_trails_agol_2022:250 (Grand Forest East Trail) Hausdorff 11.5 m
+- `seg-006560` — bimprd_trails_agol_2022:308 (Hilltop Trail) Hausdorff 10.7 m
+- `seg-006567` — bimprd_trails_agol_2022:125 (unnamed) Hausdorff 19.8 m
+- `seg-006585` — bimprd_trails_2015_legacy:758 (Manzanita Park) Hausdorff 11.9 m
+- `seg-006585` — bimprd_trails_agol_2022:178 (Manzanita Trail) Hausdorff 11.5 m
+- `seg-006707` — bimprd_trails_agol_2022:279 (Manzanita Trail) Hausdorff 11.0 m
+- `seg-006719` — bimprd_trails_agol_2022:217 (Manzanita Trail) Hausdorff 12.5 m
+- `seg-006721` — bimprd_trails_2015_legacy:196 (Manzanita Park) Hausdorff 10.1 m
+- `seg-006721` — bimprd_trails_2015_legacy:716 (Manzanita Park) Hausdorff 10.1 m
+- `seg-006721` — bimprd_trails_2015_legacy:814 (Manzanita Park) Hausdorff 10.1 m
+- `seg-006724` — bimprd_trails_agol_2022:275 (Manzanita Trail) Hausdorff 11.2 m
+- `seg-006725` — bimprd_trails_2015_legacy:759 (Manzanita Park) Hausdorff 12.7 m
+- `seg-006725` — bimprd_trails_2015_legacy:772 (Manzanita Park) Hausdorff 13.3 m
+- `seg-006725` — bimprd_trails_2015_legacy:773 (Manzanita Park) Hausdorff 13.6 m
+- `seg-006725` — bimprd_trails_agol_2022:133 (Manzanita Trail) Hausdorff 11.4 m
+- `seg-006725` — bimprd_trails_agol_2022:176 (Manzanita Trail) Hausdorff 13.4 m
+- `seg-006725` — bimprd_trails_agol_2022:223 (Manzanita Trail) Hausdorff 13.4 m
+- `seg-006725` — bimprd_trails_agol_2022:281 (Manzanita Trail) Hausdorff 13.4 m
+- `seg-006729` — bimprd_trails_2015_legacy:772 (Manzanita Park) Hausdorff 26.7 m
+- `seg-006729` — bimprd_trails_agol_2022:176 (Manzanita Trail) Hausdorff 25.9 m
+- `seg-006733` — bimprd_trails_2015_legacy:239 (Manzanita Park) Hausdorff 11.4 m
+- `seg-006733` — bimprd_trails_2015_legacy:788 (Manzanita Park) Hausdorff 11.4 m
+- `seg-006733` — bimprd_trails_2015_legacy:860 (Manzanita Park) Hausdorff 11.4 m
+- `seg-006734` — bimprd_trails_2015_legacy:239 (Manzanita Park) Hausdorff 11.6 m
+- `seg-006734` — bimprd_trails_2015_legacy:788 (Manzanita Park) Hausdorff 11.6 m
+- `seg-006734` — bimprd_trails_2015_legacy:860 (Manzanita Park) Hausdorff 11.6 m
+- `seg-006737` — bimprd_trails_agol_2022:275 (Manzanita Trail) Hausdorff 13.4 m
+- `seg-006742` — bimprd_trails_2015_legacy:759 (Manzanita Park) Hausdorff 10.1 m
+- `seg-006742` — bimprd_trails_agol_2022:133 (Manzanita Trail) Hausdorff 11.3 m
+- `seg-006742` — bimprd_trails_agol_2022:275 (Manzanita Trail) Hausdorff 13.4 m
+- `seg-006745` — bimprd_trails_2015_legacy:248 (Manzanita Park) Hausdorff 12.2 m
+- `seg-006745` — bimprd_trails_2015_legacy:797 (Manzanita Park) Hausdorff 12.2 m
+- `seg-006745` — bimprd_trails_2015_legacy:869 (Manzanita Park) Hausdorff 12.2 m
+- `seg-006757` — bimprd_trails_agol_2022:199 (Manzanita Trail) Hausdorff 16.5 m
+- `seg-006758` — bimprd_trails_2015_legacy:196 (Manzanita Park) Hausdorff 10.1 m
+- `seg-006758` — bimprd_trails_2015_legacy:716 (Manzanita Park) Hausdorff 10.1 m
+- `seg-006758` — bimprd_trails_2015_legacy:814 (Manzanita Park) Hausdorff 10.1 m
+- `seg-006777` — bimprd_trails_2015_legacy:248 (Manzanita Park) Hausdorff 12.3 m
+- `seg-006777` — bimprd_trails_2015_legacy:797 (Manzanita Park) Hausdorff 12.3 m
+- `seg-006777` — bimprd_trails_2015_legacy:869 (Manzanita Park) Hausdorff 12.3 m
+- `seg-006781` — bimprd_trails_agol_2022:50 (Kojima Trail) Hausdorff 22.6 m
+- `seg-006802` — bimprd_trails_2015_legacy:740 (Hilltop Trail) Hausdorff 12.8 m
+- `seg-006802` — bimprd_trails_agol_2022:306 (Hilltop Trail) Hausdorff 12.2 m
+- `seg-006869` — bimprd_trails_2015_legacy:1000 (Peter's Trail) Hausdorff 12.0 m
+- `seg-006869` — bimprd_trails_2015_legacy:1038 (Peter's Trail) Hausdorff 10.1 m
+- `seg-006869` — bimprd_trails_2015_legacy:1041 (Peter's Trail) Hausdorff 10.4 m
+- `seg-006869` — bimprd_trails_2015_legacy:1069 (Peter's Trail) Hausdorff 10.4 m
+- `seg-006869` — bimprd_trails_2015_legacy:1087 (Peter's Trail) Hausdorff 11.0 m
+- `seg-006869` — bimprd_trails_2015_legacy:1088 (Peter's Trail) Hausdorff 11.2 m
+- `seg-006869` — bimprd_trails_2015_legacy:1104 (Peter's Trail) Hausdorff 11.5 m
+- `seg-006869` — bimprd_trails_2015_legacy:1150 (Peter's Trail) Hausdorff 12.0 m
+- `seg-006869` — bimprd_trails_2015_legacy:888 (Peter's Trail) Hausdorff 10.1 m
+- `seg-006869` — bimprd_trails_2015_legacy:891 (Peter's Trail) Hausdorff 10.4 m
+- `seg-006869` — bimprd_trails_2015_legacy:919 (Peter's Trail) Hausdorff 10.4 m
+- `seg-006869` — bimprd_trails_2015_legacy:937 (Peter's Trail) Hausdorff 11.0 m
+- `seg-006869` — bimprd_trails_2015_legacy:938 (Peter's Trail) Hausdorff 11.2 m
+- `seg-006869` — bimprd_trails_2015_legacy:954 (Peter's Trail) Hausdorff 11.5 m
+- `seg-006870` — bimprd_trails_agol_2022:50 (Kojima Trail) Hausdorff 10.5 m
+- `seg-006889` — bimprd_trails_2015_legacy:565 (Grand Forest North) Hausdorff 17.6 m
+- `seg-006889` — bimprd_trails_agol_2022:359 (Grand Forest North Loop Trail) Hausdorff 16.5 m
+- `seg-006890` — bimprd_trails_2015_legacy:570 (Grand Forest North) Hausdorff 12.0 m
+- `seg-006897` — bimprd_trails_2015_legacy:539 (Grand Forest West) Hausdorff 13.4 m
+- `seg-006897` — bimprd_trails_agol_2022:208 (Ron Williamson Trillium Trail) Hausdorff 11.8 m
+- `seg-006901` — bimprd_trails_2015_legacy:565 (Grand Forest North) Hausdorff 17.6 m
+- `seg-006901` — bimprd_trails_agol_2022:359 (Grand Forest North Loop Trail) Hausdorff 16.5 m
+- `seg-006905` — bimprd_trails_agol_2022:207 (Ron Williamson Trillium Trail) Hausdorff 14.5 m
+- `seg-006951` — bimprd_trails_2015_legacy:1126 (Peter's Trail) Hausdorff 10.6 m
+- `seg-006951` — bimprd_trails_2015_legacy:976 (Peter's Trail) Hausdorff 10.6 m
+- `seg-006952` — bimprd_trails_2015_legacy:544 (Grand Forest North) Hausdorff 11.7 m
+- `seg-006952` — bimprd_trails_agol_2022:356 (Grand Forest North Loop Trail) Hausdorff 10.4 m
+- `seg-006953` — bimprd_trails_2015_legacy:545 (Grand Forest North) Hausdorff 15.0 m
+- `seg-006953` — bimprd_trails_agol_2022:357 (Grand Forest North Loop Trail) Hausdorff 13.8 m
+- `seg-006991` — bimprd_trails_2015_legacy:1113 (Peter's Trail) Hausdorff 11.7 m
+- `seg-006991` — bimprd_trails_2015_legacy:963 (Peter's Trail) Hausdorff 11.7 m
+- `seg-007019` — bimprd_trails_2015_legacy:511 (Grand Forest West) Hausdorff 20.5 m
+- `seg-007019` — bimprd_trails_agol_2022:276 (Mandus Olson Link Trail) Hausdorff 21.1 m
+- `seg-007044` — bimprd_trails_2015_legacy:520 (Grand Forest West) Hausdorff 10.1 m
+- `seg-007045` — bimprd_trails_2015_legacy:510 (Grand Forest West) Hausdorff 12.2 m
+- `seg-007045` — bimprd_trails_2015_legacy:520 (Grand Forest West) Hausdorff 12.2 m
+- `seg-007045` — bimprd_trails_agol_2022:291 (Grand Forest West) Hausdorff 14.8 m
+- `seg-007050` — bimprd_trails_2015_legacy:495 (Opal Ridge Trail) Hausdorff 10.9 m
+- `seg-007054` — bimprd_trails_2015_legacy:517 (Grand Forest West) Hausdorff 12.4 m
+- `seg-007054` — bimprd_trails_2015_legacy:535 (Grand Forest West) Hausdorff 15.3 m
+- `seg-007054` — bimprd_trails_agol_2022:232 (Grand Forest West Trail) Hausdorff 16.4 m
+- `seg-007055` — bimprd_trails_2015_legacy:526 (Grand Forest West) Hausdorff 11.4 m
+- `seg-007064` — bimprd_trails_2015_legacy:522 (Grand Forest West) Hausdorff 12.5 m
+- `seg-007064` — bimprd_trails_agol_2022:162 (Grand Forest West Trail) Hausdorff 11.8 m
+- `seg-007064` — bimprd_trails_agol_2022:180 (Grand Forest West Trail) Hausdorff 13.1 m
+- `seg-007066` — bimprd_trails_2015_legacy:1086 (Peter's Trail) Hausdorff 10.3 m
+- `seg-007066` — bimprd_trails_2015_legacy:936 (Peter's Trail) Hausdorff 10.3 m
+- `seg-007073` — bimprd_trails_2015_legacy:517 (Grand Forest West) Hausdorff 10.7 m
+- `seg-007086` — bimprd_trails_2015_legacy:316 (Forest To Sky Trail) Hausdorff 10.0 m
+- `seg-007087` — bimprd_trails_2015_legacy:549 (Grand Forest West) Hausdorff 10.9 m
+- `seg-007106` — bimprd_trails_2015_legacy:549 (Grand Forest West) Hausdorff 10.5 m
+- `seg-007106` — bimprd_trails_2015_legacy:554 (Grand Forest West) Hausdorff 11.8 m
+- `seg-007118` — bimprd_trails_agol_2022:162 (Grand Forest West Trail) Hausdorff 13.2 m
+- `seg-007119` — bimprd_trails_2015_legacy:556 (Grand Forest West) Hausdorff 12.0 m
+- `seg-007119` — bimprd_trails_agol_2022:162 (Grand Forest West Trail) Hausdorff 13.2 m
+- `seg-007119` — bimprd_trails_agol_2022:163 (Grand Forest West Trail) Hausdorff 10.8 m
+- `seg-007146` — bimprd_trails_2015_legacy:490 (Gazzam Loop Trail) Hausdorff 18.4 m
+- `seg-007147` — bimprd_trails_2015_legacy:490 (Gazzam Loop Trail) Hausdorff 18.1 m
+- `seg-007147` — bimprd_trails_agol_2022:170 (Gazzam Lake Loop Trail) Hausdorff 10.1 m
+- `seg-007179` — bimprd_trails_2015_legacy:1028 (Peter's Trail) Hausdorff 12.7 m
+- `seg-007179` — bimprd_trails_2015_legacy:1030 (Peter's Trail) Hausdorff 10.6 m
+- `seg-007179` — bimprd_trails_2015_legacy:1037 (Peter's Trail) Hausdorff 14.5 m
+- `seg-007179` — bimprd_trails_2015_legacy:878 (Peter's Trail) Hausdorff 12.7 m
+- `seg-007179` — bimprd_trails_2015_legacy:880 (Peter's Trail) Hausdorff 10.6 m
+- `seg-007179` — bimprd_trails_2015_legacy:887 (Peter's Trail) Hausdorff 14.5 m
+- `seg-007188` — bimprd_trails_2015_legacy:468 (Gazzam Main Trail) Hausdorff 23.9 m
+- `seg-007204` — bimprd_trails_2015_legacy:316 (Forest To Sky Trail) Hausdorff 10.0 m
+- `seg-007259` — bimprd_trails_2015_legacy:316 (Forest To Sky Trail) Hausdorff 19.2 m
+- `seg-007259` — bimprd_trails_agol_2022:303 (Forest to Sky Trail) Hausdorff 18.6 m
+- `seg-007313` — bimprd_trails_agol_2022:188 (Gazzam Lake Main Trail) Hausdorff 17.5 m
+- `seg-007315` — bimprd_trails_2015_legacy:475 (Close Trail) Hausdorff 17.6 m
+- `seg-007340` — bimprd_trails_agol_2022:270 (Westwood Shore Trail) Hausdorff 15.7 m
+- `seg-007358` — bimprd_trails_2015_legacy:307 (Gazzam to Veterane) Hausdorff 22.0 m
+- `seg-007359` — bimprd_trails_2015_legacy:458 (Gazzam Main Trail) Hausdorff 12.1 m
+- `seg-007359` — bimprd_trails_agol_2022:188 (Gazzam Lake Main Trail) Hausdorff 11.6 m
+- `seg-007379` — bimprd_trails_agol_2022:303 (Forest to Sky Trail) Hausdorff 10.1 m
+- `seg-007380` — bimprd_trails_2015_legacy:258 (Gazzam to Veterane) Hausdorff 11.0 m
+- `seg-007380` — bimprd_trails_agol_2022:373 (Lower Veterane Trail) Hausdorff 11.4 m
+- `seg-007390` — bimprd_trails_agol_2022:4 (Knudsen Trail) Hausdorff 24.3 m
+- `seg-007391` — bimprd_trails_2015_legacy:256 (Gazzam to Veterane) Hausdorff 19.9 m
+- `seg-007394` — bimprd_trails_agol_2022:271 (Westwood Shore Trail) Hausdorff 19.3 m
+- `seg-007425` — bimprd_trails_2015_legacy:700 (Battle Point) Hausdorff 15.5 m
+- `seg-007430` — bimprd_trails_2015_legacy:700 (Battle Point) Hausdorff 10.1 m
+- `seg-007430` — bimprd_trails_agol_2022:142 (Battle Point Equestrian Trail) Hausdorff 10.7 m
+- `seg-007452` — bimprd_trails_2015_legacy:571 (Battle Point) Hausdorff 29.0 m
+- `seg-007482` — bimprd_trails_agol_2022:271 (Westwood Shore Trail) Hausdorff 16.3 m
+- `seg-007550` — bimprd_trails_agol_2022:246 (Battle Point Trail) Hausdorff 10.9 m
+- `seg-007555` — bimprd_trails_2015_legacy:624 (Battle Point) Hausdorff 12.7 m
+- `seg-007555` — bimprd_trails_2015_legacy:697 (Battle Point) Hausdorff 10.7 m
+- `seg-007555` — bimprd_trails_agol_2022:167 (Battle Point Trail) Hausdorff 14.6 m
+- `seg-007555` — bimprd_trails_agol_2022:286 (Battle Point Trail) Hausdorff 14.7 m
+- `seg-007584` — bimprd_trails_2015_legacy:622 (Battle Point) Hausdorff 10.5 m
+- `seg-007584` — bimprd_trails_agol_2022:167 (Battle Point Trail) Hausdorff 15.5 m
+- `seg-007584` — bimprd_trails_agol_2022:193 (Battle Point Trail) Hausdorff 14.4 m
+- `seg-007584` — bimprd_trails_agol_2022:228 (Battle Point Trail) Hausdorff 14.4 m
+- `seg-007585` — bimprd_trails_agol_2022:143 (Battle Point Trail) Hausdorff 12.8 m
+- `seg-007585` — bimprd_trails_agol_2022:167 (Battle Point Trail) Hausdorff 15.5 m
+- `seg-007585` — bimprd_trails_agol_2022:193 (Battle Point Trail) Hausdorff 12.8 m
+- `seg-007598` — bimprd_trails_agol_2022:140 (Battle Point Trail) Hausdorff 12.9 m
+- `seg-007598` — bimprd_trails_agol_2022:160 (Battle Point Trail) Hausdorff 13.1 m
+- `seg-007601` — bimprd_trails_2015_legacy:639 (Battle Point) Hausdorff 12.7 m
+- `seg-007601` — bimprd_trails_agol_2022:141 (Battle Point Equestrial Trail) Hausdorff 13.4 m
+- `seg-007602` — bimprd_trails_agol_2022:143 (Battle Point Trail) Hausdorff 13.6 m
+- `seg-007602` — bimprd_trails_agol_2022:228 (Battle Point Trail) Hausdorff 14.1 m
+- `seg-007615` — bimprd_trails_2015_legacy:622 (Battle Point) Hausdorff 22.4 m
+- `seg-007625` — bimprd_trails_2015_legacy:572 (Battle Point) Hausdorff 10.1 m
+- `seg-007625` — bimprd_trails_2015_legacy:689 (Battle Point) Hausdorff 10.1 m
+- `seg-007630` — bimprd_trails_2015_legacy:578 (Battle Point) Hausdorff 12.9 m
+- `seg-007630` — bimprd_trails_2015_legacy:683 (Battle Point) Hausdorff 12.9 m
+- `seg-007631` — bimprd_trails_2015_legacy:572 (Battle Point) Hausdorff 12.0 m
+- `seg-007631` — bimprd_trails_2015_legacy:689 (Battle Point) Hausdorff 12.0 m
+- `seg-007632` — bimprd_trails_2015_legacy:588 (Battle Point) Hausdorff 10.1 m
+- `seg-007632` — bimprd_trails_2015_legacy:673 (Battle Point) Hausdorff 10.1 m
+- `seg-007634` — bimprd_trails_2015_legacy:614 (Battle Point) Hausdorff 10.8 m
+- `seg-007634` — bimprd_trails_2015_legacy:647 (Battle Point) Hausdorff 10.8 m

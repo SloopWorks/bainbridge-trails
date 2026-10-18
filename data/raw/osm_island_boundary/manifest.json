@@ -1,0 +1,13 @@
+{
+  "id": "osm_island_boundary",
+  "file": "latest.json",
+  "fetched_at": "2026-10-18T18:19:43Z",
+  "sha256": "c96ae2e6b56e4c53d20df40c2a7339fc54c23d998ce2e87eed3f08b952db366a",
+  "bytes": 431381,
+  "history": [
+    {
+      "fetched_at": "2026-10-18T18:19:43Z",
+      "sha256": "c96ae2e6b56e4c53d20df40c2a7339fc54c23d998ce2e87eed3f08b952db366a"
+    }
+  ]
+}

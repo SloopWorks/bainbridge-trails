@@ -1,0 +1,30 @@
+# Manual fixes applied after automatic trail grouping (bitrails.trails).
+# Unknown trail ids / segment ids fail the build loudly, so stale fixes get noticed.
+#
+# merge:                        # {target trail id: [trail ids folded into it]}
+#   trail-a: [trail-a-2]
+# trails:                       # edit or drop generated trails, keyed by trail id (after merge)
+#   trail-loop-trail-fort-ward-park:
+#     name: Fort Ward Loop
+#     park: Fort Ward Park
+#     manager: BIMPRD
+#     official_length_mi: 1.2
+#     official_map_url: https://...
+#   trail-some-junk:
+#     drop: true
+# custom:                       # extra trails from registry segment ids (ordered)
+#   - id: trail-cross-island
+#     name: Cross Island Trail
+#     segment_ids: [seg-000123, seg-000124]
+merge:
+  # same Gazzam main trail named differently by the two BIMPRD datasets (touching/overlapping)
+  trail-gazzam-lake-main-trail: [trail-gazzam-main-trail]
+  # legacy park-name "Grand Forest East" vs 2022 "Grand Forest East Trail" (107 m apart)
+  trail-grand-forest-east-trail: [trail-grand-forest-east]
+  # one agency trail split by unmatched gaps (54 m)
+  trail-blakely-to-eagledale-trail: [trail-blakely-to-eagledale-trail-2]
+  # one connector trail between two parks, split at the park boundaries
+  trail-fort-ward-to-blakely-harbor-trail: [trail-fort-ward-to-blakely-harbor-trail-blakely-harbor-park,
+                                            trail-fort-ward-to-blakely-harbor-trail-fort-ward-park]
+trails: {}
+custom: []

@@ -1,0 +1,17 @@
+{
+  "id": "osm_overpass_trails",
+  "file": "latest.json",
+  "fetched_at": "2026-10-18T19:05:29Z",
+  "sha256": "7daba757162e30bddadee47b0d4b0070a3153da9d0cf66edba02b821cc1c6e02",
+  "bytes": 4203668,
+  "history": [
+    {
+      "fetched_at": "2026-10-18T18:19:19Z",
+      "sha256": "52872fbddd7021ce049d6cd652e1541ea351c16ae529d276a8f9c338a1d926dd"
+    },
+    {
+      "fetched_at": "2026-10-18T19:05:29Z",
+      "sha256": "7daba757162e30bddadee47b0d4b0070a3153da9d0cf66edba02b821cc1c6e02"
+    }
+  ]
+}
