@@ -23,7 +23,7 @@ Program. Needs gdal, tippecanoe, pmtiles, jq.
 ```
 (cd pipeline && uv run bitrails fetch --only usgs_3dep_dem_island)   # once
 (cd pipeline && uv run bitrails build)                                # canonical data (commit data/canonical first: dist version uses its commit date)
-(cd pipeline && uv run bitrails dist)                                 # trails.json, coverage_segments.json, segments.tiles.geojson, ATTRIBUTION.md (+ data/ATTRIBUTION.md), data/reports/summary.md
+(cd pipeline && uv run bitrails dist)                                 # trails.json, coverage_segments.json, trailheads.json, segments.tiles.geojson, ATTRIBUTION.md (+ data/ATTRIBUTION.md), data/reports/summary.md
 scripts/build-tiles.sh                                                # trails.pmtiles, basemap.pmtiles (network), terrain if missing
 ```
 
@@ -35,6 +35,7 @@ scripts/build-tiles.sh                                                # trails.p
 | `terrain/hillshade.pmtiles` | see above | 9.3 MB |
 | `trails.json` | app metadata: `version` (`<date of latest commit touching data/canonical>+<8 hex sha256 of segments.geojson>`), `island_total_m`, `island_total_shippable_m` (app v1 uses the shippable one), `trails[]` (id, name, manager, park, segment_ids, computed_length_mi, gain_m, loss_m, climb_total_m, trailheads, official_map_url, agency_only_length_mi, official_length_mi, official_length_source, folded_from). `official_length_mi` (> 0) and `official_length_source` come from `trails_overrides.yaml` (null when unset); `folded_from` (only on receivers) lists trails under 30 m folded in. Every per-trail figure comes from shippable segments only; `agency_only_length_mi` is the missing part; all-agency-only trails are omitted. | 60 KB |
 | `coverage_segments.json` | geometry for on-device coverage (compact JSON): `version` (same as `trails.json`), `segments[]` of `{id, length_m, included, trail_ids, coords, category}` (`coords` = `[lon,lat]` rounded to 6 dp). Every redistributable segment (7,537; non-`included` ones are map-matching competitors with `trail_ids` = `[]` unless they belong to a trail), with its canonical `category`, sorted by id; `trail_ids` = the `trails.json` trails whose `segment_ids` contain the segment (so folded segments name their receiver; same for tile `trail_ids`). Orientation is fixed: `coords` run so the first `[lon,lat]` is lexicographically ≤ the last (bit indices for sync depend on it). Sum of `length_m` where `included` = `island_total_shippable_m`. | 1.8 MB |
+| `trailheads.json` | geofence trailhead candidates: `version` (same as `trails.json`), `trailheads[]` of `{id (th-<6 hex sha1(lon,lat)>), lon, lat, name, trail_ids, source}`. `source` `agency` = a `trails.json` trailhead point; `road_access` = a dist-trail segment endpoint within 15 m of a road-named connector or trail-less multi_use_path endpoint. Candidates within 100 m are clustered (agency point wins, else centroid; `trail_ids` = union); name = park, else most common trail name, else `Trail access`. Redistributable geometry only. | 6 KB |
 | `ATTRIBUTION.md` | credits for every source used (also committed at `data/ATTRIBUTION.md`) | 1 KB |
 | `segments.tiles.geojson` | tippecanoe input (props whitelisted), intermediate | 2.2 MB |
 

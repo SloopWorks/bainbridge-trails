@@ -127,7 +127,8 @@ def test_run_dist_writes_outputs_without_private(tmp_path):
                        "- {id: bimprd_trails_agol_2022, name: B, kind: arcgis_rest, endpoint: null, attribution: bimprd attr}\n"
                        "- {id: usgs_3dep_dem_island, name: U, kind: elevation, endpoint: null, attribution: usgs attr}\n")
     run_dist(d, out, sources, tmp_path / "ATTR.md", date="2026-10-18T00:00:00+00:00")
-    assert {p.name for p in out.iterdir()} == {"trails.json", "ATTRIBUTION.md", "segments.tiles.geojson", "coverage_segments.json"}
+    assert {p.name for p in out.iterdir()} == {"trails.json", "ATTRIBUTION.md", "segments.tiles.geojson", "coverage_segments.json",
+                                                "trailheads.json"}
     for p in out.iterdir():
         assert PRIV not in p.read_text()
     assert (tmp_path / "ATTR.md").read_text() == (out / "ATTRIBUTION.md").read_text()

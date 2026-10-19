@@ -3,6 +3,7 @@
   data/dist/segments.tiles.geojson  tippecanoe input: segments.geojson with props whitelisted to TILE_PROPS
   data/dist/trails.json             app metadata (trails, island totals, dataset `version`)
   data/dist/coverage_segments.json  per-segment geometry (6-dp lon/lat) for on-device coverage
+  data/dist/trailheads.json         geofence trailhead candidates (agency points + road-access endpoints, clustered)
   data/dist/ATTRIBUTION.md          attribution for every source whose data is used (+ copy at data/ATTRIBUTION.md)
 Never reads data/canonical/private/. `trail_ids` is a comma-joined string in tiles (MVT has no arrays).
 `trail_ids` in tiles and coverage_segments come from dist trails.json (after folding), not canonical props.
@@ -22,7 +23,9 @@ from shapely.geometry import Point
 
 from .boundary import REPO_ROOT
 from .elevation import trail_chain_totals
+from .classify import load_rule
 from .geo import to_utm
+from .trailheads import trailheads_doc
 
 DATA = REPO_ROOT / "data"
 MI = 1609.344
@@ -219,6 +222,8 @@ def run_dist(canonical: Path = DATA / "canonical", out_dir: Path = DATA / "dist"
     write_tile_input(seg, out_dir / "segments.tiles.geojson", seg_trails)
     cov = coverage_segments_doc(seg, seg_trails, version)
     (out_dir / "coverage_segments.json").write_text(json.dumps(cov, separators=(",", ":")))
+    th = trailheads_doc(doc, seg_trails, _features(seg), load_rule(DATA / "inclusion.yaml").road_name_pattern, version)
+    (out_dir / "trailheads.json").write_text(json.dumps(th, sort_keys=True, indent=2, ensure_ascii=False) + "\n")
     md = attribution_md(used_source_ids(seg), yaml.safe_load(sources_path.read_text())["sources"])
     (out_dir / "ATTRIBUTION.md").write_text(md)
     attribution_copy.write_text(md)

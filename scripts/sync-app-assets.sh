@@ -14,6 +14,7 @@ ASSETS=(
   "basemap.pmtiles:basemap.pmtiles"
   "trails.json:trails.json"
   "coverage_segments.json:coverage_segments.json"
+  "trailheads.json:trailheads.json"
   "terrain/contours.pmtiles:contours.pmtiles"
   "terrain/hillshade.pmtiles:hillshade.pmtiles"
 )
