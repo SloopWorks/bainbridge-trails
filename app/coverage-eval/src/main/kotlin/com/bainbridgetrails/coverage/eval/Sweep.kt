@@ -25,7 +25,8 @@ import kotlin.streams.toList
  */
 data class SweepRow(
     val bufferM: Double,
-    val headingOn: Boolean,
+    /** null = heading check off */
+    val headingToleranceDeg: Double?,
     val matchMarginM: Double,
     val threshold: Double,
     val sigmaM: Double,
@@ -42,13 +43,13 @@ data class SweepRow(
     val driveCreditM: Double,
 ) {
     fun csv(): String = listOf(
-        f(bufferM), headingOn.toString(), f(matchMarginM), f(threshold), f(sigmaM), f(intervalS), walks.toString(),
+        f(bufferM), headingToleranceDeg?.let { f(it) } ?: "", f(matchMarginM), f(threshold), f(sigmaM), f(intervalS), walks.toString(),
         f(p5TrueFraction), f(meanTrueFraction), f(completeRate), f(falseCreditRatio), falseCompletes.toString(),
         f(standCreditM), vehicleChains.toString(), f(bikeCreditM), f(driveCreditM),
     ).joinToString(",")
 
     companion object {
-        const val CSV_HEADER = "buffer_m,heading_on,match_margin_m,threshold,sigma_m,interval_s,walks,p5_true_fraction," +
+        const val CSV_HEADER = "buffer_m,heading_tolerance_deg,match_margin_m,threshold,sigma_m,interval_s,walks,p5_true_fraction," +
             "mean_true_fraction,complete_rate,false_credit_ratio,false_completes,stand_credit_m,vehicle_chains," +
             "bike_credit_m,drive_credit_m"
         private fun f(v: Double) = String.format(Locale.ROOT, "%.4f", v)
@@ -79,7 +80,8 @@ fun sweep(
     sigmas: List<Double>,
     intervals: List<Double>,
     seeds: Int,
-    headings: List<Boolean> = listOf(true, false),
+    /** heading tolerances to sweep; null = heading check off */
+    headingTolerances: List<Double?> = listOf(null, 30.0, 45.0, 60.0),
     margins: List<Double> = listOf(CoverageParams().matchMarginM),
     threshold: Double = 0.90,
     categories: Map<String, String> = emptyMap(),
@@ -95,14 +97,14 @@ fun sweep(
     val trailSegs = trails.map { it.segmentIds.toSet() }
     // trails sharing no segment with trail i
     val disjoint = trails.indices.map { i -> trails.indices.filter { j -> j != i && trailSegs[i].none { it in trailSegs[j] } } }
-    val total = buffers.size * headings.size * margins.size * sigmas.size * intervals.size
+    val total = buffers.size * headingTolerances.size * margins.size * sigmas.size * intervals.size
     val rows = ArrayList<SweepRow>()
     val t0 = System.nanoTime()
 
-    for (b in buffers) for (h in headings) for (m in margins) {
+    for (b in buffers) for (h in headingTolerances) for (m in margins) {
         val params = defaults.copy(
             bufferM = b,
-            headingToleranceDeg = if (h) defaults.headingToleranceDeg else null,
+            headingToleranceDeg = h,
             matchMarginM = m,
             completionThreshold = threshold,
         )
@@ -140,7 +142,7 @@ fun sweep(
 
             val fr = walks.map { it.frac }.sorted()
             val row = SweepRow(
-                bufferM = b, headingOn = h, matchMarginM = m, threshold = threshold, sigmaM = sigma, intervalS = interval,
+                bufferM = b, headingToleranceDeg = h, matchMarginM = m, threshold = threshold, sigmaM = sigma, intervalS = interval,
                 walks = walks.size,
                 p5TrueFraction = fr[(0.05 * (fr.size - 1)).toInt()],
                 meanTrueFraction = fr.average(),

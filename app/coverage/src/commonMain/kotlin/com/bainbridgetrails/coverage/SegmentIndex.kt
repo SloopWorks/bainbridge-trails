@@ -23,7 +23,9 @@ data class SegmentGeom(
  * a displacement baseline >= headingBaselineM around its line (R6); with no such baseline q is stationary and
  * credits nothing. For each q:
  * - candidates = ticks within bufferM of q that pass the heading check
- *   (headingToleranceDeg == null, or axialDiffDeg(h, tick bearing) <= headingToleranceDeg);
+ *   (headingToleranceDeg == null, or axialDiffDeg(h, tick bearing) <= headingToleranceDeg). The tick bearing is
+ *   smoothed over the same scale as the walker's baseline (R11): bearing(P(s - b/2), P(s + b/2)), s = the tick's
+ *   distance along its segment, b = headingBaselineM, both clamped to [0, L]; if L < b, the end-to-end bearing;
  * - d_S = nearest candidate tick of segment S; d* = min over S;
  * - every segment with d_S <= d* + matchMarginM gets its nearest candidate tick and that tick's index
  *   neighbours (+-1, heading-checked) marked, each only if within bufferM of q.
@@ -37,9 +39,15 @@ class SegmentIndex(
 
     private val ids: List<String> = segments.map { it.id }
     private val slot: Map<String, Int> = ids.withIndex().associate { (i, id) -> id to i }
-    private val ticks: List<List<Tick>> = segments.map { s ->
-        val line = s.coords.map { proj.toXy(it[0], it[1]) }
-        if (line.size >= 2) resample(line, params.tickM) else emptyList()
+    private val ticks: List<List<Tick>>
+
+    /** Per tick: bearing used for the heading check, smoothed over headingBaselineM along the segment (ruling R11). */
+    private val tickBearing: List<DoubleArray>
+
+    init {
+        val lines = segments.map { s -> s.coords.map { proj.toXy(it[0], it[1]) } }
+        ticks = lines.map { if (it.size >= 2) resample(it, params.tickM) else emptyList() }
+        tickBearing = lines.mapIndexed { i, line -> smoothedBearings(line, ticks[i], params.headingBaselineM) }
     }
 
     /** cell key -> packed (segment slot, tick index) */
@@ -85,7 +93,7 @@ class SegmentIndex(
                     val tick = ticks[s][t]
                     val d = hypot(tick.p.x - q.x, tick.p.y - q.y)
                     if (d > buf) continue
-                    if (tol != null && axialDiffDeg(h, tick.bearingDeg) > tol) continue
+                    if (tol != null && axialDiffDeg(h, tickBearing[s][t]) > tol) continue
                     if (dS[s] == Double.POSITIVE_INFINITY) {
                         if (n == cand.size) cand = cand.copyOf(n * 2)
                         cand[n++] = s
@@ -105,7 +113,7 @@ class SegmentIndex(
                     mark(s, t, q)
                     for (nt in intArrayOf(t - 1, t + 1)) {
                         if (nt !in ticks[s].indices) continue
-                        if (tol != null && axialDiffDeg(h, ticks[s][nt].bearingDeg) > tol) continue
+                        if (tol != null && axialDiffDeg(h, tickBearing[s][nt]) > tol) continue
                         mark(s, nt, q)
                     }
                 }
@@ -160,6 +168,35 @@ class SegmentIndex(
     }
 
     private companion object {
+        fun smoothedBearings(line: List<Xy>, ts: List<Tick>, baselineM: Double): DoubleArray {
+            if (ts.isEmpty()) return DoubleArray(0)
+            val cum = DoubleArray(line.size)
+            for (k in 1 until line.size) cum[k] = cum[k - 1] + hypot(line[k].x - line[k - 1].x, line[k].y - line[k - 1].y)
+            val total = cum.last()
+            if (total < baselineM) {
+                val b = bearingDeg(line.first(), line.last())
+                return DoubleArray(ts.size) { b }
+            }
+            fun at(d: Double): Xy {
+                // k = last vertex leg starting at or before d (cum is non-decreasing)
+                var lo = 0
+                var hi = line.size - 2
+                while (lo < hi) {
+                    val mid = (lo + hi + 1) / 2
+                    if (cum[mid] <= d) lo = mid else hi = mid - 1
+                }
+                val k = lo
+                val len = cum[k + 1] - cum[k]
+                val f = if (len == 0.0) 0.0 else ((d - cum[k]) / len).coerceIn(0.0, 1.0)
+                return Xy(line[k].x + f * (line[k + 1].x - line[k].x), line[k].y + f * (line[k + 1].y - line[k].y))
+            }
+            // tick i sits at distance (i + 0.5) * share (see resample)
+            return DoubleArray(ts.size) { i ->
+                val sAt = (i + 0.5) * ts[i].lengthM
+                bearingDeg(at((sAt - baselineM / 2).coerceIn(0.0, total)), at((sAt + baselineM / 2).coerceIn(0.0, total)))
+            }
+        }
+
         const val CELL_M = 50.0
         const val MAX_BASELINE_STEPS = 30
         fun cell(v: Double): Int = floor(v / CELL_M).toInt()

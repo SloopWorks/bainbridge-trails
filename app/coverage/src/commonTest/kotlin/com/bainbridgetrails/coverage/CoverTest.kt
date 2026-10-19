@@ -106,6 +106,44 @@ class CoverTest {
         }
     }
 
+    /** Point [d] metres along [line] (clamped to its ends). */
+    private fun along(line: List<Xy>, d: Double): Xy {
+        var acc = 0.0
+        for (i in 0 until line.size - 1) {
+            val l = kotlin.math.hypot(line[i + 1].x - line[i].x, line[i + 1].y - line[i].y)
+            if (acc + l >= d || i == line.size - 2) {
+                val f = if (l == 0.0) 0.0 else ((d - acc) / l).coerceIn(0.0, 1.0)
+                return Xy(line[i].x + f * (line[i + 1].x - line[i].x), line[i].y + f * (line[i + 1].y - line[i].y))
+            }
+            acc += l
+        }
+        return line.last()
+    }
+
+    /**
+     * Circular arc, radius 60 m, 300 m of arc (~286 deg of turn), digitised like a hand trace: a vertex every 2 m of arc,
+     * alternately 0.5 m outside / inside the circle. Walked exactly along the line (zero noise) at 1.3 m/s. The 2 m
+     * vertex legs zig-zag ~+-30 deg about the tangent, so an unsmoothed tick bearing fails a 30 deg heading check
+     * against the walker's 15 m baseline heading (R11).
+     */
+    @Test fun curvedTrailZeroNoiseCompletes() {
+        val r = 60.0
+        val line = (0..150).map { k ->
+            val s = k * 2.0
+            val rr = r + if (k % 2 == 0) 0.5 else -0.5
+            Xy(rr * sin(s / r), rr * cos(s / r))
+        }
+        val seg = seg("seg-arc", *line.toTypedArray())
+        val idx = SegmentIndex(listOf(seg), params.copy(headingToleranceDeg = 30.0), proj)
+        for (stepS in listOf(1, 5)) {
+            val n = (seg.lengthM / (1.3 * stepS)).toInt()
+            val fixes = (0..n).map { k -> fix(k * stepS * 1000L, along(line, minOf(seg.lengthM, k * 1.3 * stepS))) }
+            val f = frac(idx, idx.coverFixes(fixes), "seg-arc")
+            println("curvedTrailZeroNoiseCompletes: stepS=$stepS fraction=$f")
+            assertTrue(f >= 0.98, "stepS=$stepS f=$f")
+        }
+    }
+
     @Test fun sparseFixesInterpolate() {
         val idx = SegmentIndex(listOf(seg("seg-000001", Xy(0.0, 0.0), Xy(200.0, 0.0))), params, proj)
         val st = idx.coverFixes(walk(Xy(0.0, 0.0), Xy(210.0, 0.0), stepS = 20))

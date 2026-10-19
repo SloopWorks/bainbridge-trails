@@ -77,4 +77,23 @@ class FixFilterTest {
         assertTrue(r.size <= 2, "pieces=${r.size}")
         assertTrue(r.sumOf { it.size } >= 295, "points=${r.sumOf { it.size }}")
     }
+
+    @Test fun singleOutlierRemoved() {
+        val w = walk(1.3, 299).toMutableList()
+        val spike = Xy(1.3 * 150, 50.0)
+        w[150] = fix(150_000, spike.x, spike.y)
+        val r = filterFixes(w, params, proj)
+        assertEquals(1, r.size)
+        assertEquals(299, r[0].size)
+        assertTrue(r[0].none { kotlin.math.hypot(it.x - spike.x, it.y - spike.y) < 1.0 }, "spike kept")
+    }
+
+    @Test fun realTurnNotRemoved() {
+        // 100 s east then 100 s north at 1.3 m/s: a sharp 90 deg corner at (130, 0)
+        val east = (0..100).map { s -> fix(s * 1000L, 1.3 * s, 0.0) }
+        val north = (1..100).map { s -> fix((100 + s) * 1000L, 130.0, 1.3 * s) }
+        val r = filterFixes(east + north, params, proj)
+        assertEquals(1, r.size)
+        assertEquals(201, r[0].size)
+    }
 }

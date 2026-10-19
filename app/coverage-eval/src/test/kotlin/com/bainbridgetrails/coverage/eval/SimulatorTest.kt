@@ -87,11 +87,11 @@ class SimulatorTest {
     fun sweepOnSyntheticDatasetGivesOneCleanRow() {
         val rows = sweep(
             ds, buffers = listOf(20.0), sigmas = listOf(0.0), intervals = listOf(1.0), seeds = 1,
-            headings = listOf(true), margins = listOf(1.0),
+            headingTolerances = listOf(30.0), margins = listOf(1.0),
         )
         assertEquals(1, rows.size)
         val r = rows.single()
-        // sigma 0 still has the default 1% 50 m outliers; each costs ~15 m either side with heading on (baseline points at it)
+        // sigma 0 still has the default 1% 50 m outliers; single ones are now dropped by the spike filter (rule 2b)
         assertTrue(r.meanTrueFraction >= 0.85, "$r")
         assertEquals(3, r.walks)
         assertEquals(0, r.falseCompletes)

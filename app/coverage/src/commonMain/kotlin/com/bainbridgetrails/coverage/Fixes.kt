@@ -15,20 +15,36 @@ private const val MIN_SPEED_BASIS_S = 10.0
 /**
  * Continuous runs of accepted fixes, in time order. Lines are drawn only within a piece.
  *
- * Rules, in order: (1) sort, drop duplicate timestamps; (2) drop mock / inaccurate fixes;
+ * Rules, in order: (1) sort, drop duplicate timestamps; (2) drop mock / inaccurate fixes; (2b) drop spikes;
  * (3) break pieces on time gap > maxGapS or jump > maxJumpM; (4) speed check; (5) drop pieces < 2 fixes.
  *
- * Speed check (rule 4): the reference fix j is chosen from the whole sequence left after rules 1-2,
+ * Spike filter (rule 2b, ruling R11): fix i, other than the first or last of the sequence left after rule 2, is
+ * dropped when d(i-1, i) > spikeM and d(i, i+1) > spikeM but d(i-1, i+1) < spikeM / 2, i.e. it leaves and returns
+ * to where the track was. Neighbours are those after rule 2, all judged in one pass (a drop never changes another
+ * fix's neighbours), so only single-fix spikes are caught; two consecutive outliers pass.
+ *
+ * Speed check (rule 4): the reference fix j is chosen from the whole sequence left after rules 1-2b,
  * including fixes the speed check itself dropped, not just the current piece. j = latest fix with
  * t_i - t_j >= speedWindowS; if none, the sequence's first fix, provided >= 10 s elapsed. Fixes within
  * 10 s of the sequence start are accepted unchecked (start-of-recording allowance only). If speed j->i
  * exceeds maxSpeedMps, fix i is dropped and the piece breaks. Breaks never reset the reference.
  */
 fun filterFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection): List<List<Xy>> {
-    val seq = fixes.sortedBy { it.timeMs }
+    val accepted = fixes.sortedBy { it.timeMs }
         .distinctBy { it.timeMs }
         .filter { !it.isMock && (it.accuracyM ?: 0.0) <= params.maxAccuracyM }
-    val xy = seq.map { proj.toXy(it.lon, it.lat) }
+    val accXy = accepted.map { proj.toXy(it.lon, it.lat) }
+    // rule 2b: single-fix spikes, judged against the original neighbours in one pass (no cascade)
+    val keep = BooleanArray(accepted.size) { i ->
+        if (i == 0 || i == accepted.size - 1) return@BooleanArray true
+        val a = accXy[i - 1]
+        val p = accXy[i]
+        val b = accXy[i + 1]
+        !(hypot(p.x - a.x, p.y - a.y) > params.spikeM && hypot(b.x - p.x, b.y - p.y) > params.spikeM &&
+            hypot(b.x - a.x, b.y - a.y) < params.spikeM / 2)
+    }
+    val seq = accepted.filterIndexed { i, _ -> keep[i] }
+    val xy = accXy.filterIndexed { i, _ -> keep[i] }
 
     val pieces = ArrayList<List<Xy>>()
     var pts = ArrayList<Xy>()

@@ -28,7 +28,7 @@ private fun straightDataset(): Dataset {
 }
 
 /**
- * Known-answer tests for the sweep metrics at sigma 0 with outliers off. Heading stays ON throughout: every trail here
+ * Known-answer tests for the sweep metrics at sigma 0 with outliers off. Heading tolerance stays 30 deg throughout: every trail here
  * is straight (or gently bent, for the synthetic set), so the heading check never confounds them.
  */
 class SweepMetricsTest {
@@ -36,7 +36,7 @@ class SweepMetricsTest {
 
     private fun row(ds: Dataset, margin: Double, intervals: List<Double> = listOf(1.0)) = sweep(
         ds, buffers = listOf(20.0), sigmas = listOf(0.0), intervals = intervals, seeds = 2,
-        headings = listOf(true), margins = listOf(margin), noiseFor = exact,
+        headingTolerances = listOf(30.0), margins = listOf(margin), noiseFor = exact,
     )
 
     @Test
@@ -92,5 +92,17 @@ class SweepMetricsTest {
         val index = SegmentIndex(ds.segments, CoverageParams())
         val (_, credit) = vehicleCreditM(ds, index, listOf("d1"), NoiseModel(0.0, outlierRate = 0.0), 1.0, 13.0, seed = 9)
         assertTrue(credit > 50.0 && credit < 200.0, "credit $credit") // 80 m at the time of writing
+    }
+
+    @Test
+    fun headingToleranceDimensionGivesOneRowEachAndCsvMarksOff() {
+        val rows = sweep(
+            straightDataset(), buffers = listOf(20.0), sigmas = listOf(0.0), intervals = listOf(1.0), seeds = 1,
+            headingTolerances = listOf(null, 45.0), margins = listOf(1.0), noiseFor = exact,
+        )
+        assertEquals(listOf(null, 45.0), rows.map { it.headingToleranceDeg })
+        assertEquals("", rows[0].csv().split(",")[1])
+        assertEquals("45.0000", rows[1].csv().split(",")[1])
+        assertEquals("heading_tolerance_deg", SweepRow.CSV_HEADER.split(",")[1])
     }
 }

@@ -15,6 +15,8 @@ data class CoverageParams(
     val speedWindowS: Double = 30.0,
     val maxGapS: Double = 60.0,
     val maxJumpM: Double = 100.0,
+    /** single-fix GPS spike: both legs > spikeM while its neighbours are < spikeM / 2 apart (filterFixes rule 2b) */
+    val spikeM: Double = 30.0,
     val completionThreshold: Double = 0.90,
     val nearlyDoneThreshold: Double = 0.75,
 )

@@ -16,7 +16,7 @@ import java.util.Locale
 import kotlin.system.exitProcess
 
 private const val USAGE = """usage:
-  sweep --data DIR --out FILE.csv [--buffers 10,15,20,25,30] [--headings on,off] [--margins 0,1,3]
+  sweep --data DIR --out FILE.csv [--buffers 10,15,20,25,30] [--headings off,30,45,60] [--margins 0,1,3]
         [--sigmas 5,10,20] [--intervals 1,5,10] [--seeds 3] [--threshold 0.90]
   gpx --data DIR FILE.gpx..."""
 
@@ -62,8 +62,9 @@ private fun doubles(s: String) = s.split(",").map { it.trim().toDouble() }
 
 private fun runSweep(dataset: Dataset, dataDir: File, flags: Map<String, String>) {
     val out = File(flags["out"] ?: usage("--out is required"))
-    val headings = (flags["headings"] ?: "on,off").split(",").map {
-        when (it.trim()) { "on" -> true; "off" -> false; else -> usage("--headings takes on/off") }
+    val headings = (flags["headings"] ?: "off,30,45,60").split(",").map {
+        val v = it.trim()
+        if (v == "off") null else v.toDoubleOrNull()?.takeIf { d -> d in 0.0..90.0 } ?: usage("--headings takes off or degrees 0..90")
     }
     val categories = readCategories(File(dataDir, "segments.tiles.geojson"))
     if (categories.isEmpty()) System.err.println("segments.tiles.geojson missing: vehicle scenarios use the longest-trails proxy")
@@ -74,7 +75,7 @@ private fun runSweep(dataset: Dataset, dataDir: File, flags: Map<String, String>
         sigmas = doubles(flags["sigmas"] ?: "5,10,20"),
         intervals = doubles(flags["intervals"] ?: "1,5,10"),
         seeds = (flags["seeds"] ?: "3").toInt(),
-        headings = headings,
+        headingTolerances = headings,
         margins = doubles(flags["margins"] ?: "0,1,3"),
         threshold = (flags["threshold"] ?: "0.90").toDouble(),
         categories = categories,
