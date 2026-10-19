@@ -60,4 +60,15 @@ class TickGraphTest {
         assertTrue(r.size > 1)
         assertTrue(r.values.all { it <= 20.0 })
     }
+
+    @Test fun closedLoopSelfJoins() {
+        val r = 200.0 / (2 * kotlin.math.PI)
+        val pts = (0..64).map { i ->
+            val a = 2 * kotlin.math.PI * i / 64
+            Xy(r * kotlin.math.cos(a), r * kotlin.math.sin(a))
+        }
+        val (idx, g) = graph(s = arrayOf(seg("L", *pts.toTypedArray())))
+        val d = assertNotNull(g.routesFrom(g.node("L", lastTick(idx, "L")), 500.0)[g.node("L", 0)])
+        assertTrue(d < 10.0, "route $d")
+    }
 }

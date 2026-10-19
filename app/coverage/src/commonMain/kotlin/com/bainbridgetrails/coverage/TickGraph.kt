@@ -41,11 +41,12 @@ class TickGraph(private val index: SegmentIndex, private val junctionM: Double =
             // end joins
             for (cx in c(e.p.x - junctionM)..c(e.p.x + junctionM)) for (cy in c(e.p.y - junctionM)..c(e.p.y + junctionM)) {
                 for (o in endGrid[(cx.toLong() shl 32) or (cy.toLong() and 0xFFFFFFFFL)] ?: continue) {
-                    if (o.slot == e.slot) continue
+                    if (o.slot == e.slot && (o.last == e.last || e.last)) continue // own ends: join once, first->last
                     if (hypot(o.p.x - e.p.x, o.p.y - e.p.y) <= junctionM) link(e.node, o.node)
                 }
             }
             // T-joins: nearest tick of any other segment whose polyline passes within junctionM
+            selfTJoin(e.slot, e.last, e.p, e.node)
             val bySlot = HashMap<Int, Long>()
             val bestD = HashMap<Int, Double>()
             for (n in index.queryTicks(e.p, junctionM + MAX_TICK_REACH_M)) {
@@ -62,6 +63,21 @@ class TickGraph(private val index: SegmentIndex, private val junctionM: Double =
                 if (dl <= junctionM) link(e.node, n)
             }
         }
+    }
+
+    /** T-join of an endpoint against its own segment's interior, skipping ticks within 2*junctionM along the line. */
+    private fun selfTJoin(s: Int, last: Boolean, p: Xy, endNode: Long) {
+        val n = pts[s].size
+        val share = index.tickLengthM(index.segmentIdOf(s))
+        var best = -1
+        var bestD = Double.POSITIVE_INFINITY
+        for (t in 0 until n) {
+            val along = ((if (last) n - 1 - t else t) + 0.5) * share
+            if (along < 2 * junctionM) continue
+            val d = hypot(pts[s][t].x - p.x, pts[s][t].y - p.y)
+            if (d < bestD) { bestD = d; best = t }
+        }
+        if (best >= 0 && bestD <= junctionM + share / 2) link(endNode, pack(s, best))
     }
 
     fun node(segmentId: String, tick: Int): Long = pack(requireNotNull(index.slotOf(segmentId)) { "unknown segment $segmentId" }, tick)
