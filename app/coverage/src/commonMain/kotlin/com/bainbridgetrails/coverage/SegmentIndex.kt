@@ -14,6 +14,7 @@ data class SegmentGeom(
     val included: Boolean,
     @SerialName("trail_ids") val trailIds: List<String>,
     val coords: List<List<Double>>,
+    val category: String? = null,
 )
 
 /**

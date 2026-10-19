@@ -72,8 +72,8 @@ def write_tile_input(segments: Path, out: Path, seg_trails: dict[str, list[str]]
 
 
 def coverage_segments_doc(segments: Path, seg_trails: dict[str, list[str]], version: str) -> dict:
-    """Geometry for on-device coverage: every segment that is `included` or in `seg_trails` (see
-    segment_trail_map; it supplies `trail_ids`). Fixed orientation: coords run so that the first (lon, lat), after
+    """Geometry for on-device coverage and map matching: every redistributable segment, with its `category`
+    (non-included ones are matching competitors; `seg_trails` (see segment_trail_map) supplies `trail_ids`). Fixed orientation: coords run so that the first (lon, lat), after
     6-dp rounding, is <= the last, lexicographically (part of the Spike 5 sync contract)."""
     out = []
     for f in _features(segments):
@@ -81,13 +81,11 @@ def coverage_segments_doc(segments: Path, seg_trails: dict[str, list[str]], vers
         if not p.get("geometry_redistributable"):
             raise ValueError(f"{p.get('id')}: geometry not redistributable; refusing to export it")
         tids = list(seg_trails.get(p["id"], []))
-        if not (p["included"] or tids):
-            continue
         coords = [[round(c[0], 6), round(c[1], 6)] for c in f["geometry"]["coordinates"]]
         if tuple(coords[0]) > tuple(coords[-1]):
             coords.reverse()
         out.append({"id": p["id"], "length_m": p["length_m"], "included": bool(p["included"]), "trail_ids": tids,
-                    "coords": coords})
+                    "coords": coords, "category": p["category"]})
     return {"version": version, "segments": sorted(out, key=lambda s: s["id"])}
 
 

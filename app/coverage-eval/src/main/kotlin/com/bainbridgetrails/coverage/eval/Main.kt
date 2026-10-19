@@ -7,10 +7,6 @@ import com.bainbridgetrails.coverage.LocalProjection
 import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.coverage.filterFixes
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.util.Locale
 import kotlin.system.exitProcess
@@ -46,7 +42,7 @@ fun main(args: Array<String>) {
     val dataDir = File(flags["data"] ?: usage("--data is required"))
     val dataset = Dataset.parse(File(dataDir, "trails.json").readText(), File(dataDir, "coverage_segments.json").readText())
     when (args[0]) {
-        "sweep" -> runSweep(dataset, dataDir, flags)
+        "sweep" -> runSweep(dataset, flags)
         "gpx" -> runGpx(dataset, positional)
         else -> usage("unknown command ${args[0]}")
     }
@@ -60,14 +56,12 @@ private fun usage(msg: String? = null): Nothing {
 
 private fun doubles(s: String) = s.split(",").map { it.trim().toDouble() }
 
-private fun runSweep(dataset: Dataset, dataDir: File, flags: Map<String, String>) {
+private fun runSweep(dataset: Dataset, flags: Map<String, String>) {
     val out = File(flags["out"] ?: usage("--out is required"))
     val headings = (flags["headings"] ?: "off,30,45,60").split(",").map {
         val v = it.trim()
         if (v == "off") null else v.toDoubleOrNull()?.takeIf { d -> d in 0.0..90.0 } ?: usage("--headings takes off or degrees 0..90")
     }
-    val categories = readCategories(File(dataDir, "segments.tiles.geojson"))
-    if (categories.isEmpty()) System.err.println("segments.tiles.geojson missing: vehicle scenarios use the longest-trails proxy")
     val start = System.nanoTime()
     val rows = sweep(
         dataset,
@@ -79,23 +73,11 @@ private fun runSweep(dataset: Dataset, dataDir: File, flags: Map<String, String>
         margins = doubles(flags["margins"] ?: "0,1,3"),
         smoothWindows = doubles(flags["smooth"] ?: "0,10,20").onEach { if (it < 0.0) usage("--smooth takes seconds >= 0") },
         threshold = (flags["threshold"] ?: "0.90").toDouble(),
-        categories = categories,
         log = { System.err.println(it) },
     )
     out.absoluteFile.parentFile?.mkdirs()
     out.writeText((listOf(SweepRow.CSV_HEADER) + rows.map { it.csv() }).joinToString("\n", postfix = "\n"))
     System.err.println(String.format(Locale.ROOT, "wrote %d rows to %s in %.1fs", rows.size, out, (System.nanoTime() - start) / 1e9))
-}
-
-/** id -> category from segments.tiles.geojson feature properties; empty if the file is missing. */
-private fun readCategories(f: File): Map<String, String> {
-    if (!f.exists()) return emptyMap()
-    return Json.parseToJsonElement(f.readText()).jsonObject["features"]!!.jsonArray.mapNotNull { feat ->
-        val p = feat.jsonObject["properties"]?.jsonObject ?: return@mapNotNull null
-        val id = p["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
-        val cat = p["category"]?.jsonPrimitive?.content ?: return@mapNotNull null
-        id to cat
-    }.toMap()
 }
 
 private fun runGpx(dataset: Dataset, files: List<String>) {

@@ -133,17 +133,25 @@ def test_run_dist_writes_outputs_without_private(tmp_path):
     assert (tmp_path / "ATTR.md").read_text() == (out / "ATTRIBUTION.md").read_text()
 
 
-def test_coverage_segments_selects_included_or_trail_segments(tmp_path):
+def test_coverage_segments_selects_all_redistributable_segments(tmp_path):
     segs = [feat("seg-000001", included=False, trail_ids=[]),
             feat("seg-000002", included=True, trail_ids=[]),
-            feat("seg-000003", included=False, trail_ids=["trail-a"])]
+            feat("seg-000003", included=False, trail_ids=["trail-a"], category="connector")]
     d = canon(tmp_path, segs=segs)
     doc = coverage_segments_doc(d / "segments.geojson", {"seg-000003": ["trail-a"]}, "v1")
-    assert [s["id"] for s in doc["segments"]] == ["seg-000002", "seg-000003"]
+    assert [s["id"] for s in doc["segments"]] == ["seg-000001", "seg-000002", "seg-000003"]
     assert doc["version"] == "v1"
-    s = doc["segments"][1]
-    assert set(s) == {"id", "length_m", "included", "trail_ids", "coords"}
+    s = doc["segments"][2]
+    assert set(s) == {"id", "length_m", "included", "trail_ids", "coords", "category"}
     assert s["included"] is False and s["trail_ids"] == ["trail-a"] and s["length_m"] == 100.0
+    assert s["category"] == "connector"
+
+
+def test_coverage_segments_exports_competitors(tmp_path):
+    d = canon(tmp_path, segs=[feat("seg-000001", included=False, trail_ids=[], category="informal")])
+    doc = coverage_segments_doc(d / "segments.geojson", {}, "v1")
+    assert doc["segments"] == [{"id": "seg-000001", "length_m": 100.0, "included": False, "trail_ids": [],
+                                "coords": [[0, 0], [1, 1]], "category": "informal"}]
 
 
 def test_coverage_segments_rounds_and_takes_trail_ids_from_map(tmp_path):
@@ -329,12 +337,12 @@ def test_coverage_segments_folded_segment_names_receiver(tmp_path):
     assert tp["seg-000002"]["trail_ids"] == "trail-big"
 
 
-def test_coverage_segments_drops_noninc_segment_whose_trail_filtered(tmp_path):
+def test_coverage_segments_filtered_trail_segment_has_no_trail_ids(tmp_path):
     segs = [feat("seg-000001", included=False, trail_ids=["trail-gone"]), feat("seg-000002", trail_ids=[])]
     d = canon(tmp_path, segs=segs)
     doc = coverage_segments_doc(d / "segments.geojson", {}, "v1")
-    assert [s["id"] for s in doc["segments"]] == ["seg-000002"]
-    assert doc["segments"][0]["trail_ids"] == []
+    assert [s["id"] for s in doc["segments"]] == ["seg-000001", "seg-000002"]
+    assert doc["segments"][0]["trail_ids"] == [] and doc["segments"][0]["included"] is False
 
 
 def test_coverage_segments_canonical_orientation(tmp_path):

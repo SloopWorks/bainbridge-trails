@@ -21,5 +21,11 @@ class RealDatasetTest {
         val expected = Regex("\"segment_ids\"").findAll(trails.readText()).count()
         assertEquals(expected, ds.trails.size)
         assertTrue(abs(sum - ds.islandTotalM) <= 1.0, "sum $sum vs ${ds.islandTotalM}")
+        val canonical = File("../../data/canonical/segments.geojson")
+        if (canonical.exists()) {
+            val redistributable = Regex("\"geometry_redistributable\":\\s*true").findAll(canonical.readText()).count()
+            assertEquals(redistributable, ds.segments.size)
+        }
+        assertTrue(ds.segments.all { it.category != null }, "every segment has a category")
     }
 }

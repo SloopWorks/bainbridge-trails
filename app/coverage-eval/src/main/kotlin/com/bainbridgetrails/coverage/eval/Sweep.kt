@@ -59,22 +59,13 @@ data class SweepRow(
 }
 
 const val VEHICLE_CATEGORY = "multi_use_path"
-private const val PROXY_TRAILS = 10
 private const val BIKE_MPS = 6.0
 private const val DRIVE_MPS = 13.0
 internal const val VEHICLE_LEAD_IN_WALK_S = 30.0
 
-/**
- * Segments a bike / car could follow: those with category [VEHICLE_CATEGORY] in [categories] (id -> category, e.g. from
- * segments.tiles.geojson). SegmentGeom has no category, so with no categories the proxy is the segments of the
- * [PROXY_TRAILS] longest trails.
- */
-fun vehicleSegmentIds(dataset: Dataset, categories: Map<String, String>): List<String> =
-    if (categories.isNotEmpty()) {
-        dataset.segments.filter { categories[it.id] == VEHICLE_CATEGORY }.map { it.id }
-    } else {
-        dataset.trails.sortedByDescending { it.computedLengthMi }.take(PROXY_TRAILS).flatMap { it.segmentIds }.distinct()
-    }
+/** Segments a bike / car could follow: those with category [VEHICLE_CATEGORY]. */
+fun vehicleSegmentIds(dataset: Dataset): List<String> =
+    dataset.segments.filter { it.category == VEHICLE_CATEGORY }.map { it.id }
 
 fun sweep(
     dataset: Dataset,
@@ -88,7 +79,6 @@ fun sweep(
     /** track smoothing windows (s) to sweep; 0 = off */
     smoothWindows: List<Double> = listOf(CoverageParams().smoothWindowS),
     threshold: Double = 0.90,
-    categories: Map<String, String> = emptyMap(),
     /** sigma -> noise model; override e.g. to switch outliers off for known-answer tests */
     noiseFor: (Double) -> NoiseModel = { NoiseModel(it) },
     log: (String) -> Unit = {},
@@ -96,7 +86,7 @@ fun sweep(
     require(seeds >= 1) { "seeds must be >= 1" }
     val proj = LocalProjection()
     val defaults = CoverageParams()
-    val vehicleIds = vehicleSegmentIds(dataset, categories)
+    val vehicleIds = vehicleSegmentIds(dataset)
     val trails = dataset.trails
     val trailSegs = trails.map { it.segmentIds.toSet() }
     // trails sharing no segment with trail i
