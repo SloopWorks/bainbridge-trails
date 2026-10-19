@@ -15,6 +15,7 @@ import kotlin.native.Platform
  * VERIFICATION ONLY, debug binaries only: the simulator cannot script taps, so launch arguments
  * `-autostartRecording 1 [-autostopRecordingAfterS <s>]` press Start (and later Stop) through the same controller
  * calls the buttons make. Permissions are not granted here: grant location first (in-app flow or simctl privacy).
+ * `-autoOptInGeofences 1` runs the trailhead-geofence opt-in after its disclosure (grant location-always first).
  * `-acceptSimulatedLocations 1` (simulator only) records simctl's software-simulated fixes as non-mock; without it
  * they are correctly flagged mock and filtered, so a simulator walk scores 0%. Ignored in release builds.
  */
@@ -24,6 +25,12 @@ internal fun debugAutostartRecording() {
     val defaults = NSUserDefaults.standardUserDefaults
     val onSimulator = NSProcessInfo.processInfo.environment["SIMULATOR_UDID"] != null
     if (onSimulator && defaults.boolForKey("acceptSimulatedLocations")) IosRecorder.acceptSimulatedLocations = true
+    // `-autoOptInGeofences 1`: the toggle's post-disclosure path (requestBackground, then enable) without the taps.
+    if (defaults.boolForKey("autoOptInGeofences")) {
+        RecordingGraph.scope.launch {
+            if (IosGeofencePlatform.requestBackground()) IosGeofencePlatform.enable()
+        }
+    }
     if (!defaults.boolForKey("autostartRecording")) return
     val stopAfterS = defaults.integerForKey("autostopRecordingAfterS")
     RecordingGraph.scope.launch {

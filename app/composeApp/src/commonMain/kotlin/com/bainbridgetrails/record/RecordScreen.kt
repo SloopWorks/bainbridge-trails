@@ -85,6 +85,8 @@ private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, 
     val notice by controller.notice.collectAsState()
     val requester = rememberPermissionRequester()
     var permissionQueue by remember { mutableStateOf<List<Perm>>(emptyList()) }
+    val geofences = rememberGeofencePlatform()
+    var showSettings by remember { mutableStateOf(false) }
 
     val recording = state is RecordingState.Recording
     LaunchedEffect(recording) {
@@ -175,8 +177,16 @@ private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, 
                     shape = RoundedCornerShape(32.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (r != null) Color(0xFFB3261E) else Color(0xFF1B6E3A)),
                 ) { Text(if (r != null) "Stop" else "Start", fontSize = 22.sp, fontWeight = FontWeight.SemiBold) }
+                // Hidden where background location is not declared (Android release builds, ruling R2).
+                if (r == null && geofences.supported) {
+                    TextButton(onClick = { showSettings = true }) {
+                        Text("Settings")
+                    }
+                }
             }
         }
+
+        if (showSettings) GeofenceSettings(geofences, onClose = { showSettings = false })
 
         if (permissionQueue.isNotEmpty()) {
             PermissionFlow(

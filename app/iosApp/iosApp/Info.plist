@@ -4,10 +4,10 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Optional: used in the background only to notify you when you arrive at a trailhead. You can turn it off at any time.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Used only while you record a walk; your route stays on your phone.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Optional: notifies you when you arrive at a trailhead.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Keeps bike and car rides from counting as walks.</string>
 	<key>UIBackgroundModes</key>
