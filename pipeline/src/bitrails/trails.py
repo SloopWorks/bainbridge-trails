@@ -62,10 +62,12 @@ class Trail:
     park: str | None
     trailheads: list[Point] = field(default_factory=list)
     official_map_url: str | None = None
+    official_length_source: str | None = None
 
     def to_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "manager": self.manager, "segment_ids": self.segment_ids,
                 "official_length_mi": self.official_length_mi,
+                "official_length_source": self.official_length_source,
                 "computed_length_mi": round(self.computed_length_mi, 3), "park": self.park,
                 "trailheads": [{"type": "Point", "coordinates": [round(p.x, 6), round(p.y, 6)]}
                                for p in self.trailheads],

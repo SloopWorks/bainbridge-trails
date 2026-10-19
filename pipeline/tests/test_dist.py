@@ -65,7 +65,7 @@ def test_dist_trails_shape_and_no_private_ids(tmp_path):
     assert [t["id"] for t in doc["trails"]] == ["trail-a"]  # all-private trail dropped
     assert set(doc["trails"][0]) == {"id", "name", "manager", "park", "segment_ids", "computed_length_mi", "gain_m",
                                      "loss_m", "climb_total_m", "trailheads", "official_map_url",
-                                     "agency_only_length_mi"}
+                                     "agency_only_length_mi", "official_length_mi", "official_length_source"}
     assert doc["trails"][0]["segment_ids"] == ["seg-000001"]
     assert PRIV not in json.dumps(doc)
 
@@ -191,3 +191,38 @@ def test_summary_helpers(tmp_path):
     d = canon(tmp_path)
     rows = agency_only_rows(d / "private" / "agency_only.geojson", [{"id": "trail-a", "name": "A"}])
     assert rows == [["A", "agency_trail", 1, "0.0", "0.0"]]
+
+
+def _doc(tmp_path, **over):
+    d = canon(tmp_path)
+    doc = json.loads((d / "trails.json").read_text())
+    doc["trails"][0].update(over)
+    return doc, shippable_info(d / "segments.geojson", None)
+
+
+def test_override_official_length_passes_through_dist(tmp_path):
+    doc, info = _doc(tmp_path, official_length_mi=1.2, official_length_source="https://example.org/map")
+    (t,) = dist_trails_doc(doc, info, "v")["trails"]
+    assert (t["official_length_mi"], t["official_length_source"]) == (1.2, "https://example.org/map")
+
+
+def test_dist_official_length_null_by_default(tmp_path):
+    doc, info = _doc(tmp_path)
+    (t,) = dist_trails_doc(doc, info, "v")["trails"]
+    assert t["official_length_mi"] is None and t["official_length_source"] is None
+
+
+@pytest.mark.parametrize("name", [None, "  "])
+def test_dist_drops_unnamed_trails(tmp_path, name):
+    doc, info = _doc(tmp_path, name=name)
+    assert dist_trails_doc(doc, info, "v")["trails"] == []
+
+
+def test_summary_flags_large_official_gap():
+    from bitrails.summary import official_vs_computed_rows
+    rows = official_vs_computed_rows([
+        {"name": "Far", "official_length_mi": 1.0, "official_length_source": "src", "computed_mi": 0.5, "agency_only_mi": 0.0},
+        {"name": "Near", "official_length_mi": 1.0, "official_length_source": "src", "computed_mi": 0.9, "agency_only_mi": 0.05},
+        {"name": "None", "official_length_mi": None, "computed_mi": 1, "agency_only_mi": 0}])
+    assert len(rows) == 2
+    assert "⚠" in rows[0][4] and "⚠" not in rows[1][4]

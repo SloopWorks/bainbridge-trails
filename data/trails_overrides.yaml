@@ -9,6 +9,7 @@
 #     park: Fort Ward Park
 #     manager: BIMPRD
 #     official_length_mi: 1.2
+#     official_length_source: https://...   # REQUIRED with official_length_mi (build fails without it)
 #     official_map_url: https://...
 #   trail-some-junk:
 #     drop: true

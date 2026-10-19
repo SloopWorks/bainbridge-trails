@@ -80,6 +80,25 @@ def manager_stats(features: list[dict], private: Path) -> dict[str, list]:
     return acc
 
 
+OFFICIAL_GAP = 0.15
+
+
+def official_vs_computed_rows(trails: list[dict]) -> list[list]:
+    """Rows for trails with an official length. Each trail dict: name, official_length_mi, official_length_source,
+    computed_mi (shippable), agency_only_mi. diff_% = (computed + agency_only - official) / official;
+    flagged with a warning sign when |diff| exceeds OFFICIAL_GAP."""
+    rows = []
+    for t in sorted(trails, key=lambda t: t["name"]):
+        off = t.get("official_length_mi")
+        if off is None:
+            continue
+        diff = (t["computed_mi"] + t["agency_only_mi"] - off) / off
+        flag = " ⚠" if abs(diff) > OFFICIAL_GAP else ""
+        rows.append([t["name"], off, round(t["computed_mi"], 3), round(t["agency_only_mi"], 3),
+                     f"{diff * 100:+.0f}%{flag}", t.get("official_length_source") or ""])
+    return rows
+
+
 def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclusion_path: Path) -> str:
     doc = json.loads((canonical / "trails.json").read_text())
     ds, trails = doc["dataset"], doc["trails"]
@@ -117,6 +136,18 @@ def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclu
                   t["official_length_mi"] if t["official_length_mi"] is not None else "", t["computed_length_mi"],
                   t.get("gain_m", ""), t.get("loss_m", "")]
                  for t in sorted(trails, key=lambda t: (-t["computed_length_mi"], t["id"]))])
+    ship_len = {f["properties"]["id"]: f["properties"]["length_m"] for f in feats}
+    ovc = []
+    for t in trails:
+        comp = sum(ship_len.get(i, 0.0) for i in t["segment_ids"]) / MI
+        ovc.append({**t, "computed_mi": comp, "agency_only_mi": max(0.0, t["computed_length_mi"] - comp)})
+    orows = official_vs_computed_rows(ovc)
+    L += ["", "## Official vs computed length", "",
+          "Official = agency-published mileage set in `trails_overrides.yaml` with a cited source. computed_mi = "
+          "shippable segments (what the app can draw); agency_only_mi = private geometry. diff_% compares "
+          "computed + agency-only with official; ⚠ = off by more than 15%.", ""]
+    L += _table(["trail", "official_mi", "computed_mi", "agency_only_mi", "diff_%", "source"], orows) \
+        if orows else ["(no trail has an official length yet)"]
     L += ["", "## Owner review", "",
           "### Classification rule (`data/inclusion.yaml`)", "",
           "A segment counts toward the island total when its public_access is not `no` and its category is in "

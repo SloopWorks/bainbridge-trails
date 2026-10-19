@@ -188,6 +188,12 @@ Official mileage is set on 0 of 127 trails: no source has an agency mileage fiel
 | Dock Street road end |  |  | 1 |  | 0.002 | 0.0 | 0.0 |
 | Waterfront Trail |  |  | 1 |  | 0.001 | 0.0 | 0.0 |
 
+## Official vs computed length
+
+Official = agency-published mileage set in `trails_overrides.yaml` with a cited source. computed_mi = shippable segments (what the app can draw); agency_only_mi = private geometry. diff_% compares computed + agency-only with official; ⚠ = off by more than 15%.
+
+(no trail has an official length yet)
+
 ## Owner review
 
 ### Classification rule (`data/inclusion.yaml`)

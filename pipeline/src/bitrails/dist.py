@@ -27,7 +27,8 @@ MI = 1609.344
 TRAILHEAD_M = 5.0
 TILE_PROPS = ("id", "category", "trail_ids", "name", "included")
 TRAIL_FIELDS = ("id", "name", "manager", "park", "segment_ids", "computed_length_mi", "gain_m", "loss_m",
-                "climb_total_m", "trailheads", "official_map_url", "agency_only_length_mi")
+                "climb_total_m", "trailheads", "official_map_url", "agency_only_length_mi",
+                "official_length_mi", "official_length_source")
 TERRAIN_SOURCE = "usgs_3dep_dem_island"   # contours, hillshade, gain/loss all derive from it
 BASEMAP_SOURCE = "protomaps_basemap"      # virtual: not in sources.yaml
 BASEMAP_ATTRIBUTION = ("(c) OpenStreetMap contributors, ODbL 1.0 - https://www.openstreetmap.org/copyright; "
@@ -99,9 +100,11 @@ def shippable_info(segments: Path, elevation: Path | None) -> dict[str, dict]:
 def dist_trails_doc(canonical_doc: dict, info: dict[str, dict], version: str) -> dict:
     """App metadata. Everything per trail (segment_ids, length, gain/loss, trailheads) is recomputed from
     shippable segments only, so a trail is 100% completable in the app. `agency_only_length_mi` = what is missing.
-    Trails with no shippable segment are dropped."""
+    Trails with no shippable segment, or no name, are dropped."""
     trails = []
     for t in canonical_doc["trails"]:
+        if not (t.get("name") or "").strip():
+            continue  # the app lists only named trails
         ids = [i for i in t["segment_ids"] if i in info]
         if not ids:
             continue
