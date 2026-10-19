@@ -62,7 +62,7 @@ class ProgressTest {
     fun statusThresholds() {
         val expected = listOf(
             0.0 to TrailStatus.NOT_STARTED, 0.01 to TrailStatus.PARTWAY, 0.74 to TrailStatus.PARTWAY,
-            0.75 to TrailStatus.NEARLY_DONE, 0.899 to TrailStatus.NEARLY_DONE, 0.90 to TrailStatus.COMPLETE,
+            0.75 to TrailStatus.NEARLY_DONE, 0.849 to TrailStatus.NEARLY_DONE, 0.85 to TrailStatus.COMPLETE,
         )
         for ((f, s) in expected) assertEquals(s, progress.status(f), "fraction $f")
     }

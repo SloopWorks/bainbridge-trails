@@ -1,11 +1,11 @@
 package com.bainbridgetrails.coverage
 
-/** Defaults are interim until the Spike 3 sweep (docs/spikes/coverage/notes.md). */
+/** Provisional (owner, 2026-10-18): option B from docs/spikes/coverage/notes.md; re-check against real GPX walks before v1. */
 data class CoverageParams(
-    val bufferM: Double = 20.0,
+    val bufferM: Double = 30.0,
     val tickM: Double = 5.0,
     /** null = no heading check */
-    val headingToleranceDeg: Double? = 30.0,
+    val headingToleranceDeg: Double? = null,
     /** min straight-line displacement for a heading; points without one are stationary and credit nothing */
     val headingBaselineM: Double = 15.0,
     /** a fix credits only segments within d* + matchMarginM of its nearest candidate segment (competitive map matching) */
@@ -19,6 +19,6 @@ data class CoverageParams(
     val spikeM: Double = 30.0,
     /** filterFixes rule 6: each fix moves to the mean of its piece's fixes within +/- smoothWindowS / 2; 0 = off */
     val smoothWindowS: Double = 10.0,
-    val completionThreshold: Double = 0.90,
+    val completionThreshold: Double = 0.85,
     val nearlyDoneThreshold: Double = 0.75,
 )

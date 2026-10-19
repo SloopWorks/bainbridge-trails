@@ -78,7 +78,7 @@ class CoverTest {
         val segs = listOf(seg("seg-000001", Xy(0.0, 0.0), Xy(200.0, 0.0)))
         val fixes = walk(Xy(100.0, -50.0), Xy(100.0, 50.0))
         val off = SegmentIndex(segs, params.copy(headingToleranceDeg = null), proj).coverFixes(fixes)
-        val on = SegmentIndex(segs, params, proj).coverFixes(fixes)
+        val on = SegmentIndex(segs, params.copy(headingToleranceDeg = 30.0), proj).coverFixes(fixes)
         val nOff = off.covered("seg-000001").size
         val nOn = on.covered("seg-000001").size
         println("perpendicularCrossingCreditsLittle: headingOff=$nOff headingOn=$nOn")

@@ -1,6 +1,6 @@
 # Spike 3: trail coverage, parameter sweep
 
-Status: **BLOCKED, owner decision needed (re-sweep after Task 9b fold + Task 9c smoothing).** The Task 9 decision rule still picks no config. `CoverageParams` defaults stay interim (buffer 20, heading 30°, margin 1, threshold 0.90); the only new default is `smoothWindowS` = 10 s, which the brief prescribed. The spec §2 completion line is unchanged.
+Status: **Provisional defaults set (owner chose option B, 2026-10-18).** The Task 9 decision rule still picks no config; defaults are option B, see "Decision (owner, 2026-10-18)". Re-check on real GPX walks before v1.
 
 Data: `sweep.csv` (full grid, threshold 0.90, 1296 rows), `sweep-t0.85.csv` and `sweep-t0.80.csv` (σ {10, 15} × interval {5, 15}, 576 rows each, re-run for rule step 3). All simulated, no real tracks. Reproduce from `app/`:
 
@@ -14,6 +14,24 @@ Data: `sweep.csv` (full grid, threshold 0.90, 1296 rows), `sweep-t0.85.csv` and 
 
 Each row has 342 walks (114 trails × 3 seeds) and 162 multi-use-path vehicle chains (transitions) per seed. The full grid takes ~107 s.
 Config labels below are buffer/heading/margin/smooth (m/°/m/s).
+
+## Decision (owner, 2026-10-18)
+
+Option B, provisional: **buffer 30 m, heading off, margin 1 m, smooth 10 s, completion threshold 0.85** (`nearlyDoneThreshold` 0.75 and `headingBaselineM` 15 unchanged; the baseline still drives the stationary rule). Now the `CoverageParams` defaults; spec §2 says 85%.
+
+Numbers for 30/off/1/10 at threshold 0.85:
+- **σ10/5 s:** completeRate 0.839, falseCreditRatio 0.066, falseCompletes 3 (@0.85; 2 @0.90, 3 @0.80). Drive credit ~26 m per transition.
+- **σ15/15 s (worst case):** completeRate 0.693 @0.85 (0.500 @0.90, 0.792 @0.80), falseCreditRatio 0.097, falseCompletes 1 (@0.85, @0.90 and @0.80).
+
+It misses the rule targets (cr >= 0.95, fcr <= 0.05, fc = 0); accepted as a provisional trade-off for completing walked trails.
+
+Next step: the owner records 2-3 GPX walks into `data/tracks/private/` (procedure at the end of this file). From `app/`, run under A, B and C, then adjust:
+
+```
+./gradlew :coverage-eval:run --args="gpx --data ../data/dist <files>"
+```
+
+Follow-up: a correlated-noise variant of the parallel guard (the current guard uses white noise, which smoothing removes almost entirely).
 
 ## Tiny-trail fold (Task 9b)
 
@@ -108,10 +126,10 @@ Worst case (σ15/15 s) fc is at threshold 0.80.
 
 ## Options for the owner (none applied)
 
-1. **Accept heading off (or 60°) + smoothing 10 s + threshold 0.80**, e.g. 30/off/1/10: cr 0.898, fcr 0.066, fc 3. Guard passes (white noise only). Misses cr ≥ 0.95 and fcr ≤ 0.05, and has 3 false completes; needs a looser rule.
+1. **Accept heading off (or 60°) + smoothing 10 s + threshold 0.80**, e.g. 30/off/1/10: cr 0.898, fcr 0.066, fc 3 (all @0.80). Guard passes (white noise only). Misses cr ≥ 0.95 and fcr ≤ 0.05, and has 3 false completes; needs a looser rule.
 2. **Keep the strict anti-false-credit rule** (30/30/1/20): fc 0 and fcr 0.029, but only ~73% of walked trails complete at 0.80. Users would routinely walk a trail and not get it.
 3. **Fix the heading noise properly** (still untested): a longer `headingBaselineM` (25–30 m) or a heading from a longer/smoothed track, then re-sweep heading 30°. Smoothing alone did not close the gap.
-4. **Loosen the targets** (e.g. cr ≥ 0.85 @0.80, fcr ≤ 0.07, fc counted only for trails ≥ 50 m) and re-apply the rule; option 1's configs would then qualify.
+4. **Loosen the targets** (e.g. cr ≥ 0.85 @0.80, fcr ≤ 0.07, fc counted only for trails ≥ 50 m) and re-apply the rule; option 1's configs might then qualify.
 5. **Fold more**: raise the fold limit from 30 m to ~50 m to remove the remaining small-trail false completes (needs a per-trail diagnosis first).
 
 ## Known limits (for any config)
