@@ -1,15 +1,37 @@
 # Spike 3: trail coverage, parameter sweep
 
-Status: **BLOCKED, owner decision needed.** The Task 9 decision rule picks no config. `CoverageParams` defaults stay interim (buffer 20, heading 30°, margin 1, threshold 0.90). The spec §2 completion line is unchanged.
+Status: **BLOCKED, owner decision needed (re-sweep after Task 9b fold + Task 9c smoothing).** The Task 9 decision rule still picks no config. `CoverageParams` defaults stay interim (buffer 20, heading 30°, margin 1, threshold 0.90); the only new default is `smoothWindowS` = 10 s, which the brief prescribed. The spec §2 completion line is unchanged.
 
-Data: `sweep.csv` (full grid, threshold 0.90, 540 rows), `sweep-t0.85.csv` and `sweep-t0.80.csv` (σ {10, 15} × interval {5, 15}, re-run for rule step 3). All simulated, no real tracks. Reproduce from `app/`:
+Data: `sweep.csv` (full grid, threshold 0.90, 1296 rows), `sweep-t0.85.csv` and `sweep-t0.80.csv` (σ {10, 15} × interval {5, 15}, 576 rows each, re-run for rule step 3). All simulated, no real tracks. Reproduce from `app/`:
 
 ```
 ./gradlew :coverage-eval:run --args="sweep --data ../data/dist --out ../docs/spikes/coverage/sweep.csv \
-  --buffers 10,15,20,25,30 --headings off,30,45,60 --margins 0,1,3 --sigmas 5,10,15 --intervals 1,5,15 --seeds 3 --threshold 0.90"
+  --buffers 15,20,25,30 --headings off,30,45,60 --margins 0,1,3 --smooth 0,10,20 --sigmas 5,10,15 --intervals 1,5,15 --seeds 3 --threshold 0.90"
+./gradlew :coverage-eval:run --args="sweep --data ../data/dist --out ../docs/spikes/coverage/sweep-t0.85.csv \
+  --buffers 15,20,25,30 --headings off,30,45,60 --margins 0,1,3 --smooth 0,10,20 --sigmas 10,15 --intervals 5,15 --seeds 3 --threshold 0.85"
+# same with --threshold 0.80 --out ../docs/spikes/coverage/sweep-t0.80.csv
 ```
 
-Each row has 369 walks (123 trails × 3 seeds) and 162 multi-use-path vehicle chains (transitions) per seed.
+Each row has 342 walks (114 trails × 3 seeds) and 162 multi-use-path vehicle chains (transitions) per seed. The full grid takes ~107 s.
+Config labels below are buffer/heading/margin/smooth (m/°/m/s).
+
+## Tiny-trail fold (Task 9b)
+
+`bitrails dist` now merges trails under 30 m into the longest touching trail (segments within 1 m), or hides them when nothing touches them. Segments and island totals are unchanged. 123 → 114 trails.
+
+| trail | folded into |
+|---|---|
+| Allan's Alley | hidden |
+| Dock Street road end | hidden |
+| Fairview Avenue Path | hidden |
+| Farm Trail | Farm Trail South |
+| Fletcher Landing Road End | hidden |
+| Gideon Trail | Gideon Park Trail |
+| Howley Cove Trail | hidden |
+| To The Learning Tree | hidden |
+| Waterfront Trail | West Loop Trail |
+
+Effect: the zero-score ceiling is gone (σ5/1 s best `completeRate` @0.90 rose from 0.940 to 0.985), and the minimum `falseCompletes` at σ10/5 s fell from 2 to 0. The remaining false completes were not re-diagnosed per trail; trails just over 30 m (e.g. Rotary Park Trails, 31 m, beside Rotary Trail) are the likely source.
 
 ## Algorithm (module `:coverage`)
 
@@ -20,68 +42,91 @@ Each row has 369 walks (123 trails × 3 seeds) and 162 multi-use-path vehicle ch
    - drop single-fix spikes: both legs > `spikeM` (30 m) while the neighbours are < 15 m apart;
    - split into pieces on a gap > `maxGapS` (60 s) or a jump > `maxJumpM` (100 m);
    - speed check: drop a fix if its speed from the fix ≥ `speedWindowS` (30 s) earlier exceeds `maxSpeedMps` (4 m/s), and split there;
-   - drop pieces with < 2 fixes.
+   - drop pieces with < 2 fixes;
+   - **smoothing (Task 9c, R16):** within each piece, each fix moves to the mean of the piece's original fixes within ±`smoothWindowS` / 2 (default 10 s). No cascade, never across a break; a fix with no neighbour in the window is unchanged (so 15–20 s recordings are untouched at 10 s); 0 = off.
 3. **Matching.** Each piece is densified every `tickM`. Each point q gets a heading from a displacement baseline ≥ `headingBaselineM`. A point with no such baseline is stationary and credits nothing.
    - Candidates are ticks within `bufferM` of q that pass the heading check (axial difference ≤ `headingToleranceDeg`; skipped when the tolerance is null).
    - Competitive matching: a segment is credited only if its nearest candidate is within d\* + `matchMarginM` of the best segment's nearest candidate d\*. It credits that tick and its ±1 neighbours (heading-checked, within the buffer).
 4. **State.** `CoverageState` holds one bitset of covered ticks per segment. Union is OR, so it is order-independent and idempotent.
 5. **Progress.** A trail's fraction is the covered metres over the trail's distinct segment metres. It is COMPLETE at ≥ `completionThreshold`, NEARLY_DONE at ≥ `nearlyDoneThreshold` (0.75). The island fraction is covered metres over `islandTotalM`.
 
+## Smoothing: what it does in the sweep
+
+- **It trades true credit for false credit; it does not move the frontier.** At σ10/5 s, heading off or 60°: `completeRate` @0.90 drops ~0.07–0.09 per 10 s of window (e.g. 30/off/1: 0.830 → 0.754 → 0.658) while `falseCreditRatio` drops ~0.02–0.03 per step (0.092 → 0.066 → 0.050).
+- **At heading 30° it helps a little on both axes.** 20/30/1: cr 0.231 → 0.275 → 0.313, fcr 0.064 → 0.039 → 0.027, fc 4 → 3 → 0. But mean fraction stays ~0.81–0.83, so cr stays far below 0.95.
+- **Why it cannot fix the heading-30° gap:** the simulator's noise is Gauss–Markov with τ = 20 s (R10). A 10–20 s mean barely shrinks a 20 s-correlated offset, so the 15 m baseline heading stays noisy. It mostly removes per-fix jitter, which was crediting extra ticks on both the walked and neighbouring trails.
+- At σ0 it costs only ~1% (heading off cr 0.991 / 0.983 / 0.977 for 0 / 10 / 20 s): corner cutting and piece-end pull-in.
+- It cuts the speed-window leak: drive credit per transition averages 36 / 25 / 19 m at 0 / 10 / 20 s (σ10/5 s grid mean).
+- At σ15/15 s it changes little (cr −0.01 to −0.03): at 15 s spacing most windows hold a single fix.
+
 ## Decision trail (σ = 10 m, interval = 5 s)
 
 **Rule 1** keeps configs with `falseCompletes == 0`, `driveCreditM` ≤ 60 m per transition (R14) and `falseCreditRatio` ≤ 0.05.
-- The drive criterion passes everywhere. Drive credit runs 8.6–47.6 m per transition across all 540 rows, about 36 m at the candidate configs, so it never binds. Bike credit runs 17–53 m per transition.
-- No config has `falseCompletes == 0` at σ10/5 s. The minimum is 2, at buffer 10–20, heading off or 30°, margin 0.
-- Only buffer 10 with heading 30 or 45 meets `falseCreditRatio` ≤ 0.05.
-- **Rule 1 leaves an empty set.**
+- Drive passes everywhere: 7.7–47.6 m per transition across all 1296 rows. It never binds. Bike runs 22.8–53.3 m per transition.
+- 8 of 144 configs pass, at every threshold (0.90 / 0.85 / 0.80): **heading 30°, smooth 20 s, margin 0 or 1, buffer 15–30.**
 
-**Rules 2–3** need `completeRate` ≥ 0.95, with the threshold lowered from 0.90 down to 0.80. Ignoring rule 1, the best `completeRate` is 0.821 at 0.90, 0.883 at 0.85 and 0.916 at 0.80 (all at buffer 30, heading off, margin 3, which has 10 false completes). Even under ideal noise (σ5/1 s, threshold 0.90) no config passes; the maximum is 0.940. **Per the rule: stop and report to the owner.**
+**Rule 2** needs `completeRate` ≥ 0.95 among them. The best survivor, 30/30/1/20, gives 0.383 @0.90.
 
-**Guard test** `parallelNeighborNotCredited` (trails 12 m apart, σ5, 1 s; needs A ≥ 0.90 and B < 0.50). I probed it over the whole grid with a scratch test that was not committed. It passes **only with heading 30° and margin 0 or 1**, at every buffer: B = 0.40 at margin 0, B = 0.425 at margin 1. Heading off gives B = 0.73–0.90, and heading 45/60 gives B = 0.68–0.85.
+**Rule 3** lowers the threshold in 0.05 steps. The same 8 survive; best `completeRate` is 0.597 @0.85 and 0.725 @0.80 (30/30/1/20). **No config qualifies. Per the rule: stop, defaults and spec unchanged, report to the owner.**
 
-## Trade-off table (σ10/5 s unless noted; cr = completeRate, fc = falseCompletes)
+Ignoring rule 1, the best `completeRate` is 0.868 / 0.933 / 0.944 at 0.90 / 0.85 / 0.80 (30/60/3/0: fcr 0.104, fc 6 / 7 / 7). Even under ideal noise (σ5/1 s, @0.90) the maximum is 0.985, so the target is reachable in principle; σ10 noise is the problem.
 
-| buffer/heading/margin | guard | cr @0.90 | cr @0.85 | cr @0.80 | fcr | fc @0.90 | mean frac | stand m | drive m/transition | worst σ15/15 s cr @0.90 / @0.80 |
+## Guard test A/B (`parallelNeighborNotCredited`, unedited)
+
+Trails 12 m apart, white noise σ5, 1 s, seed 1; needs A ≥ 0.90 and B < 0.50. At the defaults (20/30/1):
+
+| smoothWindowS | A | B | result |
+|---|---|---|---|
+| 0 (before) | 1.0 | 0.425 | pass |
+| 10 (new default) | 1.0 | 0.0 | pass |
+
+A scratch probe over the whole grid (not committed; seeds 1–5) shows that **with any smoothing the guard passes at every buffer/heading/margin** (B ≤ 0.075), while without smoothing it passes only at heading 30° with margin ≤ 1 (B 0.40–0.45; others 0.63–0.93).
+
+Caveat: the guard uses white noise, which a 10 s mean removes almost entirely (σ5 → ~1.5 m). Real GPS noise is correlated, so this guard now overstates how well smoothing separates parallel trails. The sweep's fcr (correlated noise) is the more honest measure: 30/off/1/10 still has fcr 0.066 and 2 false completes.
+
+## Trade-off table (σ10/5 s unless noted; cr = completeRate, fcr = falseCreditRatio @0.90, fc = falseCompletes)
+
+Top 5:
+
+| config | guard (B) | cr @0.90 | cr @0.85 | cr @0.80 | fcr | fc @0.90 / 0.85 / 0.80 | mean frac | stand m | drive m/transition | worst σ15/15 s cr @0.90 / @0.80 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 10/30/0 | pass | 0.033 | 0.054 | 0.089 | **0.040** | 3 | 0.59 | 41 | 26 | 0.008 / 0.027 |
-| **20/30/1 (interim)** | pass | 0.176 | 0.425 | 0.640 | 0.065 | 3 | 0.78 | 44 | 36 | 0.038 / 0.130 |
-| 30/30/1 | pass | 0.276 | 0.564 | 0.726 | 0.078 | 4 | 0.80 | 47 | 37 | 0.049 / 0.222 |
-| 15/off/0 | fail | 0.547 | 0.737 | 0.827 | 0.082 | **2** | 0.85 | 36 | 33 | 0.119 / 0.409 |
-| 20/off/0 | fail | 0.718 | 0.821 | 0.870 | 0.086 | **2** | 0.88 | 36 | 36 | 0.266 / 0.658 |
-| 20/off/1 | fail | 0.751 | 0.832 | 0.881 | 0.093 | 3 | 0.89 | 35 | 37 | 0.285 / 0.680 |
-| 20/60/1 | fail | 0.748 | 0.835 | 0.892 | 0.084 | 5 | 0.89 | 38 | 36 | 0.220 / 0.626 |
-| 25/60/3 | fail | 0.808 | 0.867 | 0.913 | 0.101 | 10 | 0.91 | 38 | 38 | 0.431 / 0.761 |
-| 30/off/3 | fail | **0.821** | **0.883** | **0.916** | 0.116 | 10 | 0.91 | 35 | 38 | 0.564 / 0.802 |
+| 30/30/1/20 (best rule-1 survivor) | pass (0.0) | 0.383 | 0.597 | 0.725 | **0.029** | **0 / 0 / 0** | 0.83 | 40 | 21 | 0.067 / 0.208 (fc 1) |
+| 30/off/1/10 | pass (0.0) | 0.754 | 0.839 | 0.898 | 0.066 | 2 / 3 / 3 | 0.91 | 32 | 26 | 0.500 / 0.792 (fc 1) |
+| 30/60/3/10 | pass (0.075) | 0.810 | 0.877 | 0.909 | 0.070 | 4 / 4 / 5 | 0.93 | 36 | 27 | 0.526 / 0.807 (fc 2) |
+| 30/off/3/10 | pass (0.075) | 0.789 | 0.883 | 0.915 | 0.087 | 4 / 4 / 5 | 0.92 | 32 | 27 | 0.579 / 0.830 (fc 4) |
+| 30/60/3/0 (best cr) | fail (0.85) | **0.868** | **0.933** | **0.944** | 0.104 | 6 / 7 / 7 | 0.94 | 39 | 38 | 0.532 / 0.816 (fc 2) |
 
-`fc` rises as the threshold drops (for example, 20/off/0 goes from 2 to 3), so lowering the threshold cannot satisfy rule 1 either.
+Reference rows:
 
-### Why: diagnosis from a scratch per-trail run (σ10/5 s, own seeds)
+| config | guard (B) | cr @0.90 | cr @0.85 | cr @0.80 | fcr | fc @0.90 / 0.85 / 0.80 | mean frac | stand m | drive m/transition | worst σ15/15 s cr @0.90 / @0.80 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 20/30/1/10 (current defaults) | pass (0.0) | 0.275 | 0.520 | 0.714 | 0.039 | 3 / 3 / 3 | 0.81 | 38 | 24 | 0.044 / 0.102 (fc 1) |
+| 20/30/1/0 (pre-9c defaults) | pass (0.425) | 0.231 | 0.491 | 0.708 | 0.064 | 4 / 5 / 5 | 0.82 | 43 | 36 | 0.041 / 0.099 (fc 1) |
+| 20/off/0/0 | fail (0.75) | 0.757 | 0.851 | 0.906 | 0.082 | 2 / 3 / 4 | 0.91 | 36 | 36 | 0.260 / 0.643 (fc 1) |
 
-- **False completes are tiny trails, not real leakage.** Examples are Waterfront Trail (2 m) from walking West Loop Trail, Gideon Trail (11 m) from Gideon Park Trail, and Rotary Park Trails (31 m) from Rotary Trail. A 2–31 m trail lies wholly inside the buffer of the trail next to it. `falseCompletes == 0` is unreachable at any buffer ≥ 10 m while these stay first-class trails.
-- **The ~0.96 ceiling.** Four or five trails are shorter than the 15 m heading baseline (Dock Street road end 3 m, Waterfront 2 m, Gideon 11 m, plus another short entry). Walked alone they score 0 under every config, which removes about 4% of walks. That puts `completeRate` ≥ 0.95 at the edge of what is reachable even with zero noise.
-- **Heading 30° at σ10 under-credits every trail.** A 15 m baseline under 10 m correlated noise gives a heading error often above 30°. Long trails then land at 0.72–0.88 instead of about 0.88–0.92. That is the gap between 20/30/1 (cr 0.18) and 20/off/0 (cr 0.72). Heading 30° is also the only setting that passes the parallel-trail guard. **This is the core conflict.**
-- **Heading off sits right at the 0.90 line.** Mean fraction is 0.88–0.91, so a 0.90 threshold splits walks roughly in half. Lowering it to 0.80 lifts heading-off configs to 0.87–0.92.
+Worst case (σ15/15 s) fc is at threshold 0.80.
 
 ## Options for the owner (none applied)
 
-1. **Filter or merge tiny trails** (< ~35 m, or < 15 m at minimum) into their neighbour, or leave them out of "trails complete". This removes most false completes and the zero-score ceiling, and is likely needed under any option.
-2. **Relax the parallel-trail guard** (accept B ≈ 0.75 at 12 m spacing). Then 20/off/0 at threshold 0.80 gives cr 0.870, fcr 0.086 and fc 3 (worst case cr 0.658). This does not meet 0.95 or fcr ≤ 0.05.
-3. **Keep the guard (heading 30°) and fix the heading noise.** Options are a longer baseline (`headingBaselineM` 25–30 m) or a heading taken from the smoothed track, then re-sweep. This is untested and most likely to close the gap without giving up the anti-goal. It needs code.
-4. **Loosen the targets.** For example: cr ≥ 0.85 at 0.80, fcr ≤ 0.10, and `falseCompletes` counted only on trails ≥ 35 m.
-5. `spikeM` costs a little `completeRate` and is a follow-up knob, not a fix for this gap.
+1. **Accept heading off (or 60°) + smoothing 10 s + threshold 0.80**, e.g. 30/off/1/10: cr 0.898, fcr 0.066, fc 3. Guard passes (white noise only). Misses cr ≥ 0.95 and fcr ≤ 0.05, and has 3 false completes; needs a looser rule.
+2. **Keep the strict anti-false-credit rule** (30/30/1/20): fc 0 and fcr 0.029, but only ~73% of walked trails complete at 0.80. Users would routinely walk a trail and not get it.
+3. **Fix the heading noise properly** (still untested): a longer `headingBaselineM` (25–30 m) or a heading from a longer/smoothed track, then re-sweep heading 30°. Smoothing alone did not close the gap.
+4. **Loosen the targets** (e.g. cr ≥ 0.85 @0.80, fcr ≤ 0.07, fc counted only for trails ≥ 50 m) and re-apply the rule; option 1's configs would then qualify.
+5. **Fold more**: raise the fold limit from 30 m to ~50 m to remove the remaining small-trail false completes (needs a per-trail diagnosis first).
 
 ## Known limits (for any config)
 
-- **Parallel trails < 12 m apart.** At the defaults the guard gives A = 1.0 and B = 0.425. Heading off credits the neighbour at 73–90%.
-- **Hairpin switchbacks** tighter than the buffer score 0.71–0.93 even at zero noise.
-- **Trails shorter than the 15 m heading baseline** (4–5 trails) score 0 when walked alone. Combining or filtering trails is an owner option (see 1).
-- **Speed-window leak (R5).** About 30 s of fast travel right after walking passes the speed check. That is about 36 m per transition at the candidate configs (5.9 km driving, 7.6 km biking over 162 multi-use-path chains). It is never 0.
-- **Spike filter** costs a little `completeRate`.
-- **Foot only in v1** (owner, 2026-10-18). Riding a bike on a bike-allowed trail does not count. The 4 m/s speed check is what enforces this.
+- **Parallel trails < 12 m apart.** The guard passes everywhere with smoothing, but only because its noise is white; under correlated noise, heading off still credits neighbours (fcr 0.066–0.09).
+- **Hairpin switchbacks** tighter than the buffer score 0.71–0.93 even at zero noise; smoothing cuts them further.
+- **Speed-window leak (R5).** About 30 s of fast travel right after walking passes the speed check: 19–36 m per transition on average (smoothing reduces it). It is never 0.
+- **`spikeM`** (30 m) costs a little `completeRate` and is a follow-up knob, not swept.
+- **Foot only in v1** (owner, 2026-10-18). Riding a bike on a bike-allowed trail does not count. The 4 m/s speed check enforces this.
+- **Tiny trails** (< 30 m) are now folded or hidden (table above); trails of 30–50 m can still be auto-completed from a neighbour.
+- **Smoothing** pulls each piece's first and last fix inward by up to ~half a window of travel (~6.5 m at 10 s) and cuts corners; it does nothing for sparse (≥ 15 s) recordings.
 
 ## What Spike 4 must deliver
 
-Background location at **σ ≤ 10 m effective accuracy and a fix interval ≤ 5 s** while walking. At 15 s / σ15, every config collapses: cr @0.90 is 0.01–0.56, and even 30/off/3 only reaches 0.80 at threshold 0.80.
+Background location at **σ ≤ 10 m effective accuracy and a fix interval ≤ 5 s** while walking. At 15 s / σ15, every config collapses: cr @0.90 is at most 0.59, and even 30/off/3 only reaches 0.83 at threshold 0.80.
 
 Spike 4 should report, on iOS and Android with the screen off:
 - the real interval distribution;

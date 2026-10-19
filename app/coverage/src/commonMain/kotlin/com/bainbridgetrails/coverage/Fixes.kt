@@ -16,7 +16,8 @@ private const val MIN_SPEED_BASIS_S = 10.0
  * Continuous runs of accepted fixes, in time order. Lines are drawn only within a piece.
  *
  * Rules, in order: (1) sort, drop duplicate timestamps; (2) drop mock / inaccurate fixes; (2b) drop spikes;
- * (3) break pieces on time gap > maxGapS or jump > maxJumpM; (4) speed check; (5) drop pieces < 2 fixes.
+ * (3) break pieces on time gap > maxGapS or jump > maxJumpM; (4) speed check; (5) drop pieces < 2 fixes;
+ * (6) smoothing.
  *
  * Spike filter (rule 2b, ruling R11): fix i, other than the first or last of the sequence left after rule 2, is
  * dropped when d(i-1, i) > spikeM and d(i, i+1) > spikeM but d(i-1, i+1) < spikeM / 2, i.e. it leaves and returns
@@ -28,6 +29,10 @@ private const val MIN_SPEED_BASIS_S = 10.0
  * t_i - t_j >= speedWindowS; if none, the sequence's first fix, provided >= 10 s elapsed. Fixes within
  * 10 s of the sequence start are accepted unchecked (start-of-recording allowance only). If speed j->i
  * exceeds maxSpeedMps, fix i is dropped and the piece breaks. Breaks never reset the reference.
+ *
+ * Smoothing (rule 6, ruling R16): within each piece, each fix's position becomes the mean of the original positions of that
+ * piece's fixes with |t_j - t_i| <= smoothWindowS / 2 (no cascade; never across a break). A fix with no neighbour in the
+ * window keeps its position, so sparse recordings (interval > smoothWindowS / 2) are unchanged. smoothWindowS = 0 disables it.
  */
 fun filterFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection): List<List<Xy>> {
     val accepted = fixes.sortedBy { it.timeMs }
@@ -48,9 +53,11 @@ fun filterFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection)
 
     val pieces = ArrayList<List<Xy>>()
     var pts = ArrayList<Xy>()
+    var times = ArrayList<Long>()
     fun flush() {
-        if (pts.size >= 2) pieces.add(pts)
+        if (pts.size >= 2) pieces.add(smooth(pts, times, params.smoothWindowS))
         pts = ArrayList()
+        times = ArrayList()
     }
 
     for (i in seq.indices) {
@@ -74,7 +81,25 @@ fun filterFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection)
             }
         }
         pts.add(p)
+        times.add(t)
     }
     flush()
     return pieces
+}
+
+/** Rule 6: each point -> mean of the piece's original points with |t_j - t_i| <= windowS / 2 (no cascade); windowS <= 0 = off. */
+private fun smooth(pts: List<Xy>, times: List<Long>, windowS: Double): List<Xy> {
+    if (windowS <= 0.0) return pts
+    val halfMs = windowS * 500.0
+    var lo = 0
+    var hi = 0 // exclusive
+    var sx = 0.0
+    var sy = 0.0
+    return pts.indices.map { i ->
+        val t = times[i]
+        while (hi < pts.size && times[hi] - t <= halfMs) { sx += pts[hi].x; sy += pts[hi].y; hi++ }
+        while (t - times[lo] > halfMs) { sx -= pts[lo].x; sy -= pts[lo].y; lo++ }
+        val n = hi - lo
+        if (n == 1) pts[i] else Xy(sx / n, sy / n)
+    }
 }

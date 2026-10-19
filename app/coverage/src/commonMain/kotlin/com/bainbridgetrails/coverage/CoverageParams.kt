@@ -17,6 +17,8 @@ data class CoverageParams(
     val maxJumpM: Double = 100.0,
     /** single-fix GPS spike: both legs > spikeM while its neighbours are < spikeM / 2 apart (filterFixes rule 2b) */
     val spikeM: Double = 30.0,
+    /** filterFixes rule 6: each fix moves to the mean of its piece's fixes within +/- smoothWindowS / 2; 0 = off */
+    val smoothWindowS: Double = 10.0,
     val completionThreshold: Double = 0.90,
     val nearlyDoneThreshold: Double = 0.75,
 )

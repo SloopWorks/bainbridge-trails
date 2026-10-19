@@ -96,4 +96,47 @@ class FixFilterTest {
         assertEquals(1, r.size)
         assertEquals(201, r[0].size)
     }
+
+    private fun gauss(r: kotlin.random.Random): Double {
+        val u1 = r.nextDouble().coerceAtLeast(1e-12)
+        val u2 = r.nextDouble()
+        return kotlin.math.sqrt(-2.0 * kotlin.math.ln(u1)) * kotlin.math.cos(2.0 * kotlin.math.PI * u2)
+    }
+
+    /** Eastward 1.3 m/s walk along y = 0, one fix per [stepS] s, white noise sigma [sigma] m on x and y. */
+    private fun noisyWalk(seconds: Int, sigma: Double, stepS: Int = 1, seed: Int = 3): List<Fix> {
+        val rnd = kotlin.random.Random(seed)
+        return (0..seconds step stepS).map { s -> fix(s * 1000L, 1.3 * s + sigma * gauss(rnd), sigma * gauss(rnd)) }
+    }
+
+    private fun rmsPerp(ys: List<Double>) = kotlin.math.sqrt(ys.sumOf { it * it } / ys.size)
+
+    @Test fun smoothingReducesNoise() {
+        val fixes = noisyWalk(299, sigma = 8.0)
+        val before = rmsPerp(fixes.map { proj.toXy(it.lon, it.lat).y })
+        val out = filterFixes(fixes, params, proj)
+        val after = rmsPerp(out.flatten().map { it.y })
+        println("smoothingReducesNoise: rms before=$before after=$after window=${params.smoothWindowS}s")
+        assertTrue(out.sumOf { it.size } >= 290, "points=${out.sumOf { it.size }}")
+        assertTrue(after < 0.6 * before, "before=$before after=$after")
+    }
+
+    @Test fun smoothingOffIsIdentity() {
+        // sigma 3: no fix trips the spike or speed rules, so the unsmoothed output is every input fix in one piece
+        val fixes = noisyWalk(299, sigma = 3.0)
+        val expected = fixes.map { proj.toXy(it.lon, it.lat) }
+        val out = filterFixes(fixes, params.copy(smoothWindowS = 0.0), proj)
+        assertEquals(1, out.size)
+        assertEquals(expected.size, out[0].size)
+        for (i in expected.indices) {
+            assertTrue(kotlin.math.hypot(out[0][i].x - expected[i].x, out[0][i].y - expected[i].y) < 1e-6, "fix $i moved")
+        }
+        assertTrue(filterFixes(fixes, params, proj)[0] != out[0], "default smoothing should move fixes")
+    }
+
+    @Test fun smoothingKeepsSparseFixes() {
+        val fixes = noisyWalk(600, sigma = 8.0, stepS = 20)
+        assertEquals(10.0, params.smoothWindowS)
+        assertEquals(filterFixes(fixes, params.copy(smoothWindowS = 0.0), proj), filterFixes(fixes, params, proj))
+    }
 }

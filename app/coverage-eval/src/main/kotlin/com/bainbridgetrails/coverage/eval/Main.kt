@@ -17,7 +17,7 @@ import kotlin.system.exitProcess
 
 private const val USAGE = """usage:
   sweep --data DIR --out FILE.csv [--buffers 10,15,20,25,30] [--headings off,30,45,60] [--margins 0,1,3]
-        [--sigmas 5,10,20] [--intervals 1,5,10] [--seeds 3] [--threshold 0.90]
+        [--smooth 0,10,20] [--sigmas 5,10,20] [--intervals 1,5,10] [--seeds 3] [--threshold 0.90]
   gpx --data DIR FILE.gpx..."""
 
 fun main(args: Array<String>) {
@@ -37,7 +37,7 @@ fun main(args: Array<String>) {
         }
     }
     val allowed = when (args[0]) {
-        "sweep" -> setOf("data", "out", "buffers", "headings", "margins", "sigmas", "intervals", "seeds", "threshold")
+        "sweep" -> setOf("data", "out", "buffers", "headings", "margins", "smooth", "sigmas", "intervals", "seeds", "threshold")
         "gpx" -> setOf("data")
         else -> usage("unknown command ${args[0]}")
     }
@@ -77,6 +77,7 @@ private fun runSweep(dataset: Dataset, dataDir: File, flags: Map<String, String>
         seeds = (flags["seeds"] ?: "3").toInt(),
         headingTolerances = headings,
         margins = doubles(flags["margins"] ?: "0,1,3"),
+        smoothWindows = doubles(flags["smooth"] ?: "0,10,20").onEach { if (it < 0.0) usage("--smooth takes seconds >= 0") },
         threshold = (flags["threshold"] ?: "0.90").toDouble(),
         categories = categories,
         log = { System.err.println(it) },

@@ -87,11 +87,28 @@ class SweepMetricsTest {
 
     @Test
     fun drivingLeaksOnlyTheTransition() {
-        // 30 s walk then 13 m/s: the speed check (vs the fix 30 s earlier) trips ~7 s after the switch, so ~90 m leak
+        // 30 s walk then 13 m/s: the speed check (vs the fix 30 s earlier) trips ~7 s after the switch, so ~90 m leak unsmoothed
         val ds = straightDataset()
-        val index = SegmentIndex(ds.segments, CoverageParams())
-        val (_, credit) = vehicleCreditM(ds, index, listOf("d1"), NoiseModel(0.0, outlierRate = 0.0), 1.0, 13.0, seed = 9)
-        assertTrue(credit > 50.0 && credit < 200.0, "credit $credit") // 80 m at the time of writing
+        fun credit(p: CoverageParams) =
+            vehicleCreditM(ds, SegmentIndex(ds.segments, p), listOf("d1"), NoiseModel(0.0, outlierRate = 0.0), 1.0, 13.0, seed = 9).second
+        val raw = credit(CoverageParams(smoothWindowS = 0.0))
+        assertTrue(raw > 50.0 && raw < 200.0, "credit $raw") // 80 m at the time of writing
+        // smoothing pulls the leaked transition fixes back toward the walk: never more leak (45 m at the time of writing)
+        val smoothed = credit(CoverageParams())
+        assertTrue(smoothed <= raw, "smoothed $smoothed raw $raw")
+    }
+
+    @Test
+    fun smoothWindowDimensionGivesOneRowEachAndCsvColumn() {
+        val rows = sweep(
+            straightDataset(), buffers = listOf(20.0), sigmas = listOf(0.0), intervals = listOf(1.0), seeds = 1,
+            headingTolerances = listOf(30.0), margins = listOf(1.0), smoothWindows = listOf(0.0, 10.0, 20.0), noiseFor = exact,
+        )
+        assertEquals(listOf(0.0, 10.0, 20.0), rows.map { it.smoothWindowS })
+        val col = SweepRow.CSV_HEADER.split(",").indexOf("smooth_window_s")
+        assertTrue(col >= 0, SweepRow.CSV_HEADER)
+        assertEquals(listOf("0.0000", "10.0000", "20.0000"), rows.map { it.csv().split(",")[col] })
+        assertEquals(SweepRow.CSV_HEADER.split(",").size, rows[0].csv().split(",").size)
     }
 
     @Test
