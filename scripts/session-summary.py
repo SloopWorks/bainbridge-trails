@@ -57,7 +57,10 @@ def main(path):
     if len(batt) >= 2 and batt[-1][0] > batt[0][0]:
         drop = batt[0][1] - batt[-1][1]
         hrs = (batt[-1][0] - batt[0][0]) / 3_600_000
-        print(f"battery: {batt[0][1]}% -> {batt[-1][1]}% over {hrs:.2f} h = {drop / hrs:.1f} %/h")
+        if any(b[1] > a[1] for a, b in zip(batt, batt[1:])):
+            print(f"battery: {batt[0][1]}% -> {batt[-1][1]}% over {hrs:.2f} h; WARNING battery rose (charging?), %/h omitted")
+        else:
+            print(f"battery: {batt[0][1]}% -> {batt[-1][1]}% over {hrs:.2f} h = {drop / hrs:.1f} %/h")
     else:
         print("battery: not enough diag readings")
     accs = [d["meanAccuracyM"] for d in diags if d.get("meanAccuracyM") is not None]

@@ -1,11 +1,11 @@
 # Spike 4: location + activity verification (notes)
 
-Branch `spike4/location-activity`. Build published to channel `dev-spike4-location-activity`: build id 01a15421-f152-73cb-a103-3430024643cd (built from a356527).
+Branch `spike4/location-activity`. Dev build published to channel `dev-spike4-location-activity`: build id 01a15421-f152-73cb-a103-3430024643cd (built from a356527).
 
 ## Architecture
 - `:tracking` (common): `SessionStore` (append-only JSONL, `<dir>/sessions/<id>.jsonl`, one flushed line per event), `Gating` (activity + step checks), `Finalizer` (gate, then coverage), `RecordingController` (state machine), `Geofences`, `Diagnostics`.
 - Platform recorders are the only writers (R4): `RecordingService` (Android FGS, type `location`) and `IosRecorder` push events into one channel; a single coroutine appends then emits on `RecordingBus`. The controller never writes a live session.
-- Every 5 min the recorder writes a `diag` event (battery %, fixes and mean accuracy since the last diag). It does not affect gating or coverage.
+- Every 5 min the recorder writes a `diag` event (battery %, fixes and mean accuracy since the last diag). It does not affect gating or coverage. Verified at runtime on the Android emulator (below); iOS diag is unverified at runtime (compiled only).
 - Crash recovery: an unfinished session (no `stop`) is offered for finishing on next launch (verified, Android 6.2%).
 - Raw tracks stay on the phone: `noBackupFilesDir/tracking` (Android), Application Support/tracking (iOS). Nothing is logged with coordinates.
 
@@ -21,7 +21,7 @@ Branch `spike4/location-activity`. Build published to channel `dev-spike4-locati
 | | Always | only in the optional geofence opt-in |
 
 ## Store review
-- **Play.** FGS `location` type: justified as a user-started, visible walk recording (ongoing notification with Stop). Background location is declared in the debug manifest only, so release has no geofence surface (receivers and `RECEIVE_BOOT_COMPLETED` are debug-only too). To ship geofences: (1) move the permission, receivers and boot receiver to the main manifest; (2) complete the Play Console background-location declaration; (3) record a video showing the in-app prominent disclosure and the permission flow; (4) justify the core feature (trailhead arrival prompt) and why foreground-only is insufficient; (5) keep the opt-in disclosure text current.
+- **Play.** FGS `location` type: justified as a user-started, visible walk recording (ongoing notification with Stop). Background location is declared in the debug manifest only, so release has no geofence surface (receivers and `RECEIVE_BOOT_COMPLETED` are debug-only too). Targeting SDK 34+, the FGS `location` type also needs the Play Console foreground-service declaration (with a video), and background location needs a privacy policy. To ship geofences: (1) move the permission, receivers and boot receiver to the main manifest; (2) complete the Play Console background-location declaration; (3) record a video showing the in-app prominent disclosure and the permission flow; (4) justify the core feature (trailhead arrival prompt) and why foreground-only is insufficient; (5) keep the opt-in disclosure text current.
 - **App Store.** When-in-use plus `UIBackgroundModes: location` (walk recording with the screen off). Always only for the opt-in trailhead feature, with `NSLocationAlwaysAndWhenInUseUsageDescription` stating the purpose. Motion string explains bike/car filtering.
 
 ## Gating rules and limits
@@ -35,7 +35,10 @@ Branch `spike4/location-activity`. Build published to channel `dev-spike4-locati
 - iOS simulator: `simctl` fixes are flagged simulated, so default result is 0% (all dropped as mock; [mock-filtered](screens/ios-results-mock-filtered.png)). With debug-only `-acceptSimulatedLocations`: Gazzam **8.5%** ([results](screens/ios-results.png), [recording](screens/ios-recording.png), [background](screens/ios-background.png)). The simulator has no CoreMotion, so Unverified.
 - Geofences, Android: opt-in worked ([disclosure](screens/android-geofence-disclosure.png), [allow all the time](screens/android-geofence-allow-all-the-time.png)); **1 of 6** entries fired, ~2 min 15 s late (GMS stationary throttling), notification in [android-geofence.png](screens/android-geofence.png). iOS: region entry logged ~3 s after the inside fix; banner not shown because the notification alert needs a tap ([prompt](screens/ios-geofence-notification-prompt.png)). Accepted gap (R10).
 
+- Diag on Android emulator (Pixel_9_Pro_bt4, ~5.5 min replay): one line appeared at the 5 min mark, read via `run-as`: `{"t":"diag","timeMs":...,"batteryPct":100,"fixCount":142,"meanAccuracyM":4.64}` (emulator battery is constant 100%).
+
 ## Open questions for v1
+- iOS diag (UIDevice battery) unverified at runtime.
 - Live provisional % during the walk (today: results only at Finish).
 - Raw-track retention: propose keep 30 days after finalise, then delete (coverage store keeps the result).
 - `Dataset.parse` takes 5-8.6 s on a debug emulator; measure on release/device, consider a binary format.
@@ -45,7 +48,7 @@ Branch `spike4/location-activity`. Build published to channel `dev-spike4-locati
 - Android geofence latency on a real device; fences do not alert if already inside at opt-in.
 
 ## Owner field test (Pixel, dev build `com.bainbridgetrails.app.dev`)
-Install the dev-channel build. Grant all prompts. Record each as its own session.
+Install the dev-channel build before 2026-10-21T12:28Z (it expires after 48 h); otherwise republish from the branch: `scripts/sync-app-assets.sh`, `cd app && ./gradlew -PshipyardDeployPluginRepository=file://$HOME/.m2/repository :androidApp:assembleDebug`, then `shipyard-deploy publish androidApp/build/outputs/apk/debug/androidApp-debug.apk` (with `SHIPYARD_DEPLOY_SERVER` and `SHIPYARD_DEPLOY_TOKEN` set). Grant all prompts. Record each as its own session.
 1. **60 min walk, screen off**, Gazzam or Grand Forest. Start, lock phone, pocket, Finish at the end.
 2. **5 min car ride** with recording on (drive, then Finish). Expect vehicle fixes dropped.
 3. **Walk along a road beside a trail** (about 10 min). Note whether road fixes credit the trail.

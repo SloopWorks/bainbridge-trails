@@ -8,8 +8,8 @@ fun batteryPercent(level: Int, scale: Int): Int? =
     if (level < 0 || scale <= 0) null else (level * 100L / scale).toInt()
 
 /**
- * Collects fix count and accuracy between diag ticks. Not thread-safe: feed and flush from one thread
- * (the recorders call [onFix] from their fix callback and [flush] from the same context, or guard externally).
+ * Collects fix count and accuracy between diag ticks. Not thread-safe: it is fed only from the single
+ * writer coroutine (via [resolve]); source callbacks never touch it.
  */
 class DiagAccumulator {
     private var count = 0
@@ -35,7 +35,7 @@ class DiagAccumulator {
 }
 
 /** [SessionEvent.Diag.fixCount] value marking a tick request from the timer; the writer swaps it for a real Diag. */
-const val DIAG_TICK = -1
+internal const val DIAG_TICK = -1
 
 /** Timer side: a placeholder carrying the time and battery reading. The writer resolves it via [DiagAccumulator.resolve]. */
 fun diagTick(timeMs: Long, batteryPct: Int?) = SessionEvent.Diag(timeMs, batteryPct, DIAG_TICK, null)
