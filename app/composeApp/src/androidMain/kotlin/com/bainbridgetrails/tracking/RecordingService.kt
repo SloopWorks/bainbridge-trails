@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -210,9 +211,12 @@ class RecordingService : Service() {
         }
         if (stopping) return
         stopping = true
-        val stp = steps.takeIf { stepJob != null }
+        val heartbeatJob = stepJob
+        val stp = steps.takeIf { heartbeatJob != null }
         stopSources(keepSteps = true)
         scope.launch {
+            // Wait for an in-flight heartbeat flush to be abandoned before Stop's own flush starts.
+            heartbeatJob?.cancelAndJoin()
             // last count held to the end of the walk; nothing if the flush does not complete in time
             stp?.flush(STOP_FLUSH_TIMEOUT_MS) { channel.trySend(stepTick(System.currentTimeMillis())) }
             withContext(Dispatchers.Main) {
