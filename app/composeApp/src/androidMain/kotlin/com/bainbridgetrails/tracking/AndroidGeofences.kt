@@ -74,7 +74,7 @@ object AndroidGeofences {
     @SuppressLint("MissingPermission") // backgroundGranted() checked first
     suspend fun register(context: Context): Int {
         val app = context.applicationContext
-        if (!declared(app) || !optedIn(app) || !backgroundGranted(app)) return 0
+        if (!mayRegister(app)) return 0
         val all = RecordingGraph.trailheads().await()
         val chosen = if (all.size <= Geofences.ANDROID_MAX) all else {
             val last = runCatching { LocationServices.getFusedLocationProviderClient(app).lastLocation.await() }.getOrNull()
@@ -94,15 +94,23 @@ object AndroidGeofences {
                 },
             )
             .build()
+        // Re-check after the suspensions above: an opt-out (or revoked permission) while this re-arm was in flight
+        // must win. Both run on the main thread, so nothing can interleave between this check and the add call, and
+        // Play services applies a later removeGeofences after this add.
+        if (!mayRegister(app)) return 0
         LocationServices.getGeofencingClient(app).addGeofences(request, pendingIntent(app)).await()
         Log.i(TAG, "registered ${chosen.size} trailhead geofences")
         return chosen.size
     }
 
+    private fun mayRegister(app: Context): Boolean =
+        Geofences.shouldRegister(declared(app), optedIn(app), backgroundGranted(app))
+
     fun unregister(context: Context) {
         val app = context.applicationContext
         LocationServices.getGeofencingClient(app).removeGeofences(pendingIntent(app))
-        Log.i(TAG, "removed trailhead geofences")
+            .addOnSuccessListener { Log.i(TAG, "removed trailhead geofences") }
+            .addOnFailureListener { Log.w(TAG, "remove geofences failed: ${it.javaClass.simpleName}") }
     }
 
     /** Fire-and-forget [register] for app start; failures are logged (no coordinates). */

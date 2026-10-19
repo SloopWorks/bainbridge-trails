@@ -8,6 +8,7 @@ import com.bainbridgetrails.record.RecordingGraph
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
@@ -37,8 +38,10 @@ class GeofenceReceiver : BroadcastReceiver() {
                     }
                 }
                 Log.i(TAG, "arrival: ${ids.size} trailhead(s)")
-            } catch (e: CancellationException) {
+            } catch (e: TimeoutCancellationException) {
                 Log.w(TAG, "arrival text timed out")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w(TAG, "arrival failed: ${e.javaClass.simpleName}")
             } finally {
@@ -58,8 +61,10 @@ class GeofenceBootReceiver : BroadcastReceiver() {
         RecordingGraph.scope.launch {
             try {
                 withTimeout(9_000) { AndroidGeofences.register(app) }
-            } catch (e: CancellationException) {
+            } catch (e: TimeoutCancellationException) {
                 Log.w(TAG, "boot re-register timed out")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w(TAG, "boot re-register failed: ${e.javaClass.simpleName}")
             } finally {

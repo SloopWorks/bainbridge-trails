@@ -181,7 +181,12 @@ object IosGeofences {
         val app = UIApplication.sharedApplication
         // A background relaunch for a region event gets ~10 s; ask for a little more to load the dataset.
         var task = UIBackgroundTaskInvalid
-        task = app.beginBackgroundTaskWithExpirationHandler { app.endBackgroundTask(task) }
+        task = app.beginBackgroundTaskWithExpirationHandler {
+            // Expired before the post finished: end it here and mark it so the finally block doesn't end it twice.
+            val expiring = task
+            task = UIBackgroundTaskInvalid
+            if (expiring != UIBackgroundTaskInvalid) app.endBackgroundTask(expiring)
+        }
         scope.launch {
             try {
                 val text = RecordingGraph.arrivalText(PlatformContext.INSTANCE, trailheadId) ?: return@launch
@@ -198,7 +203,9 @@ object IosGeofences {
             } catch (e: Exception) {
                 println("Geofences: arrival failed (${e::class.simpleName})")
             } finally {
-                if (task != UIBackgroundTaskInvalid) app.endBackgroundTask(task)
+                val ending = task
+                task = UIBackgroundTaskInvalid
+                if (ending != UIBackgroundTaskInvalid) app.endBackgroundTask(ending)
             }
         }
     }

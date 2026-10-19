@@ -48,6 +48,14 @@ object Geofences {
         return "You're at ${th.name} — $k of $n trails here complete"
     }
 
+    /**
+     * Whether trailhead geofences may be (re-)registered: the feature exists in this build, the user is opted in,
+     * and background location is granted. Checked before loading AND again immediately before the platform add
+     * call, so an opt-out during an in-flight re-arm wins.
+     */
+    fun shouldRegister(declared: Boolean, optedIn: Boolean, backgroundGranted: Boolean): Boolean =
+        declared && optedIn && backgroundGranted
+
     /** Haversine distance in metres. */
     fun distanceM(lon1: Double, lat1: Double, lon2: Double, lat2: Double): Double {
         val r = 6_371_008.8

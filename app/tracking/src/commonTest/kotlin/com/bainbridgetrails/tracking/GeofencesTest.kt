@@ -81,4 +81,12 @@ class GeofencesTest {
         val text = """{"version":"v1","trailheads":[{"id":"th-1","lon":-122.5,"lat":47.6,"name":"X","trail_ids":["t-a"],"source":"road_access"}]}"""
         assertEquals(listOf(Trailhead("th-1", -122.5, 47.6, "X", listOf("t-a"))), Geofences.parse(text))
     }
+
+    @Test
+    fun shouldRegisterNeedsAllThree() {
+        assertEquals(true, Geofences.shouldRegister(declared = true, optedIn = true, backgroundGranted = true))
+        assertEquals(false, Geofences.shouldRegister(declared = true, optedIn = false, backgroundGranted = true))
+        assertEquals(false, Geofences.shouldRegister(declared = true, optedIn = true, backgroundGranted = false))
+        assertEquals(false, Geofences.shouldRegister(declared = false, optedIn = true, backgroundGranted = true))
+    }
 }
