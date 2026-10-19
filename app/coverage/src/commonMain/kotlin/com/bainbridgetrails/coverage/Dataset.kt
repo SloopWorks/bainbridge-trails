@@ -1,0 +1,40 @@
+package com.bainbridgetrails.coverage
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+@Serializable
+data class TrailMeta(
+    val id: String,
+    val name: String,
+    @SerialName("segment_ids") val segmentIds: List<String>,
+    @SerialName("computed_length_mi") val computedLengthMi: Double,
+    @SerialName("official_length_mi") val officialLengthMi: Double? = null,
+) {
+    val displayLengthMi: Double get() = officialLengthMi ?: computedLengthMi
+}
+
+@Serializable
+private data class TrailsFile(
+    val version: String,
+    @SerialName("island_total_shippable_m") val islandTotalShippableM: Double,
+    val trails: List<TrailMeta>,
+)
+
+@Serializable
+private data class SegmentsFile(val version: String, val segments: List<SegmentGeom>)
+
+/** Parsed trails.json + coverage_segments.json. [islandTotalM] is the shippable total. */
+class Dataset(val trails: List<TrailMeta>, val islandTotalM: Double, val segments: List<SegmentGeom>) {
+    companion object {
+        private val json = Json { ignoreUnknownKeys = true }
+
+        fun parse(trailsJson: String, coverageSegmentsJson: String): Dataset {
+            val t = json.decodeFromString(TrailsFile.serializer(), trailsJson)
+            val s = json.decodeFromString(SegmentsFile.serializer(), coverageSegmentsJson)
+            require(t.version == s.version) { "dataset version mismatch: trails=${t.version} segments=${s.version}" }
+            return Dataset(t.trails, t.islandTotalShippableM, s.segments)
+        }
+    }
+}
