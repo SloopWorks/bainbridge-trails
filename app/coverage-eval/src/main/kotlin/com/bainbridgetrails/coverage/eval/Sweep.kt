@@ -33,17 +33,19 @@ import kotlin.streams.toList
  *   consist of scored segments only).
  * - standCreditM: mean per walk of covered m (scored segments) from walking the last 60 s of the trail's first chain
  *   then standing 10 min, minus the same walk without the stand.
- * - bikeCreditM / driveCreditM: mean per seed of total covered m (all segments) from walking 30 s then riding 6 / 13 m/s
+ * - bikeCreditM / driveCreditM: mean per seed of total covered m (scored segments) from walking 30 s then riding 6 / 13 m/s
  *   along every vehicle chain, minus the 30 s walk's own coverage; [vehicleChains] = chains (= transitions) per run.
  * - offNetCreditRatio: walking every [offNetworkChains] chain (each its own recording), pooled over chains and seeds:
- *   covered m on scored segments / walked chain m.
+ *   covered m on scored segments / walked chain m. NaN (empty in the CSV) when the dataset has no such chains.
  * - emissionSigmaM / transitionBetaM / offNetworkM: the HMM parameters; null (empty in the CSV) on COMPETITIVE rows.
+ * - headingToleranceDeg / matchMarginM: COMPETITIVE only; null (empty in the CSV) on HMM rows, which ignore them.
  */
 data class SweepRow(
     val bufferM: Double,
-    /** null = heading check off */
+    /** null = heading check off (COMPETITIVE) or not applicable (HMM) */
     val headingToleranceDeg: Double?,
-    val matchMarginM: Double,
+    /** null = not applicable (HMM) */
+    val matchMarginM: Double?,
     /** filterFixes rule 6 window; 0 = smoothing off */
     val smoothWindowS: Double,
     val threshold: Double,
@@ -66,10 +68,10 @@ data class SweepRow(
     val offNetCreditRatio: Double,
 ) {
     fun csv(): String = listOf(
-        f(bufferM), headingToleranceDeg?.let { f(it) } ?: "", f(matchMarginM), f(smoothWindowS), f(threshold), f(sigmaM), f(intervalS), walks.toString(),
+        f(bufferM), opt(headingToleranceDeg), opt(matchMarginM), f(smoothWindowS), f(threshold), f(sigmaM), f(intervalS), walks.toString(),
         f(p5TrueFraction), f(meanTrueFraction), f(completeRate), f(falseCreditRatio), falseCompletes.toString(),
         f(standCreditM), vehicleChains.toString(), f(bikeCreditM), f(driveCreditM),
-        matcher.name.lowercase(), opt(emissionSigmaM), opt(transitionBetaM), opt(offNetworkM), f(offNetCreditRatio),
+        matcher.name.lowercase(), opt(emissionSigmaM), opt(transitionBetaM), opt(offNetworkM), opt(offNetCreditRatio.takeUnless { it.isNaN() }),
     ).joinToString(",")
 
     companion object {
@@ -180,99 +182,99 @@ fun sweep(
     val disjoint = trails.indices.map { i -> trails.indices.filter { j -> j != i && trailSegs[i].none { it in trailSegs[j] } } }
     val scored = dataset.segments.filter(::isScored)
     val offChains = offNetworkChains(dataset, proj, defaults.tickM)
-    val hmmPerSet = hmmSigmas.size * hmmBetas.size * offNetworkMs.size
-    val configsPerSet = matchers.distinct().sumOf { if (it == Matcher.HMM) hmmPerSet else 1 }
-    val total = buffers.size * headingTolerances.size * margins.size * smoothWindows.size * configsPerSet * sigmas.size * intervals.size
+    val ms = matchers.distinct()
+    // Per buffer: COMPETITIVE over heading x margin x smoothing (Spike 3 order); HMM over smoothing x sigma x beta x
+    // offNetwork only (it ignores heading and margin, so those would only duplicate rows).
+    val configs = buffers.flatMap { b ->
+        val base = defaults.copy(bufferM = b, completionThreshold = threshold)
+        val comp = if (Matcher.COMPETITIVE !in ms) emptyList() else
+            headingTolerances.flatMap { h -> margins.flatMap { m -> smoothWindows.map { sw ->
+                base.copy(headingToleranceDeg = h, matchMarginM = m, smoothWindowS = sw)
+            } } }
+        val hmm = if (Matcher.HMM !in ms) emptyList() else
+            smoothWindows.flatMap { sw -> hmmSigmas.distinct().flatMap { es -> hmmBetas.distinct().flatMap { tb ->
+                offNetworkMs.distinct().map { off ->
+                    base.copy(matcher = Matcher.HMM, smoothWindowS = sw, emissionSigmaM = es, transitionBetaM = tb, offNetworkM = off)
+                }
+            } } }
+        comp + hmm
+    }
+    val total = configs.size * sigmas.size * intervals.size
     log("off-network chains: ${offChains.size}")
     val sharedHmm = SharedHmm(dataset.segments, proj)
     val rows = ArrayList<SweepRow>()
     val t0 = System.nanoTime()
 
-    for (b in buffers) for (h in headingTolerances) for (m in margins) for (sw in smoothWindows) {
-        val base = defaults.copy(
-            bufferM = b,
-            headingToleranceDeg = h,
-            matchMarginM = m,
-            smoothWindowS = sw,
-            completionThreshold = threshold,
-        )
-        val configs = matchers.distinct().flatMap { mt ->
-            when (mt) {
-                Matcher.COMPETITIVE -> listOf(base)
-                Matcher.HMM -> hmmSigmas.flatMap { es -> hmmBetas.flatMap { tb -> offNetworkMs.map { off ->
-                    base.copy(matcher = Matcher.HMM, emissionSigmaM = es, transitionBetaM = tb, offNetworkM = off)
-                } } }
+    for (params in configs) {
+        val index: SegmentIndex
+        val cover: (List<Fix>) -> CoverageState
+        when (params.matcher) {
+            Matcher.COMPETITIVE -> {
+                index = SegmentIndex(dataset.segments, params, proj) // built once per param set
+                cover = index::coverFixes
+            }
+            Matcher.HMM -> {
+                index = sharedHmm.index
+                cover = sharedHmm.coverer(params)
             }
         }
-        for (params in configs) {
-            val index: SegmentIndex
-            val cover: (List<Fix>) -> CoverageState
-            when (params.matcher) {
-                Matcher.COMPETITIVE -> {
-                    index = SegmentIndex(dataset.segments, params, proj) // built once per param set
-                    cover = index::coverFixes
+        val isHmm = params.matcher == Matcher.HMM
+        val progress = Progress(dataset, index, params)
+        val trailLenM = trails.map { t -> t.segmentIds.distinct().sumOf { index.segments[it]?.lengthM ?: 0.0 } }
+        fun coveredM(state: CoverageState, id: String): Double = coveredClampedM(index, state, id)
+
+        for (sigma in sigmas) for (interval in intervals) {
+            val noise = noiseFor(sigma)
+            val walks = IntStream.range(0, trails.size * seeds).parallel().mapToObj { w ->
+                val ti = w / seeds
+                val si = w % seeds
+                val trail = trails[ti]
+                val fixes = Simulator(dataset, seedOf(ti, si, 0), proj, params.maxGapS).walkTrail(trail.id, noise, interval)
+                val state = cover(fixes)
+                val frac = progress.trailFraction(state, trail.id)
+                val falseM = scored.sumOf { if (it.id in trailSegs[ti]) 0.0 else coveredM(state, it.id) }
+                val falseCompletes = disjoint[ti].count { j -> progress.trailFraction(state, trails[j].id) >= threshold }
+                val stand = Simulator(dataset, seedOf(ti, si, 1), proj, params.maxGapS).standScenario(trail.id, noise, interval)
+                val standCredit = scoredCoveredM(dataset, index, cover(stand.fixes)) -
+                    scoredCoveredM(dataset, index, cover(stand.fixes.take(stand.leadInFixes)))
+                Walk(frac, falseM, trailLenM[ti], falseCompletes, standCredit)
+            }.toList()
+
+            fun vehicleCredit(speed: Double, salt: Int): Pair<Int, Double> {
+                val perSeed = (0 until seeds).map { si ->
+                    vehicleCreditM(dataset, index, vehicleIds, noise, interval, speed, seedOf(-1, si, salt), params.maxGapS, cover)
                 }
-                Matcher.HMM -> {
-                    index = sharedHmm.index
-                    cover = sharedHmm.coverer(params)
-                }
+                return perSeed.first().first to perSeed.map { it.second }.average()
             }
-            val isHmm = params.matcher == Matcher.HMM
-            val progress = Progress(dataset, index, params)
-            val trailLenM = trails.map { t -> t.segmentIds.distinct().sumOf { index.segments[it]?.lengthM ?: 0.0 } }
-            fun coveredM(state: CoverageState, id: String): Double = coveredClampedM(index, state, id)
-            fun scoredCoveredM(state: CoverageState): Double = scored.sumOf { coveredM(state, it.id) }
+            val (chains, bike) = vehicleCredit(BIKE_MPS, 2)
+            val (_, drive) = vehicleCredit(DRIVE_MPS, 3)
+            val offNet = (0 until seeds).map { si -> offNetCreditM(index, cover, offChains, noise, interval, seedOf(-1, si, 4), params.maxGapS, proj) }
+            val offWalkedM = offNet.sumOf { it.first }
 
-            for (sigma in sigmas) for (interval in intervals) {
-                val noise = noiseFor(sigma)
-                val walks = IntStream.range(0, trails.size * seeds).parallel().mapToObj { w ->
-                    val ti = w / seeds
-                    val si = w % seeds
-                    val trail = trails[ti]
-                    val fixes = Simulator(dataset, seedOf(ti, si, 0), proj, params.maxGapS).walkTrail(trail.id, noise, interval)
-                    val state = cover(fixes)
-                    val frac = progress.trailFraction(state, trail.id)
-                    val falseM = scored.sumOf { if (it.id in trailSegs[ti]) 0.0 else coveredM(state, it.id) }
-                    val falseCompletes = disjoint[ti].count { j -> progress.trailFraction(state, trails[j].id) >= threshold }
-                    val stand = Simulator(dataset, seedOf(ti, si, 1), proj, params.maxGapS).standScenario(trail.id, noise, interval)
-                    val standCredit = scoredCoveredM(cover(stand.fixes)) -
-                        scoredCoveredM(cover(stand.fixes.take(stand.leadInFixes)))
-                    Walk(frac, falseM, trailLenM[ti], falseCompletes, standCredit)
-                }.toList()
-
-                fun vehicleCredit(speed: Double, salt: Int): Pair<Int, Double> {
-                    val perSeed = (0 until seeds).map { si ->
-                        vehicleCreditM(dataset, index, vehicleIds, noise, interval, speed, seedOf(-1, si, salt), params.maxGapS, cover)
-                    }
-                    return perSeed.first().first to perSeed.map { it.second }.average()
-                }
-                val (chains, bike) = vehicleCredit(BIKE_MPS, 2)
-                val (_, drive) = vehicleCredit(DRIVE_MPS, 3)
-                val offNet = (0 until seeds).map { si -> offNetCreditM(index, cover, offChains, noise, interval, seedOf(-1, si, 4), params.maxGapS, proj) }
-                val offWalkedM = offNet.sumOf { it.first }
-
-                val fr = walks.map { it.frac }.sorted()
-                val row = SweepRow(
-                    bufferM = b, headingToleranceDeg = h, matchMarginM = m, smoothWindowS = sw, threshold = threshold, sigmaM = sigma, intervalS = interval,
-                    walks = walks.size,
-                    p5TrueFraction = fr[(0.05 * (fr.size - 1)).toInt()],
-                    meanTrueFraction = fr.average(),
-                    completeRate = walks.count { it.frac >= threshold }.toDouble() / walks.size,
-                    falseCreditRatio = walks.sumOf { it.falseM } / walks.sumOf { it.walkedM },
-                    falseCompletes = walks.sumOf { it.falseCompletes },
-                    standCreditM = walks.map { it.standCreditM }.average(),
-                    vehicleChains = chains,
-                    bikeCreditM = bike,
-                    driveCreditM = drive,
-                    matcher = params.matcher,
-                    emissionSigmaM = params.emissionSigmaM.takeIf { isHmm },
-                    transitionBetaM = params.transitionBetaM.takeIf { isHmm },
-                    offNetworkM = params.offNetworkM.takeIf { isHmm },
-                    offNetCreditRatio = if (offWalkedM > 0.0) offNet.sumOf { it.second } / offWalkedM else 0.0,
-                )
-                rows += row
-                log(String.format(Locale.ROOT, "[%d/%d] %.1fs %s", rows.size, total, (System.nanoTime() - t0) / 1e9, row.csv()))
-            }
+            val fr = walks.map { it.frac }.sorted()
+            val row = SweepRow(
+                bufferM = params.bufferM,
+                headingToleranceDeg = params.headingToleranceDeg.takeUnless { isHmm },
+                matchMarginM = params.matchMarginM.takeUnless { isHmm },
+                smoothWindowS = params.smoothWindowS, threshold = threshold, sigmaM = sigma, intervalS = interval,
+                walks = walks.size,
+                p5TrueFraction = fr[(0.05 * (fr.size - 1)).toInt()],
+                meanTrueFraction = fr.average(),
+                completeRate = walks.count { it.frac >= threshold }.toDouble() / walks.size,
+                falseCreditRatio = walks.sumOf { it.falseM } / walks.sumOf { it.walkedM },
+                falseCompletes = walks.sumOf { it.falseCompletes },
+                standCreditM = walks.map { it.standCreditM }.average(),
+                vehicleChains = chains,
+                bikeCreditM = bike,
+                driveCreditM = drive,
+                matcher = params.matcher,
+                emissionSigmaM = params.emissionSigmaM.takeIf { isHmm },
+                transitionBetaM = params.transitionBetaM.takeIf { isHmm },
+                offNetworkM = params.offNetworkM.takeIf { isHmm },
+                offNetCreditRatio = if (offWalkedM > 0.0) offNet.sumOf { it.second } / offWalkedM else Double.NaN,
+            )
+            rows += row
+            log(String.format(Locale.ROOT, "[%d/%d] %.1fs %s", rows.size, total, (System.nanoTime() - t0) / 1e9, row.csv()))
         }
     }
     return rows
@@ -302,13 +304,13 @@ internal class SharedHmm(segments: List<SegmentGeom>, private val proj: LocalPro
 internal fun coveredClampedM(index: SegmentIndex, state: CoverageState, id: String): Double =
     state.coveredM(index, id).coerceAtMost(index.segments[id]?.lengthM ?: 0.0)
 
-/** Covered metres over all segments, summed in dataset order. */
-internal fun totalCoveredM(dataset: Dataset, index: SegmentIndex, state: CoverageState): Double =
-    dataset.segments.sumOf { coveredClampedM(index, state, it.id) }
+/** Covered metres over scored segments ([isScored]), summed in dataset order. */
+internal fun scoredCoveredM(dataset: Dataset, index: SegmentIndex, state: CoverageState): Double =
+    dataset.segments.sumOf { if (isScored(it)) coveredClampedM(index, state, it.id) else 0.0 }
 
 /**
  * Walk [VEHICLE_LEAD_IN_WALK_S] then ride [speedMps] along every chain of [segmentIds], each chain its own recording.
- * Returns (chains, total covered m minus each lead-in walk's own coverage). Chains are covered in parallel and summed
+ * Returns (chains, covered m on scored segments minus each lead-in walk's own coverage). Chains are covered in parallel and summed
  * sequentially in chain order, so the result does not depend on scheduling.
  */
 internal fun vehicleCreditM(
@@ -319,8 +321,8 @@ internal fun vehicleCreditM(
     val sessions = Simulator(dataset, seed, maxGapS = maxGapS)
         .traverseSessions(segmentIds, noise, intervalS, speedMps, VEHICLE_LEAD_IN_WALK_S)
     val credits = sessions.parallelStream().map { s ->
-        totalCoveredM(dataset, index, cover(s.fixes)) -
-            totalCoveredM(dataset, index, cover(s.fixes.take(s.leadInFixes)))
+        scoredCoveredM(dataset, index, cover(s.fixes)) -
+            scoredCoveredM(dataset, index, cover(s.fixes.take(s.leadInFixes)))
     }.toList()
     return sessions.size to credits.sum()
 }

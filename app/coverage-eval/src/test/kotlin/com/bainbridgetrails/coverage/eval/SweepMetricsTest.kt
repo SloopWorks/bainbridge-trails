@@ -12,7 +12,6 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** Straight 1000 m trails: D at y=0, decoy E parallel at y=10 (inside a 20 m buffer), F far away at y=500. */
@@ -82,7 +81,7 @@ class SweepMetricsTest {
         val noise = NoiseModel(0.0, outlierRate = 0.0)
         val s = Simulator(ds, 9).traverseSessions(listOf("d1"), noise, 1.0, 1.3, VEHICLE_LEAD_IN_WALK_S).single()
         assertEquals(31, s.leadInFixes) // t = 0..30 s at 1 s
-        val lead = totalCoveredM(ds, index, index.coverFixes(s.fixes.take(s.leadInFixes)))
+        val lead = scoredCoveredM(ds, index, index.coverFixes(s.fixes.take(s.leadInFixes)))
         val (chains, credit) = vehicleCreditM(ds, index, listOf("d1"), noise, 1.0, 1.3, seed = 9)
         assertEquals(1, chains)
         // lead-in + "vehicle" credit = exactly what walking the whole 1000 m covers (all of it), nothing more
@@ -186,7 +185,6 @@ class SweepMetricsTest {
         assertEquals(listOf("competitive", "", "", ""), comp.takeLast(5).take(4))
         assertEquals(listOf("hmm", "8.0000", "4.0000", "20.0000"), hmm.takeLast(5).take(4))
         assertEquals(null, rows[0].emissionSigmaM)
-        assertNotNull(rows[1].offNetCreditRatio)
         // at sigma 0 the walker on x1 (15 m off) is matched to x1 by both matchers: no trail credit
         assertEquals(0.0, rows[0].offNetCreditRatio, "${rows[0]}")
         assertEquals(0.0, rows[1].offNetCreditRatio, "${rows[1]}")
@@ -221,5 +219,46 @@ class SweepMetricsTest {
                 for (s in ds.segments) assertEquals(b.covered(s.id), a.covered(s.id), "$p seed $seed trail ${t.id} seg ${s.id}")
             }
         }
+    }
+
+    @Test
+    fun vehicleCreditOnCompetitorSegmentsIsNotCounted() {
+        // riding t1 with margin 20 >= 15 m also credits competitor x1; only the scored trail counts (R7)
+        val ds = offNetDataset(true)
+        val index = SegmentIndex(ds.segments, CoverageParams(bufferM = 20.0, matchMarginM = 20.0))
+        val noise = NoiseModel(0.0, outlierRate = 0.0)
+        val s = Simulator(ds, 9).traverseSessions(listOf("t1"), noise, 1.0, 1.3, VEHICLE_LEAD_IN_WALK_S).single()
+        assertTrue(index.coverFixes(s.fixes).coveredM(index, "x1") > 500.0, "x1 is credited")
+        val lead = scoredCoveredM(ds, index, index.coverFixes(s.fixes.take(s.leadInFixes)))
+        val (_, credit) = vehicleCreditM(ds, index, listOf("t1"), noise, 1.0, 1.3, seed = 9)
+        assertTrue(abs(lead + credit - 1000.0) <= CoverageParams().tickM, "lead $lead credit $credit")
+    }
+
+    @Test
+    fun hmmRowsIgnoreHeadingAndMargin() {
+        val rows = sweep(
+            offNetDataset(true), buffers = listOf(20.0), sigmas = listOf(0.0), intervals = listOf(1.0), seeds = 1,
+            headingTolerances = listOf(null, 30.0), margins = listOf(0.0, 1.0), noiseFor = exact,
+            matchers = listOf(Matcher.COMPETITIVE, Matcher.HMM), hmmSigmas = listOf(8.0, 8.0, 10.0), hmmBetas = listOf(4.0), offNetworkMs = listOf(20.0),
+        )
+        val (comp, hmm) = rows.partition { it.matcher == Matcher.COMPETITIVE }
+        assertEquals(4, comp.size) // 2 headings x 2 margins
+        assertEquals(listOf(8.0, 10.0), hmm.map { it.emissionSigmaM }) // one row per HMM config, duplicates dropped
+        val header = SweepRow.CSV_HEADER.split(",")
+        for (r in hmm) {
+            assertEquals(null, r.headingToleranceDeg)
+            assertEquals(null, r.matchMarginM)
+            val c = r.csv().split(",")
+            assertEquals("", c[header.indexOf("heading_tolerance_deg")])
+            assertEquals("", c[header.indexOf("match_margin_m")])
+        }
+        assertEquals(listOf(0.0, 1.0, 0.0, 1.0), comp.map { it.matchMarginM })
+    }
+
+    @Test
+    fun offNetRatioIsNaNWithoutChains() {
+        val r = row(straightDataset(), margin = 1.0).single()
+        assertTrue(r.offNetCreditRatio.isNaN(), "$r")
+        assertEquals("", r.csv().split(",").last())
     }
 }
