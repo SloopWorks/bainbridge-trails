@@ -1,14 +1,15 @@
 package com.bainbridgetrails.coverage
 
+/** Defaults are interim until the Spike 3 sweep (docs/spikes/coverage/notes.md). */
 data class CoverageParams(
     val bufferM: Double = 20.0,
     val tickM: Double = 5.0,
     /** null = no heading check */
-    val headingToleranceDeg: Double? = 45.0,
+    val headingToleranceDeg: Double? = 30.0,
     /** min straight-line displacement for a heading; points without one are stationary and credit nothing */
     val headingBaselineM: Double = 15.0,
     /** a fix credits only segments within d* + matchMarginM of its nearest candidate segment (competitive map matching) */
-    val matchMarginM: Double = 3.0,
+    val matchMarginM: Double = 1.0,
     val maxAccuracyM: Double = 35.0,
     val maxSpeedMps: Double = 4.0,
     val speedWindowS: Double = 30.0,
