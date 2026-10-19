@@ -13,13 +13,14 @@ ASSETS=(
   "trails.pmtiles:trails.pmtiles"
   "basemap.pmtiles:basemap.pmtiles"
   "trails.json:trails.json"
+  "coverage_segments.json:coverage_segments.json"
   "terrain/contours.pmtiles:contours.pmtiles"
   "terrain/hillshade.pmtiles:hillshade.pmtiles"
 )
 
 for pair in "${ASSETS[@]}"; do
   src="$DIST/${pair%%:*}"
-  [[ -f "$src" ]] || { echo "missing $src -- run scripts/build-tiles.sh first" >&2; exit 1; }
+  [[ -f "$src" ]] || { echo "missing $src -- run scripts/build-tiles.sh and `bitrails dist` first" >&2; exit 1; }
 done
 
 mkdir -p "$DEST"

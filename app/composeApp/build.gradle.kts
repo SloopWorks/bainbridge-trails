@@ -6,6 +6,11 @@ plugins {
 }
 
 kotlin {
+    compilerOptions {
+        // PlatformContext (expect abstract class / actual typealias) — the Coil pattern.
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     android {
         namespace = "com.bainbridgetrails.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -40,6 +45,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.play.services.location)
+            implementation(libs.androidx.activity.compose)
             // MapLibre Native render backend. OpenGL ES: widest device + emulator support.
             runtimeOnly(libs.maplibre.compose.runtime.opengl.android)
         }
