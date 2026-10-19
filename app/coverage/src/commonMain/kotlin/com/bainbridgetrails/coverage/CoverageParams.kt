@@ -32,7 +32,11 @@ data class CoverageParams(
     val emissionSigmaM: Double = 10.0,
     /** HMM: log transition = -|route - straight| / beta */
     val transitionBetaM: Double = 5.0,
-    /** HMM: the OFF (off-network) state's emission equals a candidate's at this distance */
+    /**
+     * HMM: the OFF (off-network) state's emission equals a candidate's at this distance. Consequence: a walk parallel to
+     * a lone trail closer than ~this (and within bufferM) is credited to the trail; beyond it, OFF wins (tests
+     * offNetworkBesideTrailCreditsNothing at 27.5 m, besideTrailThresholdDocumented at 15 m).
+     */
     val offNetworkM: Double = 25.0,
     /** HMM: nats charged entering or leaving OFF */
     val offSwitchPenalty: Double = 3.0,

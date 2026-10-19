@@ -3,6 +3,7 @@ package com.bainbridgetrails.coverage
 import java.io.File
 import kotlin.math.hypot
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class HmmPerfTest {
@@ -77,7 +78,8 @@ class HmmPerfTest {
                 "warm=${"%.0f".format(warmMs)}ms coverFixes(incl. lazy graph)=${"%.0f".format(dispatchMs)}ms " +
                 "trailCovered=${"%.3f".format(coveredTrailM / trailM)}",
         )
-        assertTrue(cold == warm)
+        assertEquals(cold, warm)
         assertTrue(coldMs < 2000.0, "cover cold ${coldMs}ms")
+        assertTrue(dispatchMs < 2000.0, "coverFixes incl. lazy graph ${dispatchMs}ms")
     }
 }

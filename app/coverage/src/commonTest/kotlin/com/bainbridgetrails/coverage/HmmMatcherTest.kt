@@ -132,6 +132,21 @@ class HmmMatcherTest {
         assertEquals(CoverageState.EMPTY, st)
     }
 
+    /** Inside bufferM (30) but beyond offNetworkM (25): candidates exist every observation, OFF must win. */
+    @Test fun offNetworkBesideTrailCreditsNothing() {
+        val idx = SegmentIndex(listOf(seg("A", Xy(0.0, 0.0), Xy(300.0, 0.0))), hmm, proj)
+        val st = idx.coverFixes(fixes(positions(listOf(Xy(0.0, 27.5), Xy(300.0, 27.5))), sigma = 3.0, rnd = Random(11)))
+        println("offNetworkBesideTrailCreditsNothing: 27.5 m -> A=${st.covered("A").size} of ${idx.tickCount("A")} ticks")
+        assertEquals(CoverageState.EMPTY, st)
+    }
+
+    /** Documents, asserts nothing: under the current params a walk closer than ~offNetworkM to a lone trail is credited. */
+    @Test fun besideTrailThresholdDocumented() {
+        val idx = SegmentIndex(listOf(seg("A", Xy(0.0, 0.0), Xy(300.0, 0.0))), hmm, proj)
+        val st = idx.coverFixes(fixes(positions(listOf(Xy(0.0, 15.0), Xy(300.0, 15.0))), sigma = 3.0, rnd = Random(11)))
+        println("besideTrailThresholdDocumented: 15 m -> A=${st.covered("A").size} of ${idx.tickCount("A")} ticks")
+    }
+
     @Test fun stationaryJitterBounded() {
         val o = Xy(0.0, 0.0)
         val segs = listOf(0.0, 120.0, 240.0).mapIndexed { i, b ->

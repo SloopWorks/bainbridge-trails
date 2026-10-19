@@ -134,7 +134,7 @@ class HmmMatcher(
     private fun emission(c: Candidates, state: Int): Double =
         if (state == 0) offEmission else -c.dist[state - 1] * c.dist[state - 1] / twoSigma2
 
-    /** Piece resampled every hmmStepM of path length; first and last points included. */
+    /** Piece resampled every hmmStepM of path length; first and last points included (last skipped within 0.5 m of the previous). */
     private fun observations(piece: List<Xy>): List<Xy> {
         val step = params.hmmStepM
         val out = ArrayList<Xy>()
@@ -152,7 +152,8 @@ class HmmMatcher(
             }
             acc += len
         }
-        if (out.last() != piece.last()) out += piece.last()
+        val last = piece.last()
+        if (hypot(last.x - out.last().x, last.y - out.last().y) > MIN_FINAL_OBS_GAP_M) out += last
         return out
     }
 
@@ -163,5 +164,9 @@ class HmmMatcher(
         var y1 = Double.NEGATIVE_INFINITY
         for (p in piece) { x0 = min(x0, p.x); y0 = min(y0, p.y); x1 = max(x1, p.x); y1 = max(y1, p.y) }
         return hypot(x1 - x0, y1 - y0)
+    }
+
+    private companion object {
+        const val MIN_FINAL_OBS_GAP_M = 0.5
     }
 }
