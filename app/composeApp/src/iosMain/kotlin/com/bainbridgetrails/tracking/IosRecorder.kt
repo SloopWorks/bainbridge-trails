@@ -1,0 +1,164 @@
+package com.bainbridgetrails.tracking
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import platform.CoreLocation.CLLocationManager
+import kotlin.time.Clock
+
+/**
+ * iOS counterpart of Android's RecordingService: owns the sources for one walk and is the only writer of the
+ * session store. Call [start] / [stop] on the main thread.
+ *
+ * Single-writer (ruling R4): source callbacks only `trySend` into [events]; one coroutine consumes the channel,
+ * calls [SessionStore.append] (or [SessionStore.end] for Stop) and then [RecordingBus.emit].
+ * Backgrounding: UIBackgroundModes=location + allowsBackgroundLocationUpdates keep the process (and this writer)
+ * running while location updates flow. If the app is killed without a Stop, the session stays unfinished and the
+ * controller offers recovery on the next launch. Never logs coordinates.
+ */
+object IosRecorder {
+    // Never cancelled: the writer ends on its own when the channel is closed and drained.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var events: Channel<SessionEvent>? = null
+    private var sessionId: String? = null
+    private var sessionStartMs = 0L
+    private var stopping = false
+    private var location: IosLocationSource? = null
+    private var activity: IosActivitySource? = null
+    private var steps: IosStepSource? = null
+
+    /** Times of live activity samples in this session (main thread only), so the history fill at Stop skips them. */
+    private val liveActivityTimes = mutableSetOf<Long>()
+
+    /**
+     * VERIFICATION ONLY (set by the debug launch argument `-acceptSimulatedLocations 1`, simulator debug builds):
+     * the simulator marks every `simctl location` fix isSimulatedBySoftware, which filterFixes rightly drops as mock.
+     * This records them as non-mock so the coverage pipeline can be exercised end to end on the simulator.
+     */
+    internal var acceptSimulatedLocations = false
+
+    private fun now() = Clock.System.now().toEpochMilliseconds()
+
+    fun start(dir: String, sessionId: String, resume: Boolean) {
+        if (sessionId.isBlank()) return RecordingBus.emitLost("invalid session id")
+        if (events != null) {
+            // R7: a start while another session is active or still draining is rejected; a duplicate is ignored.
+            if (stopping || sessionId != this.sessionId) RecordingBus.emitLost(RecordingController.ALREADY_RECORDING)
+            return
+        }
+        if (!IosLocationSource.isAuthorized(CLLocationManager().authorizationStatus)) {
+            return RecordingBus.emitLost("location permission missing")
+        }
+        val channel = Channel<SessionEvent>(Channel.UNLIMITED)
+        events = channel
+        this.sessionId = sessionId
+        stopping = false
+        liveActivityTimes.clear()
+        val startMs = now()
+        sessionStartMs = startMs
+
+        scope.launch(Dispatchers.IO) {
+            val store = try {
+                SessionStore(dir).also {
+                    if (resume) {
+                        it.resume(sessionId)
+                    } else {
+                        it.begin(sessionId, startMs)
+                        RecordingBus.emit(SessionEvent.Start(sessionId, startMs))
+                    }
+                }
+            } catch (e: Exception) {
+                RecordingBus.emitLost("session store unavailable")
+                withContext(Dispatchers.Main) { if (events === channel) stop() }
+                null
+            }
+            for (event in channel) {
+                if (store == null) continue // drain so senders and Stop still complete
+                try {
+                    if (event is SessionEvent.Stop) store.end(event.timeMs) else store.append(event)
+                    RecordingBus.emit(event)
+                } catch (e: Exception) {
+                    RecordingBus.emitLost("session write failed")
+                }
+            }
+            withContext(Dispatchers.Main) { finish(channel) }
+        }
+
+        startSources(channel, startMs)
+    }
+
+    private fun startSources(channel: Channel<SessionEvent>, startMs: Long) {
+        val t = now()
+
+        val act = IosActivitySource().also { activity = it }
+        val actAvailable = act.available
+        channel.trySend(SessionEvent.SourceState(t, "activity", actAvailable))
+        if (actAvailable) {
+            act.start { sample ->
+                liveActivityTimes += sample.timeMs // main queue
+                channel.trySend(SessionEvent.Act(sample))
+            }
+        }
+
+        val stp = IosStepSource().also { steps = it }
+        val stepsAvailable = stp.available
+        channel.trySend(SessionEvent.SourceState(t, "steps", stepsAvailable))
+        if (stepsAvailable) stp.start { channel.trySend(SessionEvent.Steps(it)) }
+
+        channel.trySend(SessionEvent.SourceState(t, "location", true))
+        IosLocationSource().also { location = it }.start(
+            onFix = { fix ->
+                // R8: CLLocationManager may first hand back a cached location from before the session.
+                if (!IosMappers.isSessionFix(fix.timeMs, startMs)) return@start
+                val isMock = fix.isMock && !acceptSimulatedLocations
+                channel.trySend(SessionEvent.FixEvent(fix.timeMs, fix.lon, fix.lat, fix.accuracyM, isMock))
+            },
+            onUnavailable = { reason ->
+                channel.trySend(SessionEvent.SourceState(now(), "location", false))
+                RecordingBus.emitLost(reason)
+            },
+        )
+    }
+
+    /**
+     * Stops live sources, appends activity history for the session (fills what iOS withheld while suspended,
+     * deduped by time against live samples), then queues Stop behind everything and lets the writer drain.
+     */
+    fun stop() {
+        val channel = events ?: return
+        if (stopping) return
+        stopping = true
+        val act = activity
+        location?.stop()
+        activity?.stop()
+        steps?.stop()
+        location = null
+        activity = null
+        steps = null
+        val from = sessionStartMs
+        scope.launch {
+            val to = now()
+            val history = act?.let { withTimeoutOrNull(HISTORY_TIMEOUT_MS) { it.history(from, to) } }.orEmpty()
+            IosMappers.newHistorySamples(history, liveActivityTimes.toSet(), from, to).forEach { channel.trySend(SessionEvent.Act(it)) }
+            channel.trySend(SessionEvent.Stop(now()))
+            channel.close()
+        }
+    }
+
+    /** Runs on main after the writer has drained [channel]. */
+    private fun finish(channel: Channel<SessionEvent>) {
+        if (events !== channel) return
+        events = null
+        sessionId = null
+        stopping = false
+        liveActivityTimes.clear()
+    }
+
+    /** Well inside RecordingController's 10 s stop timeout. */
+    private const val HISTORY_TIMEOUT_MS = 3_000L
+}
