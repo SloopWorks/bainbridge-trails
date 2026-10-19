@@ -1,5 +1,8 @@
 package com.bainbridgetrails.coverage
 
+/** Map matcher used by [SegmentIndex.coverFixes]. */
+enum class Matcher { COMPETITIVE, HMM }
+
 /** Provisional (owner, 2026-10-18): option B from docs/spikes/coverage/notes.md; re-check against real GPX walks before v1. */
 data class CoverageParams(
     val bufferM: Double = 30.0,
@@ -21,4 +24,20 @@ data class CoverageParams(
     val smoothWindowS: Double = 10.0,
     val completionThreshold: Double = 0.85,
     val nearlyDoneThreshold: Double = 0.75,
+    /** COMPETITIVE = Spike 3 per-point matching; HMM = [HmmMatcher] (Spike 3b) */
+    val matcher: Matcher = Matcher.COMPETITIVE,
+    /** HMM: observation spacing along each piece's path */
+    val hmmStepM: Double = 10.0,
+    /** HMM: log emission = -d^2 / (2 sigma^2), d = distance to the candidate tick */
+    val emissionSigmaM: Double = 10.0,
+    /** HMM: log transition = -|route - straight| / beta */
+    val transitionBetaM: Double = 5.0,
+    /** HMM: the OFF (off-network) state's emission equals a candidate's at this distance */
+    val offNetworkM: Double = 25.0,
+    /** HMM: nats charged entering or leaving OFF */
+    val offSwitchPenalty: Double = 3.0,
+    /** HMM: [TickGraph] junction radius */
+    val junctionM: Double = 3.0,
+    /** HMM: nearest distinct segments kept per observation */
+    val maxCandidates: Int = 8,
 )

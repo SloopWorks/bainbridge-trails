@@ -88,8 +88,19 @@ class SegmentIndex(
 
     fun tickLengthM(segmentId: String): Double = slot[segmentId]?.let { ticks[it].firstOrNull()?.lengthM } ?: 0.0
 
-    fun coverFixes(fixes: List<Fix>): CoverageState = cover(filterFixes(fixes, params, proj))
+    /** Built on first HMM use, once per index. */
+    private val hmm: HmmMatcher by lazy { HmmMatcher(this, TickGraph(this, params.junctionM), params) }
 
+    /** Filters [fixes], then matches with [CoverageParams.matcher]: COMPETITIVE = [cover], HMM = [HmmMatcher.cover]. */
+    fun coverFixes(fixes: List<Fix>): CoverageState {
+        val pieces = filterFixes(fixes, params, proj)
+        return when (params.matcher) {
+            Matcher.COMPETITIVE -> cover(pieces)
+            Matcher.HMM -> hmm.cover(pieces)
+        }
+    }
+
+    /** Spike 3 competitive matcher, regardless of [CoverageParams.matcher]. */
     fun cover(pieces: List<List<Xy>>): CoverageState {
         val bits = arrayOfNulls<LongArray>(ticks.size)
         val dS = DoubleArray(ticks.size) { Double.POSITIVE_INFINITY }

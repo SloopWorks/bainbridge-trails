@@ -84,8 +84,11 @@ class TickGraph(private val index: SegmentIndex, private val junctionM: Double =
 
     fun neighbors(node: Long): List<Pair<Long, Double>> = adj[node] ?: emptyList()
 
-    /** Shortest route metres from [from] to every node within [maxM] (inclusive), bounded Dijkstra. */
-    fun routesFrom(from: Long, maxM: Double): Map<Long, Double> {
+    /**
+     * Shortest route metres from [from] to every node within [maxM] (inclusive), bounded Dijkstra. If [pred] is given it
+     * receives each reached node's predecessor on its shortest route ([from] has none).
+     */
+    fun routesFrom(from: Long, maxM: Double, pred: MutableMap<Long, Long>? = null): Map<Long, Double> {
         val dist = HashMap<Long, Double>()
         val done = HashSet<Long>()
         val heap = MinHeap()
@@ -98,7 +101,11 @@ class TickGraph(private val index: SegmentIndex, private val junctionM: Double =
             for ((v, w) in neighbors(u)) {
                 val nd = d + w
                 if (nd > maxM) continue
-                if (nd < (dist[v] ?: Double.POSITIVE_INFINITY)) { dist[v] = nd; heap.push(nd, v) }
+                if (nd < (dist[v] ?: Double.POSITIVE_INFINITY)) {
+                    dist[v] = nd
+                    pred?.put(v, u)
+                    heap.push(nd, v)
+                }
             }
         }
         return dist
