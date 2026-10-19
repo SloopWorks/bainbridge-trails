@@ -13,6 +13,8 @@ import kotlin.test.assertTrue
 class CoverTest {
     private val proj = LocalProjection()
     private val params = CoverageParams()
+    /** Spike 3 per-point matcher (the default is HMM since Spike 3b) for tests that pin its behaviour. */
+    private val competitive = params.copy(matcher = Matcher.COMPETITIVE)
 
     private fun lonLat(p: Xy): List<Double> = proj.toLonLat(p).let { listOf(it.first, it.second) }
 
@@ -77,8 +79,8 @@ class CoverTest {
     @Test fun perpendicularCrossingCreditsLittle() {
         val segs = listOf(seg("seg-000001", Xy(0.0, 0.0), Xy(200.0, 0.0)))
         val fixes = walk(Xy(100.0, -50.0), Xy(100.0, 50.0))
-        val off = SegmentIndex(segs, params.copy(headingToleranceDeg = null), proj).coverFixes(fixes)
-        val on = SegmentIndex(segs, params.copy(headingToleranceDeg = 30.0), proj).coverFixes(fixes)
+        val off = SegmentIndex(segs, competitive.copy(headingToleranceDeg = null), proj).coverFixes(fixes)
+        val on = SegmentIndex(segs, competitive.copy(headingToleranceDeg = 30.0), proj).coverFixes(fixes)
         val nOff = off.covered("seg-000001").size
         val nOn = on.covered("seg-000001").size
         println("perpendicularCrossingCreditsLittle: headingOff=$nOff headingOn=$nOn")
@@ -155,7 +157,7 @@ class CoverTest {
     private val partialSeg = listOf(seg("seg-000001", Xy(0.0, 0.0), Xy(300.0, 0.0)))
 
     @Test fun repeatAndReverseIdempotent() {
-        val idx = SegmentIndex(partialSeg, params, proj)
+        val idx = SegmentIndex(partialSeg, competitive, proj)
         val fwd = walk(Xy(0.0, 0.0), Xy(150.0, 0.0))
         // exact reverse of the same path, continuing in time
         val back = fwd.reversed().mapIndexed { k, f -> f.copy(timeMs = fwd.last().timeMs + (k + 1) * 1000L) }

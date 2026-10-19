@@ -189,7 +189,7 @@ fun sweep(
         val base = defaults.copy(bufferM = b, completionThreshold = threshold)
         val comp = if (Matcher.COMPETITIVE !in ms) emptyList() else
             headingTolerances.flatMap { h -> margins.flatMap { m -> smoothWindows.map { sw ->
-                base.copy(headingToleranceDeg = h, matchMarginM = m, smoothWindowS = sw)
+                base.copy(matcher = Matcher.COMPETITIVE, headingToleranceDeg = h, matchMarginM = m, smoothWindowS = sw)
             } } }
         val hmm = if (Matcher.HMM !in ms) emptyList() else
             smoothWindows.flatMap { sw -> hmmSigmas.distinct().flatMap { es -> hmmBetas.distinct().flatMap { tb ->

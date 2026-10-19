@@ -3,7 +3,11 @@ package com.bainbridgetrails.coverage
 /** Map matcher used by [SegmentIndex.coverFixes]. */
 enum class Matcher { COMPETITIVE, HMM }
 
-/** Provisional (owner, 2026-10-18): option B from docs/spikes/coverage/notes.md; re-check against real GPX walks before v1. */
+/**
+ * Provisional (owner, 2026-10-18): option B from docs/spikes/coverage/notes.md (buffer 30, smooth 10 s, threshold 0.85), with
+ * matcher HMM (Spike 3b: emissionSigmaM 15, transitionBetaM 10, offNetworkM 30); re-check against real GPX walks before v1.
+ * The COMPETITIVE fields (headingToleranceDeg, matchMarginM) stay at option B for `matcher = COMPETITIVE`.
+ */
 data class CoverageParams(
     val bufferM: Double = 30.0,
     val tickM: Double = 5.0,
@@ -25,19 +29,20 @@ data class CoverageParams(
     val completionThreshold: Double = 0.85,
     val nearlyDoneThreshold: Double = 0.75,
     /** COMPETITIVE = Spike 3 per-point matching; HMM = [HmmMatcher] (Spike 3b) */
-    val matcher: Matcher = Matcher.COMPETITIVE,
+    val matcher: Matcher = Matcher.HMM,
     /** HMM: observation spacing along each piece's path */
     val hmmStepM: Double = 10.0,
     /** HMM: log emission = -d^2 / (2 sigma^2), d = distance to the candidate tick */
-    val emissionSigmaM: Double = 10.0,
+    val emissionSigmaM: Double = 15.0,
     /** HMM: log transition = -|route - straight| / beta */
-    val transitionBetaM: Double = 5.0,
+    val transitionBetaM: Double = 10.0,
     /**
      * HMM: the OFF (off-network) state's emission equals a candidate's at this distance. Consequence: a walk parallel to
-     * a lone trail closer than ~this (and within bufferM) is credited to the trail; beyond it, OFF wins (tests
-     * offNetworkBesideTrailCreditsNothing at 27.5 m, besideTrailThresholdDocumented at 15 m).
+     * a lone trail closer than ~min(this, bufferM) is credited to the trail; beyond it, OFF wins (tests
+     * offNetworkBesideTrailCreditsNothing, besideTrailThresholdDocumented). At the default 30 = bufferM, every walk
+     * within the buffer of a lone trail is credited (Spike 3b trade-off, see notes).
      */
-    val offNetworkM: Double = 25.0,
+    val offNetworkM: Double = 30.0,
     /** HMM: nats charged entering or leaving OFF */
     val offSwitchPenalty: Double = 3.0,
     /** HMM: [TickGraph] junction radius */

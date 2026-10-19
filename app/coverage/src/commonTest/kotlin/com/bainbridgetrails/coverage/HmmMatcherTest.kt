@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class HmmMatcherTest {
     private val proj = LocalProjection()
     private val hmm = CoverageParams(matcher = Matcher.HMM)
-    private val competitive = CoverageParams()
+    private val competitive = CoverageParams(matcher = Matcher.COMPETITIVE)
 
     private fun seg(id: String, vararg pts: Xy, included: Boolean = true, category: String? = null): SegmentGeom {
         var len = 0.0
@@ -132,19 +132,24 @@ class HmmMatcherTest {
         assertEquals(CoverageState.EMPTY, st)
     }
 
-    /** Inside bufferM (30) but beyond offNetworkM (25): candidates exist every observation, OFF must win. */
+    /**
+     * Inside bufferM (30) but beyond offNetworkM (pinned at 25; the Spike 3b default 30 = bufferM leaves no such band):
+     * candidates exist every observation, OFF must win.
+     */
     @Test fun offNetworkBesideTrailCreditsNothing() {
-        val idx = SegmentIndex(listOf(seg("A", Xy(0.0, 0.0), Xy(300.0, 0.0))), hmm, proj)
+        val idx = SegmentIndex(listOf(seg("A", Xy(0.0, 0.0), Xy(300.0, 0.0))), hmm.copy(offNetworkM = 25.0), proj)
         val st = idx.coverFixes(fixes(positions(listOf(Xy(0.0, 27.5), Xy(300.0, 27.5))), sigma = 3.0, rnd = Random(11)))
         println("offNetworkBesideTrailCreditsNothing: 27.5 m -> A=${st.covered("A").size} of ${idx.tickCount("A")} ticks")
         assertEquals(CoverageState.EMPTY, st)
     }
 
-    /** Documents, asserts nothing: under the current params a walk closer than ~offNetworkM to a lone trail is credited. */
+    /** Documents, asserts nothing: under the current params a walk closer than ~min(offNetworkM, bufferM) to a lone trail is credited. */
     @Test fun besideTrailThresholdDocumented() {
         val idx = SegmentIndex(listOf(seg("A", Xy(0.0, 0.0), Xy(300.0, 0.0))), hmm, proj)
-        val st = idx.coverFixes(fixes(positions(listOf(Xy(0.0, 15.0), Xy(300.0, 15.0))), sigma = 3.0, rnd = Random(11)))
-        println("besideTrailThresholdDocumented: 15 m -> A=${st.covered("A").size} of ${idx.tickCount("A")} ticks")
+        for (d in listOf(15.0, 25.0, 27.5, 30.0, 32.5, 35.0)) {
+            val st = idx.coverFixes(fixes(positions(listOf(Xy(0.0, d), Xy(300.0, d))), sigma = 3.0, rnd = Random(11)))
+            println("besideTrailThresholdDocumented: $d m -> A=${st.covered("A").size} of ${idx.tickCount("A")} ticks")
+        }
     }
 
     @Test fun stationaryJitterBounded() {

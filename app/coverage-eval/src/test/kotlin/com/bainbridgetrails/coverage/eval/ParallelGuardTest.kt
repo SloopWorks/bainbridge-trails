@@ -50,7 +50,7 @@ class ParallelGuardTest {
 
     @Test
     fun hmmCreditsLessOfTheParallelTrailThanCompetitive() {
-        val (compA, compB) = meanAB(CoverageParams()) // option B
+        val (compA, compB) = meanAB(CoverageParams(matcher = Matcher.COMPETITIVE)) // option B
         val (hmmA, hmmB) = meanAB(CoverageParams(matcher = Matcher.HMM))
         println(String.format(Locale.ROOT, "ParallelGuard: COMPETITIVE A=%.3f B=%.3f  HMM A=%.3f B=%.3f", compA, compB, hmmA, hmmB))
         assertTrue(hmmB < compB, "HMM B $hmmB vs COMPETITIVE B $compB")

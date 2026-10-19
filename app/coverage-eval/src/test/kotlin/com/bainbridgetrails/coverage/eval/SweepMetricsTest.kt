@@ -194,7 +194,7 @@ class SweepMetricsTest {
     fun creditOnCompetitorSegmentsIsNotFalseCredit() {
         // margin 20 >= 15 m offset: walking T also credits competitor x1, which no user sees (R3)
         val ds = offNetDataset(true)
-        val index = SegmentIndex(ds.segments, CoverageParams(bufferM = 20.0, matchMarginM = 20.0))
+        val index = SegmentIndex(ds.segments, CoverageParams(matcher = Matcher.COMPETITIVE, bufferM = 20.0, matchMarginM = 20.0))
         val state = index.coverFixes(Simulator(ds, 1).walkTrail("T", exact(0.0), 1.0))
         assertTrue(state.coveredM(index, "x1") > 500.0, "x1 is credited")
         val r = sweep(ds, buffers = listOf(20.0), sigmas = listOf(0.0), intervals = listOf(1.0), seeds = 1,
@@ -225,7 +225,7 @@ class SweepMetricsTest {
     fun vehicleCreditOnCompetitorSegmentsIsNotCounted() {
         // riding t1 with margin 20 >= 15 m also credits competitor x1; only the scored trail counts (R7)
         val ds = offNetDataset(true)
-        val index = SegmentIndex(ds.segments, CoverageParams(bufferM = 20.0, matchMarginM = 20.0))
+        val index = SegmentIndex(ds.segments, CoverageParams(matcher = Matcher.COMPETITIVE, bufferM = 20.0, matchMarginM = 20.0))
         val noise = NoiseModel(0.0, outlierRate = 0.0)
         val s = Simulator(ds, 9).traverseSessions(listOf("t1"), noise, 1.0, 1.3, VEHICLE_LEAD_IN_WALK_S).single()
         assertTrue(index.coverFixes(s.fixes).coveredM(index, "x1") > 500.0, "x1 is credited")
