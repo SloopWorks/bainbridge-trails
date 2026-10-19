@@ -26,6 +26,16 @@ Android:
 
     cd app && ./gradlew :androidApp:assembleDebug
 
+Debug builds install as `com.bainbridgetrails.app.dev`, next to a future release install.
+
+Dev builds to a phone (Shipyard Deploy; config in `.shipyard-deploy.yaml`, agent rules in `AGENTS.md`).
+The plugin is opt-in, so a plain clone builds without it; pass the Maven repo that holds
+`works.sloop.shipyard:shipyard-deploy-gradle-plugin:0.1.0` (e.g. `file://$HOME/.m2/repository`
+after `publishToMavenLocal` in shipyard-deploy's `gradle-plugin/`):
+
+    cd app && ./gradlew -PshipyardDeployPluginRepository=file://$HOME/.m2/repository :androidApp:assembleDebug
+    shipyard-deploy publish androidApp/build/outputs/apk/debug/androidApp-debug.apk --dry-run
+
 iOS (simulator):
 
     xcodebuild -project app/iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator build
