@@ -134,6 +134,7 @@ class SessionStore(dir: String) {
                 is SessionEvent.Act -> acts += e.sample
                 is SessionEvent.Steps -> steps += e.sample
                 is SessionEvent.SourceState -> lastAvailable[e.source] = e.available
+                is SessionEvent.Diag -> Unit
                 is SessionEvent.Stop -> finished = true
             }
         }

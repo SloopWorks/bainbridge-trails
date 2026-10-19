@@ -8,14 +8,18 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.BatteryManager
 import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,6 +45,7 @@ class RecordingService : Service() {
     private var location: AndroidLocationSource? = null
     private var activity: AndroidActivitySource? = null
     private var steps: AndroidStepSource? = null
+    private var diagJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -105,8 +110,10 @@ class RecordingService : Service() {
                 withContext(Dispatchers.Main) { if (events === channel) requestStop() }
                 null
             }
-            for (event in channel) {
+            val diag = DiagAccumulator()
+            for (queued in channel) {
                 if (store == null) continue // drain so senders and Stop still complete
+                val event = diag.resolve(queued)
                 try {
                     if (event is SessionEvent.Stop) store.end(event.timeMs) else store.append(event)
                     RecordingBus.emit(event)
@@ -118,6 +125,18 @@ class RecordingService : Service() {
         }
 
         startSources(channel, startMs)
+        diagJob = scope.launch {
+            while (true) {
+                delay(DIAG_INTERVAL_MS)
+                channel.trySend(diagTick(System.currentTimeMillis(), batteryPct()))
+            }
+        }
+    }
+
+    /** Battery percent from the sticky ACTION_BATTERY_CHANGED broadcast; null if unavailable. */
+    private fun batteryPct(): Int? {
+        val i = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return null
+        return batteryPercent(i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1), i.getIntExtra(BatteryManager.EXTRA_SCALE, -1))
     }
 
     private fun startSources(channel: Channel<SessionEvent>, sessionStartMs: Long) {
@@ -149,6 +168,8 @@ class RecordingService : Service() {
     }
 
     private fun stopSources() {
+        diagJob?.cancel()
+        diagJob = null
         location?.stop()
         activity?.stop()
         steps?.stop()

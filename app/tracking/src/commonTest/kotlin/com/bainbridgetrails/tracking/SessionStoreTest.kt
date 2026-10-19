@@ -5,6 +5,7 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.files.SystemTemporaryDirectory
+import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlin.random.Random
 import kotlin.test.Test
@@ -46,6 +47,22 @@ class SessionStoreTest {
         assertTrue(r.stepsAvailable)
         assertTrue(r.finished)
         assertTrue(s.unfinished().isEmpty())
+    }
+
+    @Test
+    fun diagEventRoundTrip() {
+        val dir = tempDir()
+        val s = SessionStore(dir)
+        s.begin("d", 1)
+        s.append(SessionEvent.Diag(300_000, 87, 140, 6.5))
+        s.append(SessionEvent.Diag(600_000, null, 0, null))
+        s.append(fix(700_000))
+        s.end(800_000)
+        val r = s.load("d")
+        assertEquals(1, r.fixes.size) // Diag does not affect the recorded session
+        assertTrue(r.finished)
+        val text = kotlinx.io.files.SystemFileSystem.source(kotlinx.io.files.Path(dir, "sessions", "d.jsonl")).buffered().use { it.readString() }
+        assertTrue(text.contains("\"t\":\"diag\""))
     }
 
     @Test

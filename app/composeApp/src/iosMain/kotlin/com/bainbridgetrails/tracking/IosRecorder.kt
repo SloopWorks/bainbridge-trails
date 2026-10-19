@@ -3,12 +3,15 @@ package com.bainbridgetrails.tracking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import platform.CoreLocation.CLLocationManager
+import platform.UIKit.UIDevice
 import kotlin.time.Clock
 
 /**
@@ -31,6 +34,7 @@ object IosRecorder {
     private var location: IosLocationSource? = null
     private var activity: IosActivitySource? = null
     private var steps: IosStepSource? = null
+    private var diagJob: Job? = null
 
     /** Times of live activity samples in this session (main thread only), so the history fill at Stop skips them. */
     private val liveActivityTimes = mutableSetOf<Long>()
@@ -78,7 +82,9 @@ object IosRecorder {
                 null
             }
             var ended = false
-            for (event in channel) {
+            val diag = DiagAccumulator()
+            for (queued in channel) {
+                val event = diag.resolve(queued)
                 // Drain without writing when the store failed, and after Stop: a pedometer callback (its own queue)
                 // can still slip in between Stop and close; nothing is appended after end.
                 if (store == null || ended) continue
@@ -98,6 +104,20 @@ object IosRecorder {
         }
 
         startSources(channel, startMs)
+        diagJob = scope.launch {
+            while (true) {
+                delay(DIAG_INTERVAL_MS)
+                channel.trySend(diagTick(now(), batteryPct()))
+            }
+        }
+    }
+
+    /** Battery percent via UIDevice (monitoring must be enabled); null when the level is unknown (-1). */
+    private fun batteryPct(): Int? {
+        val device = UIDevice.currentDevice
+        device.batteryMonitoringEnabled = true
+        val level = device.batteryLevel
+        return if (level < 0f) null else (level * 100f).toInt()
     }
 
     private fun startSources(channel: Channel<SessionEvent>, startMs: Long) {
@@ -142,6 +162,8 @@ object IosRecorder {
         if (stopping) return
         stopping = true
         val act = activity
+        diagJob?.cancel()
+        diagJob = null
         location?.stop()
         activity?.stop()
         steps?.stop()

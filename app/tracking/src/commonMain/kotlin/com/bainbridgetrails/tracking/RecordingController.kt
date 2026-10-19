@@ -134,7 +134,7 @@ class RecordingController(
                 }
             }
             is SessionEvent.Stop -> recorderStopped?.complete(Unit)
-            is SessionEvent.Act, is SessionEvent.Steps -> Unit
+            is SessionEvent.Act, is SessionEvent.Steps, is SessionEvent.Diag -> Unit
         }
     }
 

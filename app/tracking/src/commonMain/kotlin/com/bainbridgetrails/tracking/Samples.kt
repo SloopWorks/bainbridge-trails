@@ -39,6 +39,10 @@ sealed interface SessionEvent {
     @Serializable @SerialName("source")
     data class SourceState(val timeMs: Long, val source: String, val available: Boolean) : SessionEvent
 
+    /** Periodic battery/fix diagnostics (every 5 min). Ignored when building a [RecordedSession]. */
+    @Serializable @SerialName("diag")
+    data class Diag(val timeMs: Long, val batteryPct: Int?, val fixCount: Int, val meanAccuracyM: Double?) : SessionEvent
+
     @Serializable @SerialName("stop")
     data class Stop(val timeMs: Long) : SessionEvent
 }
