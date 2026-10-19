@@ -19,7 +19,15 @@ Config labels below are buffer/heading/margin/smooth (m/°/m/s).
 
 Option B, provisional: **buffer 30 m, heading off, margin 1 m, smooth 10 s, completion threshold 0.85** (`nearlyDoneThreshold` 0.75 and `headingBaselineM` 15 unchanged; the baseline still drives the stationary rule). Now the `CoverageParams` defaults; spec §2 says 85%.
 
-Numbers for 30/off/1/10 at threshold 0.85:
+Options shown to the owner (30 m buffer; σ10/5 s; false-credit ratio and false completes from the sweep CSVs):
+
+| option | config (buffer/heading/margin/smooth) | cr @0.90 | cr @0.85 | cr @0.80 | fcr | fc @0.90 / 0.85 / 0.80 |
+|---|---|---|---|---|---|---|
+| A strict | 30 / 30° / 1 / 20 s | 0.383 | 0.597 | 0.725 | 0.029 | 0 / 0 / 0 |
+| **B balanced (chosen)** | 30 / off / 1 / 10 s | 0.754 | 0.839 | 0.898 | 0.066 | 2 / 3 / 3 |
+| C generous | 30 / 60° / 3 / off | 0.868 | 0.933 | 0.944 | 0.104 | 6 / 7 / 7 |
+
+Numbers for option B at threshold 0.85:
 - **σ10/5 s:** completeRate 0.839, falseCreditRatio 0.066, falseCompletes 3 (@0.85; 2 @0.90, 3 @0.80). Drive credit ~26 m per transition.
 - **σ15/15 s (worst case):** completeRate 0.693 @0.85 (0.500 @0.90, 0.792 @0.80), falseCreditRatio 0.097, falseCompletes 1 (@0.85, @0.90 and @0.80).
 
@@ -91,7 +99,7 @@ Ignoring rule 1, the best `completeRate` is 0.868 / 0.933 / 0.944 at 0.90 / 0.85
 
 ## Guard test A/B (`parallelNeighborNotCredited`, unedited)
 
-Trails 12 m apart, white noise σ5, 1 s, seed 1; needs A ≥ 0.90 and B < 0.50. At the defaults (20/30/1):
+Trails 12 m apart, white noise σ5, 1 s, seed 1; needs A ≥ 0.90 and B < 0.50. At the interim defaults (20/30/1, pre-decision):
 
 | smoothWindowS | A | B | result |
 |---|---|---|---|
@@ -109,7 +117,7 @@ Top 5:
 | config | guard (B) | cr @0.90 | cr @0.85 | cr @0.80 | fcr | fc @0.90 / 0.85 / 0.80 | mean frac | stand m | drive m/transition | worst σ15/15 s cr @0.90 / @0.80 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 30/30/1/20 (best rule-1 survivor) | pass (0.0) | 0.383 | 0.597 | 0.725 | **0.029** | **0 / 0 / 0** | 0.83 | 40 | 21 | 0.067 / 0.208 (fc 1) |
-| 30/off/1/10 | pass (0.0) | 0.754 | 0.839 | 0.898 | 0.066 | 2 / 3 / 3 | 0.91 | 32 | 26 | 0.500 / 0.792 (fc 1) |
+| 30/off/1/10 (current default, option B) | pass (0.0) | 0.754 | 0.839 | 0.898 | 0.066 | 2 / 3 / 3 | 0.91 | 32 | 26 | 0.500 / 0.792 (fc 1) |
 | 30/60/3/10 | pass (0.075) | 0.810 | 0.877 | 0.909 | 0.070 | 4 / 4 / 5 | 0.93 | 36 | 27 | 0.526 / 0.807 (fc 2) |
 | 30/off/3/10 | pass (0.075) | 0.789 | 0.883 | 0.915 | 0.087 | 4 / 4 / 5 | 0.92 | 32 | 27 | 0.579 / 0.830 (fc 4) |
 | 30/60/3/0 (best cr) | fail (0.85) | **0.868** | **0.933** | **0.944** | 0.104 | 6 / 7 / 7 | 0.94 | 39 | 38 | 0.532 / 0.816 (fc 2) |
@@ -118,13 +126,13 @@ Reference rows:
 
 | config | guard (B) | cr @0.90 | cr @0.85 | cr @0.80 | fcr | fc @0.90 / 0.85 / 0.80 | mean frac | stand m | drive m/transition | worst σ15/15 s cr @0.90 / @0.80 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 20/30/1/10 (current defaults) | pass (0.0) | 0.275 | 0.520 | 0.714 | 0.039 | 3 / 3 / 3 | 0.81 | 38 | 24 | 0.044 / 0.102 (fc 1) |
-| 20/30/1/0 (pre-9c defaults) | pass (0.425) | 0.231 | 0.491 | 0.708 | 0.064 | 4 / 5 / 5 | 0.82 | 43 | 36 | 0.041 / 0.099 (fc 1) |
+| 20/30/1/10 (interim defaults, pre-decision) | pass (0.0) | 0.275 | 0.520 | 0.714 | 0.039 | 3 / 3 / 3 | 0.81 | 38 | 24 | 0.044 / 0.102 (fc 1) |
+| 20/30/1/0 (interim defaults, pre-decision, pre-9c) | pass (0.425) | 0.231 | 0.491 | 0.708 | 0.064 | 4 / 5 / 5 | 0.82 | 43 | 36 | 0.041 / 0.099 (fc 1) |
 | 20/off/0/0 | fail (0.75) | 0.757 | 0.851 | 0.906 | 0.082 | 2 / 3 / 4 | 0.91 | 36 | 36 | 0.260 / 0.643 (fc 1) |
 
 Worst case (σ15/15 s) fc is at threshold 0.80.
 
-## Options for the owner (none applied)
+## Options for the owner (option B applied as the provisional default)
 
 1. **Accept heading off (or 60°) + smoothing 10 s + threshold 0.80**, e.g. 30/off/1/10: cr 0.898, fcr 0.066, fc 3 (all @0.80). Guard passes (white noise only). Misses cr ≥ 0.95 and fcr ≤ 0.05, and has 3 false completes; needs a looser rule.
 2. **Keep the strict anti-false-credit rule** (30/30/1/20): fc 0 and fcr 0.029, but only ~73% of walked trails complete at 0.80. Users would routinely walk a trail and not get it.
