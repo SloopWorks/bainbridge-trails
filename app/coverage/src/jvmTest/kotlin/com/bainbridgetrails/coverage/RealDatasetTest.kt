@@ -18,7 +18,8 @@ class RealDatasetTest {
         val ds = Dataset.parse(trails.readText(), segs.readText())
         val sum = ds.segments.filter { it.included }.sumOf { it.lengthM }
         println("realDatasetParses: trails=${ds.trails.size} segments=${ds.segments.size} includedSum=$sum islandTotalM=${ds.islandTotalM}")
-        assertEquals(123, ds.trails.size)
+        val expected = Regex("\"segment_ids\"").findAll(trails.readText()).count()
+        assertEquals(expected, ds.trails.size)
         assertTrue(abs(sum - ds.islandTotalM) <= 1.0, "sum $sum vs ${ds.islandTotalM}")
     }
 }

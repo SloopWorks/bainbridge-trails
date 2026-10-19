@@ -363,6 +363,22 @@ Usually a name carried by a tiny OSM piece (bridge, road-end stub). Drop or merg
 
 Shipped trails in `data/dist/trails.json` use shippable segments only (length, gain/loss, trailheads); `agency_only_length_mi` is the part still missing.
 
+### Tiny trails folded/hidden
+
+Trails under 30 m (9) are merged into the longest touching trail (segments within 1 m) or hidden when nothing touches them, so a tiny trail inside a neighbour's GPS buffer is not auto-completed. Segments and island totals are unchanged.
+
+| trail | folded into |
+|---|---|
+| Allan's Alley | hidden |
+| Dock Street road end | hidden |
+| Fairview Avenue Path | hidden |
+| Farm Trail | Farm Trail South |
+| Fletcher Landing Road End | hidden |
+| Gideon Trail | Gideon Park Trail |
+| Howley Cove Trail | hidden |
+| To The Learning Tree | hidden |
+| Waterfront Trail | West Loop Trail |
+
 ### Agency data licensing (your call)
 
 BIMPRD, City and STO datasets have `redistribution: unknown` in sources.yaml. Shipped geometry comes from OSM (ODbL) and USGS; agency data contributes names/attributes only and is credited as such in `data/ATTRIBUTION.md`. Confirm that is acceptable, or ask the agencies for permission (which would also unlock the agency-only trails above).

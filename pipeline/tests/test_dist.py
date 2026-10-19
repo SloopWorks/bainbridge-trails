@@ -13,7 +13,7 @@ def feat(i, **props):
     base = {"id": i, "category": "agency_trail", "subtype": None, "manager": "BIMPRD", "sources": ["osm_overpass_trails"],
             "confidence": "high", "public_access": "yes", "allowed_uses": ["foot"], "included": True,
             "geometry_redistributable": True, "name": "Loop", "trail_ids": ["trail-a", "trail-b"], "park": "P",
-            "length_m": 10.0, "gain_m": 1.0, "loss_m": 1.0, "elev_min_m": 1.0, "elev_max_m": 2.0}
+            "length_m": 100.0, "gain_m": 1.0, "loss_m": 1.0, "elev_min_m": 1.0, "elev_max_m": 2.0}
     base.update(props)
     return {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[0, 0], [1, 1]]},
             "properties": base}
@@ -76,8 +76,8 @@ def test_trail_stats_from_shippable_segments_only(tmp_path):
     info = shippable_info(d / "segments.geojson", d / "elevation.json")
     (t,) = dist_trails_doc(json.loads((d / "trails.json").read_text()), info, "v")["trails"]
     assert t["segment_ids"] == ["seg-000001"]
-    assert t["computed_length_mi"] == round(10 / 1609.344, 3)
-    assert t["agency_only_length_mi"] == round(0.1 - 10 / 1609.344, 3)
+    assert t["computed_length_mi"] == round(100 / 1609.344, 3)
+    assert t["agency_only_length_mi"] == round(0.1 - 100 / 1609.344, 3)
     assert t["gain_m"] == 5.0 and t["loss_m"] == 0.0 and t["climb_total_m"] == 5.0  # canonical said 1/2/3
 
 
@@ -143,7 +143,7 @@ def test_coverage_segments_selects_included_or_trail_segments(tmp_path):
     assert doc["version"] == "v1"
     s = doc["segments"][1]
     assert set(s) == {"id", "length_m", "included", "trail_ids", "coords"}
-    assert s["included"] is False and s["trail_ids"] == ["trail-a"] and s["length_m"] == 10.0
+    assert s["included"] is False and s["trail_ids"] == ["trail-a"] and s["length_m"] == 100.0
 
 
 def test_coverage_segments_rounds_and_filters_trail_ids(tmp_path):
@@ -190,7 +190,7 @@ def test_summary_helpers(tmp_path):
     assert ("Grand Forest East", "Grand Forest East Trail") in pairs
     d = canon(tmp_path)
     rows = agency_only_rows(d / "private" / "agency_only.geojson", [{"id": "trail-a", "name": "A"}])
-    assert rows == [["A", "agency_trail", 1, "0.0", "0.0"]]
+    assert rows == [["A", "agency_trail", 1, "0.1", "0.1"]]
 
 
 def _doc(tmp_path, **over):
@@ -226,3 +226,75 @@ def test_summary_flags_large_official_gap():
         {"name": "None", "official_length_mi": None, "computed_mi": 1, "agency_only_mi": 0}])
     assert len(rows) == 2
     assert "⚠" in rows[0][4] and "⚠" not in rows[1][4]
+
+
+# --- tiny trails (< 30 m) are folded into a touching trail or hidden ---
+LON, LAT = -122.5, 47.6
+DLAT = 1 / 111_200  # ~1 m of latitude in degrees
+
+
+def _line(i, lat0_m, lat1_m, lon_off_m=0.0, length=None):
+    """Segment running north from lat0_m to lat1_m (metres from the origin); lon_off_m shifts it east."""
+    lon = LON + lon_off_m / 75_000
+    f = feat(i, length_m=length if length is not None else abs(lat1_m - lat0_m))
+    f["geometry"]["coordinates"] = [[lon, LAT + lat0_m * DLAT], [lon, LAT + lat1_m * DLAT]]
+    return f
+
+
+def _trail(tid, name, ids, mi):
+    return {"id": tid, "name": name, "manager": None, "park": None, "segment_ids": ids, "official_length_mi": None,
+            "computed_length_mi": mi, "gain_m": 0, "loss_m": 0, "climb_total_m": 0, "trailheads": [],
+            "official_map_url": None}
+
+
+def _tiny_doc(tmp_path, segs, trails):
+    d = canon(tmp_path, segs=segs, trails=trails)
+    doc = json.loads((d / "trails.json").read_text())
+    return dist_trails_doc(doc, shippable_info(d / "segments.geojson", None), "v")
+
+
+def test_tiny_trail_folded_into_touching_trail(tmp_path):
+    segs = [_line("seg-000001", 0, 500), _line("seg-000002", 500, 520)]
+    out = _tiny_doc(tmp_path, segs, [_trail("trail-a", "Big", ["seg-000001"], 0.31),
+                                     _trail("trail-b", "Tiny", ["seg-000002"], 0.012)])
+    (t,) = out["trails"]
+    assert t["id"] == "trail-a" and t["segment_ids"] == ["seg-000001", "seg-000002"]
+    assert t["computed_length_mi"] == round(520 / 1609.344, 3)
+    assert t["folded_from"] == ["trail-b"]
+
+
+def test_tiny_trail_without_neighbour_hidden(tmp_path):
+    segs = [_line("seg-000001", 0, 500), _line("seg-000002", 0, 20, lon_off_m=300)]
+    out = _tiny_doc(tmp_path, segs, [_trail("trail-a", "Big", ["seg-000001"], 0.31),
+                                     _trail("trail-b", "Tiny", ["seg-000002"], 0.012)])
+    (t,) = out["trails"]
+    assert t["segment_ids"] == ["seg-000001"] and "folded_from" not in t
+
+
+def test_tiny_trail_prefers_longest_neighbour(tmp_path):
+    segs = [_line("seg-000001", 0, 200), _line("seg-000002", 0, 500, lon_off_m=100),
+            _line("seg-000003", 200, 220)]
+    segs[2]["geometry"]["coordinates"][1] = [LON + 100 / 75_000, LAT + 500 * DLAT]  # joins both ends
+    segs[2]["geometry"]["coordinates"][0] = [LON, LAT + 200 * DLAT]
+    out = _tiny_doc(tmp_path, segs, [_trail("trail-a", "Short", ["seg-000001"], 0.12),
+                                     _trail("trail-b", "Long", ["seg-000002"], 0.31),
+                                     _trail("trail-c", "Tiny", ["seg-000003"], 0.012)])
+    by = {t["id"]: t for t in out["trails"]}
+    assert set(by) == {"trail-a", "trail-b"}
+    assert by["trail-b"]["segment_ids"] == ["seg-000002", "seg-000003"]
+    assert "folded_from" not in by["trail-a"]
+
+
+def test_island_totals_unchanged_by_folding(tmp_path):
+    segs = [_line("seg-000001", 0, 500), _line("seg-000002", 500, 520)]
+    out = _tiny_doc(tmp_path, segs, [_trail("trail-a", "Big", ["seg-000001"], 0.31),
+                                     _trail("trail-b", "Tiny", ["seg-000002"], 0.012)])
+    assert out["island_total_m"] == 100.0 and out["island_total_shippable_m"] == 60.0
+
+
+def test_tiny_trail_rows_list_folded_and_hidden():
+    from bitrails.summary import tiny_trail_rows
+    canon_trails = [{"id": "t1", "name": "Big", "segment_ids": ["s1"]}, {"id": "t2", "name": "Folded", "segment_ids": ["s2"]},
+                    {"id": "t3", "name": "Hidden", "segment_ids": ["s3"]}, {"id": "t4", "name": "Private", "segment_ids": ["p"]}]
+    dist = [{"id": "t1", "name": "Big", "folded_from": ["t2"]}]
+    assert tiny_trail_rows(canon_trails, dist, {"s1", "s2", "s3"}) == [["Folded", "Big"], ["Hidden", "hidden"]]

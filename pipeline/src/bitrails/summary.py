@@ -99,7 +99,16 @@ def official_vs_computed_rows(trails: list[dict]) -> list[list]:
     return rows
 
 
-def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclusion_path: Path) -> str:
+def tiny_trail_rows(canon_trails: list[dict], dist_trails: list[dict], ship_ids: set[str]) -> list[list]:
+    """[name, receiver name | "hidden"] for named canonical trails with shippable segments that dist folded or hid."""
+    kept = {t["id"] for t in dist_trails}
+    into = {f: t["name"] for t in dist_trails for f in t.get("folded_from", [])}
+    return [[t["name"], into.get(t["id"], "hidden")] for t in canon_trails
+            if t["id"] not in kept and (t.get("name") or "").strip() and any(i in ship_ids for i in t["segment_ids"])]
+
+
+def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclusion_path: Path,
+                  dist_trails: list[dict] | None = None) -> str:
     doc = json.loads((canonical / "trails.json").read_text())
     ds, trails = doc["dataset"], doc["trails"]
     feats = json.loads((canonical / "segments.geojson").read_text())["features"]
@@ -180,6 +189,14 @@ def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclu
     L += [f"- {t['name']} ({t['computed_length_mi']} mi)" for t in dropped] or ["(none)"]
     L += ["", "Shipped trails in `data/dist/trails.json` use shippable segments only (length, gain/loss, trailheads); "
           "`agency_only_length_mi` is the part still missing.", ""]
+    if dist_trails is not None:
+        tiny = tiny_trail_rows(trails, dist_trails, ship_ids)
+        L += ["### Tiny trails folded/hidden", "",
+              f"Trails under 30 m ({len(tiny)}) are merged into the longest touching trail (segments within 1 m) "
+              "or hidden when nothing touches them, so a tiny trail inside a neighbour's GPS buffer is not "
+              "auto-completed. Segments and island totals are unchanged.", ""]
+        L += _table(["trail", "folded into"], tiny) if tiny else ["(none)"]
+        L += [""]
     srcs = yaml.safe_load(sources_path.read_text())["sources"]
     L += ["### Agency data licensing (your call)", "",
           "BIMPRD, City and STO datasets have `redistribution: unknown` in sources.yaml. Shipped geometry comes "
@@ -200,6 +217,6 @@ def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclu
 
 def write_summary(canonical: Path = DATA / "canonical", out: Path = DATA / "reports" / "summary.md",
                   conflicts_md: Path = DATA / "reports" / "conflicts.md", sources_path: Path = DATA / "sources.yaml",
-                  inclusion_path: Path = DATA / "inclusion.yaml") -> Path:
-    out.write_text(build_summary(canonical, conflicts_md, sources_path, inclusion_path))
+                  inclusion_path: Path = DATA / "inclusion.yaml", dist_trails: list[dict] | None = None) -> Path:
+    out.write_text(build_summary(canonical, conflicts_md, sources_path, inclusion_path, dist_trails))
     return out
