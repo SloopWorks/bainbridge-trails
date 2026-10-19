@@ -6,12 +6,14 @@ android-targetSdk = "37"
 androidx-activity = "1.12.4"
 compose-multiplatform = "1.12.2"
 kotlin = "2.4.21"
+kotlinx-coroutines = "1.11.0"
 kotlinx-io = "0.9.1"
 kotlinx-serialization = "1.11.0"
 maplibre-compose = "0.20.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinx-io" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 maplibre-compose = { module = "org.maplibre.compose:maplibre-compose", version.ref = "maplibre-compose" }
