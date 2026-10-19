@@ -21,7 +21,7 @@ Why it's special: no existing app does per-trail, cumulative, multi-session cove
 - When a trail crosses the completion threshold: a full-screen celebration (accessible: screen-reader text, reduced-motion variant), showing the trail, the user's new island %, and community stats for that trail.
 
 ### Completion rules (owner decisions)
-- A trail is **complete** when a "reasonable percentage" of its length has been covered on foot. Provisional threshold 85% (Spike 3, option B; see docs/spikes/coverage/notes.md); to be re-checked on real walks before v1.
+- A trail is **complete** when a "reasonable percentage" of its length has been covered on foot. Provisional threshold 85% (Spike 3, option B; matcher: HMM (Spike 3b); see docs/spikes/coverage/notes.md); to be re-checked on real walks before v1.
 - Coverage **accumulates across sessions**. A long trail can be finished over many outings, in any order or direction.
 - Partial progress is shown as a percentage per trail.
 - Walking speed only (builder's call: reject segments above a walking/running speed threshold so bike/car travel doesn't count).

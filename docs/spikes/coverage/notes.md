@@ -1,6 +1,6 @@
 # Spike 3: trail coverage, parameter sweep
 
-Status: **Provisional defaults set (owner chose option B, 2026-10-18).** The Task 9 decision rule still picks no config; defaults are option B, see "Decision (owner, 2026-10-18)". Re-check on real GPX walks before v1.
+Status: **Provisional defaults set (owner chose option B, 2026-10-18; matcher switched to HMM by Spike 3b).** The Task 9 decision rule still picks no config; defaults are option B's buffer / smoothing / threshold with the HMM matcher, see "Decision (owner, 2026-10-18)" and "Spike 3b: HMM matching". Re-check on real GPX walks before v1.
 
 Data: `sweep.csv` (full grid, threshold 0.90, 1296 rows), `sweep-t0.85.csv` and `sweep-t0.80.csv` (σ {10, 15} × interval {5, 15}, 576 rows each, re-run for rule step 3). All simulated, no real tracks. Reproduce from `app/`:
 
@@ -18,7 +18,7 @@ Config labels below are buffer/heading/margin/smooth (m/°/m/s).
 
 ## Decision (owner, 2026-10-18)
 
-Option B, provisional: **buffer 30 m, heading off, margin 1 m, smooth 10 s, completion threshold 0.85** (`nearlyDoneThreshold` 0.75 and `headingBaselineM` 15 unchanged; the baseline still drives the stationary rule). Now the `CoverageParams` defaults; spec §2 says 85%.
+Option B, provisional: **buffer 30 m, heading off, margin 1 m, smooth 10 s, completion threshold 0.85** (`nearlyDoneThreshold` 0.75 and `headingBaselineM` 15 unchanged; the baseline still drives the stationary rule). Now the `CoverageParams` defaults; spec §2 says 85%. Spike 3b keeps buffer 30 / smooth 10 s / threshold 0.85 and switches `matcher` to HMM (heading and margin then unused).
 
 Options shown to the owner (30 m buffer; σ10/5 s; false-credit ratio and false completes from the sweep CSVs):
 
@@ -41,6 +41,55 @@ Next step: the owner records 2-3 GPX walks into `data/tracks/private/` (procedur
 ```
 
 Follow-up: a correlated-noise variant of the parallel guard (the current guard uses white noise, which smoothing removes almost entirely).
+
+## Spike 3b: HMM matching
+
+Data: `sweep-3b.csv` (threshold 0.85, 1305 rows: 9 COMPETITIVE option B rows + 1296 HMM rows). The dataset now exports all 7,537 segments; the 5,923 competitor segments (not `included`, no trail) take part in matching but their credit is never counted. Reproduce from `app/` (HMM run 373 s locally), then concatenate with one header:
+
+```
+./gradlew :coverage-eval:run --args="sweep --data ../data/dist --out comp.csv --matchers competitive --buffers 30 --headings off \
+  --margins 1 --smooth 10 --sigmas 5,10,15 --intervals 1,5,15 --seeds 3 --threshold 0.85"
+./gradlew :coverage-eval:run --args="sweep --data ../data/dist --out hmm.csv --matchers hmm --buffers 20,30 --smooth 0,10 \
+  --hmm-sigmas 5,10,15 --hmm-betas 3,5,10 --off-network 12,15,20,30 --sigmas 5,10,15 --intervals 1,5,15 --seeds 3 --threshold 0.85"
+```
+
+**Algorithm** (`HmmMatcher`, Newson & Krumm 2009, per filtered piece). Observations every `hmmStepM` (10 m) of path. States: the nearest tick of each segment within `bufferM` (up to 8) plus one OFF (off-network) state. Emission −d²/2σ²; OFF scores as a candidate at `offNetworkM`. Transition −|route − straight| / β, with routes over the tick graph (`TickGraph`, junctions within 3 m), so a parallel trail is reachable only through a real junction. Entering or leaving OFF costs 3 nats. Viterbi; credit = matched ticks plus every tick on the route between consecutive matches. A piece with < 15 m extent credits nothing.
+
+**New metric.** `offNetCreditRatio`: walk every connector / informal competitor chain lying ≥ 50% within 30 m of a scored segment (each its own recording); credited scored metres / walked metres. 423 chains. Option B's is now measurable: **0.255 at σ10/5 s, 0.358 at σ15/15 s**.
+
+**Decision rule** (controller R1: against option B re-measured in this sweep, σ10/5 s, threshold 0.85). Adopt HMM if one config has cr ≥ B's, fc < B's, fcr < B's and offNet ≤ ½ B's; pick max cr, tie → min fcr. Re-measured B: cr 0.822, fcr 0.065, fc 2, offNet 0.255 (Spike 3 numbers were cr 0.839, fcr 0.066, fc 3; the drop comes from competitors now taking candidates). **2 of 144 HMM configs qualify; HMM adopted**: buffer 30, smooth 10 s, emissionSigmaM 15, transitionBetaM 10, offNetworkM 30. Runner-up: same with σe 10 (cr 0.827, fcr 0.027). The highest-cr HMM configs (smooth 0, cr up to 0.883) fail on fc (1–4) or offNet (0.19–0.22 > 0.128).
+
+| matcher / option (buffer/heading/margin/smooth) | σ10/5 s cr | fcr | fc | offNet | σ15/15 s cr | fcr | fc | offNet |
+|---|---|---|---|---|---|---|---|---|
+| A 30/30°/1/20 (Spike 3) | 0.597 | 0.029 | 0 | n/a | 0.102 | 0.072 | 1 | n/a |
+| B 30/off/1/10 (Spike 3) | 0.839 | 0.066 | 3 | n/a | 0.693 | 0.097 | 1 | n/a |
+| C 30/60°/3/0 (Spike 3) | 0.933 | 0.104 | 7 | n/a | 0.705 | 0.107 | 2 | n/a |
+| B re-measured (3b) | 0.822 | 0.065 | 2 | 0.255 | 0.614 | 0.096 | 1 | 0.358 |
+| **HMM 30/10 s, σe 15, β 10, off 30 (chosen)** | **0.830** | **0.026** | **1** | **0.119** | **0.667** | **0.050** | **1** | **0.215** |
+
+All @0.85. A and C were not re-measured; their Spike 3 numbers predate the competitor segments. Chosen config, σ10/5 s: mean true fraction 0.906 (B 0.896), p5 0.600 (B 0.598), stand credit 25 m (B 32 m). σ5/1 s: cr 0.950, fcr 0.010, fc 0.
+
+**offNetworkM trade-off (R6)**, 30/10 s/σe 15/β 10 at σ10/5 s:
+
+| offNetworkM | cr | fcr | fc | offNet |
+|---|---|---|---|---|
+| 12 | 0.146 | 0.009 | 0 | 0.068 |
+| 15 | 0.447 | 0.019 | 1 | 0.100 |
+| 20 | 0.772 | 0.025 | 1 | 0.117 |
+| 30 | 0.830 | 0.026 | 1 | 0.119 |
+
+A small `offNetworkM` makes OFF beat the trail itself under σ10 noise, so walked trails stop completing; it buys little off-network protection (0.119 → 0.068). Not diagnosed per chain; likely most remaining off-network credit comes from paths that touch or cross trails rather than from walks beside them.
+
+**What the owner should know (plain terms):**
+- **Beside-trail credit distance: ~30 m.** With `offNetworkM` 30 = `bufferM`, walking alongside a lone trail anywhere within 30 m of it credits the trail (`besideTrailThresholdDocumented`: 27.5 m → all 60 ticks, 30 m → 0). Only a mapped competitor path nearer than the trail (`competitorPathWinsOverTrail`) or a distance > 30 m stops it. A road shoulder or unmapped path 20 m from a trail counts as walking the trail.
+- **Remaining off-network credit: 12%** of off-network walking is credited to scored segments at σ10/5 s (21% at σ15/15 s), against 25% / 36% for option B.
+- **Bike and drive credit are unchanged**: ~42 m per transition riding a bike and ~24 m driving, at σ10/5 s (B: 41 m / 25 m). That is real credit for riding scored multi-use paths in the ~30 s before the 4 m/s speed check catches up; HMM does not touch it. Spike 4's activity gating is the planned fix.
+
+**Parallel guards** (unedited assertions): `ParallelGuardTest` (correlated σ10, 12 m apart) COMPETITIVE A 0.834 / B 0.338, HMM A 0.996 / B 0.005; `parallelNeighborNotCredited` on the new defaults A 1.0 / B 0.0. Both pass. `ParallelGuardTest`'s baseline line changed from `CoverageParams()` to `CoverageParams(matcher = Matcher.COMPETITIVE)` (same option B values) so it still compares against option B now that the default is HMM.
+
+**Runtime** (`HmmPerfTest`, JVM, longest trail, 60 min at 1 s): index 42 ms, tick graph 116 ms (built once, lazily), Viterbi cover 20 ms; `coverFixes` including the lazy graph 179 ms. Well under the 2 s budget.
+
+**Limits that remain:** beside-trail credit within 30 m (above); vehicle credit per transition (above); σ15/15 s still collapses (cr 0.667); parallel trails joined by frequent junctions are not separated by topology (untested); real-GPS validation still pending (owner's GPX walks, same procedure as below).
 
 ## Tiny-trail fold (Task 9b)
 
@@ -73,7 +122,7 @@ Effect: the zero-score ceiling is gone (σ5/1 s best `completeRate` @0.90 rose f
    - **smoothing (Task 9c, R16):** within each piece, each fix moves to the mean of the piece's original fixes within ±`smoothWindowS` / 2 (default 10 s). No cascade, never across a break; a fix with no neighbour in the window is unchanged (so 15–20 s recordings are untouched at 10 s); 0 = off.
 3. **Matching.** Each piece is densified every `tickM`. Each point q gets a heading from a displacement baseline ≥ `headingBaselineM`. A point with no such baseline is stationary and credits nothing.
    - Candidates are ticks within `bufferM` of q that pass the heading check (axial difference ≤ `headingToleranceDeg`; skipped when the tolerance is null).
-   - Competitive matching: a segment is credited only if its nearest candidate is within d\* + `matchMarginM` of the best segment's nearest candidate d\*. It credits that tick and its ±1 neighbours (heading-checked, within the buffer).
+   - Competitive matching (`matcher = COMPETITIVE`; the default is HMM since Spike 3b, see above): a segment is credited only if its nearest candidate is within d\* + `matchMarginM` of the best segment's nearest candidate d\*. It credits that tick and its ±1 neighbours (heading-checked, within the buffer).
 4. **State.** `CoverageState` holds one bitset of covered ticks per segment. Union is OR, so it is order-independent and idempotent.
 5. **Progress.** A trail's fraction is the covered metres over the trail's distinct segment metres. It is COMPLETE at ≥ `completionThreshold`, NEARLY_DONE at ≥ `nearlyDoneThreshold` (0.75). The island fraction is covered metres over `islandTotalM`.
 
@@ -143,10 +192,10 @@ Worst case (σ15/15 s) fc is at threshold 0.80.
 
 ## Known limits (for any config)
 
-- **Off-network walking is not measured.** Only `included` and trail segments are exported (1,614 of 7,537 canonical segments). Informal paths and connectors do not compete in matching, so walking a road shoulder or informal path within 30 m of a trail can credit that trail under option B (no heading check). Option B's fcr 0.066 is on-network only (the simulator walks exported trails). Fix before v1: export all redistributable segments as competitors (credit only `included` / trail ones) and add a sweep scenario that walks off-network paths next to trails.
-- **Parallel trails < 12 m apart.** The guard passes everywhere with smoothing, but only because its noise is white; under correlated noise, heading off still credits neighbours (fcr 0.066–0.09).
+- **Off-network walking** (Spike 3b): now measured (`offNetCreditRatio`) and all 7,537 segments compete. HMM credits 12% of off-network walking at σ10/5 s (option B 25%), and any walk within ~30 m of a lone trail with no nearer mapped path is credited to it. Unmapped paths cannot compete.
+- **Parallel trails < 12 m apart.** COMPETITIVE credits neighbours under correlated noise (fcr 0.065–0.096; correlated guard B 0.338). HMM separates them through topology (guard B 0.005, fcr 0.026 at σ10/5 s) unless they share frequent junctions.
 - **Hairpin switchbacks** tighter than the buffer score 0.71–0.93 even at zero noise; smoothing cuts them further.
-- **Speed-window leak (R5).** About 30 s of fast travel right after walking passes the speed check: 19–36 m per transition on average (smoothing reduces it). It is never 0.
+- **Speed-window leak (R5).** About 30 s of fast travel right after walking passes the speed check: 19–36 m per transition on average (smoothing reduces it). It is never 0. HMM does not change it (~42 m bike / ~24 m drive per transition at σ10/5 s).
 - **`spikeM`** (30 m) costs a little `completeRate` and is a follow-up knob, not swept.
 - **Foot only in v1** (owner, 2026-10-18). Riding a bike on a bike-allowed trail does not count. The 4 m/s speed check enforces this.
 - **Tiny trails** (< 30 m) are now folded or hidden (table above); trails of 30–50 m can still be auto-completed from a neighbour. A folded receiver's `agency_only_length_mi` is understated by up to 0.02 mi (the folded trail's < 30 m), since it is computed against the receiver's own canonical length.
@@ -160,6 +209,10 @@ Spike 4 should report, on iOS and Android with the screen off:
 - the real interval distribution;
 - the `horizontalAccuracy` / `accuracy` distribution under tree cover;
 - whether throttling causes gaps > 60 s, which split pieces.
+
+It should also prototype what Spike 3b leaves open:
+- **activity gating**: credit only while the platform activity recogniser says walking / running (iOS `CMMotionActivity`, Android Activity Recognition), to remove the bike / drive credit per transition;
+- **step-count cross-check**: compare pedometer steps against the matched distance per piece (~1.3–1.5 steps per m); a piece with far too few steps credits nothing. A second, independent anti-cheat signal next to the speed check.
 
 Accuracy contract: a fix with `accuracyM < 0` is dropped (iOS reports negative `horizontalAccuracy` for an invalid fix); `accuracyM == null` means unknown and the fix is kept. Platform code must map "no accuracy" to null, never to 0 or a negative value.
 
