@@ -27,5 +27,14 @@ merge:
   # one connector trail between two parks, split at the park boundaries
   trail-fort-ward-to-blakely-harbor-trail: [trail-fort-ward-to-blakely-harbor-trail-blakely-harbor-park,
                                             trail-fort-ward-to-blakely-harbor-trail-fort-ward-park]
-trails: {}
+trails:
+  trail-forest-to-sky-trail:
+    official_length_mi: 1.0
+    official_length_source: https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/87/58?widgetId=540
+  trail-close-trail:
+    official_length_mi: 0.7
+    official_length_source: https://biparks.org/map-location/close-trail/?mpfy_map=1654&mpfy-pin=1979
+  trail-hawley-cove-trail:
+    official_length_mi: 0.25
+    official_length_source: https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/99/58?widgetId=540
 custom: []

@@ -56,7 +56,7 @@ Full detail: [conflicts.md](conflicts.md).
 
 ## Trails: official vs computed miles
 
-Official mileage is set on 0 of 127 trails: no source has an agency mileage field (set it per trail in `trails_overrides.yaml`). Computed = sum of segment lengths. Gain/loss follow walking order (2 m hysteresis).
+Official mileage is set on 3 of 127 trails: no source has an agency mileage field (set it per trail in `trails_overrides.yaml`). Computed = sum of segment lengths. Gain/loss follow walking order (2 m hysteresis).
 
 | trail | manager | park | segs | official mi | computed mi | gain m | loss m |
 |---|---|---|---|---|---|---|---|
@@ -75,12 +75,12 @@ Official mileage is set on 0 of 127 trails: no source has an agency mileage fiel
 | Hilltop Trail | BIMPRD | Grand Forest | 14 |  | 0.92 | 21.7 | 61.5 |
 | Trillium Trail | BIMPRD | Grand Forest | 5 |  | 0.911 | 40.4 | 40.1 |
 | Knudsen Trail | BIMPRD | Gazzam Lake Preserve | 9 |  | 0.868 | 14.3 | 153.9 |
-| Forest to Sky Trail | BIMPRD | Grand Forest | 21 |  | 0.851 | 36.9 | 42.8 |
+| Forest to Sky Trail | BIMPRD | Grand Forest | 21 | 1.0 | 0.851 | 36.9 | 42.8 |
 | Sound to Olympics Trail |  |  | 23 |  | 0.851 | 38.7 | 13.4 |
 | Bluff Trail | BIMPRD |  | 11 |  | 0.843 | 21.4 | 44.1 |
 | Veterane Trail | BIMPRD | Gazzam Lake Preserve | 5 |  | 0.698 | 7.7 | 75.9 |
 | Blakely Harbor Trail | BIMPRD | Blakely Harbor Park | 14 |  | 0.687 | 9.2 | 0.0 |
-| Close Trail | BIMPRD | Gazzam Lake Preserve | 11 |  | 0.67 | 17.4 | 120.6 |
+| Close Trail | BIMPRD | Gazzam Lake Preserve | 11 | 0.7 | 0.67 | 17.4 | 120.6 |
 | Gazzam Lake Loop Trail | BIMPRD | Gazzam Lake Preserve | 2 |  | 0.648 | 18.8 | 17.3 |
 | Fort Ward to Blakely Harbor Trail | BIMPRD | Blakely Harbor Park | 8 |  | 0.643 | 16.4 | 25.0 |
 | Grand Forest North Loop Trail | BIMPRD | Grand Forest | 5 |  | 0.635 | 14.2 | 35.2 |
@@ -116,7 +116,7 @@ Official mileage is set on 0 of 127 trails: no source has an agency mileage fiel
 | Fort Ward Trail | BIMPRD |  | 1 |  | 0.253 | 0.0 | 14.8 |
 | Waypoint Woods Trail | BIMPRD | Waypoint Woods | 5 |  | 0.247 | 10.5 | 10.7 |
 | Grand Forest North | BIMPRD | Grand Forest | 3 |  | 0.246 | 2.4 | 24.0 |
-| Hawley Cove Trail | BIMPRD | Hawley Cove Park | 4 |  | 0.229 | 0.0 | 17.8 |
+| Hawley Cove Trail | BIMPRD | Hawley Cove Park | 4 | 0.25 | 0.229 | 0.0 | 17.8 |
 | Bristle Ridge Trail | BIMPRD |  | 3 |  | 0.228 | 0.0 | 7.0 |
 | Nutes Trail | BIMPRD | Nute's Pond | 3 |  | 0.227 | 2.2 | 3.7 |
 | Ted Olson Trail | BIMPRD | Ted Olson Nature Preserve | 3 |  | 0.222 | 8.8 | 14.1 |
@@ -192,7 +192,11 @@ Official mileage is set on 0 of 127 trails: no source has an agency mileage fiel
 
 Official = agency-published mileage set in `trails_overrides.yaml` with a cited source. computed_mi = shippable segments (what the app can draw); agency_only_mi = private geometry. diff_% compares computed + agency-only with official; ⚠ = off by more than 15%.
 
-(no trail has an official length yet)
+| trail | official_mi | computed_mi | agency_only_mi | diff_% | source |
+|---|---|---|---|---|---|
+| Close Trail | 0.7 | 0.67 | 0.0 | -4% | https://biparks.org/map-location/close-trail/?mpfy_map=1654&mpfy-pin=1979 |
+| Forest to Sky Trail | 1.0 | 0.851 | 0.0 | -15% | https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/87/58?widgetId=540 |
+| Hawley Cove Trail | 0.25 | 0.229 | 0.0 | -8% | https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/99/58?widgetId=540 |
 
 ## Owner review
 

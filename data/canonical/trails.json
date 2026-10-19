@@ -537,8 +537,8 @@
       "loss_m": 120.6,
       "manager": "BIMPRD",
       "name": "Close Trail",
-      "official_length_mi": null,
-      "official_length_source": null,
+      "official_length_mi": 0.7,
+      "official_length_source": "https://biparks.org/map-location/close-trail/?mpfy_map=1654&mpfy-pin=1979",
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -775,8 +775,8 @@
       "loss_m": 42.8,
       "manager": "BIMPRD",
       "name": "Forest to Sky Trail",
-      "official_length_mi": null,
-      "official_length_source": null,
+      "official_length_mi": 1.0,
+      "official_length_source": "https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/87/58?widgetId=540",
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -1188,8 +1188,8 @@
       "loss_m": 17.8,
       "manager": "BIMPRD",
       "name": "Hawley Cove Trail",
-      "official_length_mi": null,
-      "official_length_source": null,
+      "official_length_mi": 0.25,
+      "official_length_source": "https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/99/58?widgetId=540",
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/42/638894530535930000",
       "park": "Hawley Cove Park",
       "segment_ids": [
