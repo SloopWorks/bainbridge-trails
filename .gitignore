@@ -16,3 +16,6 @@ data/dist/*
 # map data copied into the app by scripts/sync-app-assets.sh
 app/composeApp/src/commonMain/composeResources/files/*.pmtiles
 app/composeApp/src/commonMain/composeResources/files/trails.json
+
+# real GPS tracks: never committed
+data/tracks/private/

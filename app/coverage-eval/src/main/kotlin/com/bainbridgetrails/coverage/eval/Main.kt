@@ -1,0 +1,116 @@
+package com.bainbridgetrails.coverage.eval
+
+import com.bainbridgetrails.coverage.CoverageParams
+import com.bainbridgetrails.coverage.CoverageState
+import com.bainbridgetrails.coverage.Dataset
+import com.bainbridgetrails.coverage.LocalProjection
+import com.bainbridgetrails.coverage.Progress
+import com.bainbridgetrails.coverage.SegmentIndex
+import com.bainbridgetrails.coverage.filterFixes
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.io.File
+import java.util.Locale
+import kotlin.system.exitProcess
+
+private const val USAGE = """usage:
+  sweep --data DIR --out FILE.csv [--buffers 10,15,20,25,30] [--headings on,off] [--margins 0,1,3]
+        [--sigmas 5,10,20] [--intervals 1,5,10] [--seeds 3] [--threshold 0.90]
+  gpx --data DIR FILE.gpx..."""
+
+fun main(args: Array<String>) {
+    if (args.isEmpty()) usage()
+    val flags = HashMap<String, String>()
+    val positional = ArrayList<String>()
+    var i = 1
+    while (i < args.size) {
+        val a = args[i]
+        if (a.startsWith("--")) {
+            if (i + 1 >= args.size) usage("missing value for $a")
+            flags[a.removePrefix("--")] = args[i + 1]
+            i += 2
+        } else {
+            positional += a
+            i++
+        }
+    }
+    val dataDir = File(flags["data"] ?: usage("--data is required"))
+    val dataset = Dataset.parse(File(dataDir, "trails.json").readText(), File(dataDir, "coverage_segments.json").readText())
+    when (args[0]) {
+        "sweep" -> runSweep(dataset, dataDir, flags)
+        "gpx" -> runGpx(dataset, positional)
+        else -> usage("unknown command ${args[0]}")
+    }
+}
+
+private fun usage(msg: String? = null): Nothing {
+    msg?.let { System.err.println(it) }
+    System.err.println(USAGE)
+    exitProcess(2)
+}
+
+private fun doubles(s: String) = s.split(",").map { it.trim().toDouble() }
+
+private fun runSweep(dataset: Dataset, dataDir: File, flags: Map<String, String>) {
+    val out = File(flags["out"] ?: usage("--out is required"))
+    val headings = (flags["headings"] ?: "on,off").split(",").map {
+        when (it.trim()) { "on" -> true; "off" -> false; else -> usage("--headings takes on/off") }
+    }
+    val categories = readCategories(File(dataDir, "segments.tiles.geojson"))
+    if (categories.isEmpty()) System.err.println("segments.tiles.geojson missing: vehicle scenarios use the longest-trails proxy")
+    val start = System.nanoTime()
+    val rows = sweep(
+        dataset,
+        buffers = doubles(flags["buffers"] ?: "10,15,20,25,30"),
+        sigmas = doubles(flags["sigmas"] ?: "5,10,20"),
+        intervals = doubles(flags["intervals"] ?: "1,5,10"),
+        seeds = (flags["seeds"] ?: "3").toInt(),
+        headings = headings,
+        margins = doubles(flags["margins"] ?: "0,1,3"),
+        threshold = (flags["threshold"] ?: "0.90").toDouble(),
+        categories = categories,
+        log = { System.err.println(it) },
+    )
+    out.absoluteFile.parentFile?.mkdirs()
+    out.writeText((listOf(SweepRow.CSV_HEADER) + rows.map { it.csv() }).joinToString("\n", postfix = "\n"))
+    System.err.println(String.format(Locale.ROOT, "wrote %d rows to %s in %.1fs", rows.size, out, (System.nanoTime() - start) / 1e9))
+}
+
+/** id -> category from segments.tiles.geojson feature properties; empty if the file is missing. */
+private fun readCategories(f: File): Map<String, String> {
+    if (!f.exists()) return emptyMap()
+    return Json.parseToJsonElement(f.readText()).jsonObject["features"]!!.jsonArray.mapNotNull { feat ->
+        val p = feat.jsonObject["properties"]?.jsonObject ?: return@mapNotNull null
+        val id = p["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
+        val cat = p["category"]?.jsonPrimitive?.content ?: return@mapNotNull null
+        id to cat
+    }.toMap()
+}
+
+private fun runGpx(dataset: Dataset, files: List<String>) {
+    if (files.isEmpty()) usage("gpx needs at least one file")
+    val params = CoverageParams()
+    val proj = LocalProjection()
+    val index = SegmentIndex(dataset.segments, params, proj)
+    val progress = Progress(dataset, index, params)
+    var state = CoverageState.EMPTY
+    for (path in files) {
+        val fixes = readGpx(File(path).readText())
+        // each file is its own recording (the speed check's reference never spans files)
+        state = state.union(index.coverFixes(fixes))
+        val dedup = fixes.distinctBy { it.timeMs }
+        val inaccurate = dedup.count { !it.isMock && (it.accuracyM ?: 0.0) > params.maxAccuracyM }
+        val mock = dedup.count { it.isMock }
+        val kept = filterFixes(fixes, params, proj).sumOf { it.size }
+        val other = dedup.size - mock - inaccurate - kept
+        println("$path: fixes=${fixes.size} kept=$kept dropped: duplicateTime=${fixes.size - dedup.size} mock=$mock " +
+            "inaccurate=$inaccurate speedOrShortPiece=$other")
+    }
+    println(String.format(Locale.ROOT, "island: %.2f%%  trails complete: %d", progress.islandFraction(state) * 100, progress.trailsCompleted(state)))
+    dataset.trails.map { it to progress.trailFraction(state, it.id) }
+        .filter { it.second > 0.0 }
+        .sortedByDescending { it.second }
+        .forEach { (t, f) -> println(String.format(Locale.ROOT, "  %-40s %6.1f%%  %s", t.name, f * 100, progress.status(f))) }
+}
