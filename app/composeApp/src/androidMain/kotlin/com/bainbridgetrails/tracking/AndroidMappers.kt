@@ -1,5 +1,6 @@
 package com.bainbridgetrails.tracking
 
+import android.annotation.SuppressLint
 import android.location.Location
 import android.os.Build
 import android.os.SystemClock
@@ -35,8 +36,8 @@ class LocationFieldsAdapter(private val location: Location) : LocationFields {
     override val hasAccuracy: Boolean get() = location.hasAccuracy()
     override val accuracyM: Float get() = location.accuracy
 
-    override fun isMock(): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) location.isMock else isFromMockProvider()
+    @SuppressLint("NewApi") // AndroidMappers.toFix only calls this when SDK_INT >= S.
+    override fun isMock(): Boolean = location.isMock
 
     @Suppress("DEPRECATION")
     override fun isFromMockProvider(): Boolean = location.isFromMockProvider
@@ -92,5 +93,35 @@ class StepBaseline {
         }
         last = raw
         return carried + raw - baseline
+    }
+}
+
+/** Last location state the recorder wrote. */
+enum class LocationState {
+    AVAILABLE, NO_FIX, OFF;
+
+    companion object {
+        fun after(available: Boolean, systemEnabled: Boolean): LocationState = when {
+            !systemEnabled -> OFF
+            available -> AVAILABLE
+            else -> NO_FIX
+        }
+    }
+}
+
+enum class LocationAvailabilityAction { NONE, MARK_UNAVAILABLE, LOST, MARK_AVAILABLE }
+
+/**
+ * Ruling R5. System location off -> LOST (SourceState false + RecordingBus.emitLost). Fused provider reports no
+ * fix while location is on -> MARK_UNAVAILABLE only (transient: indoors, under trees; the UI's waiting chip covers
+ * it, so never LOST). Recovery -> MARK_AVAILABLE. [current] de-duplicates: no action when the state is unchanged.
+ */
+fun locationAvailabilityAction(available: Boolean, systemEnabled: Boolean, current: LocationState): LocationAvailabilityAction {
+    val next = LocationState.after(available, systemEnabled)
+    if (next == current) return LocationAvailabilityAction.NONE
+    return when (next) {
+        LocationState.OFF -> LocationAvailabilityAction.LOST
+        LocationState.NO_FIX -> LocationAvailabilityAction.MARK_UNAVAILABLE
+        LocationState.AVAILABLE -> LocationAvailabilityAction.MARK_AVAILABLE
     }
 }

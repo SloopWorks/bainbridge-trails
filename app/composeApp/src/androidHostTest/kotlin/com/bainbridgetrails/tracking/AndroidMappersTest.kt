@@ -90,4 +90,31 @@ class AndroidMappersTest {
         assertEquals(30L, steps.relative(8f))
         assertFailsWith<IllegalArgumentException> { steps.relative(-1f) }
     }
+
+    @Test
+    fun locationAvailabilityDecisions() {
+        val A = LocationState.AVAILABLE
+        val N = LocationState.NO_FIX
+        val O = LocationState.OFF
+        // Transient no-fix (indoors, under trees): mark, never LOST.
+        assertEquals(LocationAvailabilityAction.MARK_UNAVAILABLE, locationAvailabilityAction(false, true, A))
+        assertEquals(LocationAvailabilityAction.NONE, locationAvailabilityAction(false, true, N))
+        // Fix returns.
+        assertEquals(LocationAvailabilityAction.MARK_AVAILABLE, locationAvailabilityAction(true, true, N))
+        assertEquals(LocationAvailabilityAction.NONE, locationAvailabilityAction(true, true, A))
+        // System location switched off -> LOST, once; regardless of fused availability.
+        assertEquals(LocationAvailabilityAction.LOST, locationAvailabilityAction(false, false, A))
+        assertEquals(LocationAvailabilityAction.LOST, locationAvailabilityAction(true, false, N))
+        assertEquals(LocationAvailabilityAction.NONE, locationAvailabilityAction(false, false, O))
+        // Switched back on.
+        assertEquals(LocationAvailabilityAction.MARK_AVAILABLE, locationAvailabilityAction(true, true, O))
+        assertEquals(LocationAvailabilityAction.MARK_UNAVAILABLE, locationAvailabilityAction(false, true, O))
+    }
+
+    @Test
+    fun locationStateAfterAction() {
+        assertEquals(LocationState.OFF, LocationState.after(false, false))
+        assertEquals(LocationState.NO_FIX, LocationState.after(false, true))
+        assertEquals(LocationState.AVAILABLE, LocationState.after(true, true))
+    }
 }

@@ -32,8 +32,12 @@ import java.io.File
  * restarted with `resume = true`.
  */
 class RecordingService : Service() {
+    // Deliberately never cancelled (not even in onDestroy): cancelling would kill the writer before it drains
+    // queued events. The writer ends on its own when the channel is closed and drained.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var events: Channel<SessionEvent>? = null
+    private var sessionId: String? = null
+    private var stopping = false
     private var location: AndroidLocationSource? = null
     private var activity: AndroidActivitySource? = null
     private var steps: AndroidStepSource? = null
@@ -44,13 +48,16 @@ class RecordingService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 val id = intent.getStringExtra(EXTRA_SESSION_ID)
-                if (id == null) {
-                    stopSelf(startId)
-                } else if (events == null) {
+                if (events == null && id != null) {
                     begin(id, resume = intent.getBooleanExtra(EXTRA_RESUME, false))
                 } else {
-                    // Already recording: still satisfy this startForegroundService call.
+                    // Every startForegroundService call must be answered with startForeground, even if rejected.
                     runCatching { goForeground() }
+                    when {
+                        id == null -> if (events == null) stopSelf(startId) // start() guards this; defensive
+                        stopping || id != sessionId -> RecordingBus.emitLost("already recording")
+                        else -> Unit // duplicate start for the current session
+                    }
                 }
             }
             ACTION_STOP -> requestStop()
@@ -61,6 +68,11 @@ class RecordingService : Service() {
         return START_NOT_STICKY
     }
 
+    /**
+     * Known edge, not device-verified: if location permission is revoked between [start]'s check and here,
+     * `startForeground` throws on API 34+. We emit lost and stop, but the system may still kill the app for a
+     * startForegroundService that never reached startForeground.
+     */
     private fun begin(sessionId: String, resume: Boolean) {
         try {
             goForeground()
@@ -72,6 +84,8 @@ class RecordingService : Service() {
         }
         val channel = Channel<SessionEvent>(Channel.UNLIMITED)
         events = channel
+        this.sessionId = sessionId
+        stopping = false
         val dir = File(noBackupFilesDir, "tracking").path
         val startMs = System.currentTimeMillis()
 
@@ -87,6 +101,8 @@ class RecordingService : Service() {
                 }
             } catch (e: Exception) {
                 RecordingBus.emitLost("session store unavailable")
+                // Nothing would persist: stop sources and the service. The loop below drains what was queued.
+                withContext(Dispatchers.Main) { if (events === channel) requestStop() }
                 null
             }
             for (event in channel) {
@@ -118,7 +134,9 @@ class RecordingService : Service() {
         if (stepsAvailable) stp.start { channel.trySend(SessionEvent.Steps(it)) }
 
         channel.trySend(SessionEvent.SourceState(now, "location", true))
-        AndroidLocationSource(this).also { location = it }.start(
+        AndroidLocationSource(this) { available ->
+            channel.trySend(SessionEvent.SourceState(System.currentTimeMillis(), "location", available))
+        }.also { location = it }.start(
             onFix = { fix ->
                 channel.trySend(SessionEvent.FixEvent(fix.timeMs, fix.lon, fix.lat, fix.accuracyM, fix.isMock))
             },
@@ -145,6 +163,8 @@ class RecordingService : Service() {
             stopSelf()
             return
         }
+        if (stopping) return
+        stopping = true
         stopSources()
         channel.trySend(SessionEvent.Stop(System.currentTimeMillis()))
         channel.close()
@@ -154,6 +174,8 @@ class RecordingService : Service() {
     private fun finish(channel: Channel<SessionEvent>) {
         if (events !== channel) return
         events = null
+        sessionId = null
+        stopping = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -163,6 +185,7 @@ class RecordingService : Service() {
         stopSources()
         events?.close()
         events = null
+        sessionId = null
         super.onDestroy()
     }
 
@@ -217,6 +240,10 @@ class RecordingService : Service() {
          * the service is not started (a location FGS would throw on API 34+); a lost reason is emitted instead.
          */
         fun start(context: Context, sessionId: String, resume: Boolean = false) {
+            if (sessionId.isBlank()) {
+                RecordingBus.emitLost("invalid session id")
+                return
+            }
             val granted = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
                 .any { context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
             if (!granted) {
@@ -227,11 +254,18 @@ class RecordingService : Service() {
                 .setAction(ACTION_START)
                 .putExtra(EXTRA_SESSION_ID, sessionId)
                 .putExtra(EXTRA_RESUME, resume)
-            context.startForegroundService(intent)
+            try {
+                context.startForegroundService(intent)
+            } catch (e: IllegalStateException) {
+                // ForegroundServiceStartNotAllowedException (API 31+, app in background) is an IllegalStateException.
+                RecordingBus.emitLost("cannot start recording from background")
+            } catch (e: SecurityException) {
+                RecordingBus.emitLost("cannot start location foreground service")
+            }
         }
 
         fun stop(context: Context) {
-            context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_STOP))
+            runCatching { context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_STOP)) }
         }
     }
 }
