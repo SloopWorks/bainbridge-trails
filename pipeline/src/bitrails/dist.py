@@ -5,6 +5,7 @@
   data/dist/coverage_segments.json  per-segment geometry (6-dp lon/lat) for on-device coverage
   data/dist/ATTRIBUTION.md          attribution for every source whose data is used (+ copy at data/ATTRIBUTION.md)
 Never reads data/canonical/private/. `trail_ids` is a comma-joined string in tiles (MVT has no arrays).
+`trail_ids` in tiles and coverage_segments come from dist trails.json (after folding), not canonical props.
 `scripts/build-tiles.sh` turns segments.tiles.geojson into trails.pmtiles and extracts the basemap.
 """
 from __future__ import annotations
@@ -42,14 +43,24 @@ def _features(path: Path) -> list[dict]:
     return json.loads(Path(path).read_text())["features"]
 
 
-def write_tile_input(segments: Path, out: Path) -> Path:
-    """Stripped GeoJSON for tippecanoe: only TILE_PROPS, trail_ids joined, null/absent name omitted."""
+def segment_trail_map(trails_doc: dict) -> dict[str, list[str]]:
+    """{segment id: sorted dist trail ids} inverted from dist trails' `segment_ids` (so folded segments name
+    their receiver, and trails dropped from dist are absent)."""
+    out: dict[str, set[str]] = {}
+    for t in trails_doc["trails"]:
+        for i in t["segment_ids"]:
+            out.setdefault(i, set()).add(t["id"])
+    return {i: sorted(ts) for i, ts in out.items()}
+
+
+def write_tile_input(segments: Path, out: Path, seg_trails: dict[str, list[str]]) -> Path:
+    """Stripped GeoJSON for tippecanoe: only TILE_PROPS, trail_ids (from `seg_trails`) joined, null/absent name omitted."""
     feats = []
     for f in _features(segments):
         p = f["properties"]
         if not p.get("geometry_redistributable"):
             raise ValueError(f"{p.get('id')}: geometry not redistributable; refusing to tile it")
-        props = {"id": p["id"], "category": p["category"], "trail_ids": ",".join(p.get("trail_ids") or []),
+        props = {"id": p["id"], "category": p["category"], "trail_ids": ",".join(seg_trails.get(p["id"], [])),
                  "included": bool(p["included"])}
         if p.get("name"):
             props["name"] = p["name"]
@@ -60,19 +71,23 @@ def write_tile_input(segments: Path, out: Path) -> Path:
     return out
 
 
-def coverage_segments_doc(segments: Path, trail_ids: set[str], version: str) -> dict:
-    """Geometry for on-device coverage: every segment that is `included` or belongs to a shipped trail.
-    `trail_ids` is the set of trails present in dist trails.json; others are dropped from each segment."""
+def coverage_segments_doc(segments: Path, seg_trails: dict[str, list[str]], version: str) -> dict:
+    """Geometry for on-device coverage: every segment that is `included` or in `seg_trails` (see
+    segment_trail_map; it supplies `trail_ids`). Fixed orientation: coords run so that the first (lon, lat), after
+    6-dp rounding, is <= the last, lexicographically (part of the Spike 5 sync contract)."""
     out = []
     for f in _features(segments):
         p = f["properties"]
         if not p.get("geometry_redistributable"):
             raise ValueError(f"{p.get('id')}: geometry not redistributable; refusing to export it")
-        tids = [t for t in (p.get("trail_ids") or []) if t in trail_ids]
+        tids = list(seg_trails.get(p["id"], []))
         if not (p["included"] or tids):
             continue
+        coords = [[round(c[0], 6), round(c[1], 6)] for c in f["geometry"]["coordinates"]]
+        if tuple(coords[0]) > tuple(coords[-1]):
+            coords.reverse()
         out.append({"id": p["id"], "length_m": p["length_m"], "included": bool(p["included"]), "trail_ids": tids,
-                    "coords": [[round(c[0], 6), round(c[1], 6)] for c in f["geometry"]["coordinates"]]})
+                    "coords": coords})
     return {"version": version, "segments": sorted(out, key=lambda s: s["id"])}
 
 
@@ -198,12 +213,13 @@ def run_dist(canonical: Path = DATA / "canonical", out_dir: Path = DATA / "dist"
              date: str | None = None) -> dict:
     seg = canonical / "segments.geojson"
     out_dir.mkdir(parents=True, exist_ok=True)
-    write_tile_input(seg, out_dir / "segments.tiles.geojson")
     info = shippable_info(seg, canonical / "elevation.json")
     version = dataset_version(seg, date or canonical_commit_date(canonical))
     doc = dist_trails_doc(json.loads((canonical / "trails.json").read_text()), info, version)
     (out_dir / "trails.json").write_text(json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False) + "\n")
-    cov = coverage_segments_doc(seg, {t["id"] for t in doc["trails"]}, version)
+    seg_trails = segment_trail_map(doc)
+    write_tile_input(seg, out_dir / "segments.tiles.geojson", seg_trails)
+    cov = coverage_segments_doc(seg, seg_trails, version)
     (out_dir / "coverage_segments.json").write_text(json.dumps(cov, separators=(",", ":")))
     md = attribution_md(used_source_ids(seg), yaml.safe_load(sources_path.read_text())["sources"])
     (out_dir / "ATTRIBUTION.md").write_text(md)

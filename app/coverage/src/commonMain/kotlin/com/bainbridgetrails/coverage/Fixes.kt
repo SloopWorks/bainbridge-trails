@@ -19,6 +19,9 @@ private const val MIN_SPEED_BASIS_S = 10.0
  * (3) break pieces on time gap > maxGapS or jump > maxJumpM; (4) speed check; (5) drop pieces < 2 fixes;
  * (6) smoothing.
  *
+ * Accuracy (rule 2): a fix is dropped when accuracyM > maxAccuracyM or accuracyM < 0 (iOS reports a negative
+ * horizontalAccuracy for an invalid fix). accuracyM == null means unknown and the fix is kept.
+ *
  * Spike filter (rule 2b, ruling R11): fix i, other than the first or last of the sequence left after rule 2, is
  * dropped when d(i-1, i) > spikeM and d(i, i+1) > spikeM but d(i-1, i+1) < spikeM / 2, i.e. it leaves and returns
  * to where the track was. Neighbours are those after rule 2, all judged in one pass (a drop never changes another
@@ -37,7 +40,7 @@ private const val MIN_SPEED_BASIS_S = 10.0
 fun filterFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection): List<List<Xy>> {
     val accepted = fixes.sortedBy { it.timeMs }
         .distinctBy { it.timeMs }
-        .filter { !it.isMock && (it.accuracyM ?: 0.0) <= params.maxAccuracyM }
+        .filter { f -> !f.isMock && f.accuracyM.let { it == null || (it >= 0.0 && it <= params.maxAccuracyM) } }
     val accXy = accepted.map { proj.toXy(it.lon, it.lat) }
     // rule 2b: single-fix spikes, judged against the original neighbours in one pass (no cascade)
     val keep = BooleanArray(accepted.size) { i ->

@@ -13,6 +13,7 @@ Data: `sweep.csv` (full grid, threshold 0.90, 1296 rows), `sweep-t0.85.csv` and 
 ```
 
 Each row has 342 walks (114 trails × 3 seeds) and 162 multi-use-path vehicle chains (transitions) per seed. The full grid takes ~107 s.
+CSV `bike_credit_m` and `drive_credit_m` are per-seed totals over all 162 chains (mean over seeds), not per transition; divide by 162 for the per-transition figure (option B at σ10/5 s: 7243 / 162 = 44.7 m bike, 4254 / 162 = 26.3 m drive). All "per transition" figures in this file are already divided.
 Config labels below are buffer/heading/margin/smooth (m/°/m/s).
 
 ## Decision (owner, 2026-10-18)
@@ -28,7 +29,7 @@ Options shown to the owner (30 m buffer; σ10/5 s; false-credit ratio and false 
 | C generous | 30 / 60° / 3 / off | 0.868 | 0.933 | 0.944 | 0.104 | 6 / 7 / 7 |
 
 Numbers for option B at threshold 0.85:
-- **σ10/5 s:** completeRate 0.839, falseCreditRatio 0.066, falseCompletes 3 (@0.85; 2 @0.90, 3 @0.80). Drive credit ~26 m per transition.
+- **σ10/5 s:** completeRate 0.839, falseCreditRatio 0.066, falseCompletes 3 (@0.85; 2 @0.90, 3 @0.80). Drive credit ~26 m per transition. p5 true fraction 0.677 (5% of walked trails get under ~68% credit).
 - **σ15/15 s (worst case):** completeRate 0.693 @0.85 (0.500 @0.90, 0.792 @0.80), falseCreditRatio 0.097, falseCompletes 1 (@0.85, @0.90 and @0.80).
 
 It misses the rule targets (cr >= 0.95, fcr <= 0.05, fc = 0); accepted as a provisional trade-off for completing walked trails.
@@ -64,7 +65,7 @@ Effect: the zero-score ceiling is gone (σ5/1 s best `completeRate` @0.90 rose f
 1. **Segments → ticks.** Each coverage segment is resampled every `tickM` (5 m), with ticks at the step centres. Each tick has a bearing smoothed over `headingBaselineM` (15 m) along the segment. Ticks go in a 50 m grid.
 2. **Fix filter** (`filterFixes`), in order:
    - sort and drop duplicate timestamps;
-   - drop mock fixes and fixes with accuracy > `maxAccuracyM` (35 m);
+   - drop mock fixes and fixes with accuracy > `maxAccuracyM` (35 m) or < 0 (invalid); null accuracy (unknown) is kept;
    - drop single-fix spikes: both legs > `spikeM` (30 m) while the neighbours are < 15 m apart;
    - split into pieces on a gap > `maxGapS` (60 s) or a jump > `maxJumpM` (100 m);
    - speed check: drop a fix if its speed from the fix ≥ `speedWindowS` (30 s) earlier exceeds `maxSpeedMps` (4 m/s), and split there;
@@ -106,7 +107,7 @@ Trails 12 m apart, white noise σ5, 1 s, seed 1; needs A ≥ 0.90 and B < 0.50. 
 | 0 (before) | 1.0 | 0.425 | pass |
 | 10 (new default) | 1.0 | 0.0 | pass |
 
-A scratch probe over the whole grid (not committed; seeds 1–5) shows that **with any smoothing the guard passes at every buffer/heading/margin** (B ≤ 0.075), while without smoothing it passes only at heading 30° with margin ≤ 1 (B 0.40–0.45; others 0.63–0.93).
+Unverified: a scratch probe over the whole grid (not committed, not reproducible from this repo; seeds 1–5) showed that **with any smoothing the guard passes at every buffer/heading/margin** (B ≤ 0.075), while without smoothing it passes only at heading 30° with margin ≤ 1 (B 0.40–0.45; others 0.63–0.93).
 
 Caveat: the guard uses white noise, which a 10 s mean removes almost entirely (σ5 → ~1.5 m). Real GPS noise is correlated, so this guard now overstates how well smoothing separates parallel trails. The sweep's fcr (correlated noise) is the more honest measure: 30/off/1/10 still has fcr 0.066 and 2 false completes.
 
@@ -142,12 +143,13 @@ Worst case (σ15/15 s) fc is at threshold 0.80.
 
 ## Known limits (for any config)
 
+- **Off-network walking is not measured.** Only `included` and trail segments are exported (1,614 of 7,537 canonical segments). Informal paths and connectors do not compete in matching, so walking a road shoulder or informal path within 30 m of a trail can credit that trail under option B (no heading check). Option B's fcr 0.066 is on-network only (the simulator walks exported trails). Fix before v1: export all redistributable segments as competitors (credit only `included` / trail ones) and add a sweep scenario that walks off-network paths next to trails.
 - **Parallel trails < 12 m apart.** The guard passes everywhere with smoothing, but only because its noise is white; under correlated noise, heading off still credits neighbours (fcr 0.066–0.09).
 - **Hairpin switchbacks** tighter than the buffer score 0.71–0.93 even at zero noise; smoothing cuts them further.
 - **Speed-window leak (R5).** About 30 s of fast travel right after walking passes the speed check: 19–36 m per transition on average (smoothing reduces it). It is never 0.
 - **`spikeM`** (30 m) costs a little `completeRate` and is a follow-up knob, not swept.
 - **Foot only in v1** (owner, 2026-10-18). Riding a bike on a bike-allowed trail does not count. The 4 m/s speed check enforces this.
-- **Tiny trails** (< 30 m) are now folded or hidden (table above); trails of 30–50 m can still be auto-completed from a neighbour.
+- **Tiny trails** (< 30 m) are now folded or hidden (table above); trails of 30–50 m can still be auto-completed from a neighbour. A folded receiver's `agency_only_length_mi` is understated by up to 0.02 mi (the folded trail's < 30 m), since it is computed against the receiver's own canonical length.
 - **Smoothing** pulls each piece's first and last fix inward by up to ~half a window of travel (~6.5 m at 10 s) and cuts corners; it does nothing for sparse (≥ 15 s) recordings.
 
 ## What Spike 4 must deliver
@@ -159,6 +161,8 @@ Spike 4 should report, on iOS and Android with the screen off:
 - the `horizontalAccuracy` / `accuracy` distribution under tree cover;
 - whether throttling causes gaps > 60 s, which split pieces.
 
+Accuracy contract: a fix with `accuracyM < 0` is dropped (iOS reports negative `horizontalAccuracy` for an invalid fix); `accuracyM == null` means unknown and the fix is kept. Platform code must map "no accuracy" to null, never to 0 or a negative value.
+
 ## What Spike 5 receives
 
 `CoverageState.encode()` produces a JSON object `{"seg-000001":"<base64>", ...}`:
@@ -167,7 +171,22 @@ Spike 4 should report, on iOS and Android with the screen off:
 - merging is bitwise OR (`union`), commutative and idempotent, so it is safe for sync conflicts;
 - `decode` is the inverse.
 
-Bit indices depend on `tickM` (5 m) and segment geometry. Changing `tickM` or re-cutting segments invalidates stored bits, so the dataset version and `tickM` are part of the contract.
+The contract is **(segment id, `tickM` = 5 m, fixed orientation)**. Bit i is the i-th tick from the segment's first coord in `coverage_segments.json`; `bitrails dist` orients every segment so its first (lon, lat), rounded to 6 dp, is lexicographically ≤ its last.
+
+The dataset version is **not** part of the contract: a new dataset keeps stored bits valid as long as these three hold. The segment registry keeps an id across small geometry changes (≤ 8 m / ≤ 5%), so a segment id's tick count can change between datasets; the consumer must then rescale that segment's stored bits proportionally (e.g. tick i of n → tick floor(i·n′/n) of n′). A new id is a new segment (old bits for a retired id are dropped). Changing `tickM` invalidates all stored bits.
+
+A versioned envelope (e.g. `{"v":1,"tickM":5,"bits":{…}}`) is a Spike 5 decision; not implemented.
+
+## Official mileage candidates (owner to verify in a browser)
+
+From web-search snippets only; none adopted. biparks.org returns 403 to automated fetches, so each page must be opened by hand. If confirmed, set `official_length_mi` + `official_length_source` in `trails_overrides.yaml`.
+
+- Forest to Sky Trail: https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/87/58?widgetId=540
+- Close Trail: https://biparks.org/map-location/close-trail/?mpfy_map=1654&mpfy-pin=1979 (unstable map-pin URL; find a stable page)
+- Hawley Cove Trail: https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/99/58?widgetId=540
+- Gazzam Lake Main Trail: https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/93/58?widgetId=540
+- Gazzam Lake Loop Trail: https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/93/58?widgetId=540
+- Main Loop Trail: https://www.biparks.org/Home/Components/FacilityDirectory/FacilityDirectory/95/58?widgetId=540
 
 ## Owner real-track procedure (Step 6, gate before v1 planning)
 

@@ -59,6 +59,13 @@ class FixFilterTest {
         assertEquals(99, filterFixes(inacc, params, proj).sumOf { it.size })
     }
 
+    @Test fun negativeAccuracyDropped() {
+        val base = walk(1.3, 99)
+        val neg = base.mapIndexed { i, f -> if (i == 40) f.copy(accuracyM = -1.0) else f }
+        assertEquals(99, filterFixes(neg, params, proj).sumOf { it.size })
+        assertEquals(100, filterFixes(base, params, proj).sumOf { it.size }) // null accuracy = unknown, kept
+    }
+
     @Test fun unsortedAndDuplicateFixes() {
         val clean = walk(1.3, 199)
         val messy = (clean + clean.take(10)).shuffled(kotlin.random.Random(7))

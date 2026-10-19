@@ -62,6 +62,8 @@ def apply_overrides(trails: list["Trail"], overrides: dict,
         for k in EDITABLE:
             if k in e:
                 setattr(t, k, e[k])
+        if t.official_length_mi is not None and not t.official_length_mi > 0:
+            raise ValueError(f"trails_overrides: {t.id} official_length_mi must be > 0, got {t.official_length_mi}")
         if t.official_length_mi is not None and not t.official_length_source:
             raise ValueError(f"trails_overrides: {t.id} sets official_length_mi without official_length_source "
                              "(cite where the mileage comes from)")

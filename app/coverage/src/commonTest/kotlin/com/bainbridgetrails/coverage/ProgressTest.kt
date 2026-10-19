@@ -85,4 +85,12 @@ class ProgressTest {
         val s = """{"version":"B","segments":[]}"""
         assertFailsWith<IllegalArgumentException> { Dataset.parse(t, s) }
     }
+
+    @Test
+    fun parseRejectsTrailSegmentMissingFromSegments() {
+        val t = """{"version":"A","island_total_shippable_m":10.0,"trails":[{"id":"t1","name":"T","segment_ids":["s1","s2"],"computed_length_mi":0.1}]}"""
+        val s = """{"version":"A","segments":[{"id":"s1","length_m":10.0,"included":true,"trail_ids":["t1"],"coords":[[0.0,0.0],[0.0,0.0001]]}]}"""
+        val e = assertFailsWith<IllegalArgumentException> { Dataset.parse(t, s) }
+        assertTrue(e.message!!.contains("s2"), e.message)
+    }
 }

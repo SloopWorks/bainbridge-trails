@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from bitrails.dist import (TILE_PROPS, attribution_md, coverage_segments_doc, dataset_version, dist_trails_doc, run_dist, shippable_info,
-                           used_source_ids, write_tile_input)
+from bitrails.dist import (TILE_PROPS, attribution_md, coverage_segments_doc, dataset_version, dist_trails_doc, run_dist,
+                           segment_trail_map, shippable_info, used_source_ids, write_tile_input)
 
 PUB = {"seg-000001", "seg-000002"}
 PRIV = "seg-000099"
@@ -40,7 +40,7 @@ def canon(tmp_path, segs=None, trails=None):
 
 def test_tile_input_whitelists_props(tmp_path):
     d = canon(tmp_path)
-    out = write_tile_input(d / "segments.geojson", tmp_path / "t.geojson")
+    out = write_tile_input(d / "segments.geojson", tmp_path / "t.geojson", {"seg-000001": ["trail-a", "trail-b"]})
     feats = json.loads(out.read_text())["features"]
     assert len(feats) == 2
     for f in feats:
@@ -53,7 +53,7 @@ def test_tile_input_whitelists_props(tmp_path):
 def test_tile_input_refuses_non_redistributable(tmp_path):
     d = canon(tmp_path, segs=[feat("seg-000001", geometry_redistributable=False)])
     with pytest.raises(ValueError, match="redistributable"):
-        write_tile_input(d / "segments.geojson", tmp_path / "t.geojson")
+        write_tile_input(d / "segments.geojson", tmp_path / "t.geojson", {})
 
 
 def test_dist_trails_shape_and_no_private_ids(tmp_path):
@@ -138,7 +138,7 @@ def test_coverage_segments_selects_included_or_trail_segments(tmp_path):
             feat("seg-000002", included=True, trail_ids=[]),
             feat("seg-000003", included=False, trail_ids=["trail-a"])]
     d = canon(tmp_path, segs=segs)
-    doc = coverage_segments_doc(d / "segments.geojson", {"trail-a"}, "v1")
+    doc = coverage_segments_doc(d / "segments.geojson", {"seg-000003": ["trail-a"]}, "v1")
     assert [s["id"] for s in doc["segments"]] == ["seg-000002", "seg-000003"]
     assert doc["version"] == "v1"
     s = doc["segments"][1]
@@ -146,11 +146,11 @@ def test_coverage_segments_selects_included_or_trail_segments(tmp_path):
     assert s["included"] is False and s["trail_ids"] == ["trail-a"] and s["length_m"] == 100.0
 
 
-def test_coverage_segments_rounds_and_filters_trail_ids(tmp_path):
+def test_coverage_segments_rounds_and_takes_trail_ids_from_map(tmp_path):
     a = feat("seg-000002", trail_ids=["trail-a", "trail-gone"])
     a["geometry"]["coordinates"] = [[-122.1234567, 47.0000004], [-122.1, 47.1]]
     d = canon(tmp_path, segs=[a, feat("seg-000001", trail_ids=["trail-a"])])
-    doc = coverage_segments_doc(d / "segments.geojson", {"trail-a"}, "v1")
+    doc = coverage_segments_doc(d / "segments.geojson", {"seg-000001": ["trail-a"], "seg-000002": ["trail-a"]}, "v1")
     assert [s["id"] for s in doc["segments"]] == ["seg-000001", "seg-000002"]
     s = doc["segments"][1]
     assert s["trail_ids"] == ["trail-a"]
@@ -160,7 +160,7 @@ def test_coverage_segments_rounds_and_filters_trail_ids(tmp_path):
 def test_coverage_segments_refuses_non_redistributable(tmp_path):
     d = canon(tmp_path, segs=[feat("seg-000001", geometry_redistributable=False)])
     with pytest.raises(ValueError, match="redistributable"):
-        coverage_segments_doc(d / "segments.geojson", set(), "v1")
+        coverage_segments_doc(d / "segments.geojson", {}, "v1")
 
 
 def test_run_dist_writes_coverage_segments(tmp_path):
@@ -298,3 +298,73 @@ def test_tiny_trail_rows_list_folded_and_hidden():
                     {"id": "t3", "name": "Hidden", "segment_ids": ["s3"]}, {"id": "t4", "name": "Private", "segment_ids": ["p"]}]
     dist = [{"id": "t1", "name": "Big", "folded_from": ["t2"]}]
     assert tiny_trail_rows(canon_trails, dist, {"s1", "s2", "s3"}) == [["Folded", "Big"], ["Hidden", "hidden"]]
+
+
+def test_segment_trail_map_inverts_segment_ids():
+    doc = {"trails": [{"id": "trail-b", "segment_ids": ["s1", "s2"]}, {"id": "trail-a", "segment_ids": ["s2"]}]}
+    assert segment_trail_map(doc) == {"s1": ["trail-b"], "s2": ["trail-a", "trail-b"]}
+
+
+def _fold_canon(tmp_path):
+    """trail-big (100 m) and trail-tiny (10 m, not included) touch; trail-tiny folds into trail-big."""
+    segs = [feat("seg-000001", trail_ids=["trail-big"]),
+            feat("seg-000002", included=False, trail_ids=["trail-tiny"], length_m=10.0)]
+    row = {"official_length_mi": None, "computed_length_mi": 0.1, "gain_m": 0, "loss_m": 0, "climb_total_m": 0,
+           "trailheads": [], "official_map_url": None, "manager": None, "park": None}
+    trails = [dict(row, id="trail-big", name="Big", segment_ids=["seg-000001"]),
+              dict(row, id="trail-tiny", name="Tiny", segment_ids=["seg-000002"])]
+    return canon(tmp_path, segs=segs, trails=trails)
+
+
+def test_coverage_segments_folded_segment_names_receiver(tmp_path):
+    d = _fold_canon(tmp_path)
+    info = shippable_info(d / "segments.geojson", None)
+    trails = dist_trails_doc(json.loads((d / "trails.json").read_text()), info, "v1")
+    assert [(t["id"], t.get("folded_from")) for t in trails["trails"]] == [("trail-big", ["trail-tiny"])]
+    doc = coverage_segments_doc(d / "segments.geojson", segment_trail_map(trails), "v1")
+    by = {s["id"]: s for s in doc["segments"]}
+    assert by["seg-000002"]["trail_ids"] == ["trail-big"] and by["seg-000002"]["included"] is False
+    tiles = write_tile_input(d / "segments.geojson", tmp_path / "t.geojson", segment_trail_map(trails))
+    tp = {f["properties"]["id"]: f["properties"] for f in json.loads(tiles.read_text())["features"]}
+    assert tp["seg-000002"]["trail_ids"] == "trail-big"
+
+
+def test_coverage_segments_drops_noninc_segment_whose_trail_filtered(tmp_path):
+    segs = [feat("seg-000001", included=False, trail_ids=["trail-gone"]), feat("seg-000002", trail_ids=[])]
+    d = canon(tmp_path, segs=segs)
+    doc = coverage_segments_doc(d / "segments.geojson", {}, "v1")
+    assert [s["id"] for s in doc["segments"]] == ["seg-000002"]
+    assert doc["segments"][0]["trail_ids"] == []
+
+
+def test_coverage_segments_canonical_orientation(tmp_path):
+    fwd = feat("seg-000001")
+    fwd["geometry"]["coordinates"] = [[-122.5, 47.6], [-122.4, 47.7]]
+    rev = feat("seg-000002")
+    rev["geometry"]["coordinates"] = [[-122.4, 47.7], [-122.45, 47.65], [-122.5, 47.6]]
+    tie = feat("seg-000003")  # same lon after rounding: lat decides
+    tie["geometry"]["coordinates"] = [[-122.4000001, 47.7], [-122.4, 47.6]]
+    d = canon(tmp_path, segs=[fwd, rev, tie])
+    doc = coverage_segments_doc(d / "segments.geojson", {}, "v1")
+    by = {s["id"]: s["coords"] for s in doc["segments"]}
+    assert by["seg-000001"] == [[-122.5, 47.6], [-122.4, 47.7]]
+    assert by["seg-000002"] == [[-122.5, 47.6], [-122.45, 47.65], [-122.4, 47.7]]
+    assert by["seg-000003"] == [[-122.4, 47.6], [-122.4, 47.7]]
+    for c in by.values():
+        assert tuple(c[0]) <= tuple(c[-1])
+
+
+def test_run_dist_folded_segments_carry_receiver(tmp_path):
+    d = _fold_canon(tmp_path)
+    out = tmp_path / "dist"
+    sources = tmp_path / "sources.yaml"
+    sources.write_text("sources:\n- {id: osm_overpass_trails, name: OSM, kind: overpass, endpoint: null, attribution: osm attr}\n"
+                       "- {id: usgs_3dep_dem_island, name: U, kind: elevation, endpoint: null, attribution: usgs attr}\n")
+    run_dist(d, out, sources, tmp_path / "ATTR.md", date="2026-10-18T00:00:00Z")
+    trails = json.loads((out / "trails.json").read_text())
+    cov = {s["id"]: s for s in json.loads((out / "coverage_segments.json").read_text())["segments"]}
+    for t in trails["trails"]:
+        for i in t["segment_ids"]:
+            assert t["id"] in cov[i]["trail_ids"]
+    tp = {f["properties"]["id"]: f["properties"] for f in json.loads((out / "segments.tiles.geojson").read_text())["features"]}
+    assert tp["seg-000002"]["trail_ids"] == "trail-big"

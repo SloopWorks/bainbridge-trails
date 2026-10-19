@@ -19,3 +19,7 @@ app/composeApp/src/commonMain/composeResources/files/trails.json
 
 # real GPS tracks: never committed
 data/tracks/private/
+*.gpx
+*.GPX
+*.fit
+*.FIT
