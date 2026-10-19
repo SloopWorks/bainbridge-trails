@@ -382,7 +382,7 @@ fun sweep(dataset: Dataset, buffers: List<Double>, sigmas: List<Double>, interva
   - the algorithm in ≤ 1 page
   - the chosen `CoverageParams` and why
   - the sweep table, filtered to the rows that matter
-  - known limits (parallel trails, switchbacks tighter than the buffer)
+  - known limits (parallel trails, switchbacks tighter than the buffer, and riding on bike-allowed trails not counting: foot only in v1, owner decision 2026-10-18)
   - what Spike 4 must deliver (fix interval and accuracy in background)
   - what Spike 5 receives (the `CoverageState.encode()` format)
   - the owner real-track procedure: record a walk with any GPX logger, drop it in `data/tracks/private/`, run `gpx`, compare with what was walked
