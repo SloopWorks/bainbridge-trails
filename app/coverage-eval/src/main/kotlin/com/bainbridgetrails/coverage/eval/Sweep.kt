@@ -13,7 +13,8 @@ import kotlin.streams.toList
 /**
  * One parameter set x noise setting, aggregated over every trail x seed ("walk").
  *
- * - p5/meanTrueFraction: walked trail's fraction (p5 = nearest-rank lower 5th percentile).
+ * - p5/meanTrueFraction: walked trail's fraction; p5 = sorted[floor(0.05 * (n - 1))] (lower empirical quantile, no
+ *   interpolation).
  * - completeRate: share of walks with fraction >= threshold.
  * - falseCreditRatio: pooled sum(covered m on segments not in the walked trail) / sum(walked trail m).
  * - falseCompletes: total over walks of trails sharing no segment with the walked trail that reach COMPLETE.
@@ -58,7 +59,7 @@ const val VEHICLE_CATEGORY = "multi_use_path"
 private const val PROXY_TRAILS = 10
 private const val BIKE_MPS = 6.0
 private const val DRIVE_MPS = 13.0
-private const val VEHICLE_LEAD_IN_WALK_S = 30.0
+internal const val VEHICLE_LEAD_IN_WALK_S = 30.0
 
 /**
  * Segments a bike / car could follow: those with category [VEHICLE_CATEGORY] in [categories] (id -> category, e.g. from
@@ -82,6 +83,8 @@ fun sweep(
     margins: List<Double> = listOf(CoverageParams().matchMarginM),
     threshold: Double = 0.90,
     categories: Map<String, String> = emptyMap(),
+    /** sigma -> noise model; override e.g. to switch outliers off for known-answer tests */
+    noiseFor: (Double) -> NoiseModel = { NoiseModel(it) },
     log: (String) -> Unit = {},
 ): List<SweepRow> {
     require(seeds >= 1) { "seeds must be >= 1" }
@@ -106,12 +109,11 @@ fun sweep(
         val index = SegmentIndex(dataset.segments, params, proj) // built once per param set
         val progress = Progress(dataset, index, params)
         val trailLenM = trails.map { t -> t.segmentIds.distinct().sumOf { index.segments[it]?.lengthM ?: 0.0 } }
-        fun coveredM(state: CoverageState, id: String): Double =
-            state.coveredM(index, id).coerceAtMost(index.segments[id]?.lengthM ?: 0.0)
-        fun totalCoveredM(state: CoverageState): Double = dataset.segments.sumOf { coveredM(state, it.id) }
+        fun coveredM(state: CoverageState, id: String): Double = coveredClampedM(index, state, id)
+        fun totalCoveredM(state: CoverageState): Double = totalCoveredM(dataset, index, state)
 
         for (sigma in sigmas) for (interval in intervals) {
-            val noise = NoiseModel(sigma)
+            val noise = noiseFor(sigma)
             val walks = IntStream.range(0, trails.size * seeds).parallel().mapToObj { w ->
                 val ti = w / seeds
                 val si = w % seeds
@@ -128,16 +130,10 @@ fun sweep(
             }.toList()
 
             fun vehicleCredit(speed: Double, salt: Int): Pair<Int, Double> {
-                var chains = 0
                 val perSeed = (0 until seeds).map { si ->
-                    val sessions = Simulator(dataset, seedOf(-1, si, salt), proj, params.maxGapS)
-                        .traverseSessions(vehicleIds, noise, interval, speed, VEHICLE_LEAD_IN_WALK_S)
-                    chains = sessions.size
-                    sessions.parallelStream().mapToDouble { s ->
-                        totalCoveredM(index.coverFixes(s.fixes)) - totalCoveredM(index.coverFixes(s.fixes.take(s.leadInFixes)))
-                    }.sum()
+                    vehicleCreditM(dataset, index, vehicleIds, noise, interval, speed, seedOf(-1, si, salt), params.maxGapS)
                 }
-                return chains to perSeed.average()
+                return perSeed.first().first to perSeed.map { it.second }.average()
             }
             val (chains, bike) = vehicleCredit(BIKE_MPS, 2)
             val (_, drive) = vehicleCredit(DRIVE_MPS, 3)
@@ -161,6 +157,31 @@ fun sweep(
         }
     }
     return rows
+}
+
+internal fun coveredClampedM(index: SegmentIndex, state: CoverageState, id: String): Double =
+    state.coveredM(index, id).coerceAtMost(index.segments[id]?.lengthM ?: 0.0)
+
+/** Covered metres over all segments, summed in dataset order. */
+internal fun totalCoveredM(dataset: Dataset, index: SegmentIndex, state: CoverageState): Double =
+    dataset.segments.sumOf { coveredClampedM(index, state, it.id) }
+
+/**
+ * Walk [VEHICLE_LEAD_IN_WALK_S] then ride [speedMps] along every chain of [segmentIds], each chain its own recording.
+ * Returns (chains, total covered m minus each lead-in walk's own coverage). Chains are covered in parallel and summed
+ * sequentially in chain order, so the result does not depend on scheduling.
+ */
+internal fun vehicleCreditM(
+    dataset: Dataset, index: SegmentIndex, segmentIds: List<String>, noise: NoiseModel, intervalS: Double,
+    speedMps: Double, seed: Long, maxGapS: Double = CoverageParams().maxGapS,
+): Pair<Int, Double> {
+    val sessions = Simulator(dataset, seed, maxGapS = maxGapS)
+        .traverseSessions(segmentIds, noise, intervalS, speedMps, VEHICLE_LEAD_IN_WALK_S)
+    val credits = sessions.parallelStream().map { s ->
+        totalCoveredM(dataset, index, index.coverFixes(s.fixes)) -
+            totalCoveredM(dataset, index, index.coverFixes(s.fixes.take(s.leadInFixes)))
+    }.toList()
+    return sessions.size to credits.sum()
 }
 
 private class Walk(val frac: Double, val falseM: Double, val walkedM: Double, val falseCompletes: Int, val standCreditM: Double)

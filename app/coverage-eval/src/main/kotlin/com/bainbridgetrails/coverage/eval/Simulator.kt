@@ -8,19 +8,21 @@ import com.bainbridgetrails.coverage.Xy
 import java.util.Random
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * GPS error model. On each axis e_t = rho * e_(t-1) + sqrt(1 - rho^2) * sigma * N(0,1) (one step per fix, started from
- * the stationary distribution at each session start). With probability [outlierRate] a fix is additionally displaced by
+ * GPS error model, correlated per unit time (ruling R10). On each axis, between fixes dt apart,
+ * e = rho * e_prev + sqrt(1 - rho^2) * sigma * N(0,1) with rho = exp(-dt / tauS) (~0.951 at 1 s); started from the
+ * stationary distribution at each session start. With probability [outlierRate] a fix is additionally displaced by
  * [outlierM] in a uniformly random direction. Reported accuracyM = 1.5 * sigma.
  */
-data class NoiseModel(val sigmaM: Double, val rho: Double = 0.95, val outlierRate: Double = 0.01, val outlierM: Double = 50.0)
+data class NoiseModel(val sigmaM: Double, val tauS: Double = 20.0, val outlierRate: Double = 0.01, val outlierM: Double = 50.0)
 
-/** One recording; [leadInFixes] = how many leading fixes belong to the walking lead-in (see [Simulator.traverseSessions]). */
+/** One recording; [leadInFixes] = how many leading fixes were sampled in the first phase (the walk; see [Simulator.traverseSessions]). */
 data class Session(val fixes: List<Fix>, val leadInFixes: Int)
 
 /**
@@ -54,7 +56,7 @@ class Simulator(
         for (chain in chains(trail.segmentIds)) {
             val line = Polyline(if (rng.nextBoolean()) chain.reversed() else chain)
             val v = speedMps + (rng.nextDouble() * 0.4 - 0.2)
-            out += session(listOf(Move(line, v)), noise, intervalS)
+            out += session(listOf(Move(line, v)), noise, intervalS).first
         }
         return out
     }
@@ -77,9 +79,8 @@ class Simulator(
         val phases = ArrayList<Phase>()
         if (walkM > 0.0) phases += Move(line.sub(0.0, walkM), walkMps)
         if (line.lengthM > walkM) phases += Move(line.sub(walkM, line.lengthM), speedMps)
-        val fixes = session(phases, noise, intervalS)
-        val leadEndMs = fixes.first().timeMs + (walkM / walkMps * 1000).toLong()
-        Session(fixes, fixes.count { it.timeMs <= leadEndMs })
+        val (fixes, firstPhase) = session(phases, noise, intervalS)
+        Session(fixes, if (walkM > 0.0) firstPhase else 0)
     }
 
     /**
@@ -92,9 +93,8 @@ class Simulator(
         val chain = chains(trail.segmentIds).first()
         val line = Polyline(if (rng.nextBoolean()) chain.reversed() else chain)
         val walk = line.sub(max(0.0, line.lengthM - walkS * speedMps), line.lengthM)
-        val fixes = session(listOf(Move(walk, speedMps), Stand(walk.end, standS)), noise, intervalS)
-        val walkEndMs = fixes.first().timeMs + (walk.lengthM / speedMps * 1000).toLong()
-        return Session(fixes, fixes.count { it.timeMs <= walkEndMs })
+        val (fixes, walkFixes) = session(listOf(Move(walk, speedMps), Stand(walk.end, standS)), noise, intervalS)
+        return Session(fixes, walkFixes)
     }
 
     /** Greedy endpoint chaining (ruling R8): each chain is a continuous polyline in local metres. */
@@ -128,8 +128,11 @@ class Simulator(
 
     private fun near(a: Xy, b: Xy) = hypot(a.x - b.x, a.y - b.y) <= CHAIN_JOIN_M
 
-    /** Samples the phases every intervalS (plus the final instant) with correlated noise; advances the shared clock. */
-    private fun session(phases: List<Phase>, noise: NoiseModel, intervalS: Double): List<Fix> {
+    /**
+     * Samples the phases every intervalS (plus the final instant) with correlated noise; advances the shared clock.
+     * Returns the fixes and how many of them were sampled in phases[0] (a phase owns the samples with t <= its end).
+     */
+    private fun session(phases: List<Phase>, noise: NoiseModel, intervalS: Double): Pair<List<Fix>, Int> {
         require(intervalS > 0.0) { "intervalS must be > 0" }
         val start = when (val p = phases.first()) { is Move -> p.line.start; is Stand -> p.p }
         lastEnd?.let { prev ->
@@ -137,8 +140,10 @@ class Simulator(
             clockMs += (gapS * 1000).toLong()
         }
         val total = phases.sumOf { it.durationS }
+        val firstEnd = phases.first().durationS
         val sigma = noise.sigmaM
-        val innov = sqrt(1 - noise.rho * noise.rho) * sigma
+        var firstPhase = 0
+        var prevT = 0.0
         var ex = sigma * rng.nextGaussian()
         var ey = sigma * rng.nextGaussian()
         val out = ArrayList<Fix>()
@@ -147,9 +152,13 @@ class Simulator(
             val t = minOf(k * intervalS, total)
             val p = trueAt(phases, t)
             if (k > 0) {
-                ex = noise.rho * ex + innov * rng.nextGaussian()
-                ey = noise.rho * ey + innov * rng.nextGaussian()
+                val rho = exp(-(t - prevT) / noise.tauS)
+                val innov = sqrt(1 - rho * rho) * sigma
+                ex = rho * ex + innov * rng.nextGaussian()
+                ey = rho * ey + innov * rng.nextGaussian()
             }
+            if (t <= firstEnd) firstPhase++
+            prevT = t
             var x = p.x + ex
             var y = p.y + ey
             if (rng.nextDouble() < noise.outlierRate) {
@@ -164,7 +173,7 @@ class Simulator(
         }
         clockMs += (total * 1000).toLong()
         lastEnd = trueAt(phases, total)
-        return out
+        return out to firstPhase
     }
 
     private fun trueAt(phases: List<Phase>, t: Double): Xy {

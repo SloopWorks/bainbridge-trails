@@ -36,6 +36,13 @@ fun main(args: Array<String>) {
             i++
         }
     }
+    val allowed = when (args[0]) {
+        "sweep" -> setOf("data", "out", "buffers", "headings", "margins", "sigmas", "intervals", "seeds", "threshold")
+        "gpx" -> setOf("data")
+        else -> usage("unknown command ${args[0]}")
+    }
+    (flags.keys - allowed).firstOrNull()?.let { usage("unknown flag --$it for ${args[0]}") }
+    if (args[0] == "sweep" && positional.isNotEmpty()) usage("unexpected argument ${positional.first()}")
     val dataDir = File(flags["data"] ?: usage("--data is required"))
     val dataset = Dataset.parse(File(dataDir, "trails.json").readText(), File(dataDir, "coverage_segments.json").readText())
     when (args[0]) {
