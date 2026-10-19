@@ -1,7 +1,23 @@
+// Shipyard Deploy (dev-build distribution, see ../.shipyard-deploy.yaml) is opt-in so a plain
+// clone builds without it: pass -PshipyardDeployPluginRepository=<maven repo holding the plugin>.
+buildscript {
+    providers.gradleProperty("shipyardDeployPluginRepository").orNull?.let { repository ->
+        repositories {
+            maven { url = uri(repository); content { includeGroup("works.sloop.shipyard") } }
+            mavenCentral()
+        }
+        dependencies { classpath("works.sloop.shipyard:shipyard-deploy-gradle-plugin:0.1.0-bainbridge.0597dd4") }
+    }
+}
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+}
+
+if (providers.gradleProperty("shipyardDeployPluginRepository").isPresent) {
+    apply(plugin = "works.sloop.shipyard.deploy")
 }
 
 android {
@@ -21,6 +37,9 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".dev"
+        }
         getByName("release") {
             isMinifyEnabled = false
         }
