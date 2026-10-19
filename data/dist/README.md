@@ -23,7 +23,7 @@ Program. Needs gdal, tippecanoe, pmtiles, jq.
 ```
 (cd pipeline && uv run bitrails fetch --only usgs_3dep_dem_island)   # once
 (cd pipeline && uv run bitrails build)                                # canonical data (commit data/canonical first: dist version uses its commit date)
-(cd pipeline && uv run bitrails dist)                                 # trails.json, segments.tiles.geojson, ATTRIBUTION.md (+ data/ATTRIBUTION.md), data/reports/summary.md
+(cd pipeline && uv run bitrails dist)                                 # trails.json, coverage_segments.json, segments.tiles.geojson, ATTRIBUTION.md (+ data/ATTRIBUTION.md), data/reports/summary.md
 scripts/build-tiles.sh                                                # trails.pmtiles, basemap.pmtiles (network), terrain if missing
 ```
 
@@ -34,6 +34,7 @@ scripts/build-tiles.sh                                                # trails.p
 | `terrain/contours.pmtiles` | see above | 3.1 MB |
 | `terrain/hillshade.pmtiles` | see above | 9.3 MB |
 | `trails.json` | app metadata: `version` (`<date of latest commit touching data/canonical>+<8 hex sha256 of segments.geojson>`), `island_total_m`, `island_total_shippable_m` (app v1 uses the shippable one), `trails[]` (id, name, manager, park, segment_ids, computed_length_mi, gain_m, loss_m, climb_total_m, trailheads, official_map_url, agency_only_length_mi). Every per-trail figure comes from shippable segments only; `agency_only_length_mi` is the missing part; all-agency-only trails are omitted. | 60 KB |
+| `coverage_segments.json` | geometry for on-device coverage (compact JSON): `version` (same as `trails.json`), `segments[]` of `{id, length_m, included, trail_ids, coords}` (`coords` = `[lon,lat]` rounded to 6 dp). Redistributable segments that are `included` or have a trail in `trails.json`, sorted by id; `trail_ids` limited to trails in `trails.json`. Sum of `length_m` where `included` = `island_total_shippable_m`. | 486 KB |
 | `ATTRIBUTION.md` | credits for every source used (also committed at `data/ATTRIBUTION.md`) | 1 KB |
 | `segments.tiles.geojson` | tippecanoe input (props whitelisted), intermediate | 2.2 MB |
 

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from bitrails.dist import (TILE_PROPS, attribution_md, dataset_version, dist_trails_doc, run_dist, shippable_info,
+from bitrails.dist import (TILE_PROPS, attribution_md, coverage_segments_doc, dataset_version, dist_trails_doc, run_dist, shippable_info,
                            used_source_ids, write_tile_input)
 
 PUB = {"seg-000001", "seg-000002"}
@@ -127,10 +127,53 @@ def test_run_dist_writes_outputs_without_private(tmp_path):
                        "- {id: bimprd_trails_agol_2022, name: B, kind: arcgis_rest, endpoint: null, attribution: bimprd attr}\n"
                        "- {id: usgs_3dep_dem_island, name: U, kind: elevation, endpoint: null, attribution: usgs attr}\n")
     run_dist(d, out, sources, tmp_path / "ATTR.md", date="2026-10-18T00:00:00+00:00")
-    assert {p.name for p in out.iterdir()} == {"trails.json", "ATTRIBUTION.md", "segments.tiles.geojson"}
+    assert {p.name for p in out.iterdir()} == {"trails.json", "ATTRIBUTION.md", "segments.tiles.geojson", "coverage_segments.json"}
     for p in out.iterdir():
         assert PRIV not in p.read_text()
     assert (tmp_path / "ATTR.md").read_text() == (out / "ATTRIBUTION.md").read_text()
+
+
+def test_coverage_segments_selects_included_or_trail_segments(tmp_path):
+    segs = [feat("seg-000001", included=False, trail_ids=[]),
+            feat("seg-000002", included=True, trail_ids=[]),
+            feat("seg-000003", included=False, trail_ids=["trail-a"])]
+    d = canon(tmp_path, segs=segs)
+    doc = coverage_segments_doc(d / "segments.geojson", {"trail-a"}, "v1")
+    assert [s["id"] for s in doc["segments"]] == ["seg-000002", "seg-000003"]
+    assert doc["version"] == "v1"
+    s = doc["segments"][1]
+    assert set(s) == {"id", "length_m", "included", "trail_ids", "coords"}
+    assert s["included"] is False and s["trail_ids"] == ["trail-a"] and s["length_m"] == 10.0
+
+
+def test_coverage_segments_rounds_and_filters_trail_ids(tmp_path):
+    a = feat("seg-000002", trail_ids=["trail-a", "trail-gone"])
+    a["geometry"]["coordinates"] = [[-122.1234567, 47.0000004], [-122.1, 47.1]]
+    d = canon(tmp_path, segs=[a, feat("seg-000001", trail_ids=["trail-a"])])
+    doc = coverage_segments_doc(d / "segments.geojson", {"trail-a"}, "v1")
+    assert [s["id"] for s in doc["segments"]] == ["seg-000001", "seg-000002"]
+    s = doc["segments"][1]
+    assert s["trail_ids"] == ["trail-a"]
+    assert s["coords"] == [[-122.123457, 47.0], [-122.1, 47.1]]
+
+
+def test_coverage_segments_refuses_non_redistributable(tmp_path):
+    d = canon(tmp_path, segs=[feat("seg-000001", geometry_redistributable=False)])
+    with pytest.raises(ValueError, match="redistributable"):
+        coverage_segments_doc(d / "segments.geojson", set(), "v1")
+
+
+def test_run_dist_writes_coverage_segments(tmp_path):
+    d = canon(tmp_path)
+    out = tmp_path / "dist"
+    sources = tmp_path / "sources.yaml"
+    sources.write_text("sources:\n- {id: osm_overpass_trails, name: OSM, kind: overpass, endpoint: null, attribution: osm attr}\n"
+                       "- {id: bimprd_trails_agol_2022, name: B, kind: arcgis_rest, endpoint: null, attribution: bimprd attr}\n"
+                       "- {id: usgs_3dep_dem_island, name: U, kind: elevation, endpoint: null, attribution: usgs attr}\n")
+    run_dist(d, out, sources, tmp_path / "ATTR.md", date="2026-10-18T00:00:00Z")
+    cov = json.loads((out / "coverage_segments.json").read_text())
+    assert cov["version"] == json.loads((out / "trails.json").read_text())["version"]
+    assert cov["segments"]
 
 
 def test_summary_helpers(tmp_path):

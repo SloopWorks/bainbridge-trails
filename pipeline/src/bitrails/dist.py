@@ -2,6 +2,7 @@
 
   data/dist/segments.tiles.geojson  tippecanoe input: segments.geojson with props whitelisted to TILE_PROPS
   data/dist/trails.json             app metadata (trails, island totals, dataset `version`)
+  data/dist/coverage_segments.json  per-segment geometry (6-dp lon/lat) for on-device coverage
   data/dist/ATTRIBUTION.md          attribution for every source whose data is used (+ copy at data/ATTRIBUTION.md)
 Never reads data/canonical/private/. `trail_ids` is a comma-joined string in tiles (MVT has no arrays).
 `scripts/build-tiles.sh` turns segments.tiles.geojson into trails.pmtiles and extracts the basemap.
@@ -53,6 +54,22 @@ def write_tile_input(segments: Path, out: Path) -> Path:
     body = ",\n".join(json.dumps(f, separators=(",", ":"), ensure_ascii=False) for f in feats)
     out.write_text('{"type":"FeatureCollection","features":[\n' + body + "\n]}\n")
     return out
+
+
+def coverage_segments_doc(segments: Path, trail_ids: set[str], version: str) -> dict:
+    """Geometry for on-device coverage: every segment that is `included` or belongs to a shipped trail.
+    `trail_ids` is the set of trails present in dist trails.json; others are dropped from each segment."""
+    out = []
+    for f in _features(segments):
+        p = f["properties"]
+        if not p.get("geometry_redistributable"):
+            raise ValueError(f"{p.get('id')}: geometry not redistributable; refusing to export it")
+        tids = [t for t in (p.get("trail_ids") or []) if t in trail_ids]
+        if not (p["included"] or tids):
+            continue
+        out.append({"id": p["id"], "length_m": p["length_m"], "included": bool(p["included"]), "trail_ids": tids,
+                    "coords": [[round(c[0], 6), round(c[1], 6)] for c in f["geometry"]["coordinates"]]})
+    return {"version": version, "segments": sorted(out, key=lambda s: s["id"])}
 
 
 def canonical_commit_date(canonical: Path) -> str:
@@ -143,6 +160,8 @@ def run_dist(canonical: Path = DATA / "canonical", out_dir: Path = DATA / "dist"
     version = dataset_version(seg, date or canonical_commit_date(canonical))
     doc = dist_trails_doc(json.loads((canonical / "trails.json").read_text()), info, version)
     (out_dir / "trails.json").write_text(json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False) + "\n")
+    cov = coverage_segments_doc(seg, {t["id"] for t in doc["trails"]}, version)
+    (out_dir / "coverage_segments.json").write_text(json.dumps(cov, separators=(",", ":")))
     md = attribution_md(used_source_ids(seg), yaml.safe_load(sources_path.read_text())["sources"])
     (out_dir / "ATTRIBUTION.md").write_text(md)
     attribution_copy.write_text(md)
