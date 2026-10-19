@@ -167,4 +167,36 @@ class SessionStoreTest {
         SystemFileSystem.sink(Path(dir, "sessions", "junk.jsonl")).buffered().use { it.writeString("x\n") }
         assertEquals(listOf("open", "tiny"), SessionStore(dir).unfinished())
     }
+    @Test
+    fun unterminatedStopIsFinished() {
+        val dir = tempDir()
+        val s = SessionStore(dir)
+        s.begin("u", 1)
+        s.append(fix(2))
+        // Crash after writing Stop but before its '\n'.
+        val path = Path(dir, "sessions", "u.jsonl")
+        SystemFileSystem.sink(path, append = true).buffered().use { it.writeString("{\"t\":\"stop\",\"timeMs\":3}") }
+        val s2 = SessionStore(dir)
+        assertTrue(s2.unfinished().isEmpty(), "a parseable Stop is final even without its newline")
+        assertEquals(listOf("u"), s2.finished())
+        assertTrue(s2.load("u").finished)
+        val text = SystemFileSystem.source(path).buffered().use { it.readString() }
+        assertTrue(text.endsWith("}\n"), "the scan repairs the missing newline")
+        assertEquals(listOf("u"), SessionStore(dir).finished())
+    }
+
+    @Test
+    fun finishedListsOnlyStoppedSessions() {
+        val dir = tempDir()
+        val s = SessionStore(dir)
+        s.begin("a", 1)
+        s.end(2)
+        s.begin("b", 3)
+        s.append(fix(4))
+        s.begin("c", 5)
+        s.end(6)
+        SystemFileSystem.sink(Path(dir, "sessions", "junk.jsonl")).buffered().use { it.writeString("x\n") }
+        assertEquals(listOf("a", "c"), SessionStore(dir).finished())
+        assertEquals(listOf("b"), SessionStore(dir).unfinished())
+    }
 }

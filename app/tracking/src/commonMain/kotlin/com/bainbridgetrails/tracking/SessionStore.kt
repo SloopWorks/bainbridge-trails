@@ -17,6 +17,8 @@ data class RecordedSession(
     val activityAvailable: Boolean,
     val stepsAvailable: Boolean,
     val finished: Boolean,
+    /** A "precise" SourceState reported reduced accuracy (iOS approximate location). */
+    val approximateLocation: Boolean = false,
 )
 
 /**
@@ -86,15 +88,23 @@ class SessionStore(dir: String) {
 
     /**
      * Sessions with a Start but no Stop. Cheap enough for app start: per file it parses only the first line and
-     * the last complete line (Stop is always the last event written), reading at most [TAIL_BYTES] of the tail.
+     * the last line (Stop is always the last event written), reading at most [TAIL_BYTES] of the tail.
      */
-    fun unfinished(): List<String> {
+    fun unfinished(): List<String> = ids().filter { tailState(it) == Tail.OPEN }
+
+    /**
+     * Sessions with a Start whose last event is Stop (same cheap head/tail check as [unfinished]). A Stop that lost
+     * its trailing '\n' in a crash still counts; the scan repairs the newline so [resume] and [load] agree.
+     * Call only when no recorder is writing (app launch): a finished session never has a writer.
+     */
+    fun finished(): List<String> = ids().filter { tailState(it) == Tail.STOPPED }
+
+    private fun ids(): List<String> {
         if (!SystemFileSystem.exists(sessionsDir)) return emptyList()
         return SystemFileSystem.list(sessionsDir)
             .map { it.name }
             .filter { it.endsWith(SUFFIX) }
             .map { it.removeSuffix(SUFFIX) }
-            .filter { id -> isUnfinished(id) }
             .sorted()
     }
 
@@ -105,20 +115,31 @@ class SessionStore(dir: String) {
             null
         }
 
-    private fun isUnfinished(id: String): Boolean {
+    private enum class Tail { NOT_A_SESSION, OPEN, STOPPED }
+
+    private fun tailState(id: String): Tail {
         val path = pathOf(id)
-        val size = SystemFileSystem.metadataOrNull(path)?.size ?: return false
+        val size = SystemFileSystem.metadataOrNull(path)?.size ?: return Tail.NOT_A_SESSION
         val first = SystemFileSystem.source(path).buffered().use { it.readLine() }
-        if (parse(first) !is SessionEvent.Start) return false
+        if (parse(first) !is SessionEvent.Start) return Tail.NOT_A_SESSION
         val tail = SystemFileSystem.source(path).buffered().use {
             val skip = (size - TAIL_BYTES).coerceAtLeast(0)
             it.skip(skip)
             it.readString()
         }
-        // Last complete line: everything after the final '\n' is a truncated tail (crash mid-write).
+        // A Stop written without its '\n' (crash between the two) is still a Stop: repair the newline.
+        val unterminated = tail.substring(tail.lastIndexOf('\n') + 1)
+        if (unterminated.isNotEmpty() && parse(unterminated) is SessionEvent.Stop) {
+            SystemFileSystem.sink(path, append = true).buffered().use {
+                it.writeString("\n")
+                it.flush()
+            }
+            return Tail.STOPPED
+        }
+        // Otherwise the last complete line decides; anything after the final '\n' is a truncated tail.
         val complete = tail.substring(0, tail.lastIndexOf('\n').coerceAtLeast(0))
         val lastLine = complete.substring(complete.lastIndexOf('\n') + 1)
-        return parse(lastLine) !is SessionEvent.Stop
+        return if (parse(lastLine) is SessionEvent.Stop) Tail.STOPPED else Tail.OPEN
     }
 
     fun load(sessionId: String): RecordedSession {
@@ -146,6 +167,7 @@ class SessionStore(dir: String) {
             activityAvailable = lastAvailable["activity"] == true,
             stepsAvailable = lastAvailable["steps"] == true,
             finished = finished,
+            approximateLocation = lastAvailable["precise"] == false,
         )
     }
 

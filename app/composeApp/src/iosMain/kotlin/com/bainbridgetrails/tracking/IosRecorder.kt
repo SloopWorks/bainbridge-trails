@@ -19,7 +19,8 @@ import kotlin.time.Clock
  * session store. Call [start] / [stop] on the main thread.
  *
  * Single-writer (ruling R4): source callbacks only `trySend` into [events]; one coroutine consumes the channel,
- * calls [SessionStore.append] (or [SessionStore.end] for Stop) and then [RecordingBus.emit].
+ * calls [SessionStore.append] (or [SessionStore.end] for Stop) and then [RecordingBus.emit]. The diag (5 min) and step
+ * heartbeat (30 s: a pedometer query for the session so far, authoritative across suspension) also go through it.
  * Backgrounding: UIBackgroundModes=location + allowsBackgroundLocationUpdates keep the process (and this writer)
  * running while location updates flow. If the app is killed without a Stop, the session stays unfinished and the
  * controller offers recovery on the next launch. Never logs coordinates.
@@ -35,6 +36,7 @@ object IosRecorder {
     private var activity: IosActivitySource? = null
     private var steps: IosStepSource? = null
     private var diagJob: Job? = null
+    private var stepJob: Job? = null
 
     /** Times of live activity samples in this session (main thread only), so the history fill at Stop skips them. */
     private val liveActivityTimes = mutableSetOf<Long>()
@@ -136,9 +138,21 @@ object IosRecorder {
         val stp = IosStepSource().also { steps = it }
         val stepsAvailable = stp.available
         channel.trySend(SessionEvent.SourceState(t, "steps", stepsAvailable))
-        if (stepsAvailable) stp.start { channel.trySend(SessionEvent.Steps(it)) }
+        if (stepsAvailable) {
+            // Pedometer counts from the start date, so the session begins at 0 steps.
+            channel.trySend(SessionEvent.Steps(StepSample(startMs, 0)))
+            stp.start { channel.trySend(SessionEvent.Steps(it)) }
+            stepJob = scope.launch {
+                while (true) {
+                    delay(STEP_HEARTBEAT_MS)
+                    val to = now()
+                    stp.stepsBetween(startMs, to)?.let { channel.trySend(SessionEvent.Steps(StepSample(to, it))) }
+                }
+            }
+        }
 
         channel.trySend(SessionEvent.SourceState(t, "location", true))
+        // Precise location: reduced accuracy is recorded but flagged (Recording chip, results).
         IosLocationSource().also { location = it }.start(
             onFix = { fix ->
                 // R8: CLLocationManager may first hand back a cached location from before the session.
@@ -150,6 +164,7 @@ object IosRecorder {
                 channel.trySend(SessionEvent.SourceState(now(), "location", false))
                 RecordingBus.emitLost(reason)
             },
+            onPrecise = { precise -> channel.trySend(SessionEvent.SourceState(now(), "precise", precise)) },
         )
     }
 
@@ -162,8 +177,11 @@ object IosRecorder {
         if (stopping) return
         stopping = true
         val act = activity
+        val stp = steps
         diagJob?.cancel()
         diagJob = null
+        stepJob?.cancel()
+        stepJob = null
         location?.stop()
         activity?.stop()
         steps?.stop()
@@ -175,6 +193,10 @@ object IosRecorder {
             val to = now()
             val history = act?.let { withTimeoutOrNull(HISTORY_TIMEOUT_MS) { it.history(from, to) } }.orEmpty()
             IosMappers.newHistorySamples(history, liveActivityTimes.toSet(), from, to).forEach { channel.trySend(SessionEvent.Act(it)) }
+            // Final step count for the whole session from the pedometer's history.
+            stp?.let { withTimeoutOrNull(HISTORY_TIMEOUT_MS) { it.stepsBetween(from, to) } }?.let {
+                channel.trySend(SessionEvent.Steps(StepSample(to, it)))
+            }
             channel.trySend(SessionEvent.Stop(now()))
             channel.close()
         }
@@ -189,6 +211,6 @@ object IosRecorder {
         liveActivityTimes.clear()
     }
 
-    /** Well inside RecordingController's 10 s stop timeout. */
+    /** Each of the two Stop queries (activity history, pedometer); together well inside the controller's 10 s stop timeout. */
     private const val HISTORY_TIMEOUT_MS = 3_000L
 }

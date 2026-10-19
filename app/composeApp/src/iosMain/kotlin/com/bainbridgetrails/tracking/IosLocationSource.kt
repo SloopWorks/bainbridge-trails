@@ -29,7 +29,14 @@ class IosLocationSource : LocationSource {
     private var manager: CLLocationManager? = null
     private var delegate: Delegate? = null // CLLocationManager.delegate is weak: keep it alive here
 
-    override fun start(onFix: (Fix) -> Unit, onUnavailable: (reason: String) -> Unit) {
+    override fun start(onFix: (Fix) -> Unit, onUnavailable: (reason: String) -> Unit) = start(onFix, onUnavailable) {}
+
+    /**
+     * As [LocationSource.start], plus [onPrecise] with the accuracy authorisation (true = full accuracy) at start
+     * and whenever it changes. With reduced accuracy it asks once for temporary full accuracy for this walk
+     * (Info.plist NSLocationTemporaryUsageDescriptionDictionary, purpose key [PURPOSE_KEY]) and reports the outcome.
+     */
+    fun start(onFix: (Fix) -> Unit, onUnavailable: (reason: String) -> Unit, onPrecise: (Boolean) -> Unit) {
         if (manager != null) return
         val m = CLLocationManager()
         if (!isAuthorized(m.authorizationStatus)) return onUnavailable("location permission missing")
@@ -46,6 +53,7 @@ class IosLocationSource : LocationSource {
                 val suspicious = status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted
                 val servicesEnabled = !suspicious || CLLocationManager.locationServicesEnabled()
                 IosMappers.authorizationLoss(status, servicesEnabled)?.let(::lose)
+                if (!lost && isAuthorized(status)) onPrecise(IosMappers.isPreciseAccuracy(m.accuracyAuthorization))
             },
             onError = { error ->
                 if (IosMappers.isLocationErrorLoss(error.code)) {
@@ -63,6 +71,11 @@ class IosLocationSource : LocationSource {
         manager = m
         delegate = d
         m.startUpdatingLocation()
+        if (!IosMappers.isPreciseAccuracy(m.accuracyAuthorization)) {
+            m.requestTemporaryFullAccuracyAuthorizationWithPurposeKey(PURPOSE_KEY) { _ ->
+                onPrecise(IosMappers.isPreciseAccuracy(m.accuracyAuthorization))
+            }
+        }
     }
 
     override fun stop() {
@@ -103,6 +116,9 @@ class IosLocationSource : LocationSource {
     }
 
     companion object {
+        /** Key in Info.plist NSLocationTemporaryUsageDescriptionDictionary. */
+        const val PURPOSE_KEY = "TrailMatching"
+
         fun isAuthorized(status: Int): Boolean =
             status == kCLAuthorizationStatusAuthorizedWhenInUse || status == kCLAuthorizationStatusAuthorizedAlways
     }

@@ -21,6 +21,8 @@ data class SessionSummary(
     val droppedVehicle: Int,
     val droppedSteps: Int,
     val newlyCompleted: List<String>,
+    /** The walk was recorded with approximate (reduced-accuracy) location: trails may not match. */
+    val approximateLocation: Boolean = false,
 )
 
 /**
@@ -39,13 +41,16 @@ class Finalizer(
     private val progress = Progress(dataset, index, params)
     private val mutex = Mutex()
 
+    /** Ids already finalised after their Stop. Blocking file read: call off the main thread. */
+    fun finalizedIds(): Set<String> = coverage.finalizedIds()
+
     suspend fun finalize(sessionId: String): SessionSummary = withContext(Dispatchers.Default) { mutex.withLock {
         onWork()
         val session = store.load(sessionId)
         val gate = Gating.gate(session, index.projection)
         val before = coverage.load()
         val after = before.union(index.coverFixes(gate.fixes))
-        coverage.merge(sessionId, after, gate.verified)
+        coverage.merge(sessionId, after, gate.verified, finalized = session.finished)
 
         val rose = mutableListOf<TrailResult>()
         val completed = mutableListOf<String>()
@@ -67,6 +72,7 @@ class Finalizer(
             droppedVehicle = gate.droppedVehicle,
             droppedSteps = gate.droppedSteps,
             newlyCompleted = completed,
+            approximateLocation = session.approximateLocation,
         )
     } }
 }

@@ -1,6 +1,7 @@
 package com.bainbridgetrails.tracking
 
 import com.bainbridgetrails.coverage.Fix
+import platform.CoreLocation.CLAccuracyAuthorization
 import platform.CoreLocation.CLAuthorizationStatus
 import platform.CoreLocation.kCLAuthorizationStatusDenied
 import platform.CoreLocation.kCLAuthorizationStatusRestricted
@@ -43,6 +44,10 @@ object IosMappers {
     /** A negative [horizontalAccuracy] (invalid fix) passes through; filterFixes drops it. */
     fun toFix(timeMs: Long, lon: Double, lat: Double, horizontalAccuracy: Double, simulatedBySoftware: Boolean?): Fix =
         Fix(timeMs = timeMs, lon = lon, lat = lat, accuracyM = horizontalAccuracy, isMock = isMock(simulatedBySoftware))
+
+    /** Only full accuracy is precise; reduced accuracy (the user's "Precise: Off") cannot be matched to trails. */
+    fun isPreciseAccuracy(accuracyAuthorization: CLAccuracyAuthorization): Boolean =
+        accuracyAuthorization == CLAccuracyAuthorization.CLAccuracyAuthorizationFullAccuracy
 
     /** Ruling R8: CLLocationManager may first deliver a cached location from before the session; it is not part of the walk. */
     fun isSessionFix(fixTimeMs: Long, sessionStartMs: Long): Boolean = fixTimeMs >= sessionStartMs

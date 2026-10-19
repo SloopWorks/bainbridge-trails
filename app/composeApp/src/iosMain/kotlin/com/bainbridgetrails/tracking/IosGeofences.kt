@@ -70,8 +70,14 @@ object IosGeofences {
     private val notificationDelegate = NotificationDelegate()
     private var authWaiter: CompletableDeferred<Unit>? = null
 
+    /**
+     * Ruling R11 (mirrors Android R2): geofences are a debug-build prototype. Release builds show no toggle and never
+     * request Always or monitor regions, until the owner decides to ship the feature.
+     */
+    @OptIn(kotlin.experimental.ExperimentalNativeApi::class)
     val supported: Boolean
-        get() = CLCircularRegion.`class`()?.let { CLLocationManager.isMonitoringAvailableForClass(it) } == true
+        get() = kotlin.native.Platform.isDebugBinary &&
+            CLCircularRegion.`class`()?.let { CLLocationManager.isMonitoringAvailableForClass(it) } == true
 
     fun optedIn(): Boolean = NSUserDefaults.standardUserDefaults.boolForKey(KEY_OPTED_IN)
 
@@ -85,6 +91,7 @@ object IosGeofences {
      * short grace period the current status is returned instead of waiting.
      */
     suspend fun requestAlways(): Boolean {
+        if (!supported) return false // R11: never ask for Always in release builds
         val s = manager.authorizationStatus
         if (s != kCLAuthorizationStatusAuthorizedAlways &&
             (s == kCLAuthorizationStatusNotDetermined || s == kCLAuthorizationStatusAuthorizedWhenInUse)

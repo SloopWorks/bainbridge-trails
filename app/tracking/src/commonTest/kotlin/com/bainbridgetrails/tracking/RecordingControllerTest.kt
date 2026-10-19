@@ -9,6 +9,13 @@ import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.coverage.TrailMeta
 import com.bainbridgetrails.coverage.Xy
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -68,9 +75,17 @@ class RecordingControllerTest {
             controller.onEvent(SessionEvent.Stop(clock.now))
             started = null
         }
+
+        /** The notification's Stop action (or the service stopping itself): the controller did not ask. */
+        fun externalStop() {
+            if (started == null) return
+            store.end(clock.now)
+            started = null
+            controller.onEvent(SessionEvent.Stop(clock.now))
+        }
     }
 
-    private class Rig(val controller: RecordingController, val recorder: FakeRecorder, val clock: FakeClock, val store: SessionStore)
+    private class Rig(val controller: RecordingController, val recorder: FakeRecorder, val clock: FakeClock, val store: SessionStore, val dir: String)
 
     private fun TestScope.rig(dir: String = tmpDir(), scope: CoroutineScope = backgroundScope): Rig {
         val clock = FakeClock(t0)
@@ -78,7 +93,7 @@ class RecordingControllerTest {
         val recorder = FakeRecorder(store, clock)
         val controller = RecordingController(store, Finalizer(ds, index, store, CoverageStore(dir)), { clock.now }, recorder, scope)
         recorder.controller = controller
-        return Rig(controller, recorder, clock, store)
+        return Rig(controller, recorder, clock, store, dir)
     }
 
     /** Walks east along trail A at 1.5 m/s, a fix per 2 s. */
@@ -264,5 +279,182 @@ class RecordingControllerTest {
         c.onLocationLost("already recording")
         assertIs<RecordingState.Idle>(c.state.value)
         assertNotNull(c.notice.value)
+    }
+    @Test
+    fun notificationStopFinalizes() = runTest {
+        val r = rig()
+        r.controller.onPermissions(Perm.entries.toSet())
+        val id = assertNotNull(r.controller.start())
+        r.walk(0.0, 200.0)
+        r.recorder.externalStop()
+        val done = r.controller.state.first { it is RecordingState.Done } as RecordingState.Done
+        assertEquals(id, done.summary.sessionId)
+        assertTrue(done.summary.trails.single().after > 0.9)
+        assertEquals(0, r.recorder.stops, "the recorder already stopped itself")
+        assertEquals(setOf(id), CoverageStore(r.dir).finalizedIds())
+    }
+
+    private fun recordFinished(dir: String, id: String, startMs: Long, x0: Double, x1: Double) {
+        SessionStore(dir).apply {
+            begin(id, startMs)
+            var i = 0
+            var x = x0
+            while (x <= x1) {
+                val (lon, lat) = proj.toLonLat(Xy(x, 0.0))
+                append(SessionEvent.FixEvent(startMs + i * 2_000L, lon, lat, 5.0, false))
+                i++
+                x += 3.0
+            }
+            end(startMs + i * 2_000L)
+        }
+    }
+
+    @Test
+    fun stoppedButUnfinalizedIsAutoFinalizedOnLaunch() = runTest {
+        val dir = tmpDir()
+        // One stopped walk the app never finalised (e.g. stopped from the notification while the UI was gone).
+        recordFinished(dir, "s1700000000000-a", t0, 0.0, 90.0)
+        val r = rig(dir)
+        r.controller.onLaunch()
+        val done = r.controller.state.first { it is RecordingState.Done } as RecordingState.Done
+        assertEquals("s1700000000000-a", done.summary.sessionId)
+        assertTrue(done.summary.trails.single().after > 0.3)
+        assertNull(r.controller.notice.value)
+        r.controller.dismiss()
+
+        // Two more: both are merged, the most recent is shown, with a count.
+        recordFinished(dir, "s1700000100000-b", t0 + 100_000, 90.0, 150.0)
+        recordFinished(dir, "s1700000200000-c", t0 + 200_000, 150.0, 200.0)
+        val r2 = rig(dir)
+        r2.controller.onLaunch()
+        val done2 = r2.controller.state.first { it is RecordingState.Done } as RecordingState.Done
+        assertEquals("s1700000200000-c", done2.summary.sessionId)
+        assertEquals("2 walks saved", r2.controller.notice.value)
+        assertEquals(3, CoverageStore(dir).finalizedIds().size)
+        assertTrue(done2.summary.islandAfter > 0.9, "all three merged")
+
+        // Nothing left to do on the next launch.
+        val r3 = rig(dir)
+        r3.controller.onLaunch()
+        assertIs<RecordingState.Idle>(r3.controller.state.value)
+    }
+
+    @Test
+    fun autoFinalizeThenOffersRecoveryAfterDismiss() = runTest {
+        val dir = tmpDir()
+        recordFinished(dir, "stopped", t0, 0.0, 60.0)
+        SessionStore(dir).begin("crashed", t0 + 500_000)
+        val r = rig(dir)
+        r.controller.onLaunch()
+        r.controller.state.first { it is RecordingState.Done }
+        r.controller.dismiss()
+        assertEquals(RecordingState.Recover("crashed"), r.controller.state.first { it is RecordingState.Recover })
+    }
+
+    @Test
+    fun processDeathDuringFinalizingRecovers() = runTest {
+        val dir = tmpDir()
+        val clock = FakeClock(t0)
+        val store = SessionStore(dir)
+        val recorder = FakeRecorder(store, clock)
+        // The first process dies while finalising: its scope is cancelled mid-work.
+        val process = CoroutineScope(StandardTestDispatcher(testScheduler) + Job())
+        val hanging = Finalizer(ds, index, store, CoverageStore(dir), onWork = { awaitCancellation() })
+        val c = RecordingController(store, hanging, { clock.now }, recorder, process)
+        recorder.controller = c
+        c.onPermissions(Perm.entries.toSet())
+        val id = assertNotNull(c.start())
+        Rig(c, recorder, clock, store, dir).walk(0.0, 200.0)
+        process.launch { c.stop() }
+        advanceUntilIdle()
+        assertEquals(RecordingState.Finalizing(id), c.state.value)
+        process.coroutineContext[Job]!!.cancelAndJoin()
+        assertTrue(CoverageStore(dir).finalizedIds().isEmpty())
+
+        val r = rig(dir)
+        r.controller.onLaunch()
+        val done = r.controller.state.first { it is RecordingState.Done } as RecordingState.Done
+        assertEquals(id, done.summary.sessionId)
+        assertTrue(done.summary.trails.single().after > 0.9)
+    }
+
+    @Test
+    fun alreadyRecordingWhileDrainingIsRejected() = runTest {
+        val r = rig()
+        // A recorder that is slow to drain: stop() does not write Stop until later.
+        val slow = object : Recorder {
+            lateinit var c: RecordingController
+            var active: String? = null
+            var draining = false
+            var ackStart = true
+            override fun start(sessionId: String, resume: Boolean) {
+                if (draining) return c.onLocationLost(RecordingController.ALREADY_RECORDING) // R7
+                if (!ackStart) return
+                active = sessionId
+                r.store.begin(sessionId, r.clock.now)
+                c.onEvent(SessionEvent.Start(sessionId, r.clock.now))
+            }
+            override fun stop() { draining = true }
+        }
+        val c = RecordingController(r.store, Finalizer(ds, index, r.store, CoverageStore(r.dir)), { r.clock.now }, slow, backgroundScope)
+        slow.c = c
+        c.onPermissions(Perm.entries.toSet())
+        val first = assertNotNull(c.start())
+        c.stop() // times out waiting for Stop (virtual time), finalises what is on disk
+        assertEquals(first, assertIs<RecordingState.Done>(c.state.value).summary.sessionId)
+        c.dismiss()
+
+        assertNotNull(c.start()) // the recorder is still draining: rejected
+        assertIs<RecordingState.Idle>(c.state.value)
+        assertEquals("A recording is still finishing. Try again in a moment.", c.notice.value)
+
+        // The drain ends; a new start is accepted but its Start is not reported yet when the old session's
+        // late Stop arrives. That Stop belongs to the old session: the new one keeps recording.
+        r.store.end(r.clock.now)
+        slow.draining = false
+        slow.ackStart = false
+        val second = assertNotNull(c.start())
+        c.onEvent(SessionEvent.Stop(r.clock.now))
+        assertEquals(second, assertIs<RecordingState.Recording>(c.state.value).sessionId)
+    }
+
+    @Test
+    fun mockFixesDoNotAddDistance() = runTest {
+        val r = rig()
+        r.controller.onPermissions(Perm.entries.toSet())
+        r.controller.start()
+        r.walk(0.0, 30.0)
+        val (lon, lat) = proj.toLonLat(Xy(500.0, 0.0))
+        r.clock.advance(2_000)
+        r.recorder.fix(Fix(r.clock.now, lon, lat, 5.0, isMock = true))
+        r.walk(33.0, 36.0)
+        val s = assertIs<RecordingState.Recording>(r.controller.state.value)
+        assertEquals(36.0, s.distanceM, 0.5)
+    }
+
+    @Test
+    fun trackSnapshotsStayStable() = runTest {
+        val r = rig()
+        r.controller.onPermissions(Perm.entries.toSet())
+        r.controller.start()
+        r.walk(0.0, 30.0)
+        val snap = r.controller.track.value
+        assertEquals(11, snap.size)
+        val last = snap.last()
+        r.walk(33.0, 60.0)
+        assertEquals(11, snap.size, "an earlier snapshot never grows")
+        assertEquals(last, snap.last())
+        assertEquals(21, r.controller.track.value.size)
+        assertEquals(snap, r.controller.track.value.subList(0, 11))
+    }
+
+    @Test
+    fun approximateLocationFlaggedWhileRecording() = runTest {
+        val r = rig()
+        r.controller.onPermissions(Perm.entries.toSet())
+        r.controller.start()
+        assertTrue(assertIs<RecordingState.Recording>(r.controller.state.value).preciseLocation)
+        r.controller.onEvent(SessionEvent.SourceState(t0, "precise", false))
+        assertFalse(assertIs<RecordingState.Recording>(r.controller.state.value).preciseLocation)
     }
 }

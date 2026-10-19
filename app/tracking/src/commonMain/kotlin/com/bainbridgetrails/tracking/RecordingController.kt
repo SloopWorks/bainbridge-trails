@@ -24,7 +24,9 @@ sealed interface RecordingState {
     data object Idle : RecordingState
     data class NeedsPermission(val missing: Set<Perm>) : RecordingState
     data class Recording(val sessionId: String, val startedMs: Long, val fixCount: Int, val lastFixMs: Long?, val distanceM: Double,
-                         val waitingForGps: Boolean, val activityAvailable: Boolean, val stepsAvailable: Boolean) : RecordingState
+                         val waitingForGps: Boolean, val activityAvailable: Boolean, val stepsAvailable: Boolean,
+                         /** False when the OS granted only reduced accuracy (iOS approximate location). */
+                         val preciseLocation: Boolean = true) : RecordingState
     data class Finalizing(val sessionId: String) : RecordingState
     data class Done(val summary: SessionSummary) : RecordingState
     data class Recover(val sessionId: String) : RecordingState
@@ -42,6 +44,10 @@ interface Recorder {
 
 /**
  * Drives one recording at a time: permissions -> Recording -> Finalizing -> Done, plus crash recovery.
+ *
+ * Every Stop is finalised: a Stop the controller did not ask for (the notification's Stop action, the service
+ * stopping itself) finalises the current session too. Sessions that have a Stop but were never finalised
+ * (process death while finalising, a stop the UI never saw) are finalised automatically by [onLaunch].
  *
  * Inputs come from the UI (start/stop/permissions/tick) and from the recorder via [RecordingBus]
  * ([bind] forwards [RecordingBus.events] to [onEvent] and [RecordingBus.lost] to [onLocationLost]).
@@ -71,9 +77,19 @@ class RecordingController(
     /** Brief user-facing message (rejected start, why a recording stopped). */
     val notice: StateFlow<String?> = _notice.asStateFlow()
 
+    private var trackStore = AppendOnlyTrack()
     private val _track = MutableStateFlow<List<Fix>>(emptyList())
-    /** Fixes of the current session, in memory only (the session file is the record). */
+    /**
+     * Fixes of the current session, in memory only (the session file is the record). Each value is an O(1)
+     * snapshot of an append-only buffer, so a long walk does not copy the whole track per fix.
+     */
     val track: StateFlow<List<Fix>> = _track.asStateFlow()
+
+    /** Last non-mock fix, for the live distance (mock fixes never count). */
+    private var lastRealFix: Fix? = null
+
+    /** An unfinished session found by [onLaunch] while auto-finalised walks were shown; offered after [dismiss]. */
+    private var recoverAfterDismiss = false
 
     private var granted: Set<Perm> = emptySet()
     private var recorderStarted = false
@@ -84,12 +100,46 @@ class RecordingController(
         launch { lost.collect { onLocationLost(it) } }
     }
 
-    /** Offers recovery of a session the previous process left unfinished. Call once per process, before any start. */
+    /**
+     * Call once per process, before any start. First finalises every session that has a Stop but was never
+     * finalised (merging is idempotent) and shows the most recent summary (with "N walks saved" when there were
+     * several); then offers recovery of a session the previous process left unfinished (after that summary is
+     * dismissed, if one was shown). All file work runs on [io]; the finalizer moves its own work off Main.
+     */
     suspend fun onLaunch() {
         if (_state.value !is RecordingState.Idle) return
-        val id = withContext(io) { store.unfinished().firstOrNull() } ?: return
-        if (_state.value is RecordingState.Idle) _state.value = RecordingState.Recover(id)
+        val (pending, unfinished) = withContext(io) {
+            val done = finalizer.finalizedIds()
+            store.finished().filter { it !in done }.sortedBy { startOf(it) } to store.unfinished().firstOrNull()
+        }
+        if (_state.value !is RecordingState.Idle) return
+        if (pending.isNotEmpty()) {
+            _state.value = RecordingState.Finalizing(pending.last())
+            var last: SessionSummary? = null
+            var saved = 0
+            for (id in pending) {
+                try {
+                    last = finalizer.finalize(id)
+                    saved++
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                }
+            }
+            recoverAfterDismiss = unfinished != null
+            if (last != null) {
+                if (saved > 1) _notice.value = "$saved walks saved"
+                _state.value = RecordingState.Done(last)
+                return
+            }
+            _notice.value = "Could not finish ${pending.size} saved walk(s)"
+            _state.value = RecordingState.Idle
+            recoverAfterDismiss = false
+        }
+        if (unfinished != null && _state.value is RecordingState.Idle) _state.value = RecordingState.Recover(unfinished)
     }
+
+    /** Session ids are "s<startMs>-<rand>"; sort by start time, falling back to the id. */
+    private fun startOf(id: String): Long = id.removePrefix("s").substringBefore('-').toLongOrNull() ?: Long.MAX_VALUE
 
     /** LOCATION is required; NOTIFICATIONS and ACTIVITY are optional (without ACTIVITY the walk is unverified). */
     fun onPermissions(granted: Set<Perm>) {
@@ -111,7 +161,7 @@ class RecordingController(
         }
         val id = newSessionId()
         val optional = Perm.ACTIVITY in granted
-        _track.value = emptyList()
+        clearTrack()
         _notice.value = null
         recorderStarted = false
         recorderStopped = CompletableDeferred()
@@ -130,10 +180,22 @@ class RecordingController(
                 _state.value = when (event.source) {
                     "activity" -> r.copy(activityAvailable = event.available)
                     "steps" -> r.copy(stepsAvailable = event.available)
+                    "precise" -> r.copy(preciseLocation = event.available)
                     else -> r
                 }
             }
-            is SessionEvent.Stop -> recorderStopped?.complete(Unit)
+            is SessionEvent.Stop -> {
+                recorderStopped?.complete(Unit)
+                // A Stop while still Recording was not requested here (controller stops leave Recording first):
+                // the notification's Stop action or the service stopping itself. Finalise it like a user stop.
+                // Only once the recorder reported Start for this session: a late Stop of a session that was still
+                // draining when this one was requested belongs to that older session (R7).
+                val r = _state.value as? RecordingState.Recording ?: return
+                if (!recorderStarted) return
+                recorderStopped = null
+                _state.value = RecordingState.Finalizing(r.sessionId)
+                scope.launch { finalizeTo(r.sessionId) }
+            }
             is SessionEvent.Act, is SessionEvent.Steps, is SessionEvent.Diag -> Unit
         }
     }
@@ -141,12 +203,14 @@ class RecordingController(
     fun onFix(fix: Fix) {
         val r = _state.value as? RecordingState.Recording ?: return
         if (fix.timeMs < r.startedMs) return // R8: a cached pre-start position is not part of the walk
-        val prev = _track.value.lastOrNull()
-        _track.value = _track.value + fix
+        _track.value = trackStore.append(fix)
+        // Mock fixes are drawn but never add distance (finalising drops them too).
+        val added = if (fix.isMock) 0.0 else lastRealFix?.let { distanceM(it, fix) } ?: 0.0
+        if (!fix.isMock) lastRealFix = fix
         _state.value = r.copy(
             fixCount = r.fixCount + 1,
             lastFixMs = fix.timeMs,
-            distanceM = r.distanceM + (prev?.let { distanceM(it, fix) } ?: 0.0),
+            distanceM = r.distanceM + added,
             waitingForGps = false,
         )
     }
@@ -158,7 +222,7 @@ class RecordingController(
             _notice.value = "A recording is still finishing. Try again in a moment."
             if (current is RecordingState.Recording && !recorderStarted) {
                 recorderStopped = null
-                _track.value = emptyList()
+                clearTrack()
                 _state.value = RecordingState.Idle
             }
             return
@@ -169,7 +233,7 @@ class RecordingController(
             // The recorder never began this session (e.g. it could not start): nothing to finalise.
             recorderStopped = null
             recorder.stop()
-            _track.value = emptyList()
+            clearTrack()
             _state.value = RecordingState.Idle
             return
         }
@@ -203,22 +267,23 @@ class RecordingController(
         }
     }
 
-    /** Finalises a session left unfinished by a previous process and closes its file. */
+    /**
+     * Closes a session left unfinished by a previous process, then finalises it. Closing first means a process
+     * death in between leaves a stopped-but-unfinalised session, which [onLaunch] finalises automatically.
+     */
     suspend fun finishRecovered(sessionId: String) {
         if (_state.value != RecordingState.Recover(sessionId)) return
         _state.value = RecordingState.Finalizing(sessionId)
-        finalizeTo(sessionId)
-        if (_state.value is RecordingState.Done) {
-            // No recorder runs for this session (it died with its process), so closing it here keeps one writer.
-            // Best effort: if closing fails the session is offered again next launch (re-merging is idempotent).
-            val now = clock()
-            withContext(io) {
-                runCatching {
-                    store.resume(sessionId)
-                    store.end(now)
-                }
+        // No recorder runs for this session (it died with its process), so closing it here keeps one writer.
+        // Best effort: if closing fails, the walk is still counted now and offered again next launch (idempotent).
+        val now = clock()
+        withContext(io) {
+            runCatching {
+                store.resume(sessionId)
+                store.end(now)
             }
         }
+        finalizeTo(sessionId)
     }
 
     fun discardRecovered(sessionId: String) {
@@ -231,12 +296,22 @@ class RecordingController(
         }
     }
 
-    /** Leaves the results sheet. */
+    /** Leaves the results sheet (then offers a recovery that [onLaunch] held back, if any). */
     fun dismiss() {
         if (_state.value is RecordingState.Done || _state.value is RecordingState.NeedsPermission) {
-            _track.value = emptyList()
+            clearTrack()
             _state.value = RecordingState.Idle
+            if (recoverAfterDismiss) {
+                recoverAfterDismiss = false
+                scope.launch { onLaunch() }
+            }
         }
+    }
+
+    private fun clearTrack() {
+        trackStore = AppendOnlyTrack()
+        lastRealFix = null
+        _track.value = emptyList()
     }
 
     fun clearNotice() {

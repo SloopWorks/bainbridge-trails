@@ -49,8 +49,8 @@ class GatingTest {
 
     @Test
     fun staleActivityDoesNotGovern() {
-        // vehicle sample at 0, fixes only from 300 s: sample 5 min old
-        val fixes = walk(300, 60, 1.4)
+        // vehicle sample at 0, fixes only from 610 s: sample older than the 10 min cap
+        val fixes = walk(610, 60, 1.4)
         val r = Gating.gate(session(fixes, listOf(act(0, ActivityKind.VEHICLE, Confidence.HIGH)), stepsAvailable = false))
         assertEquals(0, r.droppedVehicle)
         assertEquals(fixes.size, r.fixes.size)
@@ -131,5 +131,55 @@ class GatingTest {
         val r = Gating.gate(session(fixes, steps = steps))
         assertEquals(0, r.droppedSteps)
         assertEquals(fixes.size, r.fixes.size)
+    }
+    @Test
+    fun vehicleSampleThenTenMinutesSilenceDropped() {
+        // iOS reports transitions only: one VEHICLE sample, then nothing for 10 min of driving.
+        val fixes = walk(0, 600, 12.0)
+        val r = Gating.gate(session(fixes, listOf(act(0, ActivityKind.VEHICLE, Confidence.HIGH)), stepsAvailable = false))
+        assertEquals(fixes.size, r.droppedVehicle)
+        assertTrue(r.fixes.isEmpty())
+    }
+
+    @Test
+    fun bicycleGovernsUntilNextSample() {
+        val fixes = walk(0, 500, 3.5)
+        val acts = listOf(act(0, ActivityKind.BICYCLE, Confidence.MEDIUM), act(400, ActivityKind.ON_FOOT, Confidence.HIGH))
+        val r = Gating.gate(session(fixes, acts, stepsAvailable = false))
+        val bike = fixes.count { it.timeMs < t0 + 400_000 }
+        assertTrue(bike > 12, "longer than the old 120 s window")
+        assertEquals(bike, r.droppedVehicle)
+        assertEquals(fixes.size - bike, r.fixes.size)
+    }
+
+    @Test
+    fun movingWithNoStepSamplesAfterLastIsDropped() {
+        // Android reports steps only on change: after the last sample the count is unchanged.
+        val fixes = walk(0, 59, 5.0) // 295 m
+        val steps = listOf(StepSample(t0, 0), StepSample(t0 + 5_000, 3))
+        val r = Gating.gate(session(fixes, steps = steps))
+        assertEquals(fixes.size, r.droppedSteps)
+        assertTrue(r.fixes.isEmpty())
+    }
+
+    @Test
+    fun allRideSessionZeroStepsDropped() {
+        // A slow ride (~14 km/h) the OS never labelled: one step sample at start, no activity samples.
+        val fixes = walk(0, 599, 3.8) // ten full 60 s windows
+        val oneSample = Gating.gate(session(fixes, steps = listOf(StepSample(t0, 0))))
+        assertEquals(fixes.size, oneSample.droppedSteps)
+        assertTrue(oneSample.fixes.isEmpty())
+        // Same ride with the 30 s heartbeat holding the unchanged count.
+        val heartbeat = (0..600 step 30).map { StepSample(t0 + it * 1000L, 0) }
+        val r = Gating.gate(session(fixes, steps = heartbeat))
+        assertEquals(fixes.size, r.droppedSteps)
+    }
+
+    @Test
+    fun walkBeforeFirstStepSampleKept() {
+        // No sample at or before the window start: no step evidence either way, so nothing is dropped.
+        val fixes = walk(0, 59, 5.0)
+        val r = Gating.gate(session(fixes, steps = listOf(StepSample(t0 + 30_000, 0))))
+        assertEquals(0, r.droppedSteps)
     }
 }

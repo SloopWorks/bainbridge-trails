@@ -30,7 +30,8 @@ import java.io.File
  *
  * Single-writer (ruling R4): every source callback only does `events.trySend(...)`; one coroutine
  * consumes the channel, calls [SessionStore.append] (or [SessionStore.end] for Stop) and then
- * [RecordingBus.emit]. Nothing else touches the store. Never logs coordinates.
+ * [RecordingBus.emit]. Nothing else touches the store. The diag (5 min) and step heartbeat (30 s) timers
+ * also only queue placeholders that the writer resolves. Never logs coordinates.
  *
  * If the process dies without a Stop, the session stays unfinished in the store and can be
  * restarted with `resume = true`.
@@ -46,6 +47,7 @@ class RecordingService : Service() {
     private var activity: AndroidActivitySource? = null
     private var steps: AndroidStepSource? = null
     private var diagJob: Job? = null
+    private var stepJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -111,9 +113,10 @@ class RecordingService : Service() {
                 null
             }
             val diag = DiagAccumulator()
+            val heartbeat = StepHeartbeat()
             for (queued in channel) {
                 if (store == null) continue // drain so senders and Stop still complete
-                val event = diag.resolve(queued)
+                val event = heartbeat.resolve(diag.resolve(queued)) ?: continue
                 try {
                     if (event is SessionEvent.Stop) store.end(event.timeMs) else store.append(event)
                     RecordingBus.emit(event)
@@ -150,7 +153,16 @@ class RecordingService : Service() {
         val stp = AndroidStepSource(this).also { steps = it }
         val stepsAvailable = stp.available
         channel.trySend(SessionEvent.SourceState(now, "steps", stepsAvailable))
-        if (stepsAvailable) stp.start { channel.trySend(SessionEvent.Steps(it)) }
+        if (stepsAvailable) {
+            stp.start { channel.trySend(SessionEvent.Steps(it)) }
+            // The step counter reports only on change: a heartbeat holds the last count so gating sees "no steps".
+            stepJob = scope.launch {
+                while (true) {
+                    delay(STEP_HEARTBEAT_MS)
+                    channel.trySend(stepTick(System.currentTimeMillis()))
+                }
+            }
+        }
 
         channel.trySend(SessionEvent.SourceState(now, "location", true))
         AndroidLocationSource(this) { available ->
@@ -170,6 +182,8 @@ class RecordingService : Service() {
     private fun stopSources() {
         diagJob?.cancel()
         diagJob = null
+        stepJob?.cancel()
+        stepJob = null
         location?.stop()
         activity?.stop()
         steps?.stop()
@@ -187,8 +201,11 @@ class RecordingService : Service() {
         }
         if (stopping) return
         stopping = true
+        val hadSteps = stepJob != null
         stopSources()
-        channel.trySend(SessionEvent.Stop(System.currentTimeMillis()))
+        val now = System.currentTimeMillis()
+        if (hadSteps) channel.trySend(stepTick(now)) // last count held to the end of the walk
+        channel.trySend(SessionEvent.Stop(now))
         channel.close()
     }
 
@@ -258,18 +275,17 @@ class RecordingService : Service() {
         private const val REQUEST_OPEN = 2
 
         /**
-         * Starts recording [sessionId] (or resumes an unfinished one). Without location permission
-         * the service is not started (a location FGS would throw on API 34+); a lost reason is emitted instead.
+         * Starts recording [sessionId] (or resumes an unfinished one). Without precise (FINE) location permission
+         * the service is not started: approximate fixes cannot be matched to trails (the permission flow asks for
+         * precise first), and a location FGS without permission would throw on API 34+. A lost reason is emitted instead.
          */
         fun start(context: Context, sessionId: String, resume: Boolean = false) {
             if (sessionId.isBlank()) {
                 RecordingBus.emitLost("invalid session id")
                 return
             }
-            val granted = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-                .any { context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
-            if (!granted) {
-                RecordingBus.emitLost("location permission missing")
+            if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                RecordingBus.emitLost("precise location permission missing")
                 return
             }
             val intent = Intent(context, RecordingService::class.java)

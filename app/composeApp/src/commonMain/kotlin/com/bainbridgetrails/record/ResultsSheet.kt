@@ -64,6 +64,11 @@ internal fun ResultsSheet(summary: SessionSummary, onClose: () -> Unit, modifier
             fontSize = 17.sp,
             color = Color(0xFF1E2A24),
         )
+        if (summary.approximateLocation) Text(
+            "Recorded with approximate location: trails may not have matched. Turn on Precise Location for this app in Settings.",
+            fontSize = 13.sp,
+            color = Color(0xFFB3261E),
+        )
         if (!summary.verified) Text("Unverified walk (activity or step data unavailable)", fontSize = 13.sp, color = Color(0xFF8A5A00))
         if (summary.newlyCompleted.isNotEmpty()) {
             Text("Newly completed", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF7B1689))

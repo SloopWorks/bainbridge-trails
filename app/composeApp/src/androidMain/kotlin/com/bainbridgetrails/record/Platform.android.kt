@@ -47,10 +47,19 @@ private class AndroidPermissionRequester(
     private val context: Context,
     private val launch: (Array<String>, CompletableDeferred<Map<String, Boolean>>) -> Unit,
 ) : PermissionRequester {
+    private fun has(name: String) = context.checkSelfPermission(name) == PackageManager.PERMISSION_GRANTED
+
     private fun granted(perm: Perm): Boolean {
+        // Location: recording needs FINE. COARSE alone is approximate: the flow asks for precise (see locationAccess).
+        if (perm == Perm.LOCATION_WHILE_IN_USE) return has(Manifest.permission.ACCESS_FINE_LOCATION)
         val names = perm.manifestPermissions()
-        // Location: coarse alone is enough to record (approximate), so any of the pair counts.
-        return names.isEmpty() || names.any { context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+        return names.isEmpty() || names.any { has(it) }
+    }
+
+    override fun locationAccess(): LocationAccess = when {
+        has(Manifest.permission.ACCESS_FINE_LOCATION) -> LocationAccess.PRECISE
+        has(Manifest.permission.ACCESS_COARSE_LOCATION) -> LocationAccess.APPROXIMATE
+        else -> LocationAccess.NONE
     }
 
     override fun status(perm: Perm): PermStatus = when {

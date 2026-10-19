@@ -130,6 +130,7 @@ private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, 
                         if (r.waitingForGps) Chip("Waiting for GPS", Color(0xFFFFE9B0), Color(0xFF6B4A00))
                         else Chip("GPS ok", Color(0xFFD7F0DC), Color(0xFF1B5E20))
                         if (!r.activityAvailable || !r.stepsAvailable) Chip("Unverified", Color(0xFFEDE7DA), Color(0xFF5A4A2A))
+                        if (!r.preciseLocation) Chip("Approximate location", Color(0xFFFFE0DC), Color(0xFF8C1D18))
                     }
                 }
                 notice?.let { Chip(it, Color(0xEE26302B), Color.White) }
@@ -147,12 +148,13 @@ private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, 
                 }
             }
             is RecordingState.NeedsPermission -> BottomPanel(Modifier.align(Alignment.BottomCenter)) {
-                Text("Location is needed to record a walk.", fontSize = 16.sp, color = Color(0xFF1E2A24))
+                val approximate = requester.locationAccess() == LocationAccess.APPROXIMATE
+                Text(if (approximate) "$PRECISE_OFF_MESSAGE." else "Location is needed to record a walk.", fontSize = 16.sp, color = Color(0xFF1E2A24))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (requester.status(Perm.LOCATION_WHILE_IN_USE) == PermStatus.PERMANENTLY_DENIED) {
                         Button(onClick = { openAppSettings(context) }) { Text("Open settings") }
                     } else {
-                        Button(onClick = { onStartTapped() }) { Text("Allow location") }
+                        Button(onClick = { onStartTapped() }) { Text(if (approximate) "Use precise location" else "Allow location") }
                     }
                     TextButton(onClick = { controller.dismiss() }) { Text("Not now") }
                 }

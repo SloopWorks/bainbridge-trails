@@ -20,6 +20,7 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class FinalizerTest {
@@ -120,5 +121,30 @@ class FinalizerTest {
         var seen: Any? = null
         Finalizer(ds, index, store, CoverageStore(dir), onWork = { seen = currentCoroutineContext()[kotlin.coroutines.ContinuationInterceptor] }).finalize("s1")
         assertEquals(Dispatchers.Default, seen)
+    }
+    @Test
+    fun onlyFinishedSessionsAreMarkedFinalized() = runTest {
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        record(store, "done", 0.0, 0.0, 50.0)
+        store.begin("open", t0) // stop-timeout path: finalised before the recorder wrote Stop
+        val (lon, lat) = proj.toLonLat(Xy(60.0, 0.0))
+        store.append(SessionEvent.FixEvent(t0 + 1000, lon, lat, 5.0, false))
+        val f = fin(dir)
+        f.finalize("done")
+        f.finalize("open")
+        assertEquals(setOf("done"), CoverageStore(dir).finalizedIds(), "an unfinished session is finalised again once it has its Stop")
+    }
+
+    @Test
+    fun approximateLocationReportedInSummary() = runTest {
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        store.begin("a", t0)
+        store.append(SessionEvent.SourceState(t0, "precise", false))
+        store.end(t0 + 1)
+        assertTrue(fin(dir).finalize("a").approximateLocation)
+        record(store, "p", 0.0, 0.0, 10.0)
+        assertFalse(fin(dir).finalize("p").approximateLocation)
     }
 }

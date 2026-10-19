@@ -41,12 +41,20 @@ class CoverageStore(dir: String) {
         return json.decodeFromString(CoverageFile.serializer(), text)
     }
 
+    /** Sessions already merged after their Stop (keys of `verified`); see [merge]. */
+    fun finalizedIds(): Set<String> = read().verified.keys
+
     /** EMPTY if missing. */
     fun load(): CoverageState = read().state
 
-    fun merge(sessionId: String, state: CoverageState, verified: Boolean) {
+    /**
+     * Unions [state] into the stored coverage (idempotent). [finalized] = the session had its Stop: only then is the
+     * id recorded, so a session merged early (stop timeout) is merged again, complete, on the next launch.
+     */
+    fun merge(sessionId: String, state: CoverageState, verified: Boolean, finalized: Boolean = true) {
         val cur = read()
-        val next = cur.copy(state = cur.state.union(state), verified = cur.verified + (sessionId to verified))
+        val ids = if (finalized) cur.verified + (sessionId to verified) else cur.verified
+        val next = cur.copy(state = cur.state.union(state), verified = ids)
         SystemFileSystem.sink(tmp).buffered().use {
             it.writeString(json.encodeToString(CoverageFile.serializer(), next))
             it.flush()

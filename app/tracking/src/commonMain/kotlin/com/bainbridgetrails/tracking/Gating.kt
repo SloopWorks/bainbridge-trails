@@ -8,15 +8,19 @@ data class GateResult(val fixes: List<Fix>, val droppedVehicle: Int, val dropped
 
 /**
  * Drops fixes that cannot be on-foot travel. Two independent checks, both only ever remove fixes:
- *  1. Activity: a fix is dropped when the latest activity sample at or before it (no older than
- *     [ACTIVITY_GOVERNS_MS]) is VEHICLE or BICYCLE with confidence >= MEDIUM.
+ *  1. Activity: a fix is dropped when the latest activity sample at or before it is VEHICLE or BICYCLE with
+ *     confidence >= MEDIUM. A sample governs until the next one, capped at [ACTIVITY_GOVERNS_MS] (iOS reports
+ *     transitions only, so a single VEHICLE sample may be all there is for a whole drive).
  *  2. Steps: per [STEP_WINDOW_MS] window from the first fix, if the distance moved exceeds
  *     [STEP_MIN_MOVE_M] but steps * [MAX_STRIDE_M] cannot cover it, the window's fixes are dropped.
- *     Skipped when step data is unavailable or the window lies outside the step samples.
+ *     Cumulative steps at the window edges are interpolated between the nearest samples; after the last sample
+ *     the count is held (no new steps: Android reports only on change, and the recorder writes a heartbeat
+ *     sample every [STEP_HEARTBEAT_MS]). Skipped when step data is unavailable, when no sample exists at or
+ *     before the window start, or when the counter reset (decreased) inside the window.
  * A session is verified only when both sources were available; missing sources never drop fixes.
  */
 object Gating {
-    const val ACTIVITY_GOVERNS_MS = 120_000L
+    const val ACTIVITY_GOVERNS_MS = 600_000L
     const val STEP_WINDOW_MS = 60_000L
     const val STEP_MIN_MOVE_M = 60.0
     const val MAX_STRIDE_M = 2.5
@@ -38,14 +42,14 @@ object Gating {
         // 2. steps
         var droppedSteps = 0
         val steps = session.steps.sortedBy { it.timeMs }
-        val result: List<Fix> = if (!session.stepsAvailable || steps.size < 2 || afterActivity.isEmpty()) afterActivity else {
+        val result: List<Fix> = if (!session.stepsAvailable || steps.isEmpty() || afterActivity.isEmpty()) afterActivity else {
             val start = afterActivity.first().timeMs
             val kept = ArrayList<Fix>(afterActivity.size)
             val windows: List<List<Fix>> = afterActivity.groupBy { (it.timeMs - start) / STEP_WINDOW_MS }.entries.sortedBy { it.key }.map { it.value }
             for (window in windows) {
                 val ws = start + ((window.first().timeMs - start) / STEP_WINDOW_MS) * STEP_WINDOW_MS
                 val we = ws + STEP_WINDOW_MS
-                val covered = steps.first().timeMs <= ws && steps.last().timeMs >= we
+                val covered = steps.first().timeMs <= ws
                 var moved = 0.0
                 if (covered) {
                     for (i in 1 until window.size) {
@@ -65,7 +69,7 @@ object Gating {
         return GateResult(result, droppedVehicle, droppedSteps, session.activityAvailable && session.stepsAvailable)
     }
 
-    /** Linear interpolation of cumulative steps, clamped to the sample range. [s] sorted, size >= 2. */
+    /** Linear interpolation of cumulative steps; the last value is held after the last sample. [s] sorted, non-empty. */
     private fun cumulativeAt(s: List<StepSample>, t: Long): Double {
         if (t <= s.first().timeMs) return s.first().cumulativeSteps.toDouble()
         if (t >= s.last().timeMs) return s.last().cumulativeSteps.toDouble()

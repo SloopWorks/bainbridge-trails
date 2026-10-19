@@ -4,6 +4,7 @@
 *.iml
 local.properties
 .gradle/
+.kotlin/
 build/
 .venv/
 __pycache__/

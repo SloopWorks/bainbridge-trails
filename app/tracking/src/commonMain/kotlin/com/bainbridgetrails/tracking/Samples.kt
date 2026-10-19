@@ -35,7 +35,10 @@ sealed interface SessionEvent {
     @Serializable @SerialName("steps")
     data class Steps(val sample: StepSample) : SessionEvent
 
-    /** [source] is "activity" | "steps" | "location". */
+    /**
+     * [source] is "activity" | "steps" | "location" | "precise" ("precise" false = the OS granted only reduced
+     * accuracy, iOS; the walk is recorded but flagged).
+     */
     @Serializable @SerialName("source")
     data class SourceState(val timeMs: Long, val source: String, val available: Boolean) : SessionEvent
 

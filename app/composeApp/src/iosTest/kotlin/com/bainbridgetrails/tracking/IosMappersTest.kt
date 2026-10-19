@@ -1,5 +1,6 @@
 package com.bainbridgetrails.tracking
 
+import platform.CoreLocation.CLAccuracyAuthorization
 import platform.CoreLocation.kCLAuthorizationStatusAuthorizedAlways
 import platform.CoreLocation.kCLAuthorizationStatusAuthorizedWhenInUse
 import platform.CoreLocation.kCLAuthorizationStatusDenied
@@ -113,5 +114,11 @@ class IosMappersTest {
             listOf(ActivitySample(3_000, ActivityKind.VEHICLE, Confidence.HIGH)),
             IosMappers.newHistorySamples(history, seenTimesMs = setOf(2_000L), fromMs = 1_000, toMs = 5_000),
         )
+    }
+
+    @Test
+    fun onlyFullAccuracyIsPrecise() {
+        assertTrue(IosMappers.isPreciseAccuracy(CLAccuracyAuthorization.CLAccuracyAuthorizationFullAccuracy))
+        assertFalse(IosMappers.isPreciseAccuracy(CLAccuracyAuthorization.CLAccuracyAuthorizationReducedAccuracy))
     }
 }

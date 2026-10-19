@@ -4,16 +4,25 @@
 usage: session-summary.py <session>.jsonl
 
 Prints duration, fix count, battery %/h (from diag events), activity mix (time-weighted),
-and dropped counts. Dropped counts mirror Gating.kt: mock fixes, fixes governed by a
-VEHICLE/BICYCLE (>= MEDIUM) activity sample, and fixes in 60 s windows that moved > 60 m
-with steps * 2.5 m too short to cover it.
+and dropped counts. Dropped counts follow Gating.kt:
+  - activity: a fix is dropped when the latest activity sample at or before it is VEHICLE or
+    BICYCLE (>= MEDIUM); a sample governs until the next one, capped at 10 min.
+  - steps (only if the last "steps" source state is available): per 60 s window from the first
+    kept fix, cumulative steps at the window edges are interpolated between the nearest samples
+    and held after the last sample; the window is skipped when no sample is at or before its
+    start, or the counter decreased (reset) inside it. Dropped when it moved > 60 m and
+    steps * 2.5 m cannot cover it.
+Remaining differences from Gating.kt (labelled in the output):
+  - mock fixes are counted separately and excluded before gating (Gating.kt gates them too;
+    coverage drops them later), so vehicle/steps counts can differ when mock fixes exist;
+  - distance is haversine here vs a local planar projection in Gating.kt (sub-metre difference).
 """
 import json
 import math
 import sys
 from collections import Counter
 
-ACT_GOVERNS_MS, WINDOW_MS, MIN_MOVE_M, STRIDE_M = 120_000, 60_000, 60.0, 2.5
+ACT_GOVERNS_MS, WINDOW_MS, MIN_MOVE_M, STRIDE_M = 600_000, 60_000, 60.0, 2.5
 CONF = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
 
 
@@ -24,6 +33,21 @@ def dist(a, b):
     dp = p2 - p1
     h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * r * math.asin(math.sqrt(h))
+
+
+def cumulative_at(steps, t):
+    """Gating.cumulativeAt: interpolate between neighbours; hold the last value after the last sample."""
+    if t <= steps[0]["timeMs"]:
+        return float(steps[0]["cumulativeSteps"])
+    if t >= steps[-1]["timeMs"]:
+        return float(steps[-1]["cumulativeSteps"])
+    for a, b in zip(steps, steps[1:]):
+        if b["timeMs"] >= t:
+            if b["timeMs"] == t:
+                return float(b["cumulativeSteps"])
+            frac = (t - a["timeMs"]) / (b["timeMs"] - a["timeMs"])
+            return a["cumulativeSteps"] + frac * (b["cumulativeSteps"] - a["cumulativeSteps"])
+    return float(steps[-1]["cumulativeSteps"])
 
 
 def main(path):
@@ -48,6 +72,11 @@ def main(path):
     steps = sorted((e["sample"] for e in ev if e["t"] == "steps"), key=lambda s: s["timeMs"])
     diags = [e for e in ev if e["t"] == "diag"]
     finished = any(e["t"] == "stop" for e in ev)
+    source = {}
+    for e in ev:
+        if e["t"] == "source":
+            source[e["source"]] = e["available"]
+    steps_available = source.get("steps") is True
 
     print(f"file: {path.split('/')[-1]}  finished: {finished}")
     print(f"duration: {dur_h * 60:.1f} min")
@@ -94,20 +123,25 @@ def main(path):
         else:
             live.append(f)
     stp = 0
-    if len(steps) >= 2 and live:
+    if steps_available and steps and live:
         t0 = live[0]["timeMs"]
         wins = {}
         for f in live:
             wins.setdefault((f["timeMs"] - t0) // WINDOW_MS, []).append(f)
-        for k, w in wins.items():
+        for k, w in sorted(wins.items()):
             ws = t0 + k * WINDOW_MS
-            if not (steps[0]["timeMs"] <= ws and steps[-1]["timeMs"] >= ws + WINDOW_MS):
-                continue
+            we = ws + WINDOW_MS
+            if steps[0]["timeMs"] > ws:
+                continue  # no step evidence at the window start
+            if any(b["timeMs"] > ws and a["timeMs"] < we and b["cumulativeSteps"] < a["cumulativeSteps"]
+                   for a, b in zip(steps, steps[1:])):
+                continue  # counter reset: no usable step data
             moved = sum(dist(w[i], w[i + 1]) for i in range(len(w) - 1))
-            n = [s["cumulativeSteps"] for s in steps if ws <= s["timeMs"] <= ws + WINDOW_MS]
-            if moved > MIN_MOVE_M and (not n or (max(n) - min(n)) * STRIDE_M < moved):
+            n = cumulative_at(steps, we) - cumulative_at(steps, ws)
+            if n >= 0 and moved > MIN_MOVE_M and n * STRIDE_M < moved:
                 stp += len(w)
-    print(f"dropped: mock {mock}, vehicle/bicycle {veh}, steps {stp} (approximation of Gating.kt)")
+    print(f"dropped: mock {mock}, vehicle/bicycle {veh}, steps {stp}"
+          " (differs from Gating.kt: mock fixes excluded before gating here; haversine distance)")
 
 
 if __name__ == "__main__":
