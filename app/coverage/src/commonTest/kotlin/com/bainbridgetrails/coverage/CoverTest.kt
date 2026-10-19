@@ -119,7 +119,8 @@ class CoverTest {
     @Test fun repeatAndReverseIdempotent() {
         val idx = SegmentIndex(partialSeg, params, proj)
         val fwd = walk(Xy(0.0, 0.0), Xy(150.0, 0.0))
-        val back = walk(Xy(150.0, 0.0), Xy(0.0, 0.0), t0 = fwd.last().timeMs + 1000)
+        // exact reverse of the same path, continuing in time
+        val back = fwd.reversed().mapIndexed { k, f -> f.copy(timeMs = fwd.last().timeMs + (k + 1) * 1000L) }
         val sF = idx.coverFixes(fwd)
         val sFB = idx.coverFixes(fwd + back)
         assertTrue(sF.covered("seg-000001").size in 1 until idx.tickCount("seg-000001"))

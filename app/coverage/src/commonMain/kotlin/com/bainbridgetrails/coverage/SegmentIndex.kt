@@ -2,6 +2,7 @@ package com.bainbridgetrails.coverage
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.hypot
 
@@ -16,14 +17,16 @@ data class SegmentGeom(
 )
 
 /**
- * Ticks every ~tickM along each segment, in a 50 m grid, plus competitive map matching (ruling R3).
+ * Ticks every ~tickM along each segment, in a 50 m grid, plus competitive map matching (rulings R3 + R6).
  *
- * Each piece is densified to points q every tickM along each line (vertices included); q carries the
- * line's bearing h (none if the line is < 2 m). For each q:
+ * Each piece is densified to points q every tickM along each line (vertices included). q's heading h comes from
+ * a displacement baseline >= headingBaselineM around its line (R6); with no such baseline q is stationary and
+ * credits nothing. For each q:
  * - candidates = ticks within bufferM of q that pass the heading check
- *   (headingToleranceDeg == null, or no h, or axialDiffDeg(h, tick bearing) <= headingToleranceDeg);
+ *   (headingToleranceDeg == null, or axialDiffDeg(h, tick bearing) <= headingToleranceDeg);
  * - d_S = nearest candidate tick of segment S; d* = min over S;
- * - every segment with d_S <= d* + matchMarginM gets all its candidate ticks of q marked covered.
+ * - every segment with d_S <= d* + matchMarginM gets its nearest candidate tick and that tick's index
+ *   neighbours (+-1, heading-checked) marked, each only if within bufferM of q.
  */
 class SegmentIndex(
     segments: List<SegmentGeom>,
@@ -59,12 +62,21 @@ class SegmentIndex(
     fun cover(pieces: List<List<Xy>>): CoverageState {
         val bits = arrayOfNulls<LongArray>(ticks.size)
         val dS = DoubleArray(ticks.size) { Double.POSITIVE_INFINITY }
-        var candSArr = IntArray(256)
-        var candTArr = IntArray(256)
+        val bestT = IntArray(ticks.size)
+        var cand = IntArray(64)
+        val buf = params.bufferM
+        val tol = params.headingToleranceDeg
 
-        fun visit(q: Xy, h: Double?) {
-            var n = 0
-            val buf = params.bufferM
+        fun mark(s: Int, t: Int, q: Xy) {
+            if (t < 0 || t >= ticks[s].size) return
+            val p = ticks[s][t].p
+            if (hypot(p.x - q.x, p.y - q.y) > buf) return
+            val w = bits[s] ?: LongArray((ticks[s].size + 63) / 64).also { bits[s] = it }
+            w[t / 64] = w[t / 64] or (1L shl (t % 64))
+        }
+
+        fun visit(q: Xy, h: Double) {
+            var n = 0 // distinct segments with a candidate
             for (cx in cell(q.x - buf)..cell(q.x + buf)) for (cy in cell(q.y - buf)..cell(q.y + buf)) {
                 val entries = grid[cellKey(cx, cy)] ?: continue
                 for (e in entries) {
@@ -73,39 +85,40 @@ class SegmentIndex(
                     val tick = ticks[s][t]
                     val d = hypot(tick.p.x - q.x, tick.p.y - q.y)
                     if (d > buf) continue
-                    val tol = params.headingToleranceDeg
-                    if (tol != null && h != null && axialDiffDeg(h, tick.bearingDeg) > tol) continue
-                    if (n == candSArr.size) {
-                        candSArr = candSArr.copyOf(n * 2)
-                        candTArr = candTArr.copyOf(n * 2)
+                    if (tol != null && axialDiffDeg(h, tick.bearingDeg) > tol) continue
+                    if (dS[s] == Double.POSITIVE_INFINITY) {
+                        if (n == cand.size) cand = cand.copyOf(n * 2)
+                        cand[n++] = s
                     }
-                    candSArr[n] = s
-                    candTArr[n] = t
-                    n++
-                    if (d < dS[s]) dS[s] = d
+                    if (d < dS[s]) { dS[s] = d; bestT[s] = t }
                 }
             }
             if (n == 0) return
             var dStar = Double.POSITIVE_INFINITY
-            for (i in 0 until n) if (dS[candSArr[i]] < dStar) dStar = dS[candSArr[i]]
+            for (i in 0 until n) if (dS[cand[i]] < dStar) dStar = dS[cand[i]]
             val limit = dStar + params.matchMarginM
             for (i in 0 until n) {
-                val s = candSArr[i]
-                if (dS[s] > limit) continue
-                val t = candTArr[i]
-                val w = bits[s] ?: LongArray((ticks[s].size + 63) / 64).also { bits[s] = it }
-                w[t / 64] = w[t / 64] or (1L shl (t % 64))
+                val s = cand[i]
+                if (dS[s] <= limit) {
+                    val t = bestT[s]
+                    // nearest tick + index neighbours; neighbours must pass the heading check too
+                    mark(s, t, q)
+                    for (nt in intArrayOf(t - 1, t + 1)) {
+                        if (nt !in ticks[s].indices) continue
+                        if (tol != null && axialDiffDeg(h, ticks[s][nt].bearingDeg) > tol) continue
+                        mark(s, nt, q)
+                    }
+                }
+                dS[s] = Double.POSITIVE_INFINITY
             }
-            for (i in 0 until n) dS[candSArr[i]] = Double.POSITIVE_INFINITY
         }
 
         for (piece in pieces) {
-            if (piece.size == 1) visit(piece[0], null)
             for (i in 0 until piece.size - 1) {
+                val h = baselineHeading(piece, i) ?: continue // stationary: no credit
                 val a = piece[i]
                 val b = piece[i + 1]
                 val len = hypot(b.x - a.x, b.y - a.y)
-                val h = if (len < MIN_HEADING_LINE_M) null else bearingDeg(a, b)
                 var off = 0.0
                 while (off < len || off == 0.0) {
                     val f = if (len == 0.0) 0.0 else off / len
@@ -121,9 +134,34 @@ class SegmentIndex(
         return CoverageState(out)
     }
 
+    /**
+     * Heading for points on line i (piece[i]..piece[i+1]) from a displacement baseline (ruling R6). Pairs
+     * a = piece[i - j], b = piece[i + 1 + m] with j, m in 0..[MAX_BASELINE_STEPS] (clamped to the piece) are tried
+     * in order of total span j + m, most balanced first; the first pair >= headingBaselineM apart gives
+     * h = bearing(a, b). Asymmetric pairs matter at U-turns, where a symmetric pair stays folded. null = stationary.
+     */
+    private fun baselineHeading(piece: List<Xy>, i: Int): Double? {
+        val maxJ = minOf(MAX_BASELINE_STEPS, i)
+        val maxM = minOf(MAX_BASELINE_STEPS, piece.size - 2 - i)
+        val min2 = params.headingBaselineM * params.headingBaselineM
+        for (span in 0..(maxJ + maxM)) {
+            val lo = maxOf(0, span - maxM)
+            val hi = minOf(maxJ, span)
+            if (lo > hi) continue
+            for (j in (lo..hi).sortedBy { abs(2 * it - span) }) {
+                val a = piece[i - j]
+                val b = piece[i + 1 + span - j]
+                val dx = b.x - a.x
+                val dy = b.y - a.y
+                if (dx * dx + dy * dy >= min2) return bearingDeg(a, b)
+            }
+        }
+        return null
+    }
+
     private companion object {
         const val CELL_M = 50.0
-        const val MIN_HEADING_LINE_M = 2.0
+        const val MAX_BASELINE_STEPS = 30
         fun cell(v: Double): Int = floor(v / CELL_M).toInt()
         fun cellKey(cx: Int, cy: Int): Long = (cx.toLong() shl 32) or (cy.toLong() and 0xFFFFFFFFL)
         fun pack(s: Int, t: Int): Long = (s.toLong() shl 32) or (t.toLong() and 0xFFFFFFFFL)

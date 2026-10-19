@@ -65,7 +65,7 @@ fun resample(line: List<Xy>, stepM: Double): List<Tick> {
     require(stepM > 0.0) { "stepM must be > 0" }
     val segLen = DoubleArray(line.size - 1) { hypot(line[it + 1].x - line[it].x, line[it + 1].y - line[it].y) }
     val total = segLen.sum()
-    val n = max(1, ceil(total / stepM).toInt())
+    val n = max(1, ceil(total / stepM - 1e-9).toInt())
     val share = total / n
     val ticks = ArrayList<Tick>(n)
     var seg = 0

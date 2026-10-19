@@ -68,4 +68,11 @@ class GeometryTest {
         assertEquals(1, ticks.size)
         assertEquals(2.0, ticks[0].lengthM)
     }
+
+    @Test
+    fun resampleRoundTripLength() {
+        val proj = LocalProjection()
+        val line = listOf(Xy(0.0, 0.0), Xy(200.0, 0.0)).map { val (lon, lat) = proj.toLonLat(it); proj.toXy(lon, lat) }
+        assertEquals(40, resample(line, 5.0).size)
+    }
 }

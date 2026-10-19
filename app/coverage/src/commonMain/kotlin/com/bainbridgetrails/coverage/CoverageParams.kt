@@ -5,6 +5,8 @@ data class CoverageParams(
     val tickM: Double = 5.0,
     /** null = no heading check */
     val headingToleranceDeg: Double? = 45.0,
+    /** min straight-line displacement for a heading; points without one are stationary and credit nothing */
+    val headingBaselineM: Double = 15.0,
     /** a fix credits only segments within d* + matchMarginM of its nearest candidate segment (competitive map matching) */
     val matchMarginM: Double = 3.0,
     val maxAccuracyM: Double = 35.0,
