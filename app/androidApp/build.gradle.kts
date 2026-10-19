@@ -6,7 +6,7 @@ buildscript {
             maven { url = uri(repository); content { includeGroup("works.sloop.shipyard") } }
             mavenCentral()
         }
-        dependencies { classpath("works.sloop.shipyard:shipyard-deploy-gradle-plugin:0.1.0") }
+        dependencies { classpath("works.sloop.shipyard:shipyard-deploy-gradle-plugin:0.1.0-bainbridge.0597dd4") }
     }
 }
 
