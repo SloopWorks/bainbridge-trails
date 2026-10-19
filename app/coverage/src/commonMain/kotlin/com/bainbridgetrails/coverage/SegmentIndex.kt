@@ -62,6 +62,28 @@ class SegmentIndex(
         m.mapValues { it.value.toLongArray() }
     }
 
+    /** Read access for [TickGraph]: tick positions of every segment, indexed by slot. */
+    internal val tickPoints: List<List<Xy>> by lazy { ticks.map { ts -> ts.map { it.p } } }
+
+    internal val projection: LocalProjection get() = proj
+
+    internal fun slotOf(id: String): Int? = slot[id]
+
+    internal fun segmentIdOf(slot: Int): String = ids[slot]
+
+    /** Packed (slot shl 32 | tick) of every tick within [radius] of [p], via the 50 m grid. */
+    internal fun queryTicks(p: Xy, radius: Double): List<Long> {
+        val out = ArrayList<Long>()
+        for (cx in cell(p.x - radius)..cell(p.x + radius)) for (cy in cell(p.y - radius)..cell(p.y + radius)) {
+            val entries = grid[cellKey(cx, cy)] ?: continue
+            for (e in entries) {
+                val tp = ticks[(e ushr 32).toInt()][e.toInt()].p
+                if (hypot(tp.x - p.x, tp.y - p.y) <= radius) out += e
+            }
+        }
+        return out
+    }
+
     fun tickCount(segmentId: String): Int = slot[segmentId]?.let { ticks[it].size } ?: 0
 
     fun tickLengthM(segmentId: String): Double = slot[segmentId]?.let { ticks[it].firstOrNull()?.lengthM } ?: 0.0
