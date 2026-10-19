@@ -18,7 +18,8 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(project(":coverage"))
+            // api: Fix appears in public signatures (RecordedSession, LocationSource).
+            api(project(":coverage"))
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.io.core)
             implementation(libs.kotlinx.coroutines.core)

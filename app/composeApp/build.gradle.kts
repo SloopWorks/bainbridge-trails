@@ -35,8 +35,11 @@ kotlin {
             implementation(libs.maplibre.compose)
             implementation(libs.kotlinx.io.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(project(":tracking"))
         }
         androidMain.dependencies {
+            implementation(libs.play.services.location)
             // MapLibre Native render backend. OpenGL ES: widest device + emulator support.
             runtimeOnly(libs.maplibre.compose.runtime.opengl.android)
         }
