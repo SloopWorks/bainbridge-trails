@@ -12,46 +12,51 @@ data class Fix(
 
 private const val MIN_SPEED_BASIS_S = 10.0
 
-/** Continuous runs of accepted fixes, in time order. Lines are drawn only within a piece. */
+/**
+ * Continuous runs of accepted fixes, in time order. Lines are drawn only within a piece.
+ *
+ * Rules, in order: (1) sort, drop duplicate timestamps; (2) drop mock / inaccurate fixes;
+ * (3) break pieces on time gap > maxGapS or jump > maxJumpM; (4) speed check; (5) drop pieces < 2 fixes.
+ *
+ * Speed check (rule 4): the reference fix j is chosen from the whole sequence left after rules 1-2,
+ * including fixes the speed check itself dropped, not just the current piece. j = latest fix with
+ * t_i - t_j >= speedWindowS; if none, the sequence's first fix, provided >= 10 s elapsed. Fixes within
+ * 10 s of the sequence start are accepted unchecked (start-of-recording allowance only). If speed j->i
+ * exceeds maxSpeedMps, fix i is dropped and the piece breaks. Breaks never reset the reference.
+ */
 fun filterFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection): List<List<Xy>> {
-    val kept = fixes.sortedBy { it.timeMs }
+    val seq = fixes.sortedBy { it.timeMs }
         .distinctBy { it.timeMs }
         .filter { !it.isMock && (it.accuracyM ?: 0.0) <= params.maxAccuracyM }
+    val xy = seq.map { proj.toXy(it.lon, it.lat) }
 
     val pieces = ArrayList<List<Xy>>()
-    var times = ArrayList<Long>()
     var pts = ArrayList<Xy>()
-
     fun flush() {
         if (pts.size >= 2) pieces.add(pts)
-        times = ArrayList()
         pts = ArrayList()
     }
 
-    for (f in kept) {
-        val p = proj.toXy(f.lon, f.lat)
-        if (pts.isNotEmpty()) {
-            val last = pts.last()
-            val gapS = (f.timeMs - times.last()) / 1000.0
-            if (gapS > params.maxGapS || hypot(p.x - last.x, p.y - last.y) > params.maxJumpM) flush()
+    for (i in seq.indices) {
+        val t = seq[i].timeMs
+        val p = xy[i]
+        if (i > 0) {
+            val gapS = (t - seq[i - 1].timeMs) / 1000.0
+            val q = xy[i - 1]
+            if (gapS > params.maxGapS || hypot(p.x - q.x, p.y - q.y) > params.maxJumpM) flush()
         }
-        if (pts.isNotEmpty()) {
-            // latest fix at least speedWindowS back; else piece start if >= 10 s elapsed
-            var j = -1
-            for (k in times.indices.reversed()) {
-                if ((f.timeMs - times[k]) / 1000.0 >= params.speedWindowS) { j = k; break }
-            }
-            if (j < 0 && (f.timeMs - times[0]) / 1000.0 >= MIN_SPEED_BASIS_S) j = 0
-            if (j >= 0) {
-                val dt = (f.timeMs - times[j]) / 1000.0
-                val speed = hypot(p.x - pts[j].x, p.y - pts[j].y) / dt
-                if (speed > params.maxSpeedMps) {
-                    flush()
-                    continue
-                }
+        var j = -1
+        for (k in i - 1 downTo 0) {
+            if ((t - seq[k].timeMs) / 1000.0 >= params.speedWindowS) { j = k; break }
+        }
+        if (j < 0 && i > 0 && (t - seq[0].timeMs) / 1000.0 >= MIN_SPEED_BASIS_S) j = 0
+        if (j >= 0) {
+            val dt = (t - seq[j].timeMs) / 1000.0
+            if (hypot(p.x - xy[j].x, p.y - xy[j].y) / dt > params.maxSpeedMps) {
+                flush()
+                continue
             }
         }
-        times.add(f.timeMs)
         pts.add(p)
     }
     flush()

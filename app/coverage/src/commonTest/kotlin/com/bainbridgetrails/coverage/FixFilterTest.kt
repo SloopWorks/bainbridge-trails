@@ -23,9 +23,18 @@ class FixFilterTest {
         assertEquals(300, r[0].size)
     }
 
-    @Test fun driveDropped() = assertEquals(0, filterFixes(walk(13.0, 120), params, proj).size)
+    /** 30 s walk, then [speed] m/s for 120 s. Returns surviving fast-part points beyond the first speedWindowS (30 s) ramp, where the
+     *  30 s reference window still straddles the walk and speed ramps up. */
+    private fun fastSurvivors(speed: Double): Int {
+        val w = walk(1.3, 29)
+        val x0 = 1.3 * 29
+        val fast = (1..120).map { s -> fix((29 + s) * 1000L, x0 + speed * s, 0.0) }
+        return filterFixes(w + fast, params, proj).sumOf { pc -> pc.count { it.x > x0 + speed * params.speedWindowS + 0.5 } }
+    }
 
-    @Test fun bikeDropped() = assertEquals(0, filterFixes(walk(6.0, 120), params, proj).size)
+    @Test fun driveDropped() = assertEquals(0, fastSurvivors(13.0))
+
+    @Test fun bikeDropped() = assertEquals(0, fastSurvivors(6.0))
 
     @Test fun runKept() = assertEquals(1, filterFixes(walk(3.5, 120), params, proj).size)
 
