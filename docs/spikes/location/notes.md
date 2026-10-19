@@ -1,6 +1,6 @@
 # Spike 4: location + activity verification (notes)
 
-Branch `spike4/location-activity`. Dev build published to channel `dev-spike4-location-activity`: build id 01a15421-f152-73cb-a103-3430024643cd (built from a356527).
+Branch `spike4/location-activity`. Dev build published to channel `dev-spike4-location-activity`: build id 01a15444-1b88-7993-a72d-37b3f0bbc71c (built from e60558d, clean tree; expires 2026-10-21T13:05Z).
 
 ## Architecture
 - `:tracking` (common): `SessionStore` (append-only JSONL, `<dir>/sessions/<id>.jsonl`, one flushed line per event), `Gating` (activity + step checks), `Finalizer` (gate, then coverage), `RecordingController` (state machine), `Geofences`, `Diagnostics`.
@@ -56,7 +56,7 @@ Branch `spike4/location-activity`. Dev build published to channel `dev-spike4-lo
 - Android geofence latency on a real device; fences do not alert if already inside at opt-in.
 
 ## Owner field test (Pixel, dev build `com.bainbridgetrails.app.dev`)
-Install the dev-channel build before 2026-10-21T12:28Z (it expires after 48 h); otherwise republish from the branch: `scripts/sync-app-assets.sh`, `cd app && ./gradlew -PshipyardDeployPluginRepository=file://$HOME/.m2/repository :androidApp:assembleDebug`, then `shipyard-deploy publish androidApp/build/outputs/apk/debug/androidApp-debug.apk` (with `SHIPYARD_DEPLOY_SERVER` and `SHIPYARD_DEPLOY_TOKEN` set). Grant all prompts. Record each as its own session.
+Install the dev-channel build before 2026-10-21T13:05Z (it expires after 48 h); otherwise republish from the branch: `scripts/sync-app-assets.sh`, `cd app && ./gradlew -PshipyardDeployPluginRepository=file://$HOME/.m2/repository :androidApp:assembleDebug`, then `shipyard-deploy publish androidApp/build/outputs/apk/debug/androidApp-debug.apk` (with `SHIPYARD_DEPLOY_SERVER` and `SHIPYARD_DEPLOY_TOKEN` set). Grant all prompts. Record each as its own session.
 1. **60 min walk, screen off**, Gazzam or Grand Forest. Start, lock phone, pocket, Finish at the end.
 2. **Slow bike ride** (under 14 km/h, at least 10 min, ending the session while still riding): the real activity-gating test. Expect bike fixes dropped (BICYCLE activity and/or too few steps).
 3. **5 min car ride** with recording on (drive, then Finish). This mostly exercises the coverage speed filter (`maxSpeedMps` 4 m/s = 14.4 km/h drops faster fixes regardless of activity); vehicle labels are a bonus. A slow bike ride stays under that filter, which is why step 2 is the real gating test.
