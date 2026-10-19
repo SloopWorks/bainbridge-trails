@@ -101,4 +101,35 @@ class GatingTest {
         assertFalse(Gating.gate(session(fixes, steps = steps, activityAvailable = false)).verified)
         assertFalse(Gating.gate(session(fixes, steps = steps, stepsAvailable = false)).verified)
     }
+
+    private fun govern(kind: ActivityKind, c: Confidence): GateResult =
+        Gating.gate(session(walk(0, 100, 1.4), listOf(act(0, kind, c)), stepsAvailable = false))
+
+    @Test
+    fun bicycleHighDropped() {
+        val r = govern(ActivityKind.BICYCLE, Confidence.HIGH)
+        assertEquals(11, r.droppedVehicle)
+        assertTrue(r.fixes.isEmpty())
+    }
+
+    @Test
+    fun vehicleMediumDropped() = assertEquals(11, govern(ActivityKind.VEHICLE, Confidence.MEDIUM).droppedVehicle)
+
+    @Test
+    fun bicycleMediumDropped() = assertEquals(11, govern(ActivityKind.BICYCLE, Confidence.MEDIUM).droppedVehicle)
+
+    @Test
+    fun lowConfidenceKept() {
+        assertEquals(0, govern(ActivityKind.VEHICLE, Confidence.LOW).droppedVehicle)
+        assertEquals(0, govern(ActivityKind.BICYCLE, Confidence.LOW).droppedVehicle)
+    }
+
+    @Test
+    fun stepCounterResetIsNoData() {
+        val fixes = walk(0, 59, 5.0)
+        val steps = listOf(StepSample(t0, 5000), StepSample(t0 + 30_000, 10), StepSample(t0 + 60_000, 20))
+        val r = Gating.gate(session(fixes, steps = steps))
+        assertEquals(0, r.droppedSteps)
+        assertEquals(fixes.size, r.fixes.size)
+    }
 }

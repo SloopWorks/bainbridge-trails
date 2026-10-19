@@ -6,6 +6,8 @@ import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.coverage.TrailStatus
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 data class TrailResult(val trailId: String, val name: String, val before: Double, val after: Double, val status: TrailStatus)
@@ -35,11 +37,12 @@ class Finalizer(
     private val onWork: suspend () -> Unit = {},
 ) {
     private val progress = Progress(dataset, index, params)
+    private val mutex = Mutex()
 
-    suspend fun finalize(sessionId: String): SessionSummary = withContext(Dispatchers.Default) {
+    suspend fun finalize(sessionId: String): SessionSummary = withContext(Dispatchers.Default) { mutex.withLock {
         onWork()
         val session = store.load(sessionId)
-        val gate = Gating.gate(session)
+        val gate = Gating.gate(session, index.projection)
         val before = coverage.load()
         val after = before.union(index.coverFixes(gate.fixes))
         coverage.merge(sessionId, after, gate.verified)
@@ -65,5 +68,5 @@ class Finalizer(
             droppedSteps = gate.droppedSteps,
             newlyCompleted = completed,
         )
-    }
+    } }
 }

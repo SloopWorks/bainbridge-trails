@@ -9,8 +9,8 @@ data class GateResult(val fixes: List<Fix>, val droppedVehicle: Int, val dropped
 /**
  * Drops fixes that cannot be on-foot travel. Two independent checks, both only ever remove fixes:
  *  1. Activity: a fix is dropped when the latest activity sample at or before it (no older than
- *     [ACTIVITY_GOVERNS_MS]) is VEHICLE with HIGH confidence.
- *  2. Steps: per [STEP_WINDOW_MS] window from the first fix, if the distance moved is at least
+ *     [ACTIVITY_GOVERNS_MS]) is VEHICLE or BICYCLE with confidence >= MEDIUM.
+ *  2. Steps: per [STEP_WINDOW_MS] window from the first fix, if the distance moved exceeds
  *     [STEP_MIN_MOVE_M] but steps * [MAX_STRIDE_M] cannot cover it, the window's fixes are dropped.
  *     Skipped when step data is unavailable or the window lies outside the step samples.
  * A session is verified only when both sources were available; missing sources never drop fixes.
@@ -31,7 +31,7 @@ object Gating {
         for (f in sorted) {
             val a = acts.lastOrNull { it.timeMs <= f.timeMs }
             val governs = a != null && f.timeMs - a.timeMs <= ACTIVITY_GOVERNS_MS
-            if (governs && a.kind == ActivityKind.VEHICLE && a.confidence == Confidence.HIGH) droppedVehicle++
+            if (governs && (a.kind == ActivityKind.VEHICLE || a.kind == ActivityKind.BICYCLE) && a.confidence >= Confidence.MEDIUM) droppedVehicle++
             else afterActivity += f
         }
 
@@ -55,7 +55,9 @@ object Gating {
                     }
                 }
                 val n = if (covered) cumulativeAt(steps, we) - cumulativeAt(steps, ws) else 0.0
-                if (covered && moved >= STEP_MIN_MOVE_M && n * MAX_STRIDE_M < moved) droppedSteps += window.size
+                // a counter reset (cumulative decreases inside the window) means no usable step data
+                val reset = covered && steps.zipWithNext().any { (a, b) -> b.timeMs > ws && a.timeMs < we && b.cumulativeSteps < a.cumulativeSteps }
+                if (covered && !reset && n >= 0.0 && moved > STEP_MIN_MOVE_M && n * MAX_STRIDE_M < moved) droppedSteps += window.size
                 else kept += window
             }
             kept

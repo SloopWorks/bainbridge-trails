@@ -71,7 +71,7 @@ class SegmentIndex(
     /** Read access for [TickGraph]: tick positions of every segment, indexed by slot. */
     internal val tickPoints: List<List<Xy>> by lazy { ticks.map { ts -> ts.map { it.p } } }
 
-    internal val projection: LocalProjection get() = proj
+    val projection: LocalProjection get() = proj
 
     internal fun slotOf(id: String): Int? = slot[id]
 
