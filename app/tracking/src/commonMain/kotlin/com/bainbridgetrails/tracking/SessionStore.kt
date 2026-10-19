@@ -4,6 +4,7 @@ import com.bainbridgetrails.coverage.Fix
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readLine
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
@@ -83,17 +84,41 @@ class SessionStore(dir: String) {
         currentId = null
     }
 
+    /**
+     * Sessions with a Start but no Stop. Cheap enough for app start: per file it parses only the first line and
+     * the last complete line (Stop is always the last event written), reading at most [TAIL_BYTES] of the tail.
+     */
     fun unfinished(): List<String> {
         if (!SystemFileSystem.exists(sessionsDir)) return emptyList()
         return SystemFileSystem.list(sessionsDir)
             .map { it.name }
             .filter { it.endsWith(SUFFIX) }
             .map { it.removeSuffix(SUFFIX) }
-            .filter { id ->
-                val events = readEvents(id)
-                events.any { it is SessionEvent.Start } && events.none { it is SessionEvent.Stop }
-            }
+            .filter { id -> isUnfinished(id) }
             .sorted()
+    }
+
+    private fun parse(line: String?): SessionEvent? =
+        if (line.isNullOrBlank()) null else try {
+            json.decodeFromString(SessionEvent.serializer(), line)
+        } catch (_: Exception) {
+            null
+        }
+
+    private fun isUnfinished(id: String): Boolean {
+        val path = pathOf(id)
+        val size = SystemFileSystem.metadataOrNull(path)?.size ?: return false
+        val first = SystemFileSystem.source(path).buffered().use { it.readLine() }
+        if (parse(first) !is SessionEvent.Start) return false
+        val tail = SystemFileSystem.source(path).buffered().use {
+            val skip = (size - TAIL_BYTES).coerceAtLeast(0)
+            it.skip(skip)
+            it.readString()
+        }
+        // Last complete line: everything after the final '\n' is a truncated tail (crash mid-write).
+        val complete = tail.substring(0, tail.lastIndexOf('\n').coerceAtLeast(0))
+        val lastLine = complete.substring(complete.lastIndexOf('\n') + 1)
+        return parse(lastLine) !is SessionEvent.Stop
     }
 
     fun load(sessionId: String): RecordedSession {
@@ -146,5 +171,6 @@ class SessionStore(dir: String) {
 
     private companion object {
         const val SUFFIX = ".jsonl"
+        const val TAIL_BYTES = 4_096L
     }
 }

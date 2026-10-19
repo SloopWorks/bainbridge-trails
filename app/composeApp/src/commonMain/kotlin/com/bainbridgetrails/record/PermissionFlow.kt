@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,6 +89,12 @@ internal fun PermissionFlow(
     val r = rationale(perm)
     val initial = remember(perm) { requester.status(perm) }
     val shown = denied ?: initial.takeIf { it == PermStatus.PERMANENTLY_DENIED }
+    // Back from Settings: if the permission was turned on there, move on without another tap.
+    // (Not while a system dialog is in flight: closing it also resumes the activity.)
+    LifecycleResumeEffect(perm, shown, busy) {
+        if (!busy && shown == PermStatus.PERMANENTLY_DENIED && requester.status(perm) == PermStatus.GRANTED) next()
+        onPauseOrDispose { }
+    }
 
     Box(
         Modifier
@@ -112,7 +119,7 @@ internal fun PermissionFlow(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(onClick = onOpenSettings) { Text("Open settings") }
-                        TextButton(onClick = { if (r.required) finish() else next() }) { Text(if (r.required) "Cancel" else "Continue without") }
+                        TextButton(onClick = { if (r.required) finish() else next() }) { Text(if (r.required) "Continue" else "Continue without") }
                     }
                 }
                 PermStatus.DENIED -> {

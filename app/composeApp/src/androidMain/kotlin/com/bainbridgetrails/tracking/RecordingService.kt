@@ -117,10 +117,10 @@ class RecordingService : Service() {
             withContext(Dispatchers.Main) { finish(channel) }
         }
 
-        startSources(channel)
+        startSources(channel, startMs)
     }
 
-    private fun startSources(channel: Channel<SessionEvent>) {
+    private fun startSources(channel: Channel<SessionEvent>, sessionStartMs: Long) {
         val now = System.currentTimeMillis()
 
         val act = AndroidActivitySource(this).also { activity = it }
@@ -138,6 +138,7 @@ class RecordingService : Service() {
             channel.trySend(SessionEvent.SourceState(System.currentTimeMillis(), "location", available))
         }.also { location = it }.start(
             onFix = { fix ->
+                if (!AndroidMappers.isSessionFix(fix.timeMs, sessionStartMs)) return@start // R8: stale pre-start fix
                 channel.trySend(SessionEvent.FixEvent(fix.timeMs, fix.lon, fix.lat, fix.accuracyM, fix.isMock))
             },
             onUnavailable = { reason ->

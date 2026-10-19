@@ -2,13 +2,16 @@ package com.bainbridgetrails.tracking
 
 import com.bainbridgetrails.coverage.Fix
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
 import kotlin.math.asin
@@ -48,7 +51,7 @@ interface Recorder {
  * Lost reasons (ruling R7): "already recording" is the recorder refusing a start, shown as a brief
  * [notice]; any other reason ends the session: [RecordingState.Stopped], then finalise, then [RecordingState.Done].
  *
- * Not thread-safe: call from one thread (the app uses Main). [Finalizer] moves its own work off it.
+ * Not thread-safe: call from one thread (the app uses Main). File I/O runs on [io]; [Finalizer] moves its own work off it.
  */
 class RecordingController(
     private val store: SessionStore,
@@ -58,6 +61,8 @@ class RecordingController(
     private val scope: CoroutineScope,
     private val newSessionId: () -> String = { defaultSessionId(clock()) },
     private val stopTimeoutMs: Long = 10_000,
+    /** Session-file I/O (scanning, closing, deleting) runs here, never on the caller's (main) thread. */
+    private val io: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val _state = MutableStateFlow<RecordingState>(RecordingState.Idle)
     val state: StateFlow<RecordingState> = _state.asStateFlow()
@@ -79,11 +84,11 @@ class RecordingController(
         launch { lost.collect { onLocationLost(it) } }
     }
 
-    /** Offers recovery of a session the previous process left unfinished. Call once per process. */
-    fun onLaunch() {
+    /** Offers recovery of a session the previous process left unfinished. Call once per process, before any start. */
+    suspend fun onLaunch() {
         if (_state.value !is RecordingState.Idle) return
-        val id = store.unfinished().firstOrNull() ?: return
-        _state.value = RecordingState.Recover(id)
+        val id = withContext(io) { store.unfinished().firstOrNull() } ?: return
+        if (_state.value is RecordingState.Idle) _state.value = RecordingState.Recover(id)
     }
 
     /** LOCATION is required; NOTIFICATIONS and ACTIVITY are optional (without ACTIVITY the walk is unverified). */
@@ -135,6 +140,7 @@ class RecordingController(
 
     fun onFix(fix: Fix) {
         val r = _state.value as? RecordingState.Recording ?: return
+        if (fix.timeMs < r.startedMs) return // R8: a cached pre-start position is not part of the walk
         val prev = _track.value.lastOrNull()
         _track.value = _track.value + fix
         _state.value = r.copy(
@@ -159,6 +165,14 @@ class RecordingController(
         }
         _notice.value = reason
         if (current !is RecordingState.Recording) return
+        if (!recorderStarted) {
+            // The recorder never began this session (e.g. it could not start): nothing to finalise.
+            recorderStopped = null
+            recorder.stop()
+            _track.value = emptyList()
+            _state.value = RecordingState.Idle
+            return
+        }
         _state.value = RecordingState.Stopped(reason, current.sessionId)
         scope.launch { stopAndFinalize(current.sessionId) }
     }
@@ -197,18 +211,24 @@ class RecordingController(
         if (_state.value is RecordingState.Done) {
             // No recorder runs for this session (it died with its process), so closing it here keeps one writer.
             // Best effort: if closing fails the session is offered again next launch (re-merging is idempotent).
-            runCatching {
-                store.resume(sessionId)
-                store.end(clock())
+            val now = clock()
+            withContext(io) {
+                runCatching {
+                    store.resume(sessionId)
+                    store.end(now)
+                }
             }
         }
     }
 
     fun discardRecovered(sessionId: String) {
         if (_state.value != RecordingState.Recover(sessionId)) return
-        store.delete(sessionId)
-        _state.value = RecordingState.Idle
-        onLaunch() // offer the next one, if any
+        _state.value = RecordingState.Finalizing(sessionId) // busy; blocks start() until the file is gone
+        scope.launch {
+            withContext(io) { runCatching { store.delete(sessionId) } }
+            _state.value = RecordingState.Idle
+            onLaunch() // offer the next one, if any
+        }
     }
 
     /** Leaves the results sheet. */

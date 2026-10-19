@@ -35,14 +35,17 @@ internal object RecordingGraph {
     private var controller: Deferred<RecordingController>? = null
 
     /** Ruling R1: parse the bundled dataset once per process, off the main thread. Call at app start. */
-    fun dataset(): Deferred<Dataset> = dataset ?: scope.async(Dispatchers.Default) {
+    fun dataset(): Deferred<Dataset> = dataset?.takeUnless { it.failed() } ?: scope.async(Dispatchers.Default) {
         val trails = Res.readBytes("files/trails.json").decodeToString()
         val segments = Res.readBytes("files/coverage_segments.json").decodeToString()
         Dataset.parse(trails, segments)
     }.also { dataset = it }
 
-    /** Builds the segment index (lazily: first use of the Record screen) and the controller, once per process. */
-    fun controller(context: PlatformContext): Deferred<RecordingController> = controller ?: scope.async {
+    /**
+     * Builds the segment index (lazily: first use of the Record screen) and the controller, once per process.
+     * Completes after the recovery check, so the screen never offers Start before a pending Recover is known.
+     */
+    fun controller(context: PlatformContext): Deferred<RecordingController> = controller?.takeUnless { it.failed() } ?: scope.async {
         val ds = dataset().await()
         val dir = trackingDir(context)
         val (index, store, coverage) = withContext(Dispatchers.Default) {
@@ -57,4 +60,8 @@ internal object RecordingGraph {
             it.onLaunch()
         }
     }.also { controller = it }
+
+    /** A failed load is not cached: the next call (the screen's Retry) starts over. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private fun Deferred<*>.failed(): Boolean = isCompleted && getCompletionExceptionOrNull() != null
 }

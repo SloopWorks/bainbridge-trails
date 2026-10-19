@@ -55,6 +55,8 @@ class AndroidLocationSource(
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, INTERVAL_MS)
             .setMinUpdateIntervalMillis(MIN_INTERVAL_MS)
             .setMinUpdateDistanceMeters(0f)
+            // R8: no cached (pre-session) location as the first update.
+            .setMaxUpdateAgeMillis(0)
             .build()
         val cb = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {

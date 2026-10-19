@@ -9,6 +9,13 @@ import kotlin.test.assertFailsWith
 class AndroidMappersTest {
 
     @Test
+    fun fixesBeforeSessionStartAreDropped() {
+        assertEquals(false, AndroidMappers.isSessionFix(fixTimeMs = 999, sessionStartMs = 1_000))
+        assertEquals(true, AndroidMappers.isSessionFix(fixTimeMs = 1_000, sessionStartMs = 1_000))
+        assertEquals(true, AndroidMappers.isSessionFix(fixTimeMs = 1_001, sessionStartMs = 1_000))
+    }
+
+    @Test
     fun activityTypeMapping() {
         assertEquals(ActivityKind.VEHICLE, AndroidMappers.activityKind(DetectedActivity.IN_VEHICLE))
         assertEquals(ActivityKind.BICYCLE, AndroidMappers.activityKind(DetectedActivity.ON_BICYCLE))

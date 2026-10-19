@@ -129,4 +129,25 @@ class SessionStoreTest {
         assertFailsWith<IllegalStateException> { s.resume("missing") }
         assertFailsWith<IllegalStateException> { s.begin("f", 3) }
     }
+
+    @Test
+    fun unfinishedReadsOnlyFirstAndLastCompleteLine() {
+        val dir = tempDir()
+        val s = SessionStore(dir)
+        // Long finished session with a corrupt line in the middle: only the head and the tail decide.
+        s.begin("long", 1)
+        repeat(2_000) { s.append(fix(2L + it)) }
+        SystemFileSystem.sink(Path(dir, "sessions", "long.jsonl"), append = true).buffered().use { it.writeString("garbage\n") }
+        s.append(fix(5_000))
+        s.end(5_001)
+        // Unfinished: last complete line is a fix, followed by a truncated tail.
+        s.begin("open", 1)
+        repeat(2_000) { s.append(fix(2L + it)) }
+        SystemFileSystem.sink(Path(dir, "sessions", "open.jsonl"), append = true).buffered().use { it.writeString("{\"t\":\"stop\",\"ti") }
+        // Truncated right after Start: still unfinished (recoverable).
+        SessionStore(dir).begin("tiny", 1)
+        // No Start: not a session.
+        SystemFileSystem.sink(Path(dir, "sessions", "junk.jsonl")).buffered().use { it.writeString("x\n") }
+        assertEquals(listOf("open", "tiny"), SessionStore(dir).unfinished())
+    }
 }

@@ -50,3 +50,35 @@ fun TrackLayer(track: List<Fix>) {
         join = const(LineJoin.Round),
     )
 }
+
+/**
+ * Battery: the map's GeoJSON source is rebuilt (and re-tiled by MapLibre) at most every [MIN_INTERVAL_MS]
+ * of fix time, or sooner once the walker has moved [MIN_MOVE_M] from the last drawn point.
+ */
+internal object TrackThrottle {
+    const val MIN_INTERVAL_MS = 5_000L
+    const val MIN_MOVE_M = 10.0
+
+    fun shouldRebuild(drawn: List<Fix>, track: List<Fix>): Boolean {
+        if (track.isEmpty()) return drawn.isNotEmpty()
+        if (drawn.isEmpty()) return true
+        if (track.size < drawn.size || track.first() != drawn.first()) return true // new session
+        if (track.size == drawn.size) return false
+        val a = drawn.last()
+        val b = track.last()
+        return b.timeMs - a.timeMs >= MIN_INTERVAL_MS || metres(a, b) >= MIN_MOVE_M
+    }
+
+    private fun metres(a: Fix, b: Fix): Double {
+        val k = kotlin.math.cos((a.lat + b.lat) / 2 * kotlin.math.PI / 180)
+        return kotlin.math.hypot((b.lon - a.lon) * 111_320.0 * k, (b.lat - a.lat) * 110_574.0)
+    }
+}
+
+/** [track], but only advanced when [TrackThrottle] says so; the same list instance otherwise (so callers skip). */
+@Composable
+internal fun rememberThrottledTrack(track: List<Fix>): List<Fix> {
+    val drawn = remember { arrayOf(emptyList<Fix>()) }
+    if (TrackThrottle.shouldRebuild(drawn[0], track)) drawn[0] = track
+    return drawn[0]
+}

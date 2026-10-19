@@ -20,7 +20,7 @@ ASSETS=(
 
 for pair in "${ASSETS[@]}"; do
   src="$DIST/${pair%%:*}"
-  [[ -f "$src" ]] || { echo "missing $src -- run scripts/build-tiles.sh and `bitrails dist` first" >&2; exit 1; }
+  [[ -f "$src" ]] || { echo "missing $src -- run scripts/build-tiles.sh and bitrails dist (in pipeline/) first" >&2; exit 1; }
 done
 
 mkdir -p "$DEST"

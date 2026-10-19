@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.bainbridgetrails.map.MapStyle
 import com.bainbridgetrails.map.SpikeLaunch
 import com.bainbridgetrails.map.TrailMap
@@ -55,7 +56,9 @@ private sealed interface Load {
 @Composable
 fun RecordScreen(launch: SpikeLaunch = SpikeLaunch(), modifier: Modifier = Modifier) {
     val context = rememberPlatformContext()
-    val load by produceState<Load>(Load.Loading, context) {
+    var attempt by remember { mutableStateOf(0) }
+    val load by produceState<Load>(Load.Loading, context, attempt) {
+        value = Load.Loading
         value = try {
             Load.Ready(RecordingGraph.controller(context).await())
         } catch (e: CancellationException) {
@@ -70,6 +73,7 @@ fun RecordScreen(launch: SpikeLaunch = SpikeLaunch(), modifier: Modifier = Modif
             TrailMap(MapStyle.TOPO, Modifier.fillMaxSize(), initialCamera = launch.camera)
             BottomPanel(Modifier.align(Alignment.BottomCenter)) {
                 Text(if (l is Load.Failed) l.message else "Loading trails…", fontSize = 16.sp, color = Color(0xFF1E2A24))
+                if (l is Load.Failed) Button(onClick = { attempt++ }) { Text("Retry") }
             }
         }
     }
@@ -78,19 +82,23 @@ fun RecordScreen(launch: SpikeLaunch = SpikeLaunch(), modifier: Modifier = Modif
 @Composable
 private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, context: PlatformContext, modifier: Modifier) {
     val state by controller.state.collectAsState()
-    val track by controller.track.collectAsState()
     val notice by controller.notice.collectAsState()
     val requester = rememberPermissionRequester()
     var permissionQueue by remember { mutableStateOf<List<Perm>>(emptyList()) }
-    var now by remember { mutableLongStateOf(Clock.System.now().toEpochMilliseconds()) }
 
     val recording = state is RecordingState.Recording
     LaunchedEffect(recording) {
         while (recording) {
-            now = Clock.System.now().toEpochMilliseconds()
             controller.tick()
             delay(1_000)
         }
+    }
+    // Back from Settings (or another app): a location grant clears the NeedsPermission panel.
+    LifecycleResumeEffect(requester) {
+        if (requester.status(Perm.LOCATION_WHILE_IN_USE) == PermStatus.GRANTED) {
+            controller.onPermissions(Perm.entries.filterTo(mutableSetOf()) { requester.status(it) == PermStatus.GRANTED })
+        }
+        onPauseOrDispose { }
     }
     LaunchedEffect(notice) {
         if (notice != null) {
@@ -110,17 +118,8 @@ private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, 
         else permissionQueue = ask
     }
 
-    val last = track.lastOrNull()
     Box(modifier.fillMaxSize()) {
-        TrailMap(
-            MapStyle.TOPO,
-            Modifier.fillMaxSize(),
-            initialCamera = launch.camera,
-            controlsTopPadding = 48.dp,
-            follow = last?.let { Position(longitude = it.lon, latitude = it.lat) },
-        ) {
-            TrackLayer(track)
-        }
+        RecordMap(controller, launch)
 
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(8.dp)) {
             Column(Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -166,7 +165,7 @@ private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, 
             is RecordingState.Recording, RecordingState.Idle -> BottomPanel(Modifier.align(Alignment.BottomCenter)) {
                 val r = s as? RecordingState.Recording
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Stat("Time", elapsed(r?.let { (now - it.startedMs).coerceAtLeast(0) } ?: 0))
+                    ElapsedStat(r?.startedMs)
                     Stat("Distance", distance(r?.distanceM ?: 0.0))
                     Stat("Fixes", (r?.fixCount ?: 0).toString())
                 }
@@ -192,6 +191,33 @@ private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, 
             )
         }
     }
+}
+
+/**
+ * The map and live track. Isolated so per-second and per-fix UI updates elsewhere don't recompose the map:
+ * it only changes when [rememberThrottledTrack] hands it a new list (≤ every 5 s or 10 m).
+ */
+@Composable
+private fun RecordMap(controller: RecordingController, launch: SpikeLaunch) {
+    val track by controller.track.collectAsState()
+    val drawn = rememberThrottledTrack(track)
+    val follow = drawn.lastOrNull()?.let { Position(longitude = it.lon, latitude = it.lat) }
+    TrailMap(MapStyle.TOPO, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 48.dp, follow = follow) {
+        TrackLayer(drawn)
+    }
+}
+
+/** Elapsed time with its own 1 s clock, so only this text recomposes every second. */
+@Composable
+private fun ElapsedStat(startedMs: Long?) {
+    var now by remember { mutableLongStateOf(Clock.System.now().toEpochMilliseconds()) }
+    LaunchedEffect(startedMs) {
+        while (startedMs != null) {
+            now = Clock.System.now().toEpochMilliseconds()
+            delay(1_000)
+        }
+    }
+    Stat("Time", elapsed(startedMs?.let { (now - it).coerceAtLeast(0) } ?: 0))
 }
 
 @Composable

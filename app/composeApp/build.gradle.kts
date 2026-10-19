@@ -42,6 +42,8 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.coroutines.core)
             implementation(project(":tracking"))
+            // Already on the classpath via Compose; explicit because RecordScreen uses LifecycleResumeEffect.
+            implementation(libs.androidx.lifecycle.runtime.compose)
         }
         androidMain.dependencies {
             implementation(libs.play.services.location)

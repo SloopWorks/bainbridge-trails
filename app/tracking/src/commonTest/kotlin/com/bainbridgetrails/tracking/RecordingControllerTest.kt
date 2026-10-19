@@ -189,7 +189,7 @@ class RecordingControllerTest {
         r2.controller.onLaunch()
         assertEquals(RecordingState.Recover("crashed2"), r2.controller.state.value)
         r2.controller.discardRecovered("crashed2")
-        assertIs<RecordingState.Idle>(r2.controller.state.value)
+        r2.controller.state.first { it is RecordingState.Idle }
         assertTrue(r2.store.unfinished().isEmpty())
     }
 
@@ -213,6 +213,41 @@ class RecordingControllerTest {
         assertEquals(id, done.summary.sessionId)
         assertTrue(done.summary.trails.single().after > 0.0)
         assertEquals("location unavailable", r.controller.notice.value)
+    }
+
+    @Test
+    fun staleFixBeforeStartIgnored() = runTest {
+        val r = rig()
+        r.controller.onPermissions(Perm.entries.toSet())
+        r.controller.start()
+        // A cached position from before Start, ~150 m away, delivered after Start (ruling R8).
+        val (lon, lat) = proj.toLonLat(Xy(150.0, 150.0))
+        r.controller.onFix(Fix(t0 - 5_000, lon, lat, 5.0, false))
+        val s = assertIs<RecordingState.Recording>(r.controller.state.value)
+        assertEquals(0, s.fixCount)
+        assertTrue(s.waitingForGps)
+        assertTrue(r.controller.track.value.isEmpty())
+        r.walk(0.0, 3.0)
+        val after = assertIs<RecordingState.Recording>(r.controller.state.value)
+        assertEquals(2, after.fixCount)
+        assertEquals(3.0, after.distanceM, 0.1)
+    }
+
+    @Test
+    fun lostBeforeRecorderStartedGoesIdleWithReason() = runTest {
+        val r = rig()
+        val silent = object : Recorder {
+            var stops = 0
+            override fun start(sessionId: String, resume: Boolean) = Unit
+            override fun stop() { stops++ }
+        }
+        val c = RecordingController(r.store, Finalizer(ds, index, r.store, CoverageStore(tmpDir())), { r.clock.now }, silent, backgroundScope)
+        c.onPermissions(Perm.entries.toSet())
+        assertNotNull(c.start())
+        c.onLocationLost("cannot start location foreground service")
+        assertIs<RecordingState.Idle>(c.state.value, "no session was recorded, so nothing is finalised")
+        assertEquals("cannot start location foreground service", c.notice.value)
+        assertEquals(1, silent.stops)
     }
 
     @Test
