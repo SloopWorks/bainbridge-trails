@@ -11,12 +11,21 @@ data class GateResult(val fixes: List<Fix>, val droppedVehicle: Int, val dropped
  *  1. Activity: a fix is dropped when the latest activity sample at or before it is VEHICLE or BICYCLE with
  *     confidence >= MEDIUM. A sample governs until the next one, capped at [ACTIVITY_GOVERNS_MS] (iOS reports
  *     transitions only, so a single VEHICLE sample may be all there is for a whole drive).
- *  2. Steps: per [STEP_WINDOW_MS] window from the first fix, if the distance moved exceeds
- *     [STEP_MIN_MOVE_M] but steps * [MAX_STRIDE_M] cannot cover it, the window's fixes are dropped.
- *     Cumulative steps at the window edges are interpolated between the nearest samples; after the last sample
+ *  2. Steps: fixes are grouped into [STEP_WINDOW_MS] windows from the first fix. Each window [ws, we) is judged
+ *     by an evidence span [ws - STEP_EVIDENCE_PAD_MS, we + STEP_EVIDENCE_PAD_MS], clamped to the session's fix
+ *     time range. The window's fixes are dropped only if the distance moved over the span exceeds
+ *     3 * [STEP_MIN_MOVE_M] and the span's steps * [MAX_STRIDE_M] cannot cover it.
+ *     Why a span and not the window alone: step counters stall for about a minute while the user keeps walking
+ *     (observed on a Pixel 10 Pro: 2 steps over 71 m, then a normal 109 steps the next minute; Activity
+ *     Recognition independently reported STILL (HIGH) for ~40 s, then UNKNOWN, so the phone sensed no stepping
+ *     motion, likely held steady or carried differently. Not a background restriction: standby bucket ACTIVE,
+ *     sensor still registered, GPS at 1 Hz throughout), whereas a bike
+ *     or car ride lasts minutes. Rides shorter than the span are still caught by the activity gate (1.) and by
+ *     the speed filter in coverage.
+ *     Cumulative steps at the span edges are interpolated between the nearest samples; after the last sample
  *     the count is held (no new steps: Android reports only on change, and the recorder writes a heartbeat
  *     sample every [STEP_HEARTBEAT_MS]). Skipped when step data is unavailable, when no sample exists at or
- *     before the window start, or when the counter reset (decreased) inside the window.
+ *     before the span start, or when the counter reset (decreased) inside the span.
  * A session is verified only when both sources were available; missing sources never drop fixes.
  */
 object Gating {
@@ -24,6 +33,10 @@ object Gating {
     const val STEP_WINDOW_MS = 60_000L
     const val STEP_MIN_MOVE_M = 60.0
     const val MAX_STRIDE_M = 2.5
+    const val STEP_EVIDENCE_PAD_MS = 60_000L
+
+    /** Distance an evidence span must exceed before missing steps can drop its window. */
+    private const val SPAN_MIN_MOVE_M = 3 * STEP_MIN_MOVE_M
 
     fun gate(session: RecordedSession, proj: LocalProjection = LocalProjection()): GateResult {
         val sorted = session.fixes.sortedBy { it.timeMs }
@@ -44,24 +57,31 @@ object Gating {
         val steps = session.steps.sortedBy { it.timeMs }
         val result: List<Fix> = if (!session.stepsAvailable || steps.isEmpty() || afterActivity.isEmpty()) afterActivity else {
             val start = afterActivity.first().timeMs
+            val end = afterActivity.last().timeMs
+            val times = LongArray(afterActivity.size) { afterActivity[it].timeMs }
+            // path length from the first fix to fix i
+            val path = DoubleArray(afterActivity.size)
+            for (i in 1 until afterActivity.size) {
+                val a = proj.toXy(afterActivity[i - 1].lon, afterActivity[i - 1].lat)
+                val b = proj.toXy(afterActivity[i].lon, afterActivity[i].lat)
+                path[i] = path[i - 1] + hypot(b.x - a.x, b.y - a.y)
+            }
             val kept = ArrayList<Fix>(afterActivity.size)
             val windows: List<List<Fix>> = afterActivity.groupBy { (it.timeMs - start) / STEP_WINDOW_MS }.entries.sortedBy { it.key }.map { it.value }
             for (window in windows) {
                 val ws = start + ((window.first().timeMs - start) / STEP_WINDOW_MS) * STEP_WINDOW_MS
                 val we = ws + STEP_WINDOW_MS
-                val covered = steps.first().timeMs <= ws
-                var moved = 0.0
-                if (covered) {
-                    for (i in 1 until window.size) {
-                        val a = proj.toXy(window[i - 1].lon, window[i - 1].lat)
-                        val b = proj.toXy(window[i].lon, window[i].lat)
-                        moved += hypot(b.x - a.x, b.y - a.y)
-                    }
-                }
-                val n = if (covered) cumulativeAt(steps, we) - cumulativeAt(steps, ws) else 0.0
-                // a counter reset (cumulative decreases inside the window) means no usable step data
-                val reset = covered && steps.zipWithNext().any { (a, b) -> b.timeMs > ws && a.timeMs < we && b.cumulativeSteps < a.cumulativeSteps }
-                if (covered && !reset && n >= 0.0 && moved > STEP_MIN_MOVE_M && n * MAX_STRIDE_M < moved) droppedSteps += window.size
+                val ss = maxOf(ws - STEP_EVIDENCE_PAD_MS, start)
+                val se = minOf(we + STEP_EVIDENCE_PAD_MS, end)
+                val covered = steps.first().timeMs <= ss
+                // fixes with time in [ss, se]: first index >= ss, last index <= se
+                val i0 = times.indexOfFirst { it >= ss }
+                val i1 = times.indexOfLast { it <= se }
+                val moved = if (i1 > i0) path[i1] - path[i0] else 0.0
+                val n = if (covered) cumulativeAt(steps, se) - cumulativeAt(steps, ss) else 0.0
+                // a counter reset (cumulative decreases inside the span) means no usable step data
+                val reset = covered && steps.zipWithNext().any { (a, b) -> b.timeMs > ss && a.timeMs < se && b.cumulativeSteps < a.cumulativeSteps }
+                if (covered && !reset && n >= 0.0 && moved > SPAN_MIN_MOVE_M && n * MAX_STRIDE_M < moved) droppedSteps += window.size
                 else kept += window
             }
             kept

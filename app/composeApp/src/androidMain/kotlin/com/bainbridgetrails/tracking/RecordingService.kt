@@ -31,7 +31,9 @@ import java.io.File
  * Single-writer (ruling R4): every source callback only does `events.trySend(...)`; one coroutine
  * consumes the channel, calls [SessionStore.append] (or [SessionStore.end] for Stop) and then
  * [RecordingBus.emit]. Nothing else touches the store. The diag (5 min) and step heartbeat (30 s) timers
- * also only queue placeholders that the writer resolves. Never logs coordinates.
+ * also only queue placeholders that the writer resolves. The step heartbeat first flushes the step sensor's
+ * FIFO and queues its tick from `onFlushCompleted` (after any batched step events), or nothing if the flush
+ * does not complete within [STEP_FLUSH_TIMEOUT_MS]. Never logs coordinates.
  *
  * If the process dies without a Stop, the session stays unfinished in the store and can be
  * restarted with `resume = true`.
@@ -156,10 +158,11 @@ class RecordingService : Service() {
         if (stepsAvailable) {
             stp.start { channel.trySend(SessionEvent.Steps(it)) }
             // The step counter reports only on change: a heartbeat holds the last count so gating sees "no steps".
+            // Flush first so batched steps land before the tick; no completed flush, no tick.
             stepJob = scope.launch {
                 while (true) {
                     delay(STEP_HEARTBEAT_MS)
-                    channel.trySend(stepTick(System.currentTimeMillis()))
+                    stp.flush(STEP_FLUSH_TIMEOUT_MS) { channel.trySend(stepTick(System.currentTimeMillis())) }
                 }
             }
         }
@@ -179,20 +182,26 @@ class RecordingService : Service() {
         )
     }
 
-    private fun stopSources() {
+    /** Stops every source; with [keepSteps] the step sensor stays registered (Stop flushes it first). */
+    private fun stopSources(keepSteps: Boolean = false) {
         diagJob?.cancel()
         diagJob = null
         stepJob?.cancel()
         stepJob = null
         location?.stop()
         activity?.stop()
-        steps?.stop()
         location = null
         activity = null
-        steps = null
+        if (!keepSteps) {
+            steps?.stop()
+            steps = null
+        }
     }
 
-    /** Stops sources, queues Stop behind every pending event, and lets the writer drain. */
+    /**
+     * Stops sources, queues Stop behind every pending event, and lets the writer drain. The step sensor is flushed
+     * first (up to [STOP_FLUSH_TIMEOUT_MS]) so batched steps and a final held count reach the session before Stop.
+     */
     private fun requestStop() {
         val channel = events
         if (channel == null) {
@@ -201,12 +210,19 @@ class RecordingService : Service() {
         }
         if (stopping) return
         stopping = true
-        val hadSteps = stepJob != null
-        stopSources()
-        val now = System.currentTimeMillis()
-        if (hadSteps) channel.trySend(stepTick(now)) // last count held to the end of the walk
-        channel.trySend(SessionEvent.Stop(now))
-        channel.close()
+        val stp = steps.takeIf { stepJob != null }
+        stopSources(keepSteps = true)
+        scope.launch {
+            // last count held to the end of the walk; nothing if the flush does not complete in time
+            stp?.flush(STOP_FLUSH_TIMEOUT_MS) { channel.trySend(stepTick(System.currentTimeMillis())) }
+            withContext(Dispatchers.Main) {
+                val s = steps
+                s?.stop()
+                if (steps === s) steps = null
+            }
+            channel.trySend(SessionEvent.Stop(System.currentTimeMillis()))
+            channel.close()
+        }
     }
 
     /** Runs on main after the writer has drained [channel]. */
@@ -273,6 +289,8 @@ class RecordingService : Service() {
         private const val NOTIFICATION_ID = 4101
         private const val REQUEST_STOP = 1
         private const val REQUEST_OPEN = 2
+        private const val STEP_FLUSH_TIMEOUT_MS = 5_000L
+        private const val STOP_FLUSH_TIMEOUT_MS = 2_000L
 
         /**
          * Starts recording [sessionId] (or resumes an unfinished one). Without precise (FINE) location permission

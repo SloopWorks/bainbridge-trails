@@ -30,11 +30,6 @@ class SessionStore(dir: String) {
     private val sessionsDir = Path(dir, "sessions")
     private var currentId: String? = null
 
-    private val json = Json {
-        classDiscriminator = "t"
-        ignoreUnknownKeys = true
-    }
-
     init {
         SystemFileSystem.createDirectories(sessionsDir)
     }
@@ -142,34 +137,7 @@ class SessionStore(dir: String) {
         return if (parse(lastLine) is SessionEvent.Stop) Tail.STOPPED else Tail.OPEN
     }
 
-    fun load(sessionId: String): RecordedSession {
-        val fixes = mutableListOf<Fix>()
-        val acts = mutableListOf<ActivitySample>()
-        val steps = mutableListOf<StepSample>()
-        val lastAvailable = mutableMapOf<String, Boolean>()
-        var finished = false
-        for (e in readEvents(sessionId)) {
-            when (e) {
-                is SessionEvent.Start -> Unit
-                is SessionEvent.FixEvent -> fixes += Fix(e.timeMs, e.lon, e.lat, e.accuracyM, e.isMock)
-                is SessionEvent.Act -> acts += e.sample
-                is SessionEvent.Steps -> steps += e.sample
-                is SessionEvent.SourceState -> lastAvailable[e.source] = e.available
-                is SessionEvent.Diag -> Unit
-                is SessionEvent.Stop -> finished = true
-            }
-        }
-        return RecordedSession(
-            id = sessionId,
-            fixes = fixes,
-            activities = acts,
-            steps = steps,
-            activityAvailable = lastAvailable["activity"] == true,
-            stepsAvailable = lastAvailable["steps"] == true,
-            finished = finished,
-            approximateLocation = lastAvailable["precise"] == false,
-        )
-    }
+    fun load(sessionId: String): RecordedSession = toSession(sessionId, readEvents(sessionId))
 
     fun delete(sessionId: String) {
         val path = pathOf(sessionId)
@@ -181,8 +149,22 @@ class SessionStore(dir: String) {
     private fun readEvents(id: String): List<SessionEvent> {
         val path = pathOf(id)
         if (!SystemFileSystem.exists(path)) return emptyList()
-        val text = SystemFileSystem.source(path).buffered().use { it.readString() }
-        return text.split('\n').mapNotNull { line ->
+        return parseEvents(SystemFileSystem.source(path).buffered().use { it.readString() })
+    }
+
+    companion object {
+        private const val SUFFIX = ".jsonl"
+        private const val TAIL_BYTES = 4_096L
+
+        private val json = Json {
+            classDiscriminator = "t"
+            ignoreUnknownKeys = true
+        }
+
+        /** Builds a [RecordedSession] from session JSONL [text] (e.g. a pulled file, for offline re-gating). */
+        fun parse(sessionId: String, text: String): RecordedSession = toSession(sessionId, parseEvents(text))
+
+        private fun parseEvents(text: String): List<SessionEvent> = text.split('\n').mapNotNull { line ->
             if (line.isBlank()) null
             else try {
                 json.decodeFromString(SessionEvent.serializer(), line)
@@ -190,10 +172,34 @@ class SessionStore(dir: String) {
                 null
             }
         }
-    }
 
-    private companion object {
-        const val SUFFIX = ".jsonl"
-        const val TAIL_BYTES = 4_096L
+        private fun toSession(sessionId: String, events: List<SessionEvent>): RecordedSession {
+            val fixes = mutableListOf<Fix>()
+            val acts = mutableListOf<ActivitySample>()
+            val steps = mutableListOf<StepSample>()
+            val lastAvailable = mutableMapOf<String, Boolean>()
+            var finished = false
+            for (e in events) {
+                when (e) {
+                    is SessionEvent.Start -> Unit
+                    is SessionEvent.FixEvent -> fixes += Fix(e.timeMs, e.lon, e.lat, e.accuracyM, e.isMock)
+                    is SessionEvent.Act -> acts += e.sample
+                    is SessionEvent.Steps -> steps += e.sample
+                    is SessionEvent.SourceState -> lastAvailable[e.source] = e.available
+                    is SessionEvent.Diag -> Unit
+                    is SessionEvent.Stop -> finished = true
+                }
+            }
+            return RecordedSession(
+                id = sessionId,
+                fixes = fixes,
+                activities = acts,
+                steps = steps,
+                activityAvailable = lastAvailable["activity"] == true,
+                stepsAvailable = lastAvailable["steps"] == true,
+                finished = finished,
+                approximateLocation = lastAvailable["precise"] == false,
+            )
+        }
     }
 }

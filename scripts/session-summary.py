@@ -7,11 +7,13 @@ Prints duration, fix count, battery %/h (from diag events), activity mix (time-w
 and dropped counts. Dropped counts follow Gating.kt:
   - activity: a fix is dropped when the latest activity sample at or before it is VEHICLE or
     BICYCLE (>= MEDIUM); a sample governs until the next one, capped at 10 min.
-  - steps (only if the last "steps" source state is available): per 60 s window from the first
-    kept fix, cumulative steps at the window edges are interpolated between the nearest samples
-    and held after the last sample; the window is skipped when no sample is at or before its
-    start, or the counter decreased (reset) inside it. Dropped when it moved > 60 m and
-    steps * 2.5 m cannot cover it.
+  - steps (only if the last "steps" source state is available): per 60 s window [ws, we) from
+    the first kept fix, judged by an evidence span [ws - 60 s, we + 60 s] clamped to the kept
+    fixes' time range (step counters stall for ~1 min while walking). Cumulative steps at the
+    span edges are interpolated between the nearest samples and held after the last sample;
+    the window is skipped when no sample is at or before the span start, or the counter
+    decreased (reset) inside the span. Its fixes are dropped when the span moved > 180 m
+    (3 x 60 m) and span steps * 2.5 m cannot cover it.
 Remaining differences from Gating.kt (labelled in the output):
   - mock fixes are counted separately and excluded before gating (Gating.kt gates them too;
     coverage drops them later), so vehicle/steps counts can differ when mock fixes exist;
@@ -23,6 +25,7 @@ import sys
 from collections import Counter
 
 ACT_GOVERNS_MS, WINDOW_MS, MIN_MOVE_M, STRIDE_M = 600_000, 60_000, 60.0, 2.5
+PAD_MS, SPAN_MIN_MOVE_M = 60_000, 3 * MIN_MOVE_M
 CONF = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
 
 
@@ -125,20 +128,26 @@ def main(path):
     stp = 0
     if steps_available and steps and live:
         t0 = live[0]["timeMs"]
+        t_end = live[-1]["timeMs"]
+        path = [0.0]
+        for i in range(1, len(live)):
+            path.append(path[-1] + dist(live[i - 1], live[i]))
         wins = {}
         for f in live:
             wins.setdefault((f["timeMs"] - t0) // WINDOW_MS, []).append(f)
         for k, w in sorted(wins.items()):
             ws = t0 + k * WINDOW_MS
             we = ws + WINDOW_MS
-            if steps[0]["timeMs"] > ws:
-                continue  # no step evidence at the window start
-            if any(b["timeMs"] > ws and a["timeMs"] < we and b["cumulativeSteps"] < a["cumulativeSteps"]
+            ss, se = max(ws - PAD_MS, t0), min(we + PAD_MS, t_end)
+            if steps[0]["timeMs"] > ss:
+                continue  # no step evidence at the span start
+            if any(b["timeMs"] > ss and a["timeMs"] < se and b["cumulativeSteps"] < a["cumulativeSteps"]
                    for a, b in zip(steps, steps[1:])):
                 continue  # counter reset: no usable step data
-            moved = sum(dist(w[i], w[i + 1]) for i in range(len(w) - 1))
-            n = cumulative_at(steps, we) - cumulative_at(steps, ws)
-            if n >= 0 and moved > MIN_MOVE_M and n * STRIDE_M < moved:
+            idx = [i for i, f in enumerate(live) if ss <= f["timeMs"] <= se]
+            moved = path[idx[-1]] - path[idx[0]] if idx else 0.0
+            n = cumulative_at(steps, se) - cumulative_at(steps, ss)
+            if n >= 0 and moved > SPAN_MIN_MOVE_M and n * STRIDE_M < moved:
                 stp += len(w)
     print(f"dropped: mock {mock}, vehicle/bicycle {veh}, steps {stp}"
           " (differs from Gating.kt: mock fixes excluded before gating here; haversine distance)")

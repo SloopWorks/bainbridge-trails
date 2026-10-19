@@ -182,4 +182,40 @@ class GatingTest {
         val r = Gating.gate(session(fixes, steps = listOf(StepSample(t0 + 30_000, 0))))
         assertEquals(0, r.droppedSteps)
     }
+    /** Step samples every 10 s from 0 to [endS], counting [perMin](minute) steps evenly through each minute. */
+    private fun stepsPerMinute(endS: Int, perMin: (Int) -> Int): List<StepSample> {
+        var total = 0.0
+        return (0..endS step 10).map { s ->
+            if (s > 0) total += perMin((s - 1) / 60) / 6.0
+            StepSample(t0 + s * 1000L, total.toLong())
+        }
+    }
+
+    @Test
+    fun oneMinuteStallInsideWalkIsKept() {
+        // Field test (Pixel 10 Pro): the step counter stalled for ~1 min (2 steps) while the user walked ~78 m.
+        val fixes = walk(0, 179, 1.3, stepS = 1)
+        val steps = stepsPerMinute(180) { m -> if (m == 1) 2 else 110 }
+        val r = Gating.gate(session(fixes, steps = steps))
+        assertEquals(0, r.droppedSteps)
+        assertEquals(fixes.size, r.fixes.size)
+    }
+
+    @Test
+    fun threeMinuteZeroStepRideDropped() {
+        val fixes = walk(0, 239, 4.0) // 4 m/s for 4 min
+        val steps = (0..240 step 30).map { StepSample(t0 + it * 1000L, 0) }
+        val r = Gating.gate(session(fixes, steps = steps))
+        assertEquals(fixes.size, r.droppedSteps)
+        assertTrue(r.fixes.isEmpty())
+    }
+
+    @Test
+    fun stallAtSessionStartKept() {
+        val fixes = walk(0, 239, 1.3, stepS = 1)
+        val steps = stepsPerMinute(240) { m -> if (m == 0) 0 else 110 }
+        val r = Gating.gate(session(fixes, steps = steps))
+        assertEquals(0, r.droppedSteps)
+        assertEquals(fixes.size, r.fixes.size)
+    }
 }

@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     implementation(project(":coverage"))
+    implementation(project(":tracking")) // `session`: SessionStore.parse + Gating
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.kotlin.test)
 }

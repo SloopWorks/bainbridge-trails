@@ -28,7 +28,8 @@ class SessionStoreTest {
 
     @Test
     fun roundTripsAllEvents() {
-        val s = SessionStore(tempDir())
+        val dir = tempDir()
+        val s = SessionStore(dir)
         s.begin("a", 1)
         s.append(SessionEvent.SourceState(2, "location", true))
         s.append(SessionEvent.FixEvent(3, 10.25, 20.5, null, true))
@@ -47,6 +48,9 @@ class SessionStoreTest {
         assertTrue(r.stepsAvailable)
         assertTrue(r.finished)
         assertTrue(s.unfinished().isEmpty())
+        // offline parse of the same file (coverage-eval `session`) builds the same session
+        val text = SystemFileSystem.source(Path(dir, "sessions", "a.jsonl")).buffered().use { it.readString() }
+        assertEquals(r, SessionStore.parse("a", text + "{truncated"))
     }
 
     @Test
