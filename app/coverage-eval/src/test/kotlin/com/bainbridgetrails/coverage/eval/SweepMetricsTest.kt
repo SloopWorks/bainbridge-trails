@@ -3,12 +3,16 @@ package com.bainbridgetrails.coverage.eval
 import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.Dataset
 import com.bainbridgetrails.coverage.LocalProjection
+import com.bainbridgetrails.coverage.Matcher
 import com.bainbridgetrails.coverage.SegmentGeom
 import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.coverage.TrailMeta
+import com.bainbridgetrails.coverage.Xy
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** Straight 1000 m trails: D at y=0, decoy E parallel at y=10 (inside a 20 m buffer), F far away at y=500. */
@@ -121,5 +125,101 @@ class SweepMetricsTest {
         assertEquals("", rows[0].csv().split(",")[1])
         assertEquals("45.0000", rows[1].csv().split(",")[1])
         assertEquals("heading_tolerance_deg", SweepRow.CSV_HEADER.split(",")[1])
+    }
+
+    /**
+     * Trail T straight 1000 m at y=0; competitor X (connector, not included, no trails) parallel at y=15; competitor Z
+     * (informal) far away at y=300 (never within 30 m of a trail tick, so not an off-network chain).
+     */
+    private fun offNetDataset(withCompetitors: Boolean): Dataset {
+        val proj = LocalProjection()
+        fun seg(id: String, y: Double, included: Boolean, trails: List<String>, category: String) = SegmentGeom(
+            id, 1000.0, included, trails,
+            listOf(0.0, 500.0, 1000.0).map { x -> proj.toLonLat(Xy(x, y)).let { listOf(it.first, it.second) } }, category,
+        )
+        val t = seg("t1", 0.0, true, listOf("T"), "agency_trail")
+        val comps = listOf(seg("x1", 15.0, false, emptyList(), "connector"), seg("z1", 300.0, false, emptyList(), "informal"))
+        val segs = if (withCompetitors) listOf(t) + comps else listOf(t)
+        return Dataset(listOf(TrailMeta("T", "T", listOf("t1"), 0.62)), 1000.0, segs)
+    }
+
+    @Test
+    fun offNetScenarioMeasuresTrailCredit() {
+        val withComp = offNetDataset(true)
+        val chains = offNetworkChains(withComp)
+        assertEquals(1, chains.size, "only x1 lies near the trail")
+        assertTrue(chains.single().all { kotlin.math.abs(it.y - 15.0) < 1e-6 }, "${chains.single()}")
+        val noise = NoiseModel(5.0, outlierRate = 0.0)
+        fun ratio(ds: Dataset, matcher: Matcher): Double {
+            val index = SegmentIndex(ds.segments, CoverageParams(matcher = matcher))
+            val (walked, credit) = (0 until 3).map { s -> offNetCreditM(index, index::coverFixes, chains, noise, 5.0, seed = 20L + s) }
+                .reduce { a, b -> (a.first + b.first) to (a.second + b.second) }
+            return credit / walked
+        }
+        // Spike 3 export shape (trail only): the walker walks where the competitor would be; COMPETITIVE credits the trail
+        val compTrailOnly = ratio(offNetDataset(false), Matcher.COMPETITIVE)
+        val compWith = ratio(withComp, Matcher.COMPETITIVE)
+        val hmmWith = ratio(withComp, Matcher.HMM)
+        println(String.format(Locale.ROOT, "OffNet: COMPETITIVE trail-only=%.3f COMPETITIVE with competitor=%.3f HMM with competitor=%.3f",
+            compTrailOnly, compWith, hmmWith))
+        assertTrue(compTrailOnly > 0.5, "COMPETITIVE trail-only $compTrailOnly")
+        assertTrue(hmmWith < 0.1, "HMM with competitor $hmmWith")
+    }
+
+    @Test
+    fun matcherDimensionRowsAndCsv() {
+        val rows = sweep(
+            offNetDataset(true), buffers = listOf(20.0), sigmas = listOf(0.0), intervals = listOf(1.0), seeds = 1,
+            headingTolerances = listOf(null), margins = listOf(1.0), noiseFor = exact,
+            matchers = listOf(Matcher.COMPETITIVE, Matcher.HMM), hmmSigmas = listOf(8.0), hmmBetas = listOf(4.0), offNetworkMs = listOf(20.0),
+        )
+        assertEquals(listOf(Matcher.COMPETITIVE, Matcher.HMM), rows.map { it.matcher })
+        val header = SweepRow.CSV_HEADER.split(",")
+        val newCols = listOf("matcher", "emission_sigma_m", "transition_beta_m", "off_network_m", "off_net_credit_ratio")
+        assertEquals(newCols, header.takeLast(5))
+        assertEquals("buffer_m", header.first())
+        assertEquals("drive_credit_m", header[header.size - 6])
+        val comp = rows[0].csv().split(",")
+        val hmm = rows[1].csv().split(",")
+        assertEquals(header.size, comp.size)
+        assertEquals(header.size, hmm.size)
+        assertEquals(listOf("competitive", "", "", ""), comp.takeLast(5).take(4))
+        assertEquals(listOf("hmm", "8.0000", "4.0000", "20.0000"), hmm.takeLast(5).take(4))
+        assertEquals(null, rows[0].emissionSigmaM)
+        assertNotNull(rows[1].offNetCreditRatio)
+        // at sigma 0 the walker on x1 (15 m off) is matched to x1 by both matchers: no trail credit
+        assertEquals(0.0, rows[0].offNetCreditRatio, "${rows[0]}")
+        assertEquals(0.0, rows[1].offNetCreditRatio, "${rows[1]}")
+    }
+
+    @Test
+    fun creditOnCompetitorSegmentsIsNotFalseCredit() {
+        // margin 20 >= 15 m offset: walking T also credits competitor x1, which no user sees (R3)
+        val ds = offNetDataset(true)
+        val index = SegmentIndex(ds.segments, CoverageParams(bufferM = 20.0, matchMarginM = 20.0))
+        val state = index.coverFixes(Simulator(ds, 1).walkTrail("T", exact(0.0), 1.0))
+        assertTrue(state.coveredM(index, "x1") > 500.0, "x1 is credited")
+        val r = sweep(ds, buffers = listOf(20.0), sigmas = listOf(0.0), intervals = listOf(1.0), seeds = 1,
+            headingTolerances = listOf(null), margins = listOf(20.0), noiseFor = exact).single()
+        assertEquals(0.0, r.falseCreditRatio, "$r")
+    }
+
+    @Test
+    fun sharedHmmMatchesPerParamsIndex() {
+        // shared index is built with default bufferM 30; the config's own bufferM / sigma / beta must still apply
+        val ds = syntheticDataset()
+        val shared = SharedHmm(ds.segments)
+        for (p in listOf(
+            CoverageParams(matcher = Matcher.HMM, bufferM = 15.0, emissionSigmaM = 6.0, transitionBetaM = 3.0, offNetworkM = 12.0),
+            CoverageParams(matcher = Matcher.HMM, smoothWindowS = 0.0),
+        )) {
+            val own = SegmentIndex(ds.segments, p)
+            for (seed in 0L until 3L) for (t in ds.trails) {
+                val fixes = Simulator(ds, seed).walkTrail(t.id, NoiseModel(12.0), 5.0)
+                val a = shared.coverer(p)(fixes)
+                val b = own.coverFixes(fixes)
+                for (s in ds.segments) assertEquals(b.covered(s.id), a.covered(s.id), "$p seed $seed trail ${t.id} seg ${s.id}")
+            }
+        }
     }
 }

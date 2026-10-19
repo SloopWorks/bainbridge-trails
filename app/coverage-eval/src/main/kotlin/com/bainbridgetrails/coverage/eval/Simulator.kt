@@ -61,6 +61,13 @@ class Simulator(
         return out
     }
 
+    /** Walk one polyline (local metres) as its own session, in a seeded random direction at speedMps +- 0.2 (uniform). */
+    fun walkChain(chain: List<Xy>, noise: NoiseModel, intervalS: Double, speedMps: Double = 1.3): List<Fix> {
+        val line = Polyline(if (rng.nextBoolean()) chain.reversed() else chain)
+        val v = speedMps + (rng.nextDouble() * 0.4 - 0.2)
+        return session(listOf(Move(line, v)), noise, intervalS).first
+    }
+
     /** All chains of [segmentIds] at [speedMps] (no lead-in), one continuous fix stream with session gaps. */
     fun traverse(segmentIds: List<String>, noise: NoiseModel, intervalS: Double, speedMps: Double): List<Fix> =
         traverseSessions(segmentIds, noise, intervalS, speedMps, leadInWalkS = 0.0).flatMap { it.fixes }

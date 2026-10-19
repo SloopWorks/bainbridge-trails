@@ -4,6 +4,7 @@ import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.CoverageState
 import com.bainbridgetrails.coverage.Dataset
 import com.bainbridgetrails.coverage.LocalProjection
+import com.bainbridgetrails.coverage.Matcher
 import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.coverage.filterFixes
@@ -14,6 +15,7 @@ import kotlin.system.exitProcess
 private const val USAGE = """usage:
   sweep --data DIR --out FILE.csv [--buffers 10,15,20,25,30] [--headings off,30,45,60] [--margins 0,1,3]
         [--smooth 0,10,20] [--sigmas 5,10,20] [--intervals 1,5,10] [--seeds 3] [--threshold 0.90]
+        [--matchers competitive,hmm] [--hmm-sigmas 10] [--hmm-betas 5] [--off-network 25]  (HMM rows only)
   gpx --data DIR FILE.gpx..."""
 
 fun main(args: Array<String>) {
@@ -33,7 +35,8 @@ fun main(args: Array<String>) {
         }
     }
     val allowed = when (args[0]) {
-        "sweep" -> setOf("data", "out", "buffers", "headings", "margins", "smooth", "sigmas", "intervals", "seeds", "threshold")
+        "sweep" -> setOf("data", "out", "buffers", "headings", "margins", "smooth", "sigmas", "intervals", "seeds", "threshold",
+            "matchers", "hmm-sigmas", "hmm-betas", "off-network")
         "gpx" -> setOf("data")
         else -> usage("unknown command ${args[0]}")
     }
@@ -62,6 +65,16 @@ private fun runSweep(dataset: Dataset, flags: Map<String, String>) {
         val v = it.trim()
         if (v == "off") null else v.toDoubleOrNull()?.takeIf { d -> d in 0.0..90.0 } ?: usage("--headings takes off or degrees 0..90")
     }
+    val matchers = (flags["matchers"] ?: "competitive").split(",").map {
+        when (it.trim()) {
+            "competitive" -> Matcher.COMPETITIVE
+            "hmm" -> Matcher.HMM
+            else -> usage("--matchers takes competitive,hmm")
+        }
+    }
+    val hmm = CoverageParams()
+    fun positive(flag: String, default: Double) =
+        doubles(flags[flag] ?: default.toString()).onEach { if (it <= 0.0) usage("--$flag takes metres > 0") }
     val start = System.nanoTime()
     val rows = sweep(
         dataset,
@@ -74,6 +87,10 @@ private fun runSweep(dataset: Dataset, flags: Map<String, String>) {
         smoothWindows = doubles(flags["smooth"] ?: "0,10,20").onEach { if (it < 0.0) usage("--smooth takes seconds >= 0") },
         threshold = (flags["threshold"] ?: "0.90").toDouble(),
         log = { System.err.println(it) },
+        matchers = matchers,
+        hmmSigmas = positive("hmm-sigmas", hmm.emissionSigmaM),
+        hmmBetas = positive("hmm-betas", hmm.transitionBetaM),
+        offNetworkMs = positive("off-network", hmm.offNetworkM),
     )
     out.absoluteFile.parentFile?.mkdirs()
     out.writeText((listOf(SweepRow.CSV_HEADER) + rows.map { it.csv() }).joinToString("\n", postfix = "\n"))
