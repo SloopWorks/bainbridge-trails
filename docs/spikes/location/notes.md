@@ -1,6 +1,6 @@
 # Spike 4: location + activity verification (notes)
 
-Branch `spike4/location-activity`. Build published to channel `dev-spike4-location-activity`: build id PENDING_BUILD_ID.
+Branch `spike4/location-activity`. Build published to channel `dev-spike4-location-activity`: build id 01a15421-f152-73cb-a103-3430024643cd (built from a356527).
 
 ## Architecture
 - `:tracking` (common): `SessionStore` (append-only JSONL, `<dir>/sessions/<id>.jsonl`, one flushed line per event), `Gating` (activity + step checks), `Finalizer` (gate, then coverage), `RecordingController` (state machine), `Geofences`, `Diagnostics`.
