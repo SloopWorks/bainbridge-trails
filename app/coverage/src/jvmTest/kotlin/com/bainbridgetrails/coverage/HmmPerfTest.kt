@@ -61,6 +61,8 @@ class HmmPerfTest {
         t = System.nanoTime()
         val cold = matcher.cover(pieces)
         val coldMs = (System.nanoTime() - t) / 1e6
+        // route-length entries over the walk; each step's are dropped after it (no retained predecessor maps, I2)
+        val routeEntries = matcher.routeEntries
         t = System.nanoTime()
         val warm = matcher.cover(pieces)
         val warmMs = (System.nanoTime() - t) / 1e6
@@ -76,7 +78,8 @@ class HmmPerfTest {
             "HmmPerfTest: trail=${trail.id} chain=${"%.0f".format(total)}m pieces=${pieces.size} " +
                 "index=${"%.0f".format(indexMs)}ms graph=${"%.0f".format(graphMs)}ms cover cold=${"%.0f".format(coldMs)}ms " +
                 "warm=${"%.0f".format(warmMs)}ms coverFixes(incl. lazy graph)=${"%.0f".format(dispatchMs)}ms " +
-                "trailCovered=${"%.3f".format(coveredTrailM / trailM)}",
+                "trailCovered=${"%.3f".format(coveredTrailM / trailM)} routeLengthEntries=$routeEntries " +
+                "(transient, <= maxCandidates^2 = ${params.maxCandidates * params.maxCandidates} per step)",
         )
         assertEquals(cold, warm)
         assertTrue(coldMs < 2000.0, "cover cold ${coldMs}ms")

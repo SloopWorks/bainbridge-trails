@@ -18,6 +18,12 @@ data class SegmentGeom(
 )
 
 /**
+ * A segment whose credit a user can see: included in the island total, or part of some trail. Every other segment is
+ * a matching competitor only; its credit never leaves matching ([SegmentIndex.coverFixes]).
+ */
+val SegmentGeom.isScored: Boolean get() = included || trailIds.isNotEmpty()
+
+/**
  * Ticks every ~tickM along each segment, in a 50 m grid, plus competitive map matching (rulings R3 + R6).
  *
  * Each piece is densified to points q every tickM along each line (vertices included). q's heading h comes from
@@ -91,13 +97,20 @@ class SegmentIndex(
     /** Built on first HMM use, once per index. */
     private val hmm: HmmMatcher by lazy { HmmMatcher(this, TickGraph(this, params.junctionM), params) }
 
-    /** Filters [fixes], then matches with [CoverageParams.matcher]: COMPETITIVE = [cover], HMM = [HmmMatcher.cover]. */
+    private val scoredIds: Set<String> = segments.filter { it.isScored }.mapTo(HashSet()) { it.id }
+
+    /**
+     * Filters [fixes], then matches with [CoverageParams.matcher]: COMPETITIVE = [cover], HMM = [HmmMatcher.cover].
+     * The returned state holds only scored segments ([isScored]); competitor credit never leaves matching (privacy,
+     * spec §5/§8). [cover] and [HmmMatcher.cover] stay unfiltered for evaluation.
+     */
     fun coverFixes(fixes: List<Fix>): CoverageState {
         val pieces = filterFixes(fixes, params, proj)
-        return when (params.matcher) {
+        val raw = when (params.matcher) {
             Matcher.COMPETITIVE -> cover(pieces)
             Matcher.HMM -> hmm.cover(pieces)
         }
+        return raw.retainSegments(scoredIds)
     }
 
     /** Spike 3 competitive matcher, regardless of [CoverageParams.matcher]. */

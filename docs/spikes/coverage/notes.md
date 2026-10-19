@@ -57,7 +57,7 @@ Data: `sweep-3b.csv` (threshold 0.85, 1305 rows: 9 COMPETITIVE option B rows + 1
 
 **New metric.** `offNetCreditRatio`: walk every connector / informal competitor chain lying ≥ 50% within 30 m of a scored segment (each its own recording); credited scored metres / walked metres. 423 chains. Option B's is now measurable: **0.255 at σ10/5 s, 0.358 at σ15/15 s**.
 
-**Decision rule** (controller R1: against option B re-measured in this sweep, σ10/5 s, threshold 0.85). Adopt HMM if one config has cr ≥ B's, fc < B's, fcr < B's and offNet ≤ ½ B's; pick max cr, tie → min fcr. Re-measured B: cr 0.822, fcr 0.065, fc 2, offNet 0.255 (Spike 3 numbers were cr 0.839, fcr 0.066, fc 3; the drop comes from competitors now taking candidates). **2 of 144 HMM configs qualify; HMM adopted**: buffer 30, smooth 10 s, emissionSigmaM 15, transitionBetaM 10, offNetworkM 30. Runner-up: same with σe 10 (cr 0.827, fcr 0.027). The highest-cr HMM configs (smooth 0, cr up to 0.883) fail on fc (1–4) or offNet (0.19–0.22 > 0.128).
+**Decision rule** (controller R1: against option B re-measured in this sweep, σ10/5 s, threshold 0.85). Adopt HMM if one config has cr ≥ B's, fc < B's, fcr < B's and offNet ≤ ½ B's; pick max cr, tie → min fcr. Re-measured B: cr 0.822, fcr 0.065, fc 2, offNet 0.255 (Spike 3 numbers were cr 0.839, fcr 0.066, fc 3; the drop comes from competitors now taking candidates). **2 of 144 HMM configs qualify; HMM adopted**: buffer 30, smooth 10 s, emissionSigmaM 15, transitionBetaM 10, offNetworkM 30. Runner-up: same with σe 10 (cr 0.827, fcr 0.027). The highest-cr HMM configs are smooth 0 (cr up to 0.883): all 16 with cr ≥ 0.822 fail on offNet (0.180–0.216 > ½ B = 0.1275); 9 of them also fail fc (fc ≥ 2).
 
 | matcher / option (buffer/heading/margin/smooth) | σ10/5 s cr | fcr | fc | offNet | σ15/15 s cr | fcr | fc | offNet |
 |---|---|---|---|---|---|---|---|---|
@@ -67,7 +67,23 @@ Data: `sweep-3b.csv` (threshold 0.85, 1305 rows: 9 COMPETITIVE option B rows + 1
 | B re-measured (3b) | 0.822 | 0.065 | 2 | 0.255 | 0.614 | 0.096 | 1 | 0.358 |
 | **HMM 30/10 s, σe 15, β 10, off 30 (chosen)** | **0.830** | **0.026** | **1** | **0.119** | **0.667** | **0.050** | **1** | **0.215** |
 
-All @0.85. A and C were not re-measured; their Spike 3 numbers predate the competitor segments. Chosen config, σ10/5 s: mean true fraction 0.906 (B 0.896), p5 0.600 (B 0.598), stand credit 25 m (B 32 m). σ5/1 s: cr 0.950, fcr 0.010, fc 0.
+All @0.85. A and C were not re-measured; their Spike 3 numbers predate the competitor segments.
+
+**Re-measured B vs chosen HMM, all 9 noise cells** (@0.85, 342 walks per cell; bold = better of the two):
+
+| σ / interval | B cr | HMM cr | B fcr | HMM fcr | B fc | HMM fc | B offNet | HMM offNet |
+|---|---|---|---|---|---|---|---|---|
+| σ5 / 1 s | **0.962** | 0.950 | 0.038 | **0.010** | 1 | **0** | 0.189 | **0.064** |
+| σ5 / 5 s | **0.947** | 0.930 | 0.038 | **0.010** | 0 | 0 | 0.181 | **0.087** |
+| σ5 / 15 s | **0.939** | 0.924 | 0.047 | **0.016** | 0 | 0 | 0.219 | **0.095** |
+| σ10 / 1 s | 0.845 | **0.851** | 0.066 | **0.025** | 1 | **0** | 0.269 | **0.111** |
+| σ10 / 5 s | 0.822 | **0.830** | 0.065 | **0.026** | 2 | **1** | 0.255 | **0.119** |
+| σ10 / 15 s | 0.787 | **0.816** | 0.071 | **0.031** | 1 | **0** | 0.295 | **0.165** |
+| σ15 / 1 s | 0.646 | **0.675** | 0.096 | **0.052** | **1** | 2 | 0.339 | **0.181** |
+| σ15 / 5 s | 0.646 | **0.708** | 0.090 | **0.046** | **2** | 3 | 0.304 | **0.176** |
+| σ15 / 15 s | 0.614 | **0.667** | 0.096 | **0.050** | 1 | 1 | 0.358 | **0.215** |
+
+Where B beats HMM: **cr at σ5** (all three intervals, by 0.012–0.017) and **fc at σ15/1 s and σ15/5 s** (1 vs 2, 2 vs 3). HMM wins fcr and offNet in every cell. The margins at the decision cell are thin: the **fc win is 1 walk of 342** (1 vs 2), and the **offNet margin is 0.119 against the ½ B limit of 0.1275**. The runner-up (σe 10) sits at 0.123. Chosen config, σ10/5 s: mean true fraction 0.906 (B 0.896), p5 0.600 (B 0.598), stand credit 25 m (B 32 m). σ5/1 s: cr 0.950, fcr 0.010, fc 0.
 
 **offNetworkM trade-off (R6)**, 30/10 s/σe 15/β 10 at σ10/5 s:
 
@@ -78,7 +94,7 @@ All @0.85. A and C were not re-measured; their Spike 3 numbers predate the compe
 | 20 | 0.772 | 0.025 | 1 | 0.117 |
 | 30 | 0.830 | 0.026 | 1 | 0.119 |
 
-A small `offNetworkM` makes OFF beat the trail itself under σ10 noise, so walked trails stop completing; it buys little off-network protection (0.119 → 0.068). Not diagnosed per chain; likely most remaining off-network credit comes from paths that touch or cross trails rather than from walks beside them.
+A small `offNetworkM` makes OFF beat the trail itself under σ10 noise, so walked trails stop completing. What `offNetworkM` buys is **not measured by this metric**: `offNetCreditRatio` walks mapped competitor chains, which are themselves HMM candidates, so the matcher can already explain those walks without OFF (0.119 → 0.068 from 30 → 12 is the side effect on that case only). The case OFF exists for (walking on an unmapped road shoulder or across a field beside a trail, with no competitor to match) is unmeasured. The owner's GPX walks should include one deliberate beside-trail walk along a road.
 
 **What the owner should know (plain terms):**
 - **Beside-trail credit distance: ~30 m.** With `offNetworkM` 30 = `bufferM`, walking alongside a lone trail anywhere within 30 m of it credits the trail (`besideTrailThresholdDocumented`: 27.5 m → all 60 ticks, 30 m → 0). Only a mapped competitor path nearer than the trail (`competitorPathWinsOverTrail`) or a distance > 30 m stops it. A road shoulder or unmapped path 20 m from a trail counts as walking the trail.
@@ -87,9 +103,18 @@ A small `offNetworkM` makes OFF beat the trail itself under σ10 noise, so walke
 
 **Parallel guards** (unedited assertions): `ParallelGuardTest` (correlated σ10, 12 m apart) COMPETITIVE A 0.834 / B 0.338, HMM A 0.996 / B 0.005; `parallelNeighborNotCredited` on the new defaults A 1.0 / B 0.0. Both pass. `ParallelGuardTest`'s baseline line changed from `CoverageParams()` to `CoverageParams(matcher = Matcher.COMPETITIVE)` (same option B values) so it still compares against option B now that the default is HMM.
 
-**Runtime** (`HmmPerfTest`, JVM, longest trail, 60 min at 1 s): index 42 ms, tick graph 116 ms (built once, lazily), Viterbi cover 20 ms; `coverFixes` including the lazy graph 179 ms. Well under the 2 s budget.
+**Runtime** (`HmmPerfTest`, **JVM only, one trail corridor**: longest trail, 60 min at 1 s): index 42 ms, tick graph 116 ms (built once, lazily), Viterbi cover 20 ms; `coverFixes` including the lazy graph 179 ms, under the 2 s budget. Heap: the tick graph retains ~28 MB (reviewer's probe; boxed `HashMap<Long, MutableList<Pair<Long, Double>>>` adjacency). The matcher keeps only route lengths per step (≤ 8 × 8, dropped after the step) and recomputes each chosen route after the backtrack; it no longer retains per-observation predecessor maps (the 60 min walk computes 6,824 route-length entries in total, where the old code retained 72,906 predecessor entries). Open items: Android / iOS heap and time in a dense area; run `coverFixes` off the main thread (its first call builds the graph); compact the graph to CSR arrays before v1.
 
-**Limits that remain:** beside-trail credit within 30 m (above); vehicle credit per transition (above); σ15/15 s still collapses (cr 0.667); parallel trails joined by frequent junctions are not separated by topology (untested); real-GPS validation still pending (owner's GPX walks, same procedure as below).
+**Privacy:** `SegmentIndex.coverFixes` returns scored segments only (`SegmentGeom.isScored`: included, or on a trail). Competitor credit is used inside matching and never leaves it, so a stored or synced `CoverageState` never names a competitor segment. Raw `cover` / `HmmMatcher.cover` stay unfiltered for the eval, whose metrics count scored segments only.
+
+**Limits that remain:**
+- beside-trail credit within 30 m (above). **Owner sign-off needed**: `offNetworkM` 30 = `bufferM`, so any walk within 30 m of a lone trail credits it;
+- vehicle credit per transition (above);
+- σ15/15 s still collapses (cr 0.667);
+- parallel trails joined by frequent junctions are untested (topology cannot separate them);
+- single-segment switchbacks may credit the unwalked apex: each segment has one candidate tick per observation, so a route between two legs of the same segment runs through the apex ticks;
+- crossing trails rely on the pipeline splitting segments at crossings (not verified); an unsplit X-crossing has no junction in the tick graph;
+- real-GPS validation still pending (owner's GPX walks, same procedure as below).
 
 ## Tiny-trail fold (Task 9b)
 
@@ -192,7 +217,10 @@ Worst case (σ15/15 s) fc is at threshold 0.80.
 
 ## Known limits (for any config)
 
-- **Off-network walking** (Spike 3b): now measured (`offNetCreditRatio`) and all 7,537 segments compete. HMM credits 12% of off-network walking at σ10/5 s (option B 25%), and any walk within ~30 m of a lone trail with no nearer mapped path is credited to it. Unmapped paths cannot compete.
+- **Off-network walking** (Spike 3b): walking mapped competitor paths is now measured (`offNetCreditRatio`) and all 7,537 segments compete. HMM credits 12% of it at σ10/5 s (option B 25%). Walking where nothing is mapped (road shoulder, field) is not measured; any walk within ~30 m of a lone trail with no nearer mapped path is credited to it (owner sign-off needed). Unmapped paths cannot compete.
+- **Switchbacks on one segment** (HMM): one candidate tick per segment per observation, so the route between the two legs may credit the unwalked apex.
+- **Crossing trails** (HMM): the tick graph joins only endpoints, so an X-crossing is a junction only if the pipeline split the segments there (not verified).
+- **Parallel trails joined by frequent junctions** (HMM): untested.
 - **Parallel trails < 12 m apart.** COMPETITIVE credits neighbours under correlated noise (fcr 0.065–0.096; correlated guard B 0.338). HMM separates them through topology (guard B 0.005, fcr 0.026 at σ10/5 s) unless they share frequent junctions.
 - **Hairpin switchbacks** tighter than the buffer score 0.71–0.93 even at zero noise; smoothing cuts them further.
 - **Speed-window leak (R5).** About 30 s of fast travel right after walking passes the speed check: 19–36 m per transition on average (smoothing reduces it). It is never 0. HMM does not change it (~42 m bike / ~24 m drive per transition at σ10/5 s).
@@ -220,6 +248,7 @@ Accuracy contract: a fix with `accuracyM < 0` is dropped (iOS reports negative `
 
 `CoverageState.encode()` produces a JSON object `{"seg-000001":"<base64>", ...}`:
 - keys are sorted, and segments with no bits are omitted;
+- only scored segments appear (included, or on a trail); competitor segments never do (privacy, Spike 3b);
 - the payload is a little-endian bitset: tick i is bit (i % 8) of byte (i / 8), with trailing zero bytes dropped;
 - merging is bitwise OR (`union`), commutative and idempotent, so it is safe for sync conflicts;
 - `decode` is the inverse.

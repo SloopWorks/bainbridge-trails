@@ -116,7 +116,10 @@ class HmmMatcherTest {
             seg("P", Xy(0.0, 15.0), Xy(200.0, 15.0), included = false, category = "connector"),
         )
         val idx = SegmentIndex(segs, hmm, proj)
-        val st = idx.coverFixes(fixes(positions(listOf(Xy(0.0, 15.0), Xy(200.0, 15.0))), sigma = 3.0, rnd = Random(5)))
+        val walk = fixes(positions(listOf(Xy(0.0, 15.0), Xy(200.0, 15.0))), sigma = 3.0, rnd = Random(5))
+        // raw matcher: coverFixes drops competitor P (I1), so its credit is only visible here
+        val st = HmmMatcher(idx, TickGraph(idx, hmm.junctionM), hmm).cover(filterFixes(walk, hmm, proj))
+        assertEquals(CoverageState.EMPTY, idx.coverFixes(walk))
         val t = st.covered("T").size
         val p = frac(idx, st, "P")
         println("competitorPathWinsOverTrail: T=$t ticks P=$p")
@@ -199,5 +202,58 @@ class HmmMatcherTest {
         val pieces = filterFixes(fixes(positions(listOf(Xy(0.0, 0.0), Xy(200.0, 0.0)))), hmm, proj)
         val direct = HmmMatcher(idx, TickGraph(idx, hmm.junctionM), hmm).cover(pieces)
         assertEquals(direct, idx.coverFixes(fixes(positions(listOf(Xy(0.0, 0.0), Xy(200.0, 0.0))))))
+    }
+
+    private fun junctionWalk(): Pair<SegmentIndex, List<Fix>> {
+        val segs = ladder + seg("C", Xy(100.0, 100.0), Xy(100.0, 12.0))
+        val idx = SegmentIndex(segs, hmm, proj)
+        val path = listOf(Xy(0.0, 0.0), Xy(200.0, 0.0), Xy(200.0, 12.0), Xy(100.0, 12.0), Xy(100.0, 100.0))
+        return idx to fixes(positions(path), sigma = 6.0, rnd = Random(21))
+    }
+
+    /**
+     * I2: crediting recomputes each chosen route (no retained predecessor maps). Pinned to the states the retained-preds
+     * implementation produced (HEAD 1797ac4), so the change is bit-identical. Both walks credit multi-segment routes.
+     */
+    @Test fun routeCreditPinned() {
+        val (idx, f) = junctionWalk()
+        assertEquals(
+            CoverageState.decode("""{"A":"//////8=","B":"AADw//8=","C":"//8D","X1":"AQ==","X2":"Bw=="}"""),
+            HmmMatcher(idx, TickGraph(idx, hmm.junctionM), hmm).cover(filterFixes(f, hmm, proj)),
+        )
+        val sparse = fixes(
+            positions(listOf(Xy(0.0, 0.0), Xy(200.0, 0.0), Xy(200.0, 12.0), Xy(0.0, 12.0)), stepS = 15),
+            stepS = 15, sigma = 8.0, rnd = Random(4),
+        )
+        val idx2 = SegmentIndex(ladder, hmm, proj)
+        assertEquals(
+            CoverageState.decode("""{"A":"//////8=","B":"//////8=","X1":"Aw==","X2":"Bw=="}"""),
+            HmmMatcher(idx2, TickGraph(idx2, hmm.junctionM), hmm).cover(filterFixes(sparse, hmm, proj)),
+        )
+    }
+
+    /** I1 (privacy): competitor credit stays inside matching; coverFixes returns scored segments only, both matchers. */
+    @Test fun coverFixesDropsCompetitorSegments() {
+        val segs = listOf(
+            seg("P", Xy(0.0, 0.0), Xy(200.0, 0.0), included = false, category = "connector"),
+            seg("T", Xy(0.0, 200.0), Xy(200.0, 200.0)),
+        )
+        val walk = fixes(positions(listOf(Xy(0.0, 0.0), Xy(200.0, 0.0))), sigma = 3.0, rnd = Random(9))
+        for (params in listOf(hmm, competitive)) {
+            val idx = SegmentIndex(segs, params, proj)
+            val pieces = filterFixes(walk, params, proj)
+            val raw = when (params.matcher) {
+                Matcher.HMM -> HmmMatcher(idx, TickGraph(idx, params.junctionM), params).cover(pieces)
+                Matcher.COMPETITIVE -> idx.cover(pieces)
+            }
+            assertTrue(raw.covered("P").isNotEmpty(), "${params.matcher}: raw cover credits the competitor")
+            assertEquals(CoverageState.EMPTY, idx.coverFixes(walk), "${params.matcher}")
+        }
+    }
+
+    @Test fun isScoredRule() {
+        assertTrue(seg("a", Xy(0.0, 0.0), Xy(1.0, 0.0)).isScored)
+        assertTrue(!seg("b", Xy(0.0, 0.0), Xy(1.0, 0.0), included = false).isScored)
+        assertTrue(seg("c", Xy(0.0, 0.0), Xy(1.0, 0.0), included = false).copy(trailIds = listOf("t")).isScored)
     }
 }

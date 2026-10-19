@@ -13,9 +13,11 @@ import kotlin.math.hypot
 class TickGraph(private val index: SegmentIndex, private val junctionM: Double = 3.0) {
     private val pts: List<List<Xy>> = index.tickPoints
     private val adj = HashMap<Long, MutableList<Pair<Long, Double>>>()
-    private val edgeSeen = HashSet<Pair<Long, Long>>()
 
     init {
+        // build-time only: dropped after init so the graph retains adjacency alone (CSR deferred to before v1)
+        val edgeSeen = HashSet<Pair<Long, Long>>()
+        fun link(a: Long, b: Long) = link(a, b, edgeSeen)
         val ids = pts.indices.map { index.segmentIdOf(it) }
         val polylines = ids.map { id ->
             index.segments.getValue(id).coords.map { index.projection.toXy(it[0], it[1]) }
@@ -46,7 +48,7 @@ class TickGraph(private val index: SegmentIndex, private val junctionM: Double =
                 }
             }
             // T-joins: nearest tick of any other segment whose polyline passes within junctionM
-            selfTJoin(e.slot, e.last, e.p, e.node)
+            selfTJoin(e.slot, e.last, e.p, e.node, edgeSeen)
             val bySlot = HashMap<Int, Long>()
             val bestD = HashMap<Int, Double>()
             for (n in index.queryTicks(e.p, junctionM + MAX_TICK_REACH_M)) {
@@ -66,7 +68,7 @@ class TickGraph(private val index: SegmentIndex, private val junctionM: Double =
     }
 
     /** T-join of an endpoint against its own segment's interior, skipping ticks within 2*junctionM along the line. */
-    private fun selfTJoin(s: Int, last: Boolean, p: Xy, endNode: Long) {
+    private fun selfTJoin(s: Int, last: Boolean, p: Xy, endNode: Long, edgeSeen: MutableSet<Pair<Long, Long>>) {
         val n = pts[s].size
         val share = index.tickLengthM(index.segmentIdOf(s))
         var best = -1
@@ -77,7 +79,7 @@ class TickGraph(private val index: SegmentIndex, private val junctionM: Double =
             val d = hypot(pts[s][t].x - p.x, pts[s][t].y - p.y)
             if (d < bestD) { bestD = d; best = t }
         }
-        if (best >= 0 && bestD <= junctionM + share / 2) link(endNode, pack(s, best))
+        if (best >= 0 && bestD <= junctionM + share / 2) link(endNode, pack(s, best), edgeSeen)
     }
 
     fun node(segmentId: String, tick: Int): Long = pack(requireNotNull(index.slotOf(segmentId)) { "unknown segment $segmentId" }, tick)
@@ -111,7 +113,7 @@ class TickGraph(private val index: SegmentIndex, private val junctionM: Double =
         return dist
     }
 
-    private fun link(a: Long, b: Long) {
+    private fun link(a: Long, b: Long, edgeSeen: MutableSet<Pair<Long, Long>>) {
         if (a == b || !edgeSeen.add(if (a < b) a to b else b to a)) return
         val pa = pts[slotOf(a)][tickOf(a)]
         val pb = pts[slotOf(b)][tickOf(b)]

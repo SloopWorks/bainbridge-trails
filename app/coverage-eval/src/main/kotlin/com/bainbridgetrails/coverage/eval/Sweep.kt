@@ -13,6 +13,7 @@ import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.coverage.TickGraph
 import com.bainbridgetrails.coverage.Xy
 import com.bainbridgetrails.coverage.filterFixes
+import com.bainbridgetrails.coverage.isScored
 import com.bainbridgetrails.coverage.resample
 import java.util.Locale
 import java.util.stream.IntStream
@@ -88,9 +89,6 @@ private const val BIKE_MPS = 6.0
 private const val DRIVE_MPS = 13.0
 internal const val VEHICLE_LEAD_IN_WALK_S = 30.0
 
-/** A segment whose credit a user can see: included in the island total, or part of some trail. */
-fun isScored(s: SegmentGeom): Boolean = s.included || s.trailIds.isNotEmpty()
-
 /** Competitor categories walked by the off-network scenario. */
 val OFF_NETWORK_CATEGORIES = setOf("connector", "informal")
 
@@ -111,7 +109,7 @@ fun offNetworkChains(
     fun key(cx: Int, cy: Int) = (cx.toLong() shl 32) or (cy.toLong() and 0xFFFFFFFFL)
     val grid = HashMap<Long, MutableList<Xy>>()
     for (s in dataset.segments) {
-        if (!isScored(s)) continue
+        if (!s.isScored) continue
         val line = s.coords.map { proj.toXy(it[0], it[1]) }
         if (line.size < 2) continue
         for (t in resample(line, tickM)) grid.getOrPut(key(cell(t.p.x), cell(t.p.y))) { ArrayList() } += t.p
@@ -136,7 +134,7 @@ fun offNetCreditM(
     index: SegmentIndex, cover: (List<Fix>) -> CoverageState, chains: List<List<Xy>>, noise: NoiseModel,
     intervalS: Double, seed: Long, maxGapS: Double = CoverageParams().maxGapS, proj: LocalProjection = LocalProjection(),
 ): Pair<Double, Double> {
-    val scored = index.segments.values.filter(::isScored).sortedBy { it.id }
+    val scored = index.segments.values.filter { it.isScored }.sortedBy { it.id }
     val empty = Dataset(emptyList(), 0.0, emptyList())
     val credits = IntStream.range(0, chains.size).parallel().mapToObj { c ->
         val fixes = Simulator(empty, mix(seed + c * GOLDEN), proj, maxGapS).walkChain(chains[c], noise, intervalS)
@@ -180,7 +178,7 @@ fun sweep(
     val trailSegs = trails.map { it.segmentIds.toSet() }
     // trails sharing no segment with trail i
     val disjoint = trails.indices.map { i -> trails.indices.filter { j -> j != i && trailSegs[i].none { it in trailSegs[j] } } }
-    val scored = dataset.segments.filter(::isScored)
+    val scored = dataset.segments.filter { it.isScored }
     val offChains = offNetworkChains(dataset, proj, defaults.tickM)
     val ms = matchers.distinct()
     // Per buffer: COMPETITIVE over heading x margin x smoothing (Spike 3 order); HMM over smoothing x sigma x beta x
@@ -283,8 +281,9 @@ fun sweep(
 /**
  * One [SegmentIndex] + [TickGraph] shared by every HMM config. Index geometry depends only on tickM / headingBaselineM,
  * graph topology on that plus junctionM; none of them is swept, so each config only gets its own (cheap) [HmmMatcher].
- * Equivalent to `SegmentIndex(segments, params).coverFixes` with matcher HMM (HmmMatcher reads bufferM etc. from its
- * own params, never the index's).
+ * Equivalent on scored segments to `SegmentIndex(segments, params).coverFixes` with matcher HMM (HmmMatcher reads
+ * bufferM etc. from its own params, never the index's); unlike coverFixes it also returns competitor bits (raw
+ * [HmmMatcher.cover]), which every metric ignores ([scoredCoveredM]).
  */
 internal class SharedHmm(segments: List<SegmentGeom>, private val proj: LocalProjection = LocalProjection()) {
     private val base = CoverageParams()
@@ -306,7 +305,7 @@ internal fun coveredClampedM(index: SegmentIndex, state: CoverageState, id: Stri
 
 /** Covered metres over scored segments ([isScored]), summed in dataset order. */
 internal fun scoredCoveredM(dataset: Dataset, index: SegmentIndex, state: CoverageState): Double =
-    dataset.segments.sumOf { if (isScored(it)) coveredClampedM(index, state, it.id) else 0.0 }
+    dataset.segments.sumOf { if (it.isScored) coveredClampedM(index, state, it.id) else 0.0 }
 
 /**
  * Walk [VEHICLE_LEAD_IN_WALK_S] then ride [speedMps] along every chain of [segmentIds], each chain its own recording.

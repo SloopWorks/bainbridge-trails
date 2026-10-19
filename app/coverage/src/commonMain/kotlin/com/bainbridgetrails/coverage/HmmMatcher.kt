@@ -18,7 +18,9 @@ import kotlin.math.min
  *   [TickGraph.routesFrom] bounded at 2g + 50 (no route = impossible); OFF -> OFF = 0; to or from OFF = -offSwitchPenalty.
  * - Viterbi in log space; ties go to the lower state index (so OFF wins exact ties).
  * - Credit: every on-network state's own tick, plus every tick on the shortest route between consecutive on-network
- *   states (reconstructed from the Dijkstra predecessors).
+ *   states. The forward pass keeps only route lengths; after the backtrack each chosen route is recomputed with the
+ *   same bounded Dijkstra (deterministic, so the same route) and walked back through its predecessors. No per-observation
+ *   predecessor maps are retained.
  */
 class HmmMatcher(
     private val index: SegmentIndex,
@@ -28,6 +30,13 @@ class HmmMatcher(
     private val pts: List<List<Xy>> = index.tickPoints
     private val twoSigma2 = 2 * params.emissionSigmaM * params.emissionSigmaM
     private val offEmission = -params.offNetworkM * params.offNetworkM / twoSigma2
+
+    /**
+     * Diagnostics: route-length entries computed by [cover] calls so far (sum over steps of prev x cur candidates).
+     * Each step's entries are dropped after that step; nothing else per route outlives it.
+     */
+    internal var routeEntries: Long = 0L
+        private set
 
     fun cover(pieces: List<List<Xy>>): CoverageState {
         val bits = HashMap<Int, LongArray>()
@@ -61,26 +70,28 @@ class HmmMatcher(
         return Candidates(LongArray(order.size) { bestN.getValue(order[it]) }, DoubleArray(order.size) { bestD.getValue(order[it]) })
     }
 
+    /** Route bound between observations [k] - 1 and [k]: 2g + 50, g = straight distance. */
+    private fun maxRouteM(obs: List<Xy>, k: Int): Double = 2 * gap(obs, k) + 50.0
+
+    private fun gap(obs: List<Xy>, k: Int): Double = hypot(obs[k].x - obs[k - 1].x, obs[k].y - obs[k - 1].y)
+
     private fun matchPiece(obs: List<Xy>, mark: (Long) -> Unit) {
         val cands = obs.map { candidates(it) }
         // state 0 = OFF, state i >= 1 = cands[k].nodes[i - 1]
         val back = arrayOfNulls<IntArray>(obs.size)
-        /** preds[k][i - 1] = Dijkstra predecessors from candidate i of observation k (k < last) */
-        val preds = arrayOfNulls<Array<HashMap<Long, Long>>>(obs.size)
 
         var score = DoubleArray(cands[0].nodes.size + 1) { i -> emission(cands[0], i) }
         for (k in 1 until obs.size) {
             val prev = cands[k - 1]
             val cur = cands[k]
-            val g = hypot(obs[k].x - obs[k - 1].x, obs[k].y - obs[k - 1].y)
-            val maxM = 2 * g + 50.0
-            // routes[i - 1][j - 1] = route metres prev candidate i -> cur candidate j, NaN = none
-            val pk = Array(prev.nodes.size) { HashMap<Long, Long>() }
+            val g = gap(obs, k)
+            val maxM = maxRouteM(obs, k)
+            // routes[i - 1][j - 1] = route metres prev candidate i -> cur candidate j, NaN = none; dropped after this step
             val routes = Array(prev.nodes.size) { i ->
-                val r = graph.routesFrom(prev.nodes[i], maxM, pk[i])
+                val r = graph.routesFrom(prev.nodes[i], maxM)
                 DoubleArray(cur.nodes.size) { j -> r[cur.nodes[j]] ?: Double.NaN }
             }
-            preds[k - 1] = pk
+            routeEntries += prev.nodes.size.toLong() * cur.nodes.size
             val next = DoubleArray(cur.nodes.size + 1)
             val bk = IntArray(cur.nodes.size + 1)
             for (j in 0..cur.nodes.size) {
@@ -114,6 +125,7 @@ class HmmMatcher(
         path[obs.size - 1] = bestEnd
         for (k in obs.size - 1 downTo 1) path[k - 1] = back[k]!![path[k]]
 
+        val pred = HashMap<Long, Long>()
         for (k in obs.indices) {
             val j = path[k]
             if (j == 0) continue
@@ -122,7 +134,9 @@ class HmmMatcher(
             val i = if (k > 0) path[k - 1] else 0
             if (i == 0) continue
             val from = cands[k - 1].nodes[i - 1]
-            val pred = preds[k - 1]!![i - 1]
+            // same source and bound as the forward pass: the deterministic Dijkstra yields the same route
+            pred.clear()
+            graph.routesFrom(from, maxRouteM(obs, k), pred)
             var n = v
             while (n != from) {
                 n = pred.getValue(n)

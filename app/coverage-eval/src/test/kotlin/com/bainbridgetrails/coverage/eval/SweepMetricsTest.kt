@@ -8,6 +8,7 @@ import com.bainbridgetrails.coverage.SegmentGeom
 import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.coverage.TrailMeta
 import com.bainbridgetrails.coverage.Xy
+import com.bainbridgetrails.coverage.filterFixes
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.test.Test
@@ -194,9 +195,13 @@ class SweepMetricsTest {
     fun creditOnCompetitorSegmentsIsNotFalseCredit() {
         // margin 20 >= 15 m offset: walking T also credits competitor x1, which no user sees (R3)
         val ds = offNetDataset(true)
-        val index = SegmentIndex(ds.segments, CoverageParams(matcher = Matcher.COMPETITIVE, bufferM = 20.0, matchMarginM = 20.0))
-        val state = index.coverFixes(Simulator(ds, 1).walkTrail("T", exact(0.0), 1.0))
+        val params = CoverageParams(matcher = Matcher.COMPETITIVE, bufferM = 20.0, matchMarginM = 20.0)
+        val index = SegmentIndex(ds.segments, params)
+        val fixes = Simulator(ds, 1).walkTrail("T", exact(0.0), 1.0)
+        // raw matcher credits x1; coverFixes drops it (scored-only, I1)
+        val state = index.cover(filterFixes(fixes, params, LocalProjection()))
         assertTrue(state.coveredM(index, "x1") > 500.0, "x1 is credited")
+        assertEquals(0.0, index.coverFixes(fixes).coveredM(index, "x1"))
         val r = sweep(ds, buffers = listOf(20.0), sigmas = listOf(0.0), intervals = listOf(1.0), seeds = 1,
             headingTolerances = listOf(null), margins = listOf(20.0), noiseFor = exact).single()
         assertEquals(0.0, r.falseCreditRatio, "$r")
@@ -225,10 +230,11 @@ class SweepMetricsTest {
     fun vehicleCreditOnCompetitorSegmentsIsNotCounted() {
         // riding t1 with margin 20 >= 15 m also credits competitor x1; only the scored trail counts (R7)
         val ds = offNetDataset(true)
-        val index = SegmentIndex(ds.segments, CoverageParams(matcher = Matcher.COMPETITIVE, bufferM = 20.0, matchMarginM = 20.0))
+        val params = CoverageParams(matcher = Matcher.COMPETITIVE, bufferM = 20.0, matchMarginM = 20.0)
+        val index = SegmentIndex(ds.segments, params)
         val noise = NoiseModel(0.0, outlierRate = 0.0)
         val s = Simulator(ds, 9).traverseSessions(listOf("t1"), noise, 1.0, 1.3, VEHICLE_LEAD_IN_WALK_S).single()
-        assertTrue(index.coverFixes(s.fixes).coveredM(index, "x1") > 500.0, "x1 is credited")
+        assertTrue(index.cover(filterFixes(s.fixes, params, LocalProjection())).coveredM(index, "x1") > 500.0, "x1 is credited (raw)")
         val lead = scoredCoveredM(ds, index, index.coverFixes(s.fixes.take(s.leadInFixes)))
         val (_, credit) = vehicleCreditM(ds, index, listOf("t1"), noise, 1.0, 1.3, seed = 9)
         assertTrue(abs(lead + credit - 1000.0) <= CoverageParams().tickM, "lead $lead credit $credit")

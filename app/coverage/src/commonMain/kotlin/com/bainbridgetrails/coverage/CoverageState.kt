@@ -52,6 +52,10 @@ class CoverageState internal constructor(bits: Map<String, LongArray>) {
         return CoverageState(out)
     }
 
+    /** Same bits restricted to [ids]. */
+    internal fun retainSegments(ids: Set<String>): CoverageState =
+        if (bits.keys.all { it in ids }) this else CoverageState(bits.filterKeys { it in ids })
+
     fun encode(): String = Json.encodeToString(CoverageStateSerializer, this)
 
     internal fun toStrings(): Map<String, String> = bits.mapValues { (_, w) -> Base64.encode(toBytes(w)) }
