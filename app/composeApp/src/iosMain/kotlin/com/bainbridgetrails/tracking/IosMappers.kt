@@ -4,7 +4,7 @@ import com.bainbridgetrails.coverage.Fix
 import platform.CoreLocation.CLAuthorizationStatus
 import platform.CoreLocation.kCLAuthorizationStatusDenied
 import platform.CoreLocation.kCLAuthorizationStatusRestricted
-import platform.CoreLocation.kCLErrorLocationUnknown
+import platform.CoreLocation.kCLErrorDenied
 import platform.CoreMotion.CMMotionActivityConfidenceHigh
 import platform.CoreMotion.CMMotionActivityConfidenceMedium
 import platform.Foundation.NSDate
@@ -58,10 +58,10 @@ object IosMappers {
     }
 
     /**
-     * kCLErrorLocationUnknown is transient (no fix right now, updates continue): not a loss. Anything else
-     * from didFailWithError (kCLErrorDenied, ...) stops updates and is.
+     * Only kCLErrorDenied (authorisation or location services gone; the authorisation callback reports the same) is a
+     * loss. Everything else from didFailWithError (kCLErrorLocationUnknown, kCLErrorNetwork, ...) is transient.
      */
-    fun isLocationErrorLoss(code: Long): Boolean = code != kCLErrorLocationUnknown
+    fun isLocationErrorLoss(code: Long): Boolean = code == kCLErrorDenied
 
     /**
      * CMMotionActivity history queried at Stop fills gaps while live updates were suspended (backgrounded).

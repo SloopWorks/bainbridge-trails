@@ -21,7 +21,8 @@ import platform.darwin.NSObject
  * Create, start and stop on the main thread: the manager delivers to the run loop it was created on.
  *
  * R5 analogue: authorisation denied/restricted or location services switched off mid-recording calls
- * [onUnavailable] once. A transient kCLErrorLocationUnknown (no fix right now) is not a loss.
+ * [onUnavailable] once. Only kCLErrorDenied from didFailWithError is a loss; other errors (location unknown,
+ * network, ...) are transient and updates continue.
  */
 @OptIn(ExperimentalForeignApi::class)
 class IosLocationSource : LocationSource {
@@ -48,7 +49,7 @@ class IosLocationSource : LocationSource {
             },
             onError = { error ->
                 if (IosMappers.isLocationErrorLoss(error.code)) {
-                    lose(IosMappers.authorizationLoss(m.authorizationStatus, CLLocationManager.locationServicesEnabled()) ?: "location updates failed")
+                    lose(IosMappers.authorizationLoss(m.authorizationStatus, CLLocationManager.locationServicesEnabled()) ?: "location permission revoked")
                 }
             },
         )

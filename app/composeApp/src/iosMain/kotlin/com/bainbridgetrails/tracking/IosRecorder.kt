@@ -77,10 +77,18 @@ object IosRecorder {
                 withContext(Dispatchers.Main) { if (events === channel) stop() }
                 null
             }
+            var ended = false
             for (event in channel) {
-                if (store == null) continue // drain so senders and Stop still complete
+                // Drain without writing when the store failed, and after Stop: a pedometer callback (its own queue)
+                // can still slip in between Stop and close; nothing is appended after end.
+                if (store == null || ended) continue
                 try {
-                    if (event is SessionEvent.Stop) store.end(event.timeMs) else store.append(event)
+                    if (event is SessionEvent.Stop) {
+                        ended = true
+                        store.end(event.timeMs)
+                    } else {
+                        store.append(event)
+                    }
                     RecordingBus.emit(event)
                 } catch (e: Exception) {
                     RecordingBus.emitLost("session write failed")

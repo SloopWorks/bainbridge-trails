@@ -17,8 +17,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="${DIST:-$ROOT/data/dist}"
 SIM="${SIM:-booted}"
 SPEED=1.3
+WAYPOINTS="$(mktemp -t sim-route)"
+trap 'rm -f "$WAYPOINTS"' EXIT
 
-python3 -I - "$DIST" "$1" "${2:-0}" "$SPEED" > /tmp/sim-route-waypoints.$$ <<'PY'
+python3 -I - "$DIST" "$1" "${2:-0}" "$SPEED" > "$WAYPOINTS" <<'PY'
 import json, math, sys
 
 dist, trail_id, max_s, speed = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4])
@@ -63,6 +65,5 @@ print(f"{trail_id}: {len(out)} waypoints, {walked:.0f} m, ~{walked / speed / 60:
 for lon, lat in out:
     print(f"{lat:.7f},{lon:.7f}")  # simctl wants lat,lon
 PY
-trap 'rm -f /tmp/sim-route-waypoints.$$' EXIT
-xcrun simctl location "$SIM" start --speed="$SPEED" --interval=1 - < /tmp/sim-route-waypoints.$$
+xcrun simctl location "$SIM" start --speed="$SPEED" --interval=1 - < "$WAYPOINTS"
 echo "route started on $SIM"

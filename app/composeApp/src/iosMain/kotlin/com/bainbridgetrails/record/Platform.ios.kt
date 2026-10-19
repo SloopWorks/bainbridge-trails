@@ -9,6 +9,7 @@ import com.bainbridgetrails.tracking.IosRecorder
 import com.bainbridgetrails.tracking.Perm
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import platform.CoreLocation.CLLocationManager
 import platform.CoreLocation.CLLocationManagerDelegateProtocol
 import platform.CoreLocation.kCLAuthorizationStatusNotDetermined
@@ -46,6 +47,8 @@ actual fun rememberPlatformContext(): PlatformContext = PlatformContext.INSTANCE
 internal object IosPermissionRequester : PermissionRequester {
     private val locationManager by lazy { CLLocationManager() }
     private var locationDelegate: AuthorizationDelegate? = null
+    private val motionManager by lazy { CMMotionActivityManager() }
+    private const val MOTION_PROMPT_TIMEOUT_MS = 60_000L
 
     override fun status(perm: Perm): PermStatus = when (perm) {
         Perm.LOCATION_WHILE_IN_USE -> {
@@ -75,22 +78,28 @@ internal object IosPermissionRequester : PermissionRequester {
                 val answered = CompletableDeferred<Unit>()
                 val d = AuthorizationDelegate { status -> if (status != kCLAuthorizationStatusNotDetermined) answered.complete(Unit) }
                 locationDelegate = d // the manager's delegate is weak
-                locationManager.delegate = d
-                locationManager.requestWhenInUseAuthorization() // when-in-use only; Always is a Task 7 opt-in
-                answered.await()
-                locationManager.delegate = null
-                locationDelegate = null
+                try {
+                    locationManager.delegate = d
+                    locationManager.requestWhenInUseAuthorization() // when-in-use only; Always is a Task 7 opt-in
+                    answered.await()
+                } finally {
+                    // Also on cancellation (the flow left composition): never leave a stale delegate behind.
+                    locationManager.delegate = null
+                    locationDelegate = null
+                }
             }
             Perm.ACTIVITY -> {
                 // CoreMotion has no explicit request: the first query shows the prompt and answers after it.
+                // The manager is retained in a field: a released manager may never call the handler.
                 val answered = CompletableDeferred<Unit>()
                 val now = NSDate()
-                CMMotionActivityManager().queryActivityStartingFromDate(
+                motionManager.queryActivityStartingFromDate(
                     now.dateByAddingTimeInterval(-60.0),
                     toDate = now,
                     toQueue = NSOperationQueue.mainQueue,
                 ) { _, _ -> answered.complete(Unit) }
-                answered.await()
+                // No answer in time: fall through to status(), which reports not granted while undetermined.
+                withTimeoutOrNull(MOTION_PROMPT_TIMEOUT_MS) { answered.await() }
             }
             Perm.NOTIFICATIONS -> Unit
         }

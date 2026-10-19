@@ -6,6 +6,8 @@ import platform.CoreLocation.kCLAuthorizationStatusDenied
 import platform.CoreLocation.kCLAuthorizationStatusNotDetermined
 import platform.CoreLocation.kCLAuthorizationStatusRestricted
 import platform.CoreLocation.kCLErrorDenied
+import platform.CoreLocation.kCLErrorHeadingFailure
+import platform.CoreLocation.kCLErrorNetwork
 import platform.CoreLocation.kCLErrorLocationUnknown
 import platform.CoreMotion.CMMotionActivityConfidenceHigh
 import platform.CoreMotion.CMMotionActivityConfidenceLow
@@ -90,8 +92,10 @@ class IosMappersTest {
     }
 
     @Test
-    fun locationUnknownErrorIsTransient() {
+    fun onlyDeniedLocationErrorIsALoss() {
         assertFalse(IosMappers.isLocationErrorLoss(kCLErrorLocationUnknown))
+        assertFalse(IosMappers.isLocationErrorLoss(kCLErrorNetwork))
+        assertFalse(IosMappers.isLocationErrorLoss(kCLErrorHeadingFailure))
         assertTrue(IosMappers.isLocationErrorLoss(kCLErrorDenied))
     }
 
