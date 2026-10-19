@@ -9,6 +9,7 @@ import kotlinx.io.writeString
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -97,5 +98,35 @@ class SessionStoreTest {
         s.delete("d")
         assertFalse(SystemFileSystem.exists(Path(dir, "sessions", "d.jsonl")))
         assertTrue(s.unfinished().isEmpty())
+    }
+
+    @Test
+    fun resumeRepairsTruncatedTailThenAppends() {
+        val dir = tempDir()
+        val s = SessionStore(dir)
+        s.begin("r", 1)
+        s.append(fix(2))
+        s.append(SessionEvent.Steps(StepSample(3, 7)))
+        val path = Path(dir, "sessions", "r.jsonl")
+        SystemFileSystem.sink(path, append = true).buffered().use { it.writeString("{\"t\":\"fix\",\"timeMs\":4,\"lo") }
+        val s2 = SessionStore(dir)
+        s2.resume("r")
+        s2.append(fix(5))
+        val r = s2.load("r")
+        assertEquals(listOf(2L, 5L), r.fixes.map { it.timeMs })
+        assertEquals(listOf(StepSample(3, 7)), r.steps)
+        assertFalse(r.finished)
+        s2.end(6)
+        assertTrue(s2.load("r").finished)
+    }
+
+    @Test
+    fun resumeRejectsFinished() {
+        val s = SessionStore(tempDir())
+        s.begin("f", 1)
+        s.end(2)
+        assertFailsWith<IllegalStateException> { s.resume("f") }
+        assertFailsWith<IllegalStateException> { s.resume("missing") }
+        assertFailsWith<IllegalStateException> { s.begin("f", 3) }
     }
 }

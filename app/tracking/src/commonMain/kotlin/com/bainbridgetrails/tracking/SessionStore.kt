@@ -48,6 +48,27 @@ class SessionStore(dir: String) {
         append(SessionEvent.Start(sessionId, timeMs))
     }
 
+    /**
+     * Reopens an unfinished session for appending. Requires the file to exist and have no Stop.
+     * Drops any truncated tail (everything after the last '\n') so later appends start on a clean line.
+     */
+    fun resume(sessionId: String) {
+        val path = pathOf(sessionId)
+        check(SystemFileSystem.exists(path)) { "session not found" }
+        check(readEvents(sessionId).none { it is SessionEvent.Stop }) { "session already finished" }
+        val text = SystemFileSystem.source(path).buffered().use { it.readString() }
+        val keep = text.substring(0, text.lastIndexOf('\n') + 1)
+        if (keep.length != text.length) {
+            val tmp = Path(sessionsDir, "$sessionId.jsonl.tmp")
+            SystemFileSystem.sink(tmp).buffered().use {
+                it.writeString(keep)
+                it.flush()
+            }
+            SystemFileSystem.atomicMove(tmp, path)
+        }
+        currentId = sessionId
+    }
+
     fun append(event: SessionEvent) {
         val id = checkNotNull(currentId) { "no active session" }
         val line = json.encodeToString(SessionEvent.serializer(), event) + "\n"
