@@ -28,6 +28,25 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import com.bainbridgetrails.auth.AuthListener
+import com.bainbridgetrails.auth.AuthRepository
+import com.bainbridgetrails.auth.AuthState
+import com.bainbridgetrails.auth.SessionStore
+import com.bainbridgetrails.auth.isSignedIn
+import com.bainbridgetrails.auth.privateNoBackupDir
+import com.bainbridgetrails.data.LeaderboardRepository
+import com.bainbridgetrails.data.ProfileRepository
+import com.bainbridgetrails.data.TrailStatsRepository
+import com.bainbridgetrails.net.ApiClient
+import com.bainbridgetrails.net.AuthResponse
+import com.bainbridgetrails.net.platformHttpEngine
+import com.bainbridgetrails.sync.LocalWalk
+import com.bainbridgetrails.sync.StoreCoverage
+import com.bainbridgetrails.sync.SyncRepository
+import kotlin.time.Clock
 
 /**
  * Process-wide object graph (no DI framework). Context-free parts ([datasets]) exist from first use, so receivers
@@ -75,6 +94,77 @@ object AppGraph {
         val walks = WalkHistoryRepository(scope, read = { WalkIndex(trackingDir).all() }, io = Dispatchers.IO)
         val settings = SettingsRepository(appDataDir(context) + "/settings.json", scope, io = Dispatchers.IO)
 
+        // --- remote (docs/mvp/api.md): session, profile, sync, leaderboard, community stats
+        private val privateDir: String by lazy { privateNoBackupDir(context) }
+        private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() }
+
+        /** Bearer comes from [auth]; a 401 signs out locally. Base URL is read per request (debug drawer switch). */
+        val api: ApiClient = ApiClient(platformHttpEngine(), token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized() })
+        val auth: AuthRepository by lazy {
+            AuthRepository(api, SessionStore(privateDir, clock), localAnonName = { profile.anonName() }, io = Dispatchers.IO)
+        }
+        val profile: ProfileRepository by lazy {
+            ProfileRepository(api, appDataDir(context) + "/profile.json", isSignedIn = { auth.token() != null }, io = Dispatchers.IO)
+        }
+        val leaderboard: LeaderboardRepository by lazy {
+            LeaderboardRepository(api, "$privateDir/leaderboard.json", isSignedIn = { auth.token() != null }, now = clock, io = Dispatchers.IO)
+        }
+        val trailStats: TrailStatsRepository by lazy { TrailStatsRepository(api, clock) }
+        val sync: SyncRepository by lazy {
+            SyncRepository(
+                scope = scope,
+                api = api,
+                queuePath = "$privateDir/sync.json",
+                currentUserId = { (auth.state.value as? AuthState.SignedIn)?.session?.userId },
+                coverage = StoreCoverage(trackingDir),
+                localWalks = { withContext(Dispatchers.IO) { WalkIndex(trackingDir).all().map { LocalWalk(it.sessionId, it.durationMs / 1000) } } },
+                datasetVersion = { datasets.await().dataset.version },
+                onCoverageChanged = { coverageChanged() },
+                now = clock,
+                io = Dispatchers.IO,
+            )
+        }
+
+        /** App came to the foreground (App's lifecycle effect): sync when due, send a pending name change. */
+        fun onForeground() {
+            sync.onForeground()
+            scope.launch { if (auth.token() != null) profile.flushPending() }
+        }
+
+        /** F9e "also clear this phone": coverage, sticky completions and walk history. */
+        internal suspend fun wipeLocalProgress() = withContext(Dispatchers.IO) {
+            CoverageStore.writeLock.withLock { CoverageStore(trackingDir).reset() }
+            Path(trackingDir, "walks.json").let { if (SystemFileSystem.exists(it)) SystemFileSystem.delete(it) }
+        }
+
+        internal fun startRemote() {
+            auth.addListener(object : AuthListener {
+                override suspend fun onSignedIn(response: AuthResponse) {
+                    profile.onSignedIn(response.user)
+                    leaderboard.onAuthChanged()
+                    sync.onSignedIn() // backfill (TL-2)
+                }
+
+                override suspend fun onSignedOut(deleted: Boolean, wipeLocal: Boolean) {
+                    val wipe = deleted && wipeLocal
+                    sync.onSignedOut(wipe)
+                    profile.onSignedOut()
+                    leaderboard.onAuthChanged()
+                    if (wipe) {
+                        wipeLocalProgress()
+                        coverageChanged()
+                    }
+                }
+            })
+            scope.launch {
+                profile.load()
+                if (auth.load().isSignedIn) {
+                    sync.load()
+                    sync.onForeground()
+                }
+            }
+        }
+
         /** The recording controller (built once; completes after crash recovery / auto-finalize on launch). */
         fun controller(): Deferred<RecordingController> = RecordingGraph.controller(context)
 
@@ -90,6 +180,7 @@ object AppGraph {
         installed = graph
         datasets.load()
         graph.coverageChanged()
+        graph.startRemote()
         scope.launch {
             // Building the controller at launch finalizes stopped walks and finds unfinished ones right away
             // (progress and history are then current on every tab, not only after the Record tab opens).
@@ -104,6 +195,7 @@ object AppGraph {
                         analytics.track(AnalyticsEvents.WALK_FINISHED, mapOf("verified" to s.summary.verified.toString(), "trails" to s.summary.trails.size.toString()))
                         s.summary.newlyCompleted.forEach { analytics.track(AnalyticsEvents.TRAIL_COMPLETED, mapOf("trail" to it)) }
                         graph.coverageChanged()
+                        graph.sync.walkFinished() // F11: upload after each finished walk (queued when offline)
                         requestCelebration(Celebration(s.summary.sessionId, s.summary.newlyCompleted))
                     }
                     else -> Unit
