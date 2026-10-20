@@ -232,6 +232,22 @@ class RecordingControllerTest {
     }
 
     @Test
+    fun liveDistanceSkipsGpsJumps() = runTest {
+        val r = rig()
+        r.controller.onPermissions(Perm.entries.toSet())
+        r.controller.start()
+        r.walk(0.0, 30.0) // 30 m in 2 s steps of 3 m
+        // A multipath jump 400 m off and back, 2 s apart each: far faster than walking.
+        for (x in listOf(430.0, 30.0)) {
+            val (lon, lat) = proj.toLonLat(Xy(x, 0.0))
+            r.clock.advance(2_000)
+            r.recorder.fix(Fix(r.clock.now, lon, lat, 5.0, false))
+        }
+        val s = assertIs<RecordingState.Recording>(r.controller.state.value)
+        assertEquals(30.0, s.distanceM, 0.5)
+    }
+
+    @Test
     fun staleFixBeforeStartIgnored() = runTest {
         val r = rig()
         r.controller.onPermissions(Perm.entries.toSet())

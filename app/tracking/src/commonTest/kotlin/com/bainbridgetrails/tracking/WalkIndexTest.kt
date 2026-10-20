@@ -119,4 +119,17 @@ class WalkIndexTest {
         )
         assertEquals(3.0, WalkIndex.distanceM(fixes, proj), 0.1)
     }
+
+    @Test
+    fun gpsJumpsDoNotAddDistance() {
+        fun fix(t: Long, x: Double) = proj.toLonLat(Xy(x, 0.0)).let { com.bainbridgetrails.coverage.Fix(t, it.first, it.second, 5.0, false) }
+        // 60 s walking east at 1.3 m/s (2 s fixes), then two fixes 300 m off (a multipath jump), then the walk resumes.
+        val walk = (0..30).map { fix(it * 2_000L, it * 2.6) }
+        val jump = listOf(fix(62_000, 378.0), fix(64_000, 380.0))
+        val resume = (33..60).map { fix(it * 2_000L, (it - 2) * 2.6) }
+        val d = WalkIndex.distanceM(walk + jump + resume, proj)
+        // Walked: 58 steps of 2.6 m = 150.8 m. The jump adds nothing (old sum: ~750 m); as in coverage, the speed
+        // check still uses the dropped jump fixes as its 30 s reference, so a few resume fixes after it fall out too.
+        kotlin.test.assertTrue(d in 130.0..151.0, "distance $d")
+    }
 }

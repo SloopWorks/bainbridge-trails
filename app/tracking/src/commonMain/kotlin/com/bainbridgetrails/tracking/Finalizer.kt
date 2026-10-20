@@ -91,7 +91,7 @@ class Finalizer(
         val sorted = rose.sortedByDescending { it.after }
         val startedAt = session.startMs ?: session.fixes.minOfOrNull { it.timeMs } ?: startOf(sessionId)
         val endedAt = session.stopMs ?: session.fixes.maxOfOrNull { it.timeMs } ?: startedAt
-        val distanceM = WalkIndex.distanceM(gate.fixes.filterNot { it.isMock }.sortedBy { it.timeMs }, index.projection)
+        val distanceM = WalkIndex.distanceM(gate.fixes, index.projection, params)
         val matchedM = walked.totalCoveredM(index)
         val islandBefore = progress.islandFraction(before)
         val islandAfter = progress.islandFraction(after)

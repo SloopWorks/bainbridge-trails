@@ -1,7 +1,9 @@
 package com.bainbridgetrails.tracking
 
+import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.Fix
 import com.bainbridgetrails.coverage.LocalProjection
+import com.bainbridgetrails.coverage.filterFixes
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -100,18 +102,16 @@ class WalkIndex(dir: String) {
             ignoreUnknownKeys = true
         }
 
-        /** Planar path length of [fixes] (time order), skipping steps across gaps longer than [Gating.MAX_GAP_MS]. */
-        fun distanceM(fixes: List<Fix>, proj: LocalProjection): Double {
-            var total = 0.0
-            for (i in 1 until fixes.size) {
-                val a = fixes[i - 1]
-                val b = fixes[i]
-                if (b.timeMs - a.timeMs > Gating.MAX_GAP_MS) continue
-                val pa = proj.toXy(a.lon, a.lat)
-                val pb = proj.toXy(b.lon, b.lat)
-                total += hypot(pb.x - pa.x, pb.y - pa.y)
+        /**
+         * Walked distance of [fixes]: the planar length of the pieces coverage itself accepts ([filterFixes]: gaps,
+         * jumps > maxJumpM, speeds > maxSpeedMps, single-fix spikes and inaccurate fixes never add distance), without
+         * smoothing so a clean track measures exactly.
+         */
+        fun distanceM(fixes: List<Fix>, proj: LocalProjection, params: CoverageParams = CoverageParams()): Double =
+            filterFixes(fixes, params.copy(smoothWindowS = 0.0), proj).sumOf { piece ->
+                var total = 0.0
+                for (i in 1 until piece.size) total += hypot(piece[i].x - piece[i - 1].x, piece[i].y - piece[i - 1].y)
+                total
             }
-            return total
-        }
     }
 }

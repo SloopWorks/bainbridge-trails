@@ -212,9 +212,16 @@ class RecordingController(
         val r = _state.value as? RecordingState.Recording ?: return
         if (!SessionFix.isSessionFix(fix.timeMs, r.startedMs)) return // R8: a cached pre-start position is not part of the walk
         _track.value = trackStore.append(fix)
-        // Mock fixes are drawn but never add distance (finalising drops them too).
-        val added = if (fix.isMock) 0.0 else lastRealFix?.let { distanceM(it, fix) } ?: 0.0
-        if (!fix.isMock) lastRealFix = fix
+        // Mock / inaccurate fixes are drawn but never add distance, nor do steps across a gap or faster than walking
+        // (GPS jumps): the live estimate follows the coverage gates the final distance uses (WalkIndex.distanceM).
+        val usable = !fix.isMock && fix.accuracyM.let { it == null || it in 0.0..LIVE_PARAMS.maxAccuracyM }
+        val prev = lastRealFix
+        val added = if (!usable || prev == null) 0.0 else {
+            val d = distanceM(prev, fix)
+            val dtS = (fix.timeMs - prev.timeMs) / 1000.0
+            if (dtS <= 0 || fix.timeMs - prev.timeMs > Gating.MAX_GAP_MS || d / dtS > LIVE_PARAMS.maxSpeedMps) 0.0 else d
+        }
+        if (usable) lastRealFix = fix
         _state.value = r.copy(
             fixCount = r.fixCount + 1,
             lastFixMs = fix.timeMs,
@@ -350,6 +357,8 @@ class RecordingController(
 
         private fun defaultSessionId(nowMs: Long): String =
             "s$nowMs-" + Random.nextInt(0, 1 shl 24).toString(16)
+
+        private val LIVE_PARAMS = com.bainbridgetrails.coverage.CoverageParams()
 
         private fun distanceM(a: Fix, b: Fix): Double {
             val r = 6_371_008.8
