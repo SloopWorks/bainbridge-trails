@@ -17,7 +17,7 @@ class BinaryParityTest {
 
     @Test
     fun binaryDecodesToTheJsonDataset() {
-        val (trails, segs) = sources(dist) ?: return println("BinaryParityTest: SKIPPED, ../../data/dist files missing")
+        val (trails, segs) = sources("binaryDecodesToTheJsonDataset", dist)
         val json = Dataset.parse(trails, segs)
         val bytes = DatasetBinary.encode(json, DatasetBinary.hash(trails.encodeToByteArray()))
         val bin = Dataset.fromBinary(bytes)
@@ -36,9 +36,9 @@ class BinaryParityTest {
 
     @Test
     fun bundledBinaryIsCurrent() {
-        val (trails, segs) = sources(bundled) ?: return println("BinaryParityTest: SKIPPED, bundled JSON missing")
         val binFile = File(bundled, "dataset.bin")
-        if (!binFile.exists()) return println("BinaryParityTest: SKIPPED, bundled dataset.bin missing")
+        assumeDataFiles("bundledBinaryIsCurrent", binFile)
+        val (trails, segs) = sources("bundledBinaryIsCurrent", bundled)
         val stale = "bundled dataset.bin is stale: run scripts/sync-app-assets.sh"
         val bytes = binFile.readBytes()
         assertEquals(DatasetBinary.hash(File(bundled, "trails.json").readBytes()), DatasetBinary.trailsJsonHash(bytes), stale)
@@ -48,10 +48,11 @@ class BinaryParityTest {
         assertEquals(json.segments, bin.segments, stale)
     }
 
-    private fun sources(dir: File): Pair<String, String>? {
+    private fun sources(test: String, dir: File): Pair<String, String> {
         val t = File(dir, "trails.json")
         val s = File(dir, "coverage_segments.json")
-        return if (t.exists() && s.exists()) t.readText() to s.readText() else null
+        assumeDataFiles(test, t, s)
+        return t.readText() to s.readText()
     }
 
     private fun matcherParams() = listOf(
