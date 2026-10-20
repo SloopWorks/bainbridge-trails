@@ -286,7 +286,15 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             composable<ShowcaseRoute> { ShowcaseScreen(section = launch?.section) }
         }
         if (showBar) {
-            fun Tab.item(label: String) = BarItem(label, icon, selectedIcon, destination.isTab(route), { nav.selectTab(route) })
+            // Roads (ux.md 1.3): the list tab shows a road, not a hiker.
+            val roads = LocalGoal.current.isRoads
+            fun Tab.item(label: String) = BarItem(
+                label,
+                if (roads && route == TrailsRoute) BtIcons.Road else icon,
+                if (roads && route == TrailsRoute) BtIcons.RoadFilled else selectedIcon,
+                destination.isTab(route),
+                { nav.selectTab(route) },
+            )
             BtBottomBar(
                 start = StartTabs.map { it.item(stringResource(LocalGoal.current.s(it.label))) },
                 end = EndTabs.map { it.item(stringResource(LocalGoal.current.s(it.label))) },

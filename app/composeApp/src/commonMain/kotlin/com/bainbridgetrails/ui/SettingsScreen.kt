@@ -221,12 +221,12 @@ private fun Group(title: String) {
     )
 }
 
-/** Map data & licenses (F10-3): every line of data/dist/ATTRIBUTION.md (bundled), dataset version, fonts/icons. */
+/** Map data & licenses (F10-3): every line of the goal's bundled ATTRIBUTION.md (data/dist or data/roads/dist), dataset version, fonts/icons. */
 @Composable
 fun AttributionScreen(onBack: () -> Unit) {
     val dataset by AppGraph.datasets.state.collectAsStateWithLifecycle()
     val text by produceState<String?>(null) {
-        value = withContext(Dispatchers.IO) { runCatching { Res.readBytes("files/ATTRIBUTION.md").decodeToString() }.getOrDefault("") }
+        value = withContext(Dispatchers.IO) { runCatching { Res.readBytes("files/${com.bainbridgetrails.data.DatasetProfile.current.attributionFile}").decodeToString() }.getOrDefault("") }
     }
     ListScreen(stringResource(Res.string.settings_attribution), onBack = onBack) {
         item {

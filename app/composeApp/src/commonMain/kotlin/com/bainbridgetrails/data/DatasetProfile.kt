@@ -25,6 +25,8 @@ enum class DatasetProfile(
     val tileFile: String,
     /** Packed [metadataFile] + [coverageFile] ([com.bainbridgetrails.coverage.DatasetBinary]); null = parse the JSON. */
     val datasetBinFile: String?,
+    /** The dataset's data credits (its dist's ATTRIBUTION.md), shown in Settings → Map and data credits. */
+    val attributionFile: String,
     /** Segment id namespace; the backend keys coverage by segment id, so the two datasets never collide. */
     val segmentIdPrefix: String,
     /** Display strings. "trail" / "road": the one word the UI copy turns on. */
@@ -41,6 +43,7 @@ enum class DatasetProfile(
         coverageFile = "coverage_segments.json",
         tileFile = "trails.pmtiles",
         datasetBinFile = "dataset.bin",
+        attributionFile = "ATTRIBUTION.md",
         segmentIdPrefix = "seg-",
         thing = "trail", things = "trails",
         goal = "Walk every public trail on Bainbridge Island (65.5 mi)",
@@ -52,6 +55,7 @@ enum class DatasetProfile(
         coverageFile = "roads_coverage_segments.json",
         tileFile = "roads.pmtiles",
         datasetBinFile = "roads_dataset.bin",
+        attributionFile = "roads_ATTRIBUTION.md",
         segmentIdPrefix = "rseg-",
         thing = "road", things = "roads",
         goal = "Walk or run every public road on Bainbridge Island (162.5 mi shippable of 164.2 mi)",

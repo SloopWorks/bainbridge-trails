@@ -5,7 +5,7 @@
 #
 # The roads dataset (data/roads/dist, docs/roads/plan.md) is installed alongside the trail one when it has been built,
 # under names a debug build selects at runtime (DatasetProfile): roads.json, roads_coverage_segments.json,
-# roads.pmtiles, roads_dataset.bin, roads_road_ends.json. Both datasets then sit in the APK, so switching needs no rebuild. Skip it with
+# roads.pmtiles, roads_dataset.bin, roads_road_ends.json, roads_ATTRIBUTION.md. Both datasets then sit in the APK, so switching needs no rebuild. Skip it with
 # ROADS=0; ROADS=1 makes a missing roads build an error instead of a skip.
 set -euo pipefail
 
@@ -50,6 +50,7 @@ ROAD_ASSETS=(
   "roads.json:roads.json"
   "coverage_segments.json:roads_coverage_segments.json"
   "roads.pmtiles:roads.pmtiles"
+  "ATTRIBUTION.md:roads_ATTRIBUTION.md"
 )
 # Optional: without it the roads build simply shows no road-end pins/rows. A missing one never skips the set above;
 # it warns (auto) or fails (ROADS=1).

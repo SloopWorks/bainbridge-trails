@@ -20,6 +20,8 @@ import com.bainbridgetrails.resources.ic_error
 import com.bainbridgetrails.resources.ic_expand_more
 import com.bainbridgetrails.resources.ic_hiking
 import com.bainbridgetrails.resources.ic_hiking_filled
+import com.bainbridgetrails.resources.ic_road_filled
+import com.bainbridgetrails.resources.ic_road
 import com.bainbridgetrails.resources.ic_info
 import com.bainbridgetrails.resources.ic_keyboard_arrow_down
 import com.bainbridgetrails.resources.ic_location_disabled
@@ -59,6 +61,8 @@ object BtIcons {
     val ExpandMore = Res.drawable.ic_expand_more
     val Hiking = Res.drawable.ic_hiking
     val HikingFilled = Res.drawable.ic_hiking_filled
+    val Road = Res.drawable.ic_road
+    val RoadFilled = Res.drawable.ic_road_filled
     val Info = Res.drawable.ic_info
     val KeyboardArrowDown = Res.drawable.ic_keyboard_arrow_down
     val LocationDisabled = Res.drawable.ic_location_disabled
