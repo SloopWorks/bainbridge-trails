@@ -13,6 +13,9 @@ maplibre-compose = "0.20.0"
 # JetBrains multiplatform navigation; 2.10.0-rc01 is built against CMP 1.11 / lifecycle 2.11 (matches CMP 1.12.x here).
 navigation-compose = "2.10.0-rc01"
 play-services-location = "21.4.0"
+ktor = "3.5.0"
+androidx-credentials = "1.6.0"
+googleid = "1.2.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -25,6 +28,14 @@ maplibre-compose-runtime-opengl-android = { module = "org.maplibre.compose:mapli
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "play-services-location" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version = "2.11.0" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "androidx-credentials" }
+androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidx-credentials" }
+googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 
 androidx-navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
 
