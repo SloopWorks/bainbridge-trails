@@ -9,9 +9,10 @@ import platform.Foundation.NSProcessInfo
 fun MainViewController() = ComposeUIViewController { App(spikeLaunchFromArguments()) }
     .also { debugAutostartRecording() } // debug builds + `-autostartRecording 1` only (simulator verification)
 
-private fun spikeLaunchFromArguments(): SpikeLaunch {
+/** Null without `key=value` arguments: a normal launch (tab shell). */
+private fun spikeLaunchFromArguments(): SpikeLaunch? {
     val args = NSProcessInfo.processInfo.arguments.map { it.toString() }
     val options = args.filter { '=' in it && !it.startsWith("-") }
         .associate { it.substringBefore('=') to it.substringAfter('=') }
-    return SpikeLaunch.parse(options)
+    return if (options.isEmpty()) null else SpikeLaunch.parse(options)
 }

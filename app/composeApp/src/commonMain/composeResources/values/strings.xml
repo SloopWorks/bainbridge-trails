@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copy from docs/mvp/product.md §3 (keys are the spec's). Only the keys the current screens use are here; add the
+  rest with the screens. Compose resources substitute %1$s / %1$d only: a literal percent sign is a bare "%".
+-->
+<resources>
+    <!-- Common -->
+    <string name="app_name">Bainbridge Trails</string>
+    <string name="common_loading_trails">Loading trails…</string>
+    <string name="common_retry">Try again</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_done">Done</string>
+    <string name="common_continue">Continue</string>
+    <string name="status_not_started">Not started</string>
+    <string name="status_partway">Partway</string>
+    <string name="status_nearly_done">Nearly done</string>
+    <string name="status_complete">Complete</string>
+    <string name="status_chip">%1$s · %2$s</string>
+    <string name="status_chip_a11y">%1$s, %2$s walked</string>
+    <string name="nav_map">Map</string>
+    <string name="nav_trails">Trails</string>
+    <string name="nav_record">Record</string>
+    <string name="nav_me">Me</string>
+    <string name="nav_record_active_a11y">Record, walk in progress</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_1_title">Walk every trail on the island</string>
+    <string name="onboarding_1_body">Bainbridge has over 60 miles of public trails. See them all, pick one, and watch your map fill in.</string>
+    <string name="onboarding_2_title">Every step adds up</string>
+    <string name="onboarding_2_body">Record a walk and the trails you cover light up. Finish a trail across as many walks as you like, in any direction. A trail counts as complete at %1$d%.</string>
+    <string name="onboarding_3_title">Your walks stay on your phone</string>
+    <string name="onboarding_3_body">GPS tracks never leave this phone. If you sign in, we only sync which trail sections you’ve covered, never where or when you walked.</string>
+    <string name="onboarding_3_signin_hint">Sign in later from Me to join the leaderboard.</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_done">Start exploring</string>
+
+    <!-- Trails list -->
+    <string name="trails_title">Trails</string>
+    <string name="trails_count">%1$d of %2$d trails</string>
+
+    <!-- Trail detail -->
+    <string name="detail_length">Length</string>
+    <string name="detail_covered">Covered</string>
+    <string name="detail_start_walk">Start walk</string>
+
+    <!-- Celebration -->
+    <string name="celebrate_title">%1$s complete!</string>
+    <plurals name="celebrate_title_multi">
+        <item quantity="one">%1$d trail complete!</item>
+        <item quantity="other">%1$d trails complete!</item>
+    </plurals>
+    <string name="celebrate_body">You’ve walked %1$s of the island and finished %2$d of %3$d trails.</string>
+    <string name="celebrate_more">+%1$d more</string>
+    <string name="celebrate_continue">Continue</string>
+    <string name="celebrate_view_trail">View trail</string>
+
+    <!-- Me -->
+    <string name="me_title">Me</string>
+    <string name="me_stat_island">Island</string>
+    <string name="me_stat_trails">Trails completed</string>
+    <string name="me_stat_trails_value">%1$d / %2$d</string>
+    <string name="me_stat_miles">Trail miles walked</string>
+    <string name="me_stat_km">Trail km walked</string>
+    <string name="me_leaderboard_row_signed_out">Leaderboard</string>
+    <string name="me_in_progress">In progress</string>
+    <string name="me_in_progress_empty">Trails you’ve started will show here.</string>
+    <string name="me_history">Walks</string>
+    <string name="me_history_empty">No walks yet. Tap Record to start your first.</string>
+    <string name="me_history_row">%1$s · %2$s</string>
+    <plurals name="me_history_trails">
+        <item quantity="zero">No trails</item>
+        <item quantity="one">1 trail</item>
+        <item quantity="other">%1$d trails</item>
+    </plurals>
+    <string name="me_settings">Settings</string>
+    <string name="me_edit_name">Edit name</string>
+
+    <!-- Leaderboard -->
+    <string name="board_title">Leaderboard</string>
+    <string name="board_signed_out_title">Want to be on here?</string>
+    <string name="board_signed_out_body">Sign in to add your progress. Only your name, island % and trails completed are shown.</string>
+
+    <!-- Settings / about -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_map">Map</string>
+    <string name="settings_style">Map style</string>
+    <string name="settings_style_topo">Topo</string>
+    <string name="settings_style_light">Light</string>
+    <string name="settings_style_dark">Dark</string>
+    <string name="settings_match_dark">Use Dark map in dark mode</string>
+    <string name="settings_units">Units</string>
+    <string name="settings_units_mi">Miles</string>
+    <string name="settings_units_km">Kilometres</string>
+    <string name="settings_about">About</string>
+    <string name="settings_attribution_dataset">Trail data version %1$s</string>
+    <string name="settings_show_intro">Show intro again</string>
+
+    <!-- Errors -->
+    <string name="error_dataset_title">Trails didn’t load</string>
+    <string name="error_dataset_body">Something went wrong reading the trail data. Try again, or reinstall if it keeps happening.</string>
+</resources>

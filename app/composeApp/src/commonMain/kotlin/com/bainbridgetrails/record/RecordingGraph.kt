@@ -15,6 +15,8 @@ import com.bainbridgetrails.tracking.RecordingBus
 import com.bainbridgetrails.tracking.RecordingController
 import com.bainbridgetrails.tracking.SessionStore
 import com.bainbridgetrails.tracking.Trailhead
+import com.bainbridgetrails.tracking.WalkIndex
+import com.bainbridgetrails.graph.AppGraph
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -34,23 +36,14 @@ internal object RecordingGraph {
     /** Optional permissions already offered in this process (not asked again on every Start). */
     val askedOptional = mutableSetOf<Perm>()
 
-    private var dataset: Deferred<Dataset>? = null
-    private var index: Deferred<SegmentIndex>? = null
     private var trailheads: Deferred<List<Trailhead>>? = null
     private var controller: Deferred<RecordingController>? = null
 
-    /** Ruling R1: parse the bundled dataset once per process, off the main thread. Call at app start. */
-    fun dataset(): Deferred<Dataset> = dataset?.takeUnless { it.failed() } ?: scope.async(Dispatchers.Default) {
-        val trails = Res.readBytes("files/trails.json").decodeToString()
-        val segments = Res.readBytes("files/coverage_segments.json").decodeToString()
-        Dataset.parse(trails, segments)
-    }.also { dataset = it }
+    /** Ruling R1: the bundled dataset, parsed once per process off Main (shared with the UI via [AppGraph.datasets]). */
+    fun dataset(): Deferred<Dataset> = scope.async { AppGraph.datasets.await().dataset }
 
-    /** Segment index for the bundled dataset, built once per process off the main thread. */
-    fun index(): Deferred<SegmentIndex> = index?.takeUnless { it.failed() } ?: scope.async {
-        val ds = dataset().await()
-        withContext(Dispatchers.Default) { SegmentIndex(ds.segments, CoverageParams(), LocalProjection()) }
-    }.also { index = it }
+    /** Segment index for the bundled dataset, built once per process off Main together with the dataset. */
+    fun index(): Deferred<SegmentIndex> = scope.async { AppGraph.datasets.await().index }
 
     /** Bundled trailhead geofence candidates (`files/trailheads.json`), parsed once per process. */
     fun trailheads(): Deferred<List<Trailhead>> = trailheads?.takeUnless { it.failed() } ?: scope.async(Dispatchers.Default) {
@@ -84,7 +77,7 @@ internal object RecordingGraph {
             override fun start(sessionId: String, resume: Boolean) = startRecordingService(context, sessionId, resume)
             override fun stop() = stopRecordingService(context)
         }
-        RecordingController(store, Finalizer(ds, index, store, coverage), { Clock.System.now().toEpochMilliseconds() }, recorder, scope).also {
+        RecordingController(store, Finalizer(ds, index, store, coverage, walks = WalkIndex(dir)), { Clock.System.now().toEpochMilliseconds() }, recorder, scope).also {
             it.bind(RecordingBus.events, RecordingBus.lost)
             it.onLaunch()
         }

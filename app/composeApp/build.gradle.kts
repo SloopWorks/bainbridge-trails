@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinSerialization) // type-safe navigation routes, settings.json
 }
 
 kotlin {
@@ -44,6 +45,7 @@ kotlin {
             implementation(project(":tracking"))
             // Already on the classpath via Compose; explicit because RecordScreen uses LifecycleResumeEffect.
             implementation(libs.androidx.lifecycle.runtime.compose)
+            implementation(libs.androidx.navigation.compose)
         }
         androidMain.dependencies {
             implementation(libs.play.services.location)
@@ -53,6 +55,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }
