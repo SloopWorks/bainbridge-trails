@@ -71,6 +71,47 @@ describe("leaderboard", () => {
     expect((await h.call("GET", "/v1/leaderboard?limit=0")).status).toBe(400);
   });
 
+  it("PUT /v1/me hiddenFromBoard hides the caller at once and never undoes an admin hide (P1-8)", async () => {
+    const h = harness();
+    const me = await devLogin(h, "self-hide-me");
+    const other = await devLogin(h, "self-hide-other");
+    await setMetrics(me.userId, 60_000, 3, 10);
+    await setMetrics(other.userId, 40_000, 1, 20);
+    expect((await h.call("POST", "/v1/admin/snapshot", ADMIN)).status).toBe(200);
+    const put = (body: unknown) => h.call("PUT", "/v1/me", { token: me.token, body });
+    const board = async (token?: string) => (await (await h.call("GET", "/v1/leaderboard", token ? { token } : {})).json()) as Board;
+    expect(((await (await h.call("GET", "/v1/me", { token: me.token })).json()) as { hiddenFromBoard: boolean }).hiddenFromBoard).toBe(false);
+
+    expect((await put({ hiddenFromBoard: "yes" })).status).toBe(400);
+    const hidden = await put({ hiddenFromBoard: true });
+    expect(hidden.status).toBe(200);
+    expect(((await hidden.json()) as { hiddenFromBoard: boolean }).hiddenFromBoard).toBe(true);
+    // Gone from everyone's board immediately (snapshot edited in place); no `you` row for the caller.
+    expect((await board(other.token)).entries.some((x) => x.userId === me.userId)).toBe(false);
+    const own = await board(me.token);
+    expect(own.you).toBeNull();
+    expect(own.entries.some((x) => x.isYou)).toBe(false);
+    // ...and stays gone after a rebuild.
+    await h.call("POST", "/v1/admin/snapshot", ADMIN);
+    expect((await board(other.token)).entries.some((x) => x.userId === me.userId)).toBe(false);
+
+    // Un-hide: the caller's live row is back now; others see it after the next rebuild.
+    const shown = await put({ hiddenFromBoard: false });
+    expect(((await shown.json()) as { hiddenFromBoard: boolean }).hiddenFromBoard).toBe(false);
+    expect((await board(me.token)).you?.userId).toBe(me.userId);
+    await h.call("POST", "/v1/admin/snapshot", ADMIN);
+    expect((await board(other.token)).entries.some((x) => x.userId === me.userId)).toBe(true);
+
+    // An admin hide is separate: the user's toggle can't undo it, and it isn't reported as the user's choice.
+    await h.call("POST", `/v1/admin/users/${me.userId}/hide`, ADMIN);
+    await put({ hiddenFromBoard: true });
+    const off = await put({ hiddenFromBoard: false });
+    expect(((await off.json()) as { hiddenFromBoard: boolean }).hiddenFromBoard).toBe(false);
+    await h.call("POST", "/v1/admin/snapshot", ADMIN);
+    expect((await board(other.token)).entries.some((x) => x.userId === me.userId)).toBe(false);
+    expect((await board(me.token)).you).toBeNull();
+  });
+
   it("reached_at moves only when the floored island % rises (P1-4)", async () => {
     const h = harness();
     const { token, userId } = await devLogin(h, "lb-reach");

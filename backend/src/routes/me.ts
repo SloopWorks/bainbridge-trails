@@ -25,7 +25,8 @@ export function meBody(u: UserRow) {
     anonName: u.anon_name,
     isAnonymous: publicName(u) === u.anon_name,
     nameStatus: nameStatus(u),
-    hiddenFromBoard: u.hidden === 1,
+    // The user's own toggle (P1-8). An admin hide is moderation state and is not reported here.
+    hiddenFromBoard: u.self_hidden === 1,
     metrics: metricsJson(u),
   };
 }
@@ -33,7 +34,10 @@ export function meBody(u: UserRow) {
 export async function putMe(request: Request, env: Env, deps: Deps, user: UserRow): Promise<Response> {
   const body = await readJson(request, 4 * KB);
   if (!isObject(body)) throw badRequest("body must be an object");
-  if (!("anonName" in body) && !("displayName" in body)) throw badRequest("nothing to update: send displayName and/or anonName");
+  if (!("anonName" in body) && !("displayName" in body) && !("hiddenFromBoard" in body)) {
+    throw badRequest("nothing to update: send displayName, anonName and/or hiddenFromBoard");
+  }
+  if ("hiddenFromBoard" in body && typeof body.hiddenFromBoard !== "boolean") throw badRequest("hiddenFromBoard must be a boolean");
   let anon = user.anon_name;
   let custom = user.display_name;
   if ("anonName" in body) {
@@ -58,6 +62,17 @@ export async function putMe(request: Request, env: Env, deps: Deps, user: UserRo
       env.DB.prepare("UPDATE users SET anon_name = ?, display_name = ? WHERE id = ?").bind(anon, custom, user.id),
       ...(publicName(next) !== publicName(user) ? snapshotRename(env, user.id, publicName(next)) : []),
     ]);
+  }
+  if ("hiddenFromBoard" in body) {
+    const hide = body.hiddenFromBoard === true ? 1 : 0;
+    if (hide !== user.self_hidden) {
+      // Hiding drops the row from the snapshot at once. Un-hiding shows the caller's live `you` row at once; others
+      // see the row again at the next daily rebuild (TL-11: no live numbers for others).
+      await env.DB.batch([
+        env.DB.prepare("UPDATE users SET self_hidden = ? WHERE id = ?").bind(hide, user.id),
+        ...(hide ? snapshotRemove(env, user.id) : []),
+      ]);
+    }
   }
   return json(meBody((await getUser(env, user.id))!));
 }
