@@ -25,9 +25,16 @@
     "GOOGLE_CLIENT_IDS": "",
     // Comma-separated Apple audiences (iOS bundle id, Services ID).
     "APPLE_CLIENT_IDS": "",
-    // Cheat limits (see README "Plausibility").
-    "PLAUSIBLE_SPEED_KMH": "7",
-    "BURST_KM_PER_DAY": "15",
-    "INITIAL_IMPORT_KM": "40"
-  }
+    // Apple token revocation on account deletion (TL-10). Leave empty to disable (no-op).
+    // Also needs the secret APPLE_PRIVATE_KEY (.p8 contents): `npx wrangler secret put APPLE_PRIVATE_KEY`.
+    "APPLE_TEAM_ID": "",
+    "APPLE_KEY_ID": "",
+    // Shown on GET /delete-account as the email fallback.
+    "SUPPORT_EMAIL": "",
+    // Cheat limit (TL-2): new covered metres <= speed x sum(durationS of new walks) + slack.
+    "PLAUSIBLE_SPEED_MPS": "4.0",
+    "PLAUSIBLE_SLACK_M": "500"
+  },
+  // TL-11: rebuild leaderboard + community-stats snapshots daily (09:17 UTC = ~1-2 am Pacific). Free tier allows 5 crons.
+  "triggers": { "crons": ["17 9 * * *"] }
 }
