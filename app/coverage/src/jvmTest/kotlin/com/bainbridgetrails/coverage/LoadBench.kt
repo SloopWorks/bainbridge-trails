@@ -12,10 +12,7 @@ class LoadBench {
     fun loadTimings() {
         val segs = File("../../data/dist/coverage_segments.json")
         val trails = File("../../data/dist/trails.json")
-        if (!segs.exists() || !trails.exists()) {
-            println("LoadBench: SKIPPED, ../../data/dist files missing")
-            return
-        }
+        assumeDataFiles("LoadBench", segs, trails)
         val t = trails.readText()
         val s = segs.readText()
         val bin = DatasetBinary.encode(Dataset.parse(t, s), DatasetBinary.hash(t.encodeToByteArray()))

@@ -27,7 +27,7 @@ Legend: **done** · **partial** · **not done**.
 | 14 | Display name, anon generator, validation, blocklist | done | |
 | 15 | Report name (flags for admin review; auto-hide cut per decisions.md) | done | |
 | 16 | Delete account (server + optional local) | done | |
-| 17 | Settings: units, attribution, privacy, version | partial | in-app privacy summary only; hosted privacy policy URL missing |
+| 17 | Settings: units, attribution, privacy, version | partial | in-app privacy summary; full policy now in `docs/legal/privacy-policy.md`, served by the Worker at `<worker>/privacy` (plus `/terms`, `/support`) once deployed. Left: point Settings > Privacy policy at that URL after `PROD_BASE_URL` is final |
 | 18 | Sync up/down, union merge, offline queue | done | verified against local backend only |
 | 19 | Known fixes (double "Walk saved", recoverAfterDismiss, memoized stats) | done | |
 | 20 | Copy via resources, a11y labels, status not by colour alone | done | count strings use `<plurals>` |
@@ -76,8 +76,9 @@ prototype exists but is compiled only with `-PgeofencePrototype=true` (Android) 
    Apple, set `PROD_BASE_URL`, privacy policy URL (see top-level `README.md`).
 2. End-to-end on real devices with real OAuth against the deployed backend; field walks (location spike
    field-test plan in `docs/spikes/location/notes.md`).
-3. Release hardening: R8 with keep rules, release signing, Play FGS-location declaration + data-safety form,
-   App Store privacy labels.
+3. Release hardening: R8 with keep rules, release signing; submit the store forms drafted in `docs/store/`
+   (Play FGS-location declaration + video, data safety, content rating; App Store privacy labels) and the
+   listing text in `metadata/`; add an iOS `PrivacyInfo.xcprivacy`.
 4. P1 gaps: walk history detail, hide-me toggle, reporter-side immediate hide, other-account sync dialog,
    island 100% art, admin blocklist endpoint.
 5. Upstream debugdrawer fix (await the save before restart), then drop the AGENTS.md workaround.
