@@ -177,6 +177,17 @@ object AppGraph {
         /** The recording controller (built once; completes after crash recovery / auto-finalize on launch). */
         fun controller(): Deferred<RecordingController> = RecordingGraph.controller(context)
 
+        /**
+         * Walk detail (P1-6): a finished walk's raw fixes while its session file still exists (deleted 30 days after
+         * the walk); null once pruned or unreadable. Read on IO, drawn on this device only, never synced or logged.
+         */
+        suspend fun rawTrack(sessionId: String): List<com.bainbridgetrails.coverage.Fix>? = withContext(Dispatchers.IO) {
+            runCatching {
+                val store = com.bainbridgetrails.tracking.SessionStore(trackingDir)
+                if (sessionId in store.ids()) store.load(sessionId).fixes else null
+            }.getOrNull()
+        }
+
         /** Re-reads coverage-derived state (after a walk, a debug-tool write, or a sync). */
         fun coverageChanged() {
             progress.refresh()

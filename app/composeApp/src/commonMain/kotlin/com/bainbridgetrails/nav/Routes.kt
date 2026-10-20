@@ -12,6 +12,8 @@ sealed interface Route
 
 @Serializable data class TrailDetailRoute(val trailId: String) : Route
 @Serializable data object LeaderboardRoute : Route
+/** P1-6: a walk from Me's history, read-only (device-local; [sessionId] is the walk record's id). */
+@Serializable data class WalkDetailRoute(val sessionId: String) : Route
 @Serializable data object ProfileRoute : Route
 @Serializable data object SettingsRoute : Route
 @Serializable data object AttributionRoute : Route

@@ -65,6 +65,15 @@
     <string name="me_history_other_devices">Walks recorded on other phones aren’t listed, but their progress is included above.</string>
     <string name="me_history_unverified">Unverified</string>
     <string name="me_history_more">Show more walks</string>
+    <string name="me_history_open_a11y">Open walk</string>
+
+    <!-- Walk detail (P1-6) -->
+    <string name="walk_stats">%1$s · %2$s · %3$s</string>
+    <string name="walk_map_a11y">Map of this walk</string>
+    <string name="walk_map_track_a11y">Map of this walk with your route</string>
+    <string name="walk_track_note">Your route is only on this phone and is deleted 30 days after the walk.</string>
+    <string name="walk_no_track_note">Routes are deleted from this phone after 30 days. The trails this walk added to are outlined.</string>
+    <string name="walk_not_found">This walk isn’t on this phone anymore.</string>
     <string name="me_history_row_a11y">%1$s, %2$s, %3$s, %4$s</string>
 
     <!-- Sync -->

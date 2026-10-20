@@ -58,7 +58,8 @@ data class SelectedTrail(val id: String, val lines: List<List<List<Double>>>, va
  * Encoding (styles.md, never color alone): not started = dots, partway = long dash + casing, nearly done = solid +
  * casing, complete = thick solid (+ glow on Dark). Named trails outside the island total (TL-6) use the same colors
  * with a short even dash; unnamed not-counted paths are faint hairlines. With a [selected] trail every other trail
- * dims to 45% and the selected one gets an outline + gap + its trail-level status line on top.
+ * dims to 45% and the selected one gets an outline + gap + its trail-level status line on top. [highlight] lines
+ * (e.g. the trails a walk added to, P1-6) get the selection outline + gap under their own status lines, no dimming.
  */
 @Composable
 @MaplibreComposable
@@ -67,6 +68,7 @@ fun StatusLayers(
     style: MapStyle,
     selected: SelectedTrail? = null,
     reducedMotion: Boolean = false,
+    highlight: List<List<List<Double>>> = emptyList(),
 ) {
     val trails = getBaseSource<VectorSource>("trails") ?: return // style still loading
     val p = style.palette
@@ -128,6 +130,7 @@ fun StatusLayers(
             width = width(s, extra = TrailLineSpec.HALO_EXTRA),
             cap = const(LineCap.Round), join = const(LineJoin.Round),
         )
+        if (highlight.isNotEmpty()) HighlightLayers(highlight, p)
         // Dark casing under Partway and Nearly done.
         for (s in order) if (present(s) && TrailLineSpec.hasCasing(s)) LineLayer(
             id = "app-trail-casing-${s.name.lowercase()}",
@@ -219,6 +222,24 @@ private fun SelectionLayers(selected: SelectedTrail, p: MapPalette) {
         dasharray = TrailLineSpec.dash(s)?.let { const(it) },
         cap = const(if (s == TrailStatus.PARTWAY) LineCap.Butt else LineCap.Round),
         join = const(LineJoin.Round),
+    )
+}
+
+/** Selection outline (+6) and gap (+2) along [lines], drawn under the status lines (walk detail). */
+@Composable
+@MaplibreComposable
+private fun HighlightLayers(lines: List<List<List<Double>>>, p: MapPalette) {
+    val json = remember(lines) { multiLineGeoJson(lines) }
+    val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))
+    LineLayer(
+        id = "app-highlight-outline", source = source,
+        color = const(p.selection), opacity = const(0.9f), width = width(TrailStatus.NEARLY_DONE, extra = 6f),
+        cap = const(LineCap.Round), join = const(LineJoin.Round),
+    )
+    LineLayer(
+        id = "app-highlight-gap", source = source,
+        color = const(p.selectionGap), width = width(TrailStatus.NEARLY_DONE, extra = 2f),
+        cap = const(LineCap.Round), join = const(LineJoin.Round),
     )
 }
 
