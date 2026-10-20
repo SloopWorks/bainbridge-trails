@@ -12,6 +12,7 @@ import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.coverage.Xy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
@@ -166,6 +167,45 @@ class FinalizerTest {
         record(store2, "s2", 0.0, 0.0, 200.0)
         val again = Finalizer(ds, index, store2, CoverageStore(dir2)).finalize("s2")
         assertTrue(again.newlyCompleted.isEmpty(), "A was already complete (sticky)")
+    }
+
+    @Test
+    fun coverageMergedDuringMatchingIsSeenAsBefore() = runTest {
+        // P2-9: a sync merge landing while the walk is being matched counts as "before" (no repeat celebration).
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        record(store, "s1", 0.0, 0.0, 200.0)
+        val remote = index.coverFixes(
+            (0..66).map { Fix(t0 + it * 2000L, proj.toLonLat(Xy(it * 3.0, 0.0)).first, proj.toLonLat(Xy(it * 3.0, 0.0)).second, 5.0) },
+        )
+        val f = Finalizer(ds, index, store, CoverageStore(dir), afterMatch = {
+            CoverageStore.writeLock.withLock { CoverageStore(dir).mergeRemote(remote, setOf("A")) }
+        })
+        val sum = f.finalize("s1")
+        assertTrue(sum.newlyCompleted.isEmpty(), "A arrived complete from sync during matching")
+        assertTrue(sum.trails.none { it.trailId == "A" }, "no rise over the synced coverage")
+    }
+
+    @Test
+    fun walkRecordIsWrittenBeforeCoverageInsideTheLock() = runTest {
+        // P1-2: a walk's bits are never visible without its walk record; a failing walk write leaves coverage untouched.
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        record(store, "s1", 0.0, 0.0, 200.0)
+        SystemFileSystem.createDirectories(Path(dir, "walks.json.tmp")) // the walk index cannot write
+        val f = Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir))
+        assertTrue(runCatching { f.finalize("s1") }.isFailure)
+        assertEquals(CoverageState.EMPTY, CoverageStore(dir).load())
+        assertTrue(CoverageStore(dir).finalizedIds().isEmpty())
+    }
+
+    @Test
+    fun walkRecordCarriesFinalizeTime() = runTest {
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        record(store, "s1", 0.0, 0.0, 50.0)
+        Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir), clock = { 42L }).finalize("s1")
+        assertEquals(42L, WalkIndex(dir).all().single().finalizedAt)
     }
 }
 

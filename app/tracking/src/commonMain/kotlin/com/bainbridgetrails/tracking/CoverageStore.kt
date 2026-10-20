@@ -63,7 +63,10 @@ class CoverageStore(dir: String) {
         write(cur.copy(state = cur.state.union(state), verified = ids, completed = cur.completed + completed))
     }
 
-    /** Replaces the stored coverage with EMPTY and forgets finalized ids and sticky completions (debug tools only). */
+    /**
+     * Replaces the stored coverage with EMPTY and forgets finalized ids and sticky completions (debug tools;
+     * [LocalProgress.wipe], which also deletes the raw tracks so nothing is re-finalized). Hold [writeLock].
+     */
     fun reset() = write(CoverageFile())
 
     /** Adds sticky completions without coverage (debug tools: test the celebration; sync: server's sticky set). */
