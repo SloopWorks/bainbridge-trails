@@ -113,9 +113,21 @@ class ProfileRepositoryTest {
         assertEquals(server, repo().load().anonName)
         assertNotEquals(local, p.profile.value!!.anonName)
 
-        p.onSignedOut()
+        p.onSignedOut(wipe = false)
         assertNull(p.profile.value!!.me)
         assertEquals(server, p.profile.value!!.anonName)
+    }
+
+    @Test
+    fun pendingNameSurvivesSignOutUnlessWiped() = runTest {
+        server.online = false
+        val p = repo()
+        assertEquals(NameSaveResult.SavedLocally, p.saveCustomName("Trail Fox"))
+        p.onSignedOut(wipe = false) // e.g. a 401 while offline changes were queued
+        assertEquals("Trail Fox", p.profile.value!!.pending?.customName)
+        assertEquals("Trail Fox", repo().load().pending?.customName, "persisted")
+        p.onSignedOut(wipe = true) // account deleted
+        assertNull(p.profile.value!!.pending)
     }
 
     @Test

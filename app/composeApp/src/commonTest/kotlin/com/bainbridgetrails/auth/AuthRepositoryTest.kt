@@ -25,7 +25,7 @@ class AuthRepositoryTest {
 
     private fun repo(store: SessionStore = SessionStore(dir) { now }): AuthRepository {
         lateinit var auth: AuthRepository
-        val api = server.client(token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized() })
+        val api = server.client(token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized(it) })
         auth = AuthRepository(api, store, localAnonName = { "Calm Otter 77" })
         auth.addListener(object : AuthListener {
             override suspend fun onSignedIn(response: AuthResponse) {
@@ -149,13 +149,24 @@ class AuthRepositoryTest {
         server.on("POST /v1/auth/dev", Reply.json(Fixtures.auth()))
         server.on("GET /v1/me", Reply.error(401, "unauthorized"))
         lateinit var auth: AuthRepository
-        val api = server.client(token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized() })
-        auth = AuthRepository(api, SessionStore(dir) { now })
+        val api = server.client(token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized(it) })
+        auth = AuthRepository(api, SessionStore(dir) { now }, scope = backgroundScope)
         auth.load()
         auth.signInWithDev()
         api.getMe()
         assertEquals(AuthState.SignedOut, auth.state.value)
         assertNull(SessionStore(dir) { now }.load())
+    }
+
+    @Test
+    fun staleUnauthorizedDoesNotSignOutANewerSession() = runTest {
+        server.on("POST /v1/auth/dev", Reply.json(Fixtures.auth("u1", "tok2")))
+        val auth = repo()
+        auth.load()
+        auth.signInWithDev()
+        auth.handleUnauthorized("tok1") // a 401 for a request sent with the previous session's token
+        assertEquals("tok2", assertIs<AuthState.SignedIn>(auth.state.value).session.token)
+        assertEquals(listOf("in:u1"), events)
     }
 
     @Test

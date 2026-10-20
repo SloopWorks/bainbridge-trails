@@ -155,10 +155,13 @@ class ProfileRepository(
         flushPending()
     }
 
-    /** Signed out: forget the server profile; keep the device's anon name. */
-    suspend fun onSignedOut() = mutex.withLock {
+    /**
+     * Signed out: forget the server profile; keep the device's anon name. A pending name change stays (sent after
+     * the next sign-in) unless the account was deleted / this phone wiped ([wipe]).
+     */
+    suspend fun onSignedOut(wipe: Boolean) = mutex.withLock {
         val cur = loadLocked()
-        persist(cur.copy(me = null, pending = null))
+        persist(cur.copy(me = null, pending = if (wipe) null else cur.pending))
     }
 
     private suspend fun applyServer(me: MeDto, clearPending: PendingName?) = mutex.withLock {

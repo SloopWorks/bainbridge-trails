@@ -7,9 +7,14 @@ import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.tracking.CoverageStore
+import com.bainbridgetrails.log.AppLog
 import com.bainbridgetrails.tracking.Finalizer
 import com.bainbridgetrails.tracking.Geofences
+import com.bainbridgetrails.tracking.LocalProgress
 import com.bainbridgetrails.tracking.Perm
+import com.bainbridgetrails.tracking.RecordingState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import com.bainbridgetrails.tracking.Recorder
 import com.bainbridgetrails.tracking.RecordingBus
 import com.bainbridgetrails.tracking.RecordingController
@@ -81,8 +86,37 @@ internal object RecordingGraph {
         RecordingController(store, Finalizer(ds, index, store, coverage, walks = WalkIndex(dir)), { Clock.System.now().toEpochMilliseconds() }, recorder, scope).also {
             it.bind(RecordingBus.events, RecordingBus.lost)
             it.onLaunch()
+            // Raw-track retention: tracks of walks finalized 30+ days ago are deleted (their ids stay finalized).
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val pruned = LocalProgress.pruneRawTracks(dir, Clock.System.now().toEpochMilliseconds())
+                    if (pruned.isNotEmpty()) AppLog.i("recording", "pruned ${pruned.size} raw tracks")
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    AppLog.e("recording", "raw-track prune failed: ${e.message}")
+                }
+            }
         }
     }.also { controller = it }
+
+    /**
+     * "Also clear this phone" (F9e): deletes every session except the one being recorded, coverage, sticky
+     * completions and walk history ([LocalProgress.wipe]), drops a pending crash recovery and the live-coverage cache.
+     */
+    suspend fun wipeLocal(context: PlatformContext) = withContext(Dispatchers.Main) { // the controller is Main-only
+        val dir = trackingDir(context)
+        val c = controller?.takeIf { it.isCompleted && !it.failed() }?.await()
+        val keep = when (val s = c?.state?.value) {
+            is RecordingState.Recording -> setOf(s.sessionId)
+            is RecordingState.Finalizing -> setOf(s.sessionId)
+            is RecordingState.Stopped -> setOf(s.sessionId)
+            null -> withContext(Dispatchers.IO) { SessionStore(dir).unfinished().toSet() } // controller not built: a recorder may run
+            else -> emptySet()
+        }
+        withContext(Dispatchers.IO) { LocalProgress.wipe(dir, keep) }
+        (c?.state?.value as? RecordingState.Recover)?.let { c.discardRecovered(it.sessionId) }
+        live?.invalidate()
+    }
 
     private var live: LiveCoverageSession? = null
 

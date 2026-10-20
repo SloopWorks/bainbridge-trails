@@ -10,6 +10,7 @@ import com.bainbridgetrails.data.NameSaveResult
 import com.bainbridgetrails.data.ProfileRepository
 import com.bainbridgetrails.data.TrailStatsRepository
 import com.bainbridgetrails.sync.LocalCoverage
+import com.bainbridgetrails.sync.LocalSnapshot
 import com.bainbridgetrails.sync.LocalWalk
 import com.bainbridgetrails.sync.SyncRepository
 import com.bainbridgetrails.sync.SyncState
@@ -50,7 +51,7 @@ class BackendSmokeTest {
         AuthConfig.devSignInEnabled = true
 
         lateinit var auth: AuthRepository
-        val api = ApiClient(OkHttp.create(), baseUrl = { url }, token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized() })
+        val api = ApiClient(OkHttp.create(), baseUrl = { url }, token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized(it) })
         val profile = ProfileRepository(api, "$dir/profile.json", isSignedIn = { auth.token() != null })
         auth = AuthRepository(api, SessionStore(dir, now), localAnonName = { profile.anonName() })
         auth.load()
@@ -66,7 +67,7 @@ class BackendSmokeTest {
         // ~400 m of fully covered counted segments + one 10-minute walk (allowed 4 m/s × 600 s + 500 m).
         val local = object : LocalCoverage {
             var state = coverageFromBackendMeta(400.0)
-            override suspend fun load() = state
+            override suspend fun snapshot() = LocalSnapshot(state, listOf(LocalWalk("s-smoke", 600)))
             override suspend fun mergeRemote(state: CoverageState, completed: Set<String>): Boolean {
                 val next = this.state.union(state)
                 return (next != this.state).also { this.state = next }
@@ -78,7 +79,6 @@ class BackendSmokeTest {
             queuePath = "$dir/sync.json",
             currentUserId = { auth.token()?.let { signIn.user.userId } },
             coverage = local,
-            localWalks = { listOf(LocalWalk("s-smoke", 600)) },
             datasetVersion = { "2026-10-18+aad9d16e" },
             now = now,
             backoffMs = emptyList(),

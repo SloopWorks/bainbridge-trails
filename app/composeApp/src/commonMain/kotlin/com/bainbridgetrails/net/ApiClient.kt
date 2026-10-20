@@ -34,7 +34,8 @@ class ApiClient(
     engine: HttpClientEngine,
     private val baseUrl: () -> String = { ApiConfig.baseUrl },
     private val token: suspend () -> String? = { null },
-    private val onUnauthorized: suspend () -> Unit = {},
+    /** Gets the bearer the 401 answered, so a stale response cannot sign out a newer session. */
+    private val onUnauthorized: suspend (bearer: String) -> Unit = {},
     /** Off in tests: HttpTimeout's timers run on the caller's (virtual-time) dispatcher under runTest. */
     timeouts: Boolean = true,
 ) {
@@ -122,7 +123,7 @@ class ApiClient(
             val body = runCatching { json.decodeFromString(ErrorEnvelope.serializer(), text).error }.getOrNull()
             val retryAfter = response.headers[HttpHeaders.RetryAfter]?.trim()?.toLongOrNull()
             val error = apiErrorFrom(status, body, retryAfter)
-            if (error is ApiError.Unauthorized && bearer != null && explicitBearer == null) onUnauthorized()
+            if (error is ApiError.Unauthorized && bearer != null && explicitBearer == null) onUnauthorized(bearer)
             AppLog.w(TAG, "${method.value} ${path.substringBefore('?')} -> $status ${body?.code.orEmpty()}")
             return ApiResult.Failure(error)
         }
