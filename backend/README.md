@@ -143,10 +143,14 @@ Edit `wrangler.jsonc` `vars`:
 - Optional, for Apple token revocation on account deletion (TL-10): `APPLE_TEAM_ID`, `APPLE_KEY_ID` vars and
   `npx wrangler secret put APPLE_PRIVATE_KEY` (contents of the Sign in with Apple `.p8` key). Without them,
   revocation is a no-op.
-- `SUPPORT_EMAIL`: shown on the public `GET /delete-account` page (Play Store account-deletion URL). Use the same
-  address as the privacy policy (`privacy@sloopworks.com`, in `docs/legal/*.md`).
+- `SUPPORT_EMAIL`: shown on the public `GET /delete-account` page (Play Store account-deletion URL). Preset to
+  `privacy@sloopworks.com`, the address in the privacy policy (`docs/legal/*.md`). **TODO(owner):** route that
+  address (Cloudflare Email Routing) before publishing, or change it here and in `docs/legal/*.md` together.
 
-Then `npm run deploy`. The Worker is served at `https://bainbridge-trails-api.<account>.workers.dev`
+Then `npm run deploy`. It applies pending D1 migrations to the remote database first
+(`wrangler d1 migrations apply DB --remote`), then deploys the Worker, so new code never runs against an old
+schema. Migrations must stay backward compatible with the Worker version still serving during the deploy
+(additive columns/tables only). The Worker is served at `https://bainbridge-trails-api.<account>.workers.dev`
 (Cache API is a no-op on `workers.dev`; stats still send `Cache-Control: public, max-age=300`).
 Never set `ALLOW_DEV_AUTH` in `wrangler.jsonc` or as a production secret.
 

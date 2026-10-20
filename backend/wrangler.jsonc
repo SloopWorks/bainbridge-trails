@@ -29,8 +29,9 @@
     // Also needs the secret APPLE_PRIVATE_KEY (.p8 contents): `npx wrangler secret put APPLE_PRIVATE_KEY`.
     "APPLE_TEAM_ID": "",
     "APPLE_KEY_ID": "",
-    // Shown on GET /delete-account as the email fallback.
-    "SUPPORT_EMAIL": "",
+    // Shown on GET /delete-account as the email fallback. Same address as docs/legal/*.md.
+    // TODO(owner): make sure privacy@sloopworks.com is routed (Cloudflare Email Routing) before publishing.
+    "SUPPORT_EMAIL": "privacy@sloopworks.com",
     // Cheat limit (TL-2): new covered metres <= speed x sum(durationS of new walks) + slack.
     "PLAUSIBLE_SPEED_MPS": "4.0",
     "PLAUSIBLE_SLACK_M": "500"
