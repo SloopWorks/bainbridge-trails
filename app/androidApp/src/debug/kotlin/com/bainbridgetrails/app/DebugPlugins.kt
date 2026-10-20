@@ -97,6 +97,11 @@ class CoveragePlugin(private val context: Context) : DebugPlugin {
                     AppLog.i("debug", "marked ${target.trailId} complete from debug drawer")
                 }
             }) { Text("Complete next unfinished trail") }
+            // Replays the celebration (plural variant) without touching coverage: the 3 shortest trails of 0.2 mi or more.
+            OutlinedButton(enabled = snapshot != null, onClick = {
+                val picks = snapshot?.trails?.filter { it.lengthMi >= 0.2 }?.sortedBy { it.lengthMi }?.take(3)?.map { it.trailId } ?: return@OutlinedButton
+                AppGraph.requestCelebration(AppGraph.Celebration("debug-multi-${picks.joinToString()}-${System.currentTimeMillis()}", picks))
+            }) { Text("Show celebration (3 trails)") }
             message?.let { Text(it) }
         }
     }
