@@ -48,7 +48,7 @@ object AndroidMappers {
      * Ruling R8: a fix taken before the session (re)started is a cached position from before the walk, not
      * part of it, and would add a jump to the track and distance.
      */
-    fun isSessionFix(fixTimeMs: Long, sessionStartMs: Long): Boolean = fixTimeMs >= sessionStartMs
+    fun isSessionFix(fixTimeMs: Long, sessionStartMs: Long): Boolean = SessionFix.isSessionFix(fixTimeMs, sessionStartMs)
 
     fun activityKind(type: Int): ActivityKind = when (type) {
         DetectedActivity.IN_VEHICLE -> ActivityKind.VEHICLE

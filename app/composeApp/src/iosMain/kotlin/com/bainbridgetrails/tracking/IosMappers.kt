@@ -50,7 +50,7 @@ object IosMappers {
         accuracyAuthorization == CLAccuracyAuthorization.CLAccuracyAuthorizationFullAccuracy
 
     /** Ruling R8: CLLocationManager may first deliver a cached location from before the session; it is not part of the walk. */
-    fun isSessionFix(fixTimeMs: Long, sessionStartMs: Long): Boolean = fixTimeMs >= sessionStartMs
+    fun isSessionFix(fixTimeMs: Long, sessionStartMs: Long): Boolean = SessionFix.isSessionFix(fixTimeMs, sessionStartMs)
 
     /**
      * R5 analogue: the lost reason when authorisation or system location services went away mid-recording, else null.

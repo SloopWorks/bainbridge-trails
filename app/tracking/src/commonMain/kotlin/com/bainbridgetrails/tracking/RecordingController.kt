@@ -210,7 +210,7 @@ class RecordingController(
 
     fun onFix(fix: Fix) {
         val r = _state.value as? RecordingState.Recording ?: return
-        if (fix.timeMs < r.startedMs) return // R8: a cached pre-start position is not part of the walk
+        if (!SessionFix.isSessionFix(fix.timeMs, r.startedMs)) return // R8: a cached pre-start position is not part of the walk
         _track.value = trackStore.append(fix)
         // Mock fixes are drawn but never add distance (finalising drops them too).
         val added = if (fix.isMock) 0.0 else lastRealFix?.let { distanceM(it, fix) } ?: 0.0

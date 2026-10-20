@@ -1,6 +1,8 @@
 package com.bainbridgetrails.data
 
 import com.bainbridgetrails.coverage.CoverageState
+import com.bainbridgetrails.coverage.Dataset
+import com.bainbridgetrails.coverage.DatasetBinary
 import com.bainbridgetrails.coverage.Fix
 import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.map.MapStyle
@@ -19,7 +21,44 @@ import kotlin.test.assertTrue
 class RepositoriesTest {
     private fun TestScope.datasets(fail: Boolean = false): DatasetRepository {
         val d = StandardTestDispatcher(testScheduler)
-        return DatasetRepository(backgroundScope, { if (fail) error("boom") else DataFixtures.TRAILS to DataFixtures.SEGMENTS }, compute = d)
+        return DatasetRepository(backgroundScope, sources { fail }, compute = d)
+    }
+
+    private fun sources(bin: ByteArray? = null, fail: () -> Boolean = { false }) = DatasetSources(
+        trailsJson = { if (fail()) error("boom") else DataFixtures.TRAILS.encodeToByteArray() },
+        segmentsJson = { jsonReads++; DataFixtures.SEGMENTS },
+        datasetBin = { bin },
+    )
+
+    private var jsonReads = 0
+
+    private val jsonDataset get() = Dataset.parse(DataFixtures.TRAILS, DataFixtures.SEGMENTS)
+
+    private fun fixtureBin(trailsJson: String = DataFixtures.TRAILS): ByteArray =
+        DatasetBinary.encode(jsonDataset, DatasetBinary.hash(trailsJson.encodeToByteArray()))
+
+    @Test
+    fun datasetPrefersTheBinary() = runTest {
+        val repo = DatasetRepository(backgroundScope, sources(fixtureBin()), compute = StandardTestDispatcher(testScheduler))
+        val data = repo.await()
+        assertEquals("bin", data.format)
+        assertEquals(0, jsonReads, "JSON not read when the binary is usable")
+        assertEquals(jsonDataset.trails, data.dataset.trails)
+        assertEquals(jsonDataset.segments, data.dataset.segments)
+        assertEquals(jsonDataset.version, data.dataset.version)
+    }
+
+    @Test
+    fun datasetFallsBackToJsonOnStaleOrCorruptBinary() = runTest {
+        val stale = fixtureBin(trailsJson = DataFixtures.TRAILS.replace("t1", "t0"))
+        for (bad in listOf(stale, fixtureBin().copyOf(60), byteArrayOf(1, 2, 3))) {
+            jsonReads = 0
+            val repo = DatasetRepository(backgroundScope, sources(bad), compute = StandardTestDispatcher(testScheduler))
+            val data = repo.await()
+            assertEquals("json", data.format)
+            assertEquals(1, jsonReads)
+            assertEquals(2, data.dataset.trails.size)
+        }
     }
 
     @Test
@@ -40,7 +79,7 @@ class RepositoriesTest {
     @Test
     fun datasetFailureIsRetryable() = runTest {
         var fail = true
-        val repo = DatasetRepository(backgroundScope, { if (fail) error("boom") else DataFixtures.TRAILS to DataFixtures.SEGMENTS }, compute = StandardTestDispatcher(testScheduler))
+        val repo = DatasetRepository(backgroundScope, sources { fail }, compute = StandardTestDispatcher(testScheduler))
         repo.load()
         runCurrent() // backgroundScope work is not covered by advanceUntilIdle
         assertEquals(Loadable.Failed("boom"), repo.state.value)

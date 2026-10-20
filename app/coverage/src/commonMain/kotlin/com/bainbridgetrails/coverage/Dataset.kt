@@ -25,6 +25,9 @@ private data class TrailsFile(
 )
 
 @Serializable
+private data class VersionOnly(val version: String)
+
+@Serializable
 private data class SegmentsFile(val version: String, val segments: List<SegmentGeom>)
 
 /** Parsed trails.json + coverage_segments.json. [islandTotalM] is the shippable total. */
@@ -42,12 +45,22 @@ class Dataset(
             val t = json.decodeFromString(TrailsFile.serializer(), trailsJson)
             val s = json.decodeFromString(SegmentsFile.serializer(), coverageSegmentsJson)
             require(t.version == s.version) { "dataset version mismatch: trails=${t.version} segments=${s.version}" }
-            val segIds = s.segments.mapTo(HashSet()) { it.id }
-            for (tr in t.trails) {
+            return Dataset(t.trails, t.islandTotalShippableM, s.segments, t.version).validated()
+        }
+
+        /** As [parse], from dataset.bin ([DatasetBinary]); same result, much faster. */
+        fun fromBinary(datasetBin: ByteArray): Dataset = DatasetBinary.decode(datasetBin).validated()
+
+        /** The `version` of a trails.json document (no trail objects built). */
+        fun trailsVersion(trailsJson: String): String = json.decodeFromString(VersionOnly.serializer(), trailsJson).version
+
+        private fun Dataset.validated(): Dataset {
+            val segIds = segments.mapTo(HashSet()) { it.id }
+            for (tr in trails) {
                 val missing = tr.segmentIds.firstOrNull { it !in segIds }
                 require(missing == null) { "trail ${tr.id} segment $missing missing from coverage segments" }
             }
-            return Dataset(t.trails, t.islandTotalShippableM, s.segments, t.version)
+            return this
         }
     }
 }
