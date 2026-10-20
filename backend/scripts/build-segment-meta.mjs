@@ -69,6 +69,8 @@ const onGoal = new Set(goals.flatMap((t) => t.segment_ids));
 const segments = {};
 for (const s of segFile.segments) {
   // the backend keys coverage rows by segment id alone: a foreign prefix would mix datasets
+  // Roads also carry the trail dataset's segments as matching-only competitors (included:false, seg-*): skip them.
+  if (!s.included && !cfg.idRe.test(s.id)) continue;
   if (!cfg.idRe.test(s.id)) throw new Error(`${dataset}: segment id ${s.id} does not match ${cfg.idRe}`);
   if (!s.included && !onGoal.has(s.id)) continue;
   const [n, tickLen] = ticks(s.coords);
