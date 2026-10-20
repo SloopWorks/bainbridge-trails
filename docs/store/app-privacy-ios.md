@@ -21,8 +21,15 @@ All of it is collected only after the optional Sign in with Apple.
 |---|---|---|
 | Location > **Precise Location** | App Functionality | Covered trail sections (5 m ticks per segment, no timestamps), per-trail progress, completed trails. Finer than Apple's ~3-decimal coarse threshold, so precise. |
 | Identifiers > **User ID** | App Functionality | Random account id, Apple subject id, and the display / anonymous name (a "screen name" in Apple's terms), shown on the leaderboard. |
-| Health & Fitness > **Fitness** | App Functionality | Covered distance totals used for island % and leaderboard. Conservative: it is walking data tied to the account. |
+| Health & Fitness > **Fitness** | App Functionality | Covered distance totals used for island % and leaderboard, and checked for plausibility against walk durations (anti-cheat). Conservative: it is walking data tied to the account. |
 | User Content > **Other User Content** | App Functionality | Name reports (reporter, reported user, time) for moderation. |
+
+**Purposes vs. Play.** Play's Data safety form declares Fitness info and Other actions with "Fraud prevention,
+security and compliance" too (durations feed the plausibility check; name reports feed moderation). Apple has no
+separate fraud purpose: its **App Functionality** purpose explicitly covers "prevent fraud, implement security
+measures", and the manifest key is `NSPrivacyCollectedDataTypePurposeAppFunctionality` (the only other options are
+Analytics, Product Personalization, Developer's / Third-Party Advertising and Other Purposes). So iOS declares App
+Functionality alone for the same uses; the two forms describe identical behavior.
 
 Optional: Apple refresh token (only when revoke credentials are configured) is an auth artefact, not a data type.
 
