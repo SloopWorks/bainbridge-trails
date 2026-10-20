@@ -217,6 +217,6 @@ def run_dist(canonical: Path = DEFAULT_CANONICAL, out_dir: Path = ROADS / "dist"
     ends = road_ends_doc(seg, seg_roads, doc, version, boundary, cache_dir)
     (out_dir / "road_ends.json").write_text(json.dumps(ends, sort_keys=True, indent=2, ensure_ascii=False) + "\n")
     sources = yaml.safe_load(Path(sources_path).read_text())["sources"]
-    md = attribution_md(used_source_ids(seg, ends), sources)
+    md = attribution_md(used_source_ids(seg, ends), sources).replace("`bitrails dist`", "`bitroads dist`")
     (out_dir / "ATTRIBUTION.md").write_text(md)
     return doc

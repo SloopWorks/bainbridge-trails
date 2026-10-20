@@ -51,6 +51,8 @@ DEFAULT_CANONICAL = ROADS / "canonical"
 DEFAULT_REPORT = ROADS / "reports" / "conflicts.md"
 DEFAULT_QA = ROADS / "reports" / "qa.md"
 
+ID_PREFIX = "rseg"          # road segment ids live in their own namespace, never colliding with the
+                            # trail dataset's seg-* ids (the backend syncs both per user)
 # line sources reconciled into the canonical road set, in geometry_rank order
 ROAD_LINE_SOURCES = ("osm_overpass_roads", "cobi_rd_streets", "wsdot_local_agency_public_road",
                      "wsdot_state_route_lines")
@@ -219,7 +221,7 @@ def run_build(sources_path: Path = DEFAULT_SOURCES, cache_dir: Path = DEFAULT_CA
     per_source = load_road_sources(sources, cache_dir, island, log)
     result = reconcile(per_source, sources, None)
 
-    registry = Registry.load(registry_path)
+    registry = Registry.load(registry_path, prefix=ID_PREFIX)
     provisional = [s.id for s in result.segments]
     segments = assign_ids(result.segments, registry, finalize=not degraded)
     rekey = dict(zip(provisional, (s.id for s in segments)))

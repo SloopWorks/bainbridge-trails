@@ -16,46 +16,46 @@ WSDOT's Local Agency Public Road inventory and the City's rd_Streets layer disag
 
 | segment | name | m | WSDOT | City | category |
 |---|---|---|---|---|---|
-| `seg-000067` | Northeast South Beach Drive | 665 | public_city | private | residential |
-| `seg-001699` | Mandus Olson Road Northeast | 565 | public_parks | public_city | residential |
-| `seg-002258` | Olallie Lane | 511 | public_city | private | residential |
-| `seg-001036` | Martin Luther King Jr. Boulevard | 315 | public_school | private | residential |
-| `seg-001314` | Northeast Triple Crown Drive | 292 | public_city | private | residential |
-| `seg-002228` | Sunset Avenue Northeast | 288 | private | public_city | residential |
-| `seg-000704` | Edgecombe Place Northeast | 283 | public_city | private | residential |
-| `seg-001840` | Northeast Twin Ponds Road | 258 | public_city | private | residential |
-| `seg-001281` | Pleasant Beach Drive Northeast | 246 | public_parks | private | residential |
-| `seg-000665` | Hemlock Avenue Northeast | 244 | public_city | private | residential |
-| `seg-001358` | Citation Court | 236 | public_city | private | residential |
-| `seg-002114` | Solana Lane Northeast | 229 | public_city | private | residential |
-| `seg-000689` | Sakai Village Loop | 221 | public_city | private | residential |
-| `seg-001513` | Northeast Eagle Harbor Drive | 215 | private | public_city | residential |
-| `seg-002213` | Crystal Springs Drive Northeast | 213 | private | public_city | residential |
-| `seg-000934` | Fort Ward Park Entrance | 204 | public_parks | private | residential |
-| `seg-001689` | Kinnear Road Northeast | 185 | public_city | private | residential |
-| `seg-000358` | Sunrise Place Northeast | 174 | private | public_city | residential |
-| `seg-000093` | Northeast Ocean Drive | 172 | private | public_city | residential |
-| `seg-000228` | Northeast Quiet Valley Lane | 165 | public_city | private | residential |
-| `seg-001813` | Toad Holler Place Northeast | 164 | public_city | private | residential |
-| `seg-000967` | Northeast Business Park Lane | 158 | public_city | private | residential |
-| `seg-000381` | Gilmore | 157 | public_city | private | residential |
-| `seg-001414` | Affirmed Lane Northeast | 157 | public_city | private | residential |
-| `seg-000234` | Northeast Wiggins Road | 156 | public_city | private | residential |
-| `seg-001260` | Fort Street | 155 | private | public_city | residential |
-| `seg-000335` | Northeast Sunrose Lane | 152 | public_city | private | residential |
-| `seg-001670` | Northeast Woodson Lane | 149 | public_city | private | residential |
-| `seg-000477` | Harborview Drive Southeast | 149 | public_city | private | residential |
-| `seg-000451` | Stonebridge Lane Northeast | 144 | public_city | private | residential |
-| `seg-001184` | Fort Street | 141 | private | public_city | residential |
-| `seg-002254` | NE Tolo Rd | 131 | private | public_city | residential |
-| `seg-001392` | Northeast Triple Crown Drive | 125 | public_city | private | residential |
-| `seg-000495` | Northeast Ewing Street | 116 | private | public_city | residential |
-| `seg-000900` | Northeast Briar Rose Lane | 113 | public_city | private | residential |
-| `seg-001847` | Kojima Avenue Northeast | 110 | public_city | private | residential |
-| `seg-000190` | Northeast Manor Lane | 106 | public_city | private | residential |
-| `seg-001415` | Northeast Triple Crown Drive | 106 | public_city | private | residential |
-| `seg-001850` | Kojima Avenue Northeast | 105 | public_city | private | residential |
-| `seg-000472` | Bridgestone Court Northeast | 103 | public_city | private | residential |
+| `rseg-000067` | Northeast South Beach Drive | 665 | public_city | private | residential |
+| `rseg-001699` | Mandus Olson Road Northeast | 565 | public_parks | public_city | residential |
+| `rseg-002258` | Olallie Lane | 511 | public_city | private | residential |
+| `rseg-001036` | Martin Luther King Jr. Boulevard | 315 | public_school | private | residential |
+| `rseg-001314` | Northeast Triple Crown Drive | 292 | public_city | private | residential |
+| `rseg-002228` | Sunset Avenue Northeast | 288 | private | public_city | residential |
+| `rseg-000704` | Edgecombe Place Northeast | 283 | public_city | private | residential |
+| `rseg-001840` | Northeast Twin Ponds Road | 258 | public_city | private | residential |
+| `rseg-001281` | Pleasant Beach Drive Northeast | 246 | public_parks | private | residential |
+| `rseg-000665` | Hemlock Avenue Northeast | 244 | public_city | private | residential |
+| `rseg-001358` | Citation Court | 236 | public_city | private | residential |
+| `rseg-002114` | Solana Lane Northeast | 229 | public_city | private | residential |
+| `rseg-000689` | Sakai Village Loop | 221 | public_city | private | residential |
+| `rseg-001513` | Northeast Eagle Harbor Drive | 215 | private | public_city | residential |
+| `rseg-002213` | Crystal Springs Drive Northeast | 213 | private | public_city | residential |
+| `rseg-000934` | Fort Ward Park Entrance | 204 | public_parks | private | residential |
+| `rseg-001689` | Kinnear Road Northeast | 185 | public_city | private | residential |
+| `rseg-000358` | Sunrise Place Northeast | 174 | private | public_city | residential |
+| `rseg-000093` | Northeast Ocean Drive | 172 | private | public_city | residential |
+| `rseg-000228` | Northeast Quiet Valley Lane | 165 | public_city | private | residential |
+| `rseg-001813` | Toad Holler Place Northeast | 164 | public_city | private | residential |
+| `rseg-000967` | Northeast Business Park Lane | 158 | public_city | private | residential |
+| `rseg-000381` | Gilmore | 157 | public_city | private | residential |
+| `rseg-001414` | Affirmed Lane Northeast | 157 | public_city | private | residential |
+| `rseg-000234` | Northeast Wiggins Road | 156 | public_city | private | residential |
+| `rseg-001260` | Fort Street | 155 | private | public_city | residential |
+| `rseg-000335` | Northeast Sunrose Lane | 152 | public_city | private | residential |
+| `rseg-001670` | Northeast Woodson Lane | 149 | public_city | private | residential |
+| `rseg-000477` | Harborview Drive Southeast | 149 | public_city | private | residential |
+| `rseg-000451` | Stonebridge Lane Northeast | 144 | public_city | private | residential |
+| `rseg-001184` | Fort Street | 141 | private | public_city | residential |
+| `rseg-002254` | NE Tolo Rd | 131 | private | public_city | residential |
+| `rseg-001392` | Northeast Triple Crown Drive | 125 | public_city | private | residential |
+| `rseg-000495` | Northeast Ewing Street | 116 | private | public_city | residential |
+| `rseg-000900` | Northeast Briar Rose Lane | 113 | public_city | private | residential |
+| `rseg-001847` | Kojima Avenue Northeast | 110 | public_city | private | residential |
+| `rseg-000190` | Northeast Manor Lane | 106 | public_city | private | residential |
+| `rseg-001415` | Northeast Triple Crown Drive | 106 | public_city | private | residential |
+| `rseg-001850` | Kojima Avenue Northeast | 105 | public_city | private | residential |
+| `rseg-000472` | Bridgestone Court Northeast | 103 | public_city | private | residential |
 
 ... and 23 more.
 
@@ -65,46 +65,46 @@ WSDOT's Local Agency Public Road inventory and the City's rd_Streets layer disag
 
 | kind | segment | OSM name | agency name | m | ownership | ownership from |
 |---|---|---|---|---|---|---|
-| different | `seg-001385` | Fairmont Lane Northeast | NE Belle Hill Rd PVT | 476 | private | wsdot_local_agency_public_road |
-| different | `seg-002093` | Palomino Drive Northeast | Palamino Ln | 421 | private | wsdot_local_agency_public_road |
-| different | `seg-001036` | Martin Luther King Jr. Boulevard | West High School Entrance | 315 | public_school | wsdot_local_agency_public_road |
-| different | `seg-002137` | Northeast Wild Cherry Lane | Foster St NE | 303 | public_city | wsdot_local_agency_public_road |
-| different | `seg-002247` | Olympus Beach Road Northeast | Madrona Way NE | 298 | public_city | wsdot_local_agency_public_road |
-| different | `seg-001718` | Manzanita Park Trail | NE Day Rd W | 282 | private | cobi_rd_streets |
-| different | `seg-002015` | Northeast Williams Lane | NE Koura Rd | 273 | public_city | wsdot_local_agency_public_road |
-| different | `seg-001862` | Northeast Twin Ponds Road | Johnsonville Ln PVT | 270 | private | wsdot_local_agency_public_road |
-| different | `seg-001840` | Northeast Twin Ponds Road | Johnson Farm Ln | 258 | public_city | wsdot_local_agency_public_road |
-| different | `seg-001281` | Pleasant Beach Drive Northeast | Fort Ward State Park | 246 | public_parks | wsdot_local_agency_public_road |
-| different | `seg-001757` | Northeast Carene Lane | Point Monroe Drive NE | 239 | private | cobi_rd_streets |
-| different | `seg-001312` | Northeast Belle Hill Road | Bucsit Ln | 223 | private | wsdot_local_agency_public_road |
-| different | `seg-000049` | Rockaway Beach Road Northeast | NE Halls Hill Rd | 192 | public_city | wsdot_local_agency_public_road |
-| different | `seg-002044` | Silven Avenue Northeast | NE Ralston Rd | 182 | public_city | cobi_rd_streets |
-| different | `seg-001719` | Manzanita Park Trail | NE Day Rd W | 165 | private | cobi_rd_streets |
-| different | `seg-000220` | Winslow Way East | Eagle Place NE | 163 | public_city | wsdot_local_agency_public_road |
-| different | `seg-000490` | Northeast Summerberry Court | Summer Berry Ln | 159 | private | wsdot_local_agency_public_road |
-| different | `seg-000960` | Pool & Gym Access Road | School District Rd | 156 | private | cobi_rd_streets |
-| different | `seg-002092` | Point White Drive Northeast | Crystal Springs Dr NE | 152 | public_city | wsdot_local_agency_public_road |
-| different | `seg-000663` | Islander Loop | Madrona Way NE | 146 | private | wsdot_local_agency_public_road |
-| different | `seg-000699` | Islander Loop | Madrona Way NE | 142 | private | wsdot_local_agency_public_road |
-| different | `seg-001380` | Blakely | Elephant Ln | 123 | private | wsdot_local_agency_public_road |
-| different | `seg-001276` | Strawberrry Plant Park | Weaver Rd NW | 116 | private | cobi_rd_streets |
-| different | `seg-000732` | Northeast Radio School Road | Belfair Ave | 114 | public_city | wsdot_local_agency_public_road |
-| different | `seg-000900` | Northeast Briar Rose Lane | Woodsman Way | 113 | public_city | wsdot_local_agency_public_road |
-| different | `seg-001331` | Northeast Laughing Salmon Lane | Private Road | 113 | private | cobi_rd_streets |
-| different | `seg-002171` | Fox Cove Lane Northeast | Battle Pt Ave NE | 99 | private | cobi_rd_streets |
-| different | `seg-000826` | Pool & Gym Access Road | School District Rd | 98 | private | cobi_rd_streets |
-| different | `seg-001343` | Northeast Laughing Salmon Lane | Private Road | 97 | private | wsdot_local_agency_public_road |
-| different | `seg-001277` | Broom Street Northeast | County Road 226 | 95 | public_city | inferred:name |
-| different | `seg-002161` | Fox Cove Lane Northeast | Battle Pt Ave NE | 93 | private | cobi_rd_streets |
-| different | `seg-001355` | Blakely | Elephant Ln | 93 | private | wsdot_local_agency_public_road |
-| different | `seg-000478` | Olympic Drive Southeast | State Route 305 | 85 | public_state | wsdot_state_route_lines |
-| different | `seg-000723` | Madrone Lane North | Henshaw Way | 82 | private | cobi_rd_streets |
-| different | `seg-001993` | Northeast Williams Lane | NE Koura Rd | 80 | public_city | wsdot_local_agency_public_road |
-| different | `seg-001737` | Diamond Place Northeast | Ruby Way | 80 | public_city | wsdot_local_agency_public_road |
-| different | `seg-001552` | Barthrup Court | Barthrop Pl NE | 76 | public_city | wsdot_local_agency_public_road |
-| different | `seg-001625` | Lucy Northeast Lane | Dotson Loop NE | 76 | private | cobi_rd_streets |
-| different | `seg-000537` | Vineyard Lane Northeast | Unnamed | 75 | private | cobi_rd_streets |
-| different | `seg-000939` | Pool & Gym Access Road | Bainbridge Aquatic Cntr Dr | 73 | private | cobi_rd_streets |
+| different | `rseg-001385` | Fairmont Lane Northeast | NE Belle Hill Rd PVT | 476 | private | wsdot_local_agency_public_road |
+| different | `rseg-002093` | Palomino Drive Northeast | Palamino Ln | 421 | private | wsdot_local_agency_public_road |
+| different | `rseg-001036` | Martin Luther King Jr. Boulevard | West High School Entrance | 315 | public_school | wsdot_local_agency_public_road |
+| different | `rseg-002137` | Northeast Wild Cherry Lane | Foster St NE | 303 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-002247` | Olympus Beach Road Northeast | Madrona Way NE | 298 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-001718` | Manzanita Park Trail | NE Day Rd W | 282 | private | cobi_rd_streets |
+| different | `rseg-002015` | Northeast Williams Lane | NE Koura Rd | 273 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-001862` | Northeast Twin Ponds Road | Johnsonville Ln PVT | 270 | private | wsdot_local_agency_public_road |
+| different | `rseg-001840` | Northeast Twin Ponds Road | Johnson Farm Ln | 258 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-001281` | Pleasant Beach Drive Northeast | Fort Ward State Park | 246 | public_parks | wsdot_local_agency_public_road |
+| different | `rseg-001757` | Northeast Carene Lane | Point Monroe Drive NE | 239 | private | cobi_rd_streets |
+| different | `rseg-001312` | Northeast Belle Hill Road | Bucsit Ln | 223 | private | wsdot_local_agency_public_road |
+| different | `rseg-000049` | Rockaway Beach Road Northeast | NE Halls Hill Rd | 192 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-002044` | Silven Avenue Northeast | NE Ralston Rd | 182 | public_city | cobi_rd_streets |
+| different | `rseg-001719` | Manzanita Park Trail | NE Day Rd W | 165 | private | cobi_rd_streets |
+| different | `rseg-000220` | Winslow Way East | Eagle Place NE | 163 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-000490` | Northeast Summerberry Court | Summer Berry Ln | 159 | private | wsdot_local_agency_public_road |
+| different | `rseg-000960` | Pool & Gym Access Road | School District Rd | 156 | private | cobi_rd_streets |
+| different | `rseg-002092` | Point White Drive Northeast | Crystal Springs Dr NE | 152 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-000663` | Islander Loop | Madrona Way NE | 146 | private | wsdot_local_agency_public_road |
+| different | `rseg-000699` | Islander Loop | Madrona Way NE | 142 | private | wsdot_local_agency_public_road |
+| different | `rseg-001380` | Blakely | Elephant Ln | 123 | private | wsdot_local_agency_public_road |
+| different | `rseg-001276` | Strawberrry Plant Park | Weaver Rd NW | 116 | private | cobi_rd_streets |
+| different | `rseg-000732` | Northeast Radio School Road | Belfair Ave | 114 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-000900` | Northeast Briar Rose Lane | Woodsman Way | 113 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-001331` | Northeast Laughing Salmon Lane | Private Road | 113 | private | cobi_rd_streets |
+| different | `rseg-002171` | Fox Cove Lane Northeast | Battle Pt Ave NE | 99 | private | cobi_rd_streets |
+| different | `rseg-000826` | Pool & Gym Access Road | School District Rd | 98 | private | cobi_rd_streets |
+| different | `rseg-001343` | Northeast Laughing Salmon Lane | Private Road | 97 | private | wsdot_local_agency_public_road |
+| different | `rseg-001277` | Broom Street Northeast | County Road 226 | 95 | public_city | inferred:name |
+| different | `rseg-002161` | Fox Cove Lane Northeast | Battle Pt Ave NE | 93 | private | cobi_rd_streets |
+| different | `rseg-001355` | Blakely | Elephant Ln | 93 | private | wsdot_local_agency_public_road |
+| different | `rseg-000478` | Olympic Drive Southeast | State Route 305 | 85 | public_state | wsdot_state_route_lines |
+| different | `rseg-000723` | Madrone Lane North | Henshaw Way | 82 | private | cobi_rd_streets |
+| different | `rseg-001993` | Northeast Williams Lane | NE Koura Rd | 80 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-001737` | Diamond Place Northeast | Ruby Way | 80 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-001552` | Barthrup Court | Barthrop Pl NE | 76 | public_city | wsdot_local_agency_public_road |
+| different | `rseg-001625` | Lucy Northeast Lane | Dotson Loop NE | 76 | private | cobi_rd_streets |
+| different | `rseg-000537` | Vineyard Lane Northeast | Unnamed | 75 | private | cobi_rd_streets |
+| different | `rseg-000939` | Pool & Gym Access Road | Bainbridge Aquatic Cntr Dr | 73 | private | cobi_rd_streets |
 
 ... and 290 more (full list in `data/roads/canonical/segments.geojson`: compare `name` with `agency_names`).
 
@@ -114,46 +114,46 @@ No agency centerline matched these, and the other segments of the same street do
 
 | segment | name | m | category | sources |
 |---|---|---|---|---|
-| `seg-001921` | Northeast Twin Ponds Road | 561 | residential | osm_overpass_roads |
-| `seg-001310` | Northeast McRedmond Lane | 408 | residential | cobi_rd_streets, osm_overpass_roads |
-| `seg-002176` | (unnamed) | 404 | residential | osm_overpass_roads |
-| `seg-001655` | Northeast Agate Bluff | 333 | residential | osm_overpass_roads |
-| `seg-001783` | Stromville Lane | 320 | residential | osm_overpass_roads |
-| `seg-001726` | Flying Goat Avenue Northeast | 294 | residential | osm_overpass_roads |
-| `seg-000497` | Northeast Wild Swan Lane | 289 | residential | osm_overpass_roads |
-| `seg-001951` | Island Avenue Northeast | 241 | residential | osm_overpass_roads |
-| `seg-001037` | (unnamed) | 239 | lane | osm_overpass_roads |
-| `seg-002062` | Island Center Cemetery | 235 | lane | osm_overpass_roads |
-| `seg-000204` | Cedar Heights Ln NE | 227 | residential | osm_overpass_roads |
-| `seg-000954` | Three Tree Lane | 217 | residential | osm_overpass_roads |
-| `seg-000480` | (unnamed) | 208 | residential | osm_overpass_roads |
-| `seg-000676` | (unnamed) | 202 | residential | osm_overpass_roads |
-| `seg-000584` | (unnamed) | 199 | residential | osm_overpass_roads |
-| `seg-000469` | Nolta Loop Northeast | 195 | residential | osm_overpass_roads |
-| `seg-000526` | Bette's Lane | 193 | lane | osm_overpass_roads |
-| `seg-002017` | Northeast Marshall Road | 193 | residential | osm_overpass_roads |
-| `seg-002106` | Chorus Frog Street Northeast | 190 | residential | osm_overpass_roads |
-| `seg-001326` | Northeast Fox Den Lane | 176 | residential | osm_overpass_roads |
-| `seg-001474` | (unnamed) | 170 | residential | osm_overpass_roads |
-| `seg-001696` | Fernwood | 168 | lane | osm_overpass_roads |
-| `seg-000439` | Cedar Street Northeast | 161 | residential | cobi_rd_streets, osm_overpass_roads |
-| `seg-000393` | La Vigne Ct NE | 155 | residential | cobi_rd_streets, osm_overpass_roads |
-| `seg-000589` | Kane Cemetary | 153 | lane | osm_overpass_roads |
-| `seg-000893` | Eagledale Park Road | 148 | lane | osm_overpass_roads |
-| `seg-001832` | (unnamed) | 143 | residential | osm_overpass_roads |
-| `seg-001936` | (unnamed) | 130 | residential | osm_overpass_roads |
-| `seg-000625` | Wintersweet Road Northeast | 130 | residential | cobi_rd_streets, osm_overpass_roads |
-| `seg-002069` | Gangmarken Way Northeast | 128 | residential | osm_overpass_roads |
-| `seg-001466` | Northeast Selfors Lane | 127 | residential | cobi_rd_streets, osm_overpass_roads |
-| `seg-000165` | Northeast Manor Lane | 122 | residential | osm_overpass_roads |
-| `seg-002104` | (unnamed) | 119 | residential | osm_overpass_roads |
-| `seg-000252` | (unnamed) | 113 | residential | osm_overpass_roads |
-| `seg-000259` | Seacove Lane Northeast | 112 | lane | osm_overpass_roads |
-| `seg-000718` | Burlingame Court Northeast | 109 | residential | cobi_rd_streets, osm_overpass_roads |
-| `seg-001930` | (unnamed) | 109 | residential | osm_overpass_roads |
-| `seg-001306` | (unnamed) | 107 | residential | osm_overpass_roads |
-| `seg-000015` | Eagle Street | 105 | residential | osm_overpass_roads |
-| `seg-002255` | (unnamed) | 104 | residential | osm_overpass_roads |
+| `rseg-001921` | Northeast Twin Ponds Road | 561 | residential | osm_overpass_roads |
+| `rseg-001310` | Northeast McRedmond Lane | 408 | residential | cobi_rd_streets, osm_overpass_roads |
+| `rseg-002176` | (unnamed) | 404 | residential | osm_overpass_roads |
+| `rseg-001655` | Northeast Agate Bluff | 333 | residential | osm_overpass_roads |
+| `rseg-001783` | Stromville Lane | 320 | residential | osm_overpass_roads |
+| `rseg-001726` | Flying Goat Avenue Northeast | 294 | residential | osm_overpass_roads |
+| `rseg-000497` | Northeast Wild Swan Lane | 289 | residential | osm_overpass_roads |
+| `rseg-001951` | Island Avenue Northeast | 241 | residential | osm_overpass_roads |
+| `rseg-001037` | (unnamed) | 239 | lane | osm_overpass_roads |
+| `rseg-002062` | Island Center Cemetery | 235 | lane | osm_overpass_roads |
+| `rseg-000204` | Cedar Heights Ln NE | 227 | residential | osm_overpass_roads |
+| `rseg-000954` | Three Tree Lane | 217 | residential | osm_overpass_roads |
+| `rseg-000480` | (unnamed) | 208 | residential | osm_overpass_roads |
+| `rseg-000676` | (unnamed) | 202 | residential | osm_overpass_roads |
+| `rseg-000584` | (unnamed) | 199 | residential | osm_overpass_roads |
+| `rseg-000469` | Nolta Loop Northeast | 195 | residential | osm_overpass_roads |
+| `rseg-000526` | Bette's Lane | 193 | lane | osm_overpass_roads |
+| `rseg-002017` | Northeast Marshall Road | 193 | residential | osm_overpass_roads |
+| `rseg-002106` | Chorus Frog Street Northeast | 190 | residential | osm_overpass_roads |
+| `rseg-001326` | Northeast Fox Den Lane | 176 | residential | osm_overpass_roads |
+| `rseg-001474` | (unnamed) | 170 | residential | osm_overpass_roads |
+| `rseg-001696` | Fernwood | 168 | lane | osm_overpass_roads |
+| `rseg-000439` | Cedar Street Northeast | 161 | residential | cobi_rd_streets, osm_overpass_roads |
+| `rseg-000393` | La Vigne Ct NE | 155 | residential | cobi_rd_streets, osm_overpass_roads |
+| `rseg-000589` | Kane Cemetary | 153 | lane | osm_overpass_roads |
+| `rseg-000893` | Eagledale Park Road | 148 | lane | osm_overpass_roads |
+| `rseg-001832` | (unnamed) | 143 | residential | osm_overpass_roads |
+| `rseg-001936` | (unnamed) | 130 | residential | osm_overpass_roads |
+| `rseg-000625` | Wintersweet Road Northeast | 130 | residential | cobi_rd_streets, osm_overpass_roads |
+| `rseg-002069` | Gangmarken Way Northeast | 128 | residential | osm_overpass_roads |
+| `rseg-001466` | Northeast Selfors Lane | 127 | residential | cobi_rd_streets, osm_overpass_roads |
+| `rseg-000165` | Northeast Manor Lane | 122 | residential | osm_overpass_roads |
+| `rseg-002104` | (unnamed) | 119 | residential | osm_overpass_roads |
+| `rseg-000252` | (unnamed) | 113 | residential | osm_overpass_roads |
+| `rseg-000259` | Seacove Lane Northeast | 112 | lane | osm_overpass_roads |
+| `rseg-000718` | Burlingame Court Northeast | 109 | residential | cobi_rd_streets, osm_overpass_roads |
+| `rseg-001930` | (unnamed) | 109 | residential | osm_overpass_roads |
+| `rseg-001306` | (unnamed) | 107 | residential | osm_overpass_roads |
+| `rseg-000015` | Eagle Street | 105 | residential | osm_overpass_roads |
+| `rseg-002255` | (unnamed) | 104 | residential | osm_overpass_roads |
 
 ... and 102 more.
 
