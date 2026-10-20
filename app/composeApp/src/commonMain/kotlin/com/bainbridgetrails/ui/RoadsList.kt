@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -188,7 +189,14 @@ internal fun RoadsContent(items: List<RoadListItem>?, settings: AppSettings, onR
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            LazyColumn(Modifier.fillMaxSize()) {
+            val listState = rememberLazyListState()
+            // A new filter, sort or search starts at the top (a deep scroll into another list is meaningless).
+            var lastQuery by remember { mutableStateOf(effective) }
+            LaunchedEffect(effective) {
+                if (effective != lastQuery) listState.scrollToItem(0)
+                lastQuery = effective
+            }
+            LazyColumn(Modifier.fillMaxSize(), state = listState) {
                 if (!state.bannerDismissed && RoadListLogic.noProgressYet(items) && sections.isNotEmpty()) {
                     item(key = "banner") { RoadsBanner { state.bannerDismissed = true } }
                 }

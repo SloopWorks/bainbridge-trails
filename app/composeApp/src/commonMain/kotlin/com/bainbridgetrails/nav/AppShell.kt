@@ -232,6 +232,11 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     onMap = { nav.selectTab(MapRoute) },
                     onSeeAllInProgress = {
                         TrailsListState.query = TrailListQuery(statuses = setOf(TrailStatus.PARTWAY, TrailStatus.NEARLY_DONE))
+                        com.bainbridgetrails.ui.RoadsListState.query = com.bainbridgetrails.ui.RoadListQuery(statuses = setOf(TrailStatus.PARTWAY, TrailStatus.NEARLY_DONE))
+                        nav.selectTab(TrailsRoute)
+                    },
+                    onRoadType = { group ->
+                        com.bainbridgetrails.ui.RoadsListState.query = com.bainbridgetrails.ui.RoadListQuery(groups = setOf(group))
                         nav.selectTab(TrailsRoute)
                     },
                 )

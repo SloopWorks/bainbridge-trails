@@ -70,6 +70,14 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.floor
+import com.bainbridgetrails.data.LocalGoal
+import com.bainbridgetrails.resources.roads_results_new_miles
+import com.bainbridgetrails.resources.roads_milestone_miles_body
+import com.bainbridgetrails.ui.Milestone
+import com.bainbridgetrails.ui.Milestones
+import com.bainbridgetrails.ui.components.MilestoneCard
+import com.bainbridgetrails.ui.components.MilestoneCounter
+import com.bainbridgetrails.ui.components.milestoneDistance
 
 /** Tenths of a percent, rounded down like [Format.percent] (TL-5), so the delta matches the two shown values. */
 private fun tenths(fraction: Double): Long = floor(fraction.coerceIn(0.0, 1.0) * 1000 + 1e-9).toLong()
@@ -98,9 +106,14 @@ internal fun ResultsSheet(
     onSignIn: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Roads (docs/roads/product.md §5.2–5.3): milestones this walk crossed (highest first) and the island total. */
+    milestones: List<Milestone> = emptyList(),
+    islandTotalM: Double = 0.0,
 ) {
     var showSignIn by remember(summary.sessionId) { mutableStateOf(true) }
     var details by remember(summary.sessionId) { mutableStateOf(false) }
+    var allMilestones by remember(summary.sessionId) { mutableStateOf(false) }
+    val goal = LocalGoal.current
     Column(modifier.fillMaxWidth()) {
         Column(
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
@@ -108,6 +121,17 @@ internal fun ResultsSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (recovered) Banner(stringResource(Res.string.recovery_banner), null, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer)
+            // Milestone card first (docs/roads/ux.md §6.1): the highest crossed; "+N more" lists the rest.
+            milestones.firstOrNull()?.let { top ->
+                MilestoneCard(
+                    top, milestoneCounter(top, summary, islandTotalM, units), milestoneBody(top, summary, islandTotalM, units),
+                    more = if (allMilestones) 0 else milestones.size - 1,
+                    onMore = { allMilestones = true },
+                )
+                if (allMilestones) for (m in milestones.drop(1)) {
+                    MilestoneCard(m, milestoneCounter(m, summary, islandTotalM, units), milestoneBody(m, summary, islandTotalM, units), 0, null)
+                }
+            }
             Column {
                 Text(stringResource(Res.string.results_title), Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineSmall)
                 if (summary.endedAt > summary.startedAt) {
@@ -118,14 +142,23 @@ internal fun ResultsSheet(
                     )
                 }
             }
+            val newRoadM = (summary.islandAfter - summary.islandBefore).coerceAtLeast(0.0) * islandTotalM
+            if (goal.isRoads && newRoadM > 0.0) {
+                // product.md §5.2: road miles move every walk; the island % below moves a tenth at a time.
+                Text(
+                    stringResource(Res.string.roads_results_new_miles, Format.distance(newRoadM, units)),
+                    style = BtTheme.type.statLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             IslandTile(summary.islandBefore, summary.islandAfter)
             if (!summary.verified) Banner(stringResource(Res.string.results_unverified), Res.drawable.ic_warning, MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
-            if (summary.approximateLocation) Banner(stringResource(Res.string.results_approx_warning), Res.drawable.ic_warning, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
+            if (summary.approximateLocation) Banner(stringResource(goal.s(Res.string.results_approx_warning)), Res.drawable.ic_warning, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
 
             if (summary.trails.isEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(Res.string.results_no_progress), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(Res.string.results_no_progress_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(goal.s(Res.string.results_no_progress)), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(goal.s(Res.string.results_no_progress_hint)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 val newly = summary.trails.filter { it.trailId in summary.newlyCompleted }
@@ -135,7 +168,7 @@ internal fun ResultsSheet(
                     for (t in newly) ResultTrailRow(t.name, t.before, t.after, status(t.before), t.status)
                 }
                 if (rest.isNotEmpty()) {
-                    SectionHeader(stringResource(Res.string.results_trails_header))
+                    SectionHeader(stringResource(goal.s(Res.string.results_trails_header)))
                     for (t in rest) ResultTrailRow(t.name, t.before, t.after, status(t.before), t.status)
                 }
             }
@@ -226,4 +259,25 @@ internal fun Banner(text: String, icon: DrawableResource?, bg: Color, fg: Color,
         if (icon != null) BtIcon(icon, null, size = 20.dp, tint = fg)
         Text(text, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = fg)
     }
+}
+
+/** The card's before → after counter: road walked (mi/km) for a distance milestone; none for the others. */
+private fun milestoneCounter(m: Milestone, summary: SessionSummary, islandTotalM: Double, units: Units): MilestoneCounter? = when (m) {
+    is Milestone.Distance -> MilestoneCounter(
+        Milestones.unitsOf(summary.islandBefore * islandTotalM, units),
+        Milestones.unitsOf(summary.islandAfter * islandTotalM, units),
+        { Format.oneDecimal(it) },
+        if (units == Units.MILES) "mi" else "km",
+    )
+    else -> null
+}
+
+/** product.md §3.9 `roads_milestone_miles_body` for distance milestones; none for the others (the title says it). */
+@Composable
+private fun milestoneBody(m: Milestone, summary: SessionSummary, islandTotalM: Double, units: Units): String? = when (m) {
+    is Milestone.Distance -> {
+        val next = Milestones.nextDistance(Milestones.unitsOf(summary.islandAfter * islandTotalM, units))
+        stringResource(Res.string.roads_milestone_miles_body, Format.percent(summary.islandAfter), milestoneDistance(next, units))
+    }
+    else -> null
 }
