@@ -1,6 +1,9 @@
 package com.bainbridgetrails.app
 
+import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import com.bainbridgetrails.analytics.LogAnalytics
 import com.bainbridgetrails.auth.AuthConfig
 import com.bainbridgetrails.config.ApiConfig
@@ -59,4 +62,17 @@ object DebugTools {
         AuthConfig.devSignInEnabled = true // `signin_dev` → POST /v1/auth/dev (local wrangler dev only)
         AppLog.i("debug", "debug tools installed; backend ${ApiConfig.baseUrl}")
     }
+
+    /**
+     * Local backend on Android 17+: the app cannot reach 10.0.2.2 without ACCESS_LOCAL_NETWORK (connections just
+     * time out), so ask once per launch while it is missing. Prod (public internet) needs nothing.
+     */
+    fun onActivityCreated(activity: Activity) {
+        if (ApiConfig.baseUrl != LOCAL_BASE_URL || Build.VERSION.SDK_INT < 37) return
+        if (activity.checkSelfPermission(LOCAL_NETWORK) == PackageManager.PERMISSION_GRANTED) return
+        AppLog.w("debug", "local backend needs $LOCAL_NETWORK; requesting")
+        activity.requestPermissions(arrayOf(LOCAL_NETWORK), 0x10ca1)
+    }
+
+    private const val LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
 }

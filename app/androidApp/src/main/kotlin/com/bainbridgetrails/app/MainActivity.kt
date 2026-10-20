@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
         val launch = if (options.isEmpty()) null else SpikeLaunch.parse(options)
         AuthConfig.googleWebClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
         DebugTools.install(this) // debug: drawer + log/analytics/backend wiring + dev sign-in; release: nothing
+        DebugTools.onActivityCreated(this) // debug + Local backend: local-network permission (Android 17+)
         setContent { DebugDrawerHost { App(launch) } }
     }
 
