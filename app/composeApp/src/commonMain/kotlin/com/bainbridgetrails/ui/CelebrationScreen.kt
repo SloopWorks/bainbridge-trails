@@ -62,6 +62,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bainbridgetrails.coverage.ProgressSnapshot
+import com.bainbridgetrails.log.AppLog
+import kotlinx.coroutines.CancellationException
 import com.bainbridgetrails.data.TrailData
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.resources.Res
@@ -72,6 +74,11 @@ import com.bainbridgetrails.resources.celebrate_continue
 import com.bainbridgetrails.resources.celebrate_eyebrow
 import com.bainbridgetrails.resources.celebrate_eyebrow_multi
 import com.bainbridgetrails.resources.celebrate_island_body
+import com.bainbridgetrails.resources.celebrate_island_a11y
+import com.bainbridgetrails.resources.celebrate_island_eyebrow
+import com.bainbridgetrails.map.IslandCredit
+import com.bainbridgetrails.map.islandCredit
+import com.bainbridgetrails.ui.components.IslandGeometry
 import com.bainbridgetrails.resources.celebrate_island_label
 import com.bainbridgetrails.resources.celebrate_island_title
 import com.bainbridgetrails.resources.celebrate_more
@@ -111,12 +118,15 @@ fun CelebrationScreen(
     trailIds: List<String>,
     onContinue: () -> Unit,
     onViewTrail: (String) -> Unit,
+    island: Boolean = false,
+    preview: Boolean = false,
 ) {
     FlowBackHandler { onContinue() }
     DatasetGate { data ->
-        // Fresh numbers: the walk's coverage was written just before this opened.
-        val snapshot by produceState(graph.progress.snapshot.value, graph) {
-            value = runCatching { graph.progress.refreshNow() }.getOrNull() ?: value
+        // Fresh numbers: the walk's coverage was written just before this opened. Wait for them (the cached snapshot
+        // only if the refresh fails) so the variant below is decided once, on post-walk numbers.
+        val snapshot by produceState<ProgressSnapshot?>(null, graph) {
+            value = runCatching { graph.progress.refreshNow() }.getOrNull() ?: graph.progress.snapshot.value
         }
         val islandBefore by produceState<Double?>(null, sessionId) {
             val done = runCatching { graph.controller().await() }.getOrNull()?.state?.value as? RecordingState.Done
@@ -128,9 +138,32 @@ fun CelebrationScreen(
         val trails = remember(trailIds, data) {
             trailIds.mapNotNull { id -> data.dataset.trails.firstOrNull { it.id == id } }.sortedByDescending { it.computedLengthMi }
         }
-        if (trails.isEmpty()) return@DatasetGate
+        if (trails.isEmpty() && !island) return@DatasetGate
+        val countedIds = remember(data) { data.dataset.trails.filter { data.dataset.islandCredit(it.id) != IslandCredit.NONE }.mapTo(HashSet()) { it.id } }
+        // Frozen on first composition: a later snapshot change must not swap the variant mid-animation.
+        val whole = remember(island, trailIds) { IslandCelebration.show(island, s, trailIds, countedIds) }
+        // null = loading; a failure (or empty geometry) falls back to the trail glyph, still with the island text.
+        val geometry by produceState<Result<IslandGeometry>?>(null, data, whole) {
+            if (whole) {
+                value = try {
+                    Result.success(IslandGeometry.forDataset(data.dataset))
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    AppLog.e("celebrate", "island art unavailable: ${e.message}")
+                    Result.failure(e)
+                }
+            }
+        }
+        if (whole && geometry == null) return@DatasetGate // a frame or two while the coastline loads
+        val art = geometry?.getOrNull()?.takeIf { it.land.isNotEmpty() || it.trails.isNotEmpty() }
+        // Debug preview: final numbers whatever this phone's coverage is.
+        val shown = if (preview) s.copy(islandFraction = 1.0, trailsCompleted = s.trailCount) else s
         val community = trails.singleOrNull()?.let { stats.forTrail(it.id)?.completedCount }?.takeIf { it >= COMMUNITY_MIN }
-        CelebrationContent(data, s, trails.map { it.id to it.name }, islandBefore, community, onContinue, onViewTrail)
+        CelebrationContent(
+            data, shown, trails.map { it.id to it.name }, if (preview) null else islandBefore, community, onContinue, onViewTrail,
+            wholeIsland = whole,
+            islandArt = if (whole) art else null,
+        )
     }
 }
 
@@ -143,6 +176,8 @@ private fun CelebrationContent(
     community: Int?,
     onContinue: () -> Unit,
     onViewTrail: (String) -> Unit,
+    wholeIsland: Boolean = false,
+    islandArt: IslandGeometry? = null,
 ) {
     val reduced = BtTheme.motion.reduced
     val haptics = LocalHapticFeedback.current
@@ -162,23 +197,23 @@ private fun CelebrationContent(
 
     val single = trails.size == 1
     val island = s.islandFraction
-    val wholeIsland = island >= 1.0
     val names = trails.map { it.second }
     val shownNames = names.take(3).joinToString("\n") + if (names.size > 3) "\n" + stringResource(Res.string.celebrate_more, names.size - 3) else ""
     val eyebrow = when {
-        wholeIsland -> stringResource(Res.string.celebrate_island_title)
+        wholeIsland -> stringResource(Res.string.celebrate_island_eyebrow)
         single -> stringResource(Res.string.celebrate_eyebrow)
         else -> pluralStringResource(Res.plurals.celebrate_eyebrow_multi, trails.size, trails.size)
     }
     val walked = if (single) stringResource(Res.string.celebrate_walked, Format.percentWhole(s.trail(trails[0].first)?.fraction ?: 1.0)) else null
     val trailsLine = stringResource(Res.string.celebrate_trails_count, s.trailsCompleted, s.trailCount)
     val communityLine = community?.let { pluralStringResource(Res.plurals.celebrate_community, it, it) }
-    val announcement = buildString {
+    val announcement = if (wholeIsland) {
+        stringResource(Res.string.celebrate_island_a11y, Format.percent(island), s.trailsCompleted, s.trailCount)
+    } else buildString {
         append(
             if (single) stringResource(Res.string.celebrate_a11y_announcement, names[0], Format.percent(island), s.trailsCompleted, s.trailCount)
             else stringResource(Res.string.celebrate_a11y_announcement_multi, trails.size, names.joinToString(", "), Format.percent(island)),
         )
-        if (wholeIsland) append(' ').append(stringResource(Res.string.celebrate_island_body))
         communityLine?.let { append(' ').append(it) }
     }
 
@@ -193,7 +228,8 @@ private fun CelebrationContent(
             verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
         ) {
             Spacer(Modifier.heightIn(min = 8.dp))
-            TrailGlyph(data, trails.map { it.first }, t, reduced, complete.accent, complete.container)
+            if (islandArt != null) IslandCelebrationArt(islandArt, t)
+            else TrailGlyph(data, trails.map { it.first }, t, reduced, complete.accent, complete.container)
             Spacer(Modifier.heightIn(min = 8.dp))
             // Heading node: the whole announcement, read once on appear (assertive live region, ux.md §3.6).
             val rise = phase(t, 600, 900)
@@ -210,14 +246,23 @@ private fun CelebrationContent(
                     color = complete.accent,
                     textAlign = TextAlign.Center,
                 )
-                Text(
-                    if (wholeIsland) stringResource(Res.string.celebrate_island_body) else shownNames,
+                if (wholeIsland) {
+                    // P1-9: Fraunces headline (upright), the body line under it.
+                    Text(stringResource(Res.string.celebrate_island_title), style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
+                    Text(
+                        stringResource(Res.string.celebrate_island_body),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                } else Text(
+                    shownNames,
                     style = (if (single) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium).copy(fontStyle = FontStyle.Italic),
                     textAlign = TextAlign.Center,
                     maxLines = if (single) 3 else 5,
                     overflow = TextOverflow.Ellipsis,
                 )
-                walked?.let { Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center) }
+                if (!wholeIsland) walked?.let { Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center) }
             }
             Spacer(Modifier.heightIn(min = 12.dp))
             Column(Modifier.clearAndSetSemantics {}, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -240,7 +285,7 @@ private fun CelebrationContent(
             // Enabled from t = 0: the animation never blocks (only its look fades in).
             Column(Modifier.fillMaxWidth().widthIn(max = 480.dp).graphicsLayer { alpha = max(tail, 0.0001f) }) {
                 PrimaryButton(stringResource(Res.string.celebrate_continue), onClick = onContinue, modifier = Modifier.fillMaxWidth())
-                if (single) {
+                if (single && !wholeIsland) {
                     TextButton(onClick = { onViewTrail(trails[0].first) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(stringResource(Res.string.celebrate_view_trail))
                     }

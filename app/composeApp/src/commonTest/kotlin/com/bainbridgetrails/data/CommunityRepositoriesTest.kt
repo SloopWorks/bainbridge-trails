@@ -60,6 +60,70 @@ class CommunityRepositoriesTest {
         val restarted = boardRepo()
         restarted.refresh()
         assertEquals(listOf("b"), restarted.state.value.board!!.entries.map { it.userId })
+        // ...and offline from the cache.
+        server.online = false
+        val offline = boardRepo()
+        offline.refresh()
+        assertEquals(listOf("b"), offline.state.value.board!!.entries.map { it.userId })
+        // A failed report (offline) hides nothing.
+        assertIs<ReportResult.Failed>(offline.reportName("b"))
+        assertEquals(listOf("b"), offline.state.value.board!!.entries.map { it.userId })
+    }
+
+    @Test
+    fun hidePersonIsLocalPersistsAndCanBeShownAgain() = runTest {
+        server.on("GET /v1/leaderboard", Reply.json(board))
+        signedIn = false // hiding needs no account and sends nothing
+        val r = boardRepo()
+        r.refresh()
+        val before = server.requests.size
+        r.hidePerson("a")
+        assertEquals(before, server.requests.size)
+        assertEquals(listOf("b"), r.state.value.board!!.entries.map { it.userId })
+        assertEquals(1, r.state.value.hiddenCount)
+
+        val restarted = boardRepo()
+        restarted.refresh()
+        assertEquals(listOf("b"), restarted.state.value.board!!.entries.map { it.userId })
+        assertEquals(1, restarted.state.value.hiddenCount)
+
+        restarted.unhidePerson("a")
+        assertEquals(listOf("a", "b"), restarted.state.value.board!!.entries.map { it.userId })
+        restarted.hidePerson("a")
+        restarted.showHiddenAgain()
+        assertEquals(0, restarted.state.value.hiddenCount)
+        val again = boardRepo()
+        again.refresh()
+        assertEquals(listOf("a", "b"), again.state.value.board!!.entries.map { it.userId })
+    }
+
+    @Test
+    fun hidingBeforeAnyBoardWasFetchedStillPersists() = runTest {
+        server.online = false
+        val r = boardRepo()
+        r.refresh() // nothing cached, offline: no board yet
+        assertNull(r.state.value.board)
+        r.hidePerson("a")
+        assertEquals(1, r.state.value.hiddenCount)
+
+        server.online = true
+        server.on("GET /v1/leaderboard", Reply.json(board))
+        val restarted = boardRepo()
+        restarted.refresh()
+        assertEquals(listOf("b"), restarted.state.value.board!!.entries.map { it.userId })
+        assertEquals(1, restarted.state.value.hiddenCount)
+    }
+
+    @Test
+    fun hiddenCountIsEveryoneHiddenOnThisPhoneEvenIfOffTheCurrentBoard() = runTest {
+        server.on("GET /v1/leaderboard", Reply.json(board))
+        val r = boardRepo()
+        r.refresh()
+        r.hidePerson("a")
+        r.hidePerson("gone-from-top-100") // still hidden if they come back, so "Show again" must stay reachable
+        assertEquals(2, r.state.value.hiddenCount)
+        r.showHiddenAgain()
+        assertEquals(0, r.state.value.hiddenCount)
     }
 
     @Test

@@ -39,6 +39,7 @@ import com.bainbridgetrails.resources.ic_cloud_done
 import com.bainbridgetrails.resources.ic_sync
 import com.bainbridgetrails.resources.ic_settings
 import com.bainbridgetrails.resources.ic_verified_filled
+import com.bainbridgetrails.resources.ic_visibility_off
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -77,6 +78,7 @@ object BtIcons {
     val Sync = Res.drawable.ic_sync
     val Settings = Res.drawable.ic_settings
     val Verified = Res.drawable.ic_verified_filled
+    val VisibilityOff = Res.drawable.ic_visibility_off
 }
 
 /** Tinted icon from [BtIcons]. [contentDescription] null = decorative. */

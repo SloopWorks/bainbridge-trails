@@ -25,6 +25,8 @@ data class MeDto(
     val isAnonymous: Boolean,
     val nameStatus: String,
     val hiddenFromBoard: Boolean = false,
+    /** An admin hid this account from the board (moderation, P2-10); the user's toggle can't undo it. */
+    val hiddenByModeration: Boolean = false,
     val metrics: MetricsDto = MetricsDto(),
 ) {
     /** Custom name hit a newly added blocklist term; the anon name is shown (`name_reset_notice`). */

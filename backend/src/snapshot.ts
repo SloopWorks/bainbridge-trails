@@ -37,7 +37,7 @@ export async function rebuildSnapshots(env: Env, now: number): Promise<{ ranked:
   const [users, trails] = await env.DB.batch<unknown>([
     env.DB.prepare(
       `SELECT id, display_name, anon_name, island_rank, trails_completed, COALESCE(reached_at, 0) AS reached_at
-       FROM users WHERE hidden = 0 AND island_m > 0
+       FROM users WHERE hidden = 0 AND self_hidden = 0 AND island_m > 0
        ORDER BY island_rank DESC, trails_completed DESC, reached_at ASC, id ASC`,
     ),
     env.DB.prepare(

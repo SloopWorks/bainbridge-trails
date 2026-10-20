@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,6 +67,7 @@ import com.bainbridgetrails.resources.me_hero_caption_new
 import com.bainbridgetrails.resources.me_history
 import com.bainbridgetrails.resources.me_history_empty
 import com.bainbridgetrails.resources.me_history_more
+import com.bainbridgetrails.resources.me_history_open_a11y
 import com.bainbridgetrails.resources.me_history_other_devices
 import com.bainbridgetrails.resources.me_history_row_a11y
 import com.bainbridgetrails.resources.me_history_trails
@@ -77,6 +79,7 @@ import com.bainbridgetrails.resources.me_leaderboard_as_of
 import com.bainbridgetrails.resources.me_leaderboard_row
 import com.bainbridgetrails.resources.me_leaderboard_row_signed_out
 import com.bainbridgetrails.resources.me_leaderboard_row_unranked
+import com.bainbridgetrails.resources.me_leaderboard_row_hidden
 import com.bainbridgetrails.resources.me_leaderboard_see
 import com.bainbridgetrails.resources.me_profile_a11y
 import com.bainbridgetrails.resources.me_see_all
@@ -126,6 +129,7 @@ fun MeScreen(
     onLeaderboard: () -> Unit,
     onSettings: () -> Unit,
     onProfile: () -> Unit,
+    onWalk: (String) -> Unit,
     onMap: () -> Unit,
     onSeeAllInProgress: () -> Unit,
     modifier: Modifier = Modifier,
@@ -185,6 +189,7 @@ fun MeScreen(
                         val you = board.board?.you
                         val subtitle = when {
                             !signedIn -> stringResource(Res.string.me_leaderboard_see)
+                            profile?.me?.hiddenFromBoard == true -> stringResource(Res.string.me_leaderboard_row_hidden)
                             you != null -> stringResource(Res.string.me_leaderboard_row, you.rank, board.board?.totalRanked ?: you.rank) +
                                 (if (board.error != null && board.updatedAt != null) " · " + stringResource(Res.string.me_leaderboard_as_of, ageText(board.updatedAt!!)) else "")
                             board.board != null -> stringResource(Res.string.me_leaderboard_row_unranked)
@@ -211,7 +216,7 @@ fun MeScreen(
                         item(key = "history-empty") { EmptyState(stringResource(Res.string.me_history_empty), compact = true) }
                     }
                     items(rows.take(shownWalks), key = { "w-" + it.sessionId }) { w ->
-                        WalkRow(w, ListFormat.walkDate(w.startedAt, now, zone), settings.units)
+                        WalkRow(w, ListFormat.walkDate(w.startedAt, now, zone), settings.units, onOpen = { onWalk(w.sessionId) })
                     }
                     if (rows.size > shownWalks) {
                         item(key = "history-more") {
@@ -424,15 +429,17 @@ private fun CardRow(icon: org.jetbrains.compose.resources.DrawableResource, titl
 
 /** Walk history row: "Sat, Oct 18" · duration · distance, then trails touched; Unverified tag when so. */
 @Composable
-private fun WalkRow(w: WalkRowData, date: String, units: Units) {
+private fun WalkRow(w: WalkRowData, date: String, units: Units, onOpen: () -> Unit) {
     val trails = pluralStringResource(Res.plurals.me_history_trails, w.trailCount, w.trailCount) +
         (if (w.trailNames.isEmpty()) "" else " · " + w.trailNames.joinToString(", ") + if (w.trailCount > w.trailNames.size) "…" else "")
     val duration = ListFormat.walkDuration(w.durationMs)
     val distance = Format.distance(w.distanceM, units)
     val unverified = stringResource(Res.string.me_history_unverified)
+    val open = stringResource(Res.string.me_history_open_a11y)
     val a11y = stringResource(Res.string.me_history_row_a11y, date, Format.durationSpoken(w.durationMs), distance, trails) + if (!w.verified) ", $unverified" else ""
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 64.dp).clearAndSetSemantics { contentDescription = a11y }
+        Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(onClickLabel = open, role = Role.Button, onClick = onOpen)
+            .clearAndSetSemantics { contentDescription = a11y; role = Role.Button; onClick(open) { onOpen(); true } }
             .padding(horizontal = BtTheme.spacing.screenH, vertical = BtTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(BtTheme.spacing.md),

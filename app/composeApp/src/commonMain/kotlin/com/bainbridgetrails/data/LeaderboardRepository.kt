@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 @Serializable
-private data class BoardCache(val board: LeaderboardDto, val fetchedAt: Long, val hidden: Set<String> = emptySet())
+private data class BoardCache(val board: LeaderboardDto? = null, val fetchedAt: Long? = null, val hidden: Set<String> = emptySet())
 
 /**
  * [board] = last good response (from the network or the offline cache), with rows the user reported removed
@@ -29,6 +29,11 @@ data class LeaderboardState(
     val updatedAt: Long? = null,
     val loading: Boolean = false,
     val error: ApiError? = null,
+    /**
+     * Everyone this user hid (reported or "Hide this person") on this phone, whether or not they are on the current
+     * board (they stay hidden if they come back); footer "Hidden people (N)", whose "Show again" un-hides them all.
+     */
+    val hiddenCount: Int = 0,
 )
 
 sealed interface ReportResult {
@@ -60,7 +65,7 @@ class LeaderboardRepository(
         val c = withContext(io) { cache.read() } ?: return
         hidden = c.hidden
         raw = c.board
-        _state.update { it.copy(board = c.board.withoutHidden(), updatedAt = c.fetchedAt) }
+        _state.update { it.copy(board = c.board?.withoutHidden(), updatedAt = c.fetchedAt, hiddenCount = hidden.size) }
     }
 
     /** Fetches the board; on failure keeps showing the cache and sets [LeaderboardState.error]. */
@@ -73,7 +78,7 @@ class LeaderboardRepository(
                 is ApiResult.Ok -> {
                     val t = now()
                     raw = r.value
-                    _state.value = LeaderboardState(r.value.withoutHidden(), t, loading = false, error = null)
+                    _state.value = LeaderboardState(r.value.withoutHidden(), t, loading = false, error = null, hiddenCount = hidden.size)
                     withContext(io) { runCatching { cache.write(BoardCache(r.value, t, hidden)) } }
                 }
                 is ApiResult.Failure -> _state.update { it.copy(loading = false, error = r.error) }
@@ -104,13 +109,37 @@ class LeaderboardRepository(
         _state.update { it.copy(board = raw?.withoutHidden()) }
     }
 
+    /**
+     * "Hide this person" (App Review 1.2 block): their row disappears from this phone's board right away and stays
+     * hidden (local only, nothing is sent). Undo with [showHiddenAgain].
+     */
+    suspend fun hidePerson(userId: String) = hide(userId)
+
+    /** Undo of one [hidePerson]. */
+    suspend fun unhidePerson(userId: String) = mutex.withLock {
+        loadCache()
+        setHiddenLocked(hidden - userId)
+    }
+
+    /** "Show again": every hidden person (reported or hidden) is back on this phone's board. */
+    suspend fun showHiddenAgain() = setHidden(emptySet())
+
     private suspend fun hide(userId: String) = mutex.withLock {
         loadCache()
-        hidden = hidden + userId
-        _state.update { it.copy(board = raw?.withoutHidden()) }
-        val b = raw ?: return@withLock
-        val t = _state.value.updatedAt ?: now()
-        withContext(io) { runCatching { cache.write(BoardCache(b, t, hidden)) } }
+        setHiddenLocked(hidden + userId)
+    }
+
+    private suspend fun setHidden(next: Set<String>) = mutex.withLock {
+        loadCache()
+        setHiddenLocked(next)
+    }
+
+    private suspend fun setHiddenLocked(next: Set<String>) {
+        hidden = next
+        _state.update { it.copy(board = raw?.withoutHidden(), hiddenCount = hidden.size) }
+        // Saved even with no board yet (hidden before the first fetch), so the choice survives a restart.
+        val t = if (raw == null) null else _state.value.updatedAt ?: now()
+        withContext(io) { runCatching { cache.write(BoardCache(raw, t, hidden)) } }
     }
 
     private fun LeaderboardDto.withoutHidden(): LeaderboardDto =

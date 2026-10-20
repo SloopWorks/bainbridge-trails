@@ -4,7 +4,7 @@ import { floorTo } from "./util";
 
 /** Columns read for request handling. apple_refresh_token is deliberately excluded (read only on deletion). */
 export const USER_COLS =
-  "id, provider, display_name, anon_name, hidden, island_m, island_rank, covered_m, trails_completed, reached_at, " +
+  "id, provider, display_name, anon_name, hidden, self_hidden, island_m, island_rank, covered_m, trails_completed, reached_at, " +
   "metrics_version, coverage_rev, backfilled, walk_count, last_walk_upload_at";
 export const USER_COLS_U = USER_COLS.split(", ").map((c) => `u.${c}`).join(", ");
 
@@ -13,7 +13,10 @@ export interface UserRow {
   provider: string;
   display_name: string | null;
   anon_name: string;
+  /** Admin moderation hide (leaderboard + community stats). */
   hidden: number;
+  /** The user's own "Hide me from the leaderboard" (leaderboard only; P1-8). */
+  self_hidden: number;
   island_m: number;
   island_rank: number;
   covered_m: number;

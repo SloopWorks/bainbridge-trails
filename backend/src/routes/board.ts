@@ -43,7 +43,7 @@ export async function leaderboard(url: URL, env: Env, deps: Deps, me: UserRow | 
 
   let totalRanked = snap.total_ranked;
   let you: (typeof entries)[number] | null = null;
-  if (me && me.hidden === 0 && me.island_m > 0) {
+  if (me && me.hidden === 0 && me.self_hidden === 0 && me.island_m > 0) {
     const mine = { island_rank: me.island_rank, trails_completed: me.trails_completed, reached_at: me.reached_at ?? 0, id: me.id };
     let rank = 1;
     let inSnapshot = false;

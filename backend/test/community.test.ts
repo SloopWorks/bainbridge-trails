@@ -71,6 +71,70 @@ describe("leaderboard", () => {
     expect((await h.call("GET", "/v1/leaderboard?limit=0")).status).toBe(400);
   });
 
+  it("PUT /v1/me hiddenFromBoard hides the caller at once and never undoes an admin hide (P1-8)", async () => {
+    const h = harness();
+    const me = await devLogin(h, "self-hide-me");
+    const other = await devLogin(h, "self-hide-other");
+    await setMetrics(me.userId, 60_000, 3, 10);
+    await setMetrics(other.userId, 40_000, 1, 20);
+    expect((await h.call("POST", "/v1/admin/snapshot", ADMIN)).status).toBe(200);
+    const put = (body: unknown) => h.call("PUT", "/v1/me", { token: me.token, body });
+    const board = async (token?: string) => (await (await h.call("GET", "/v1/leaderboard", token ? { token } : {})).json()) as Board;
+    expect(((await (await h.call("GET", "/v1/me", { token: me.token })).json()) as { hiddenFromBoard: boolean }).hiddenFromBoard).toBe(false);
+
+    expect((await put({ hiddenFromBoard: "yes" })).status).toBe(400);
+    const hidden = await put({ hiddenFromBoard: true });
+    expect(hidden.status).toBe(200);
+    expect(((await hidden.json()) as { hiddenFromBoard: boolean }).hiddenFromBoard).toBe(true);
+    // Gone from everyone's board immediately (snapshot edited in place); no `you` row for the caller.
+    expect((await board(other.token)).entries.some((x) => x.userId === me.userId)).toBe(false);
+    const own = await board(me.token);
+    expect(own.you).toBeNull();
+    expect(own.entries.some((x) => x.isYou)).toBe(false);
+    // ...and stays gone after a rebuild.
+    await h.call("POST", "/v1/admin/snapshot", ADMIN);
+    expect((await board(other.token)).entries.some((x) => x.userId === me.userId)).toBe(false);
+
+    // Un-hide: the caller's live row is back now; others see it after the next rebuild.
+    const shown = await put({ hiddenFromBoard: false });
+    expect(((await shown.json()) as { hiddenFromBoard: boolean }).hiddenFromBoard).toBe(false);
+    expect((await board(me.token)).you?.userId).toBe(me.userId);
+    await h.call("POST", "/v1/admin/snapshot", ADMIN);
+    expect((await board(other.token)).entries.some((x) => x.userId === me.userId)).toBe(true);
+
+    // An admin hide is separate: the user's toggle can't undo it, and it isn't reported as the user's choice.
+    await h.call("POST", `/v1/admin/users/${me.userId}/hide`, ADMIN);
+    await put({ hiddenFromBoard: true });
+    const off = await put({ hiddenFromBoard: false });
+    const offBody = (await off.json()) as { hiddenFromBoard: boolean; hiddenByModeration: boolean };
+    expect(offBody.hiddenFromBoard).toBe(false);
+    expect(offBody.hiddenByModeration).toBe(true);
+    await h.call("POST", "/v1/admin/snapshot", ADMIN);
+    expect((await board(other.token)).entries.some((x) => x.userId === me.userId)).toBe(false);
+    expect((await board(me.token)).you).toBeNull();
+  });
+
+  it("GET /v1/me reports hiddenByModeration separately from the user's toggle (P2-10)", async () => {
+    const h = harness();
+    const me = await devLogin(h, "mod-hide-me");
+    const get = async () => (await (await h.call("GET", "/v1/me", { token: me.token })).json()) as { hiddenFromBoard: boolean; hiddenByModeration: boolean };
+    expect(await get()).toMatchObject({ hiddenFromBoard: false, hiddenByModeration: false });
+    await h.call("POST", `/v1/admin/users/${me.userId}/hide`, ADMIN);
+    expect(await get()).toMatchObject({ hiddenFromBoard: false, hiddenByModeration: true });
+  });
+
+  it("hiddenFromBoard changes are rate limited to 10/day; no-op writes don't count (P1-2)", async () => {
+    const h = harness();
+    const me = await devLogin(h, "hide-limit");
+    const put = (hiddenFromBoard: boolean) => h.call("PUT", "/v1/me", { token: me.token, body: { hiddenFromBoard } });
+    for (let i = 0; i < 5; i++) expect((await put(false)).status).toBe(200); // unchanged: free
+    for (let i = 0; i < 10; i++) expect((await put(i % 2 === 0)).status).toBe(200);
+    const limited = await put(true);
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).not.toBeNull();
+    expect((await put(false)).status).toBe(200); // already false: no change, no limit
+  });
+
   it("reached_at moves only when the floored island % rises (P1-4)", async () => {
     const h = harness();
     const { token, userId } = await devLogin(h, "lb-reach");
@@ -194,6 +258,7 @@ describe("profile, moderation, deletion", () => {
     await h.call("POST", "/v1/admin/snapshot", ADMIN);
     await h.call("POST", "/v1/report-name", { token: u.token, body: { userId: other.userId } });
     await h.call("POST", "/v1/report-name", { token: other.token, body: { userId: u.userId } });
+    await h.call("PUT", "/v1/me", { token: u.token, body: { hiddenFromBoard: true } });
     expect((await h.call("DELETE", "/v1/me", { token: u.token })).status).toBe(204);
     for (const [table, col] of [
       ["users", "id"],
@@ -281,14 +346,19 @@ describe("cron trigger", () => {
     await syncWalk(h, token, trailFull("trail-rotary-park-trails"));
     await env.DB.prepare("UPDATE users SET metrics_version = 'old', island_m = 0 WHERE id = ?").bind(userId).run();
     await env.DB.prepare("INSERT INTO rate_limits (key, window_start, count) VALUES ('auth:old', 1, 1)").run();
+    const t = Date.UTC(2026, 9, 20, 9, 17);
+    // P0-1: anything whose (<= 24 h) window has ended goes, so no row outlives the policy's "within 2 days".
+    await env.DB.prepare("INSERT INTO rate_limits (key, window_start, count) VALUES ('name:ended', ?, 1)").bind(t - 25 * 3_600_000).run();
+    await env.DB.prepare("INSERT INTO rate_limits (key, window_start, count) VALUES ('name:live', ?, 1)").bind(t - 23 * 3_600_000).run();
     await env.DB.prepare("INSERT INTO daily_salt (day, salt) VALUES ('2000-01-01', 'x')").run();
     await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ('dead', ?, 1)").bind(userId).run();
     await env.DB.prepare("UPDATE snapshot_meta SET dataset_version = 'old'").run();
 
-    const t = Date.UTC(2026, 9, 20, 9, 17);
     await worker.scheduled(createScheduledController({ scheduledTime: new Date(t), cron: "17 9 * * *" }), env);
     const one = async (sql: string) => (await env.DB.prepare(sql).first<{ n: number }>())!.n;
     expect(await one("SELECT COUNT(*) AS n FROM rate_limits WHERE key = 'auth:old'")).toBe(0);
+    expect(await one("SELECT COUNT(*) AS n FROM rate_limits WHERE key = 'name:ended'")).toBe(0);
+    expect(await one("SELECT COUNT(*) AS n FROM rate_limits WHERE key = 'name:live'")).toBe(1);
     expect(await one("SELECT COUNT(*) AS n FROM daily_salt WHERE day = '2000-01-01'")).toBe(0);
     expect(await one("SELECT COUNT(*) AS n FROM sessions WHERE token_hash = 'dead'")).toBe(0);
     const u = await env.DB.prepare("SELECT metrics_version, island_m FROM users WHERE id = ?").bind(userId).first<{ metrics_version: string; island_m: number }>();

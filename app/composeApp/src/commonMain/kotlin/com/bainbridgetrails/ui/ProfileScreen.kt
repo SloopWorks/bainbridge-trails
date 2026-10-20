@@ -79,6 +79,16 @@ import com.bainbridgetrails.resources.profile_privacy_note
 import com.bainbridgetrails.resources.profile_signed_out_body
 import com.bainbridgetrails.resources.profile_signed_out_title
 import com.bainbridgetrails.resources.profile_sync
+import com.bainbridgetrails.resources.profile_hide_body
+import com.bainbridgetrails.resources.profile_hide_failed
+import com.bainbridgetrails.resources.profile_hide_moderation
+import com.bainbridgetrails.resources.profile_hide_off
+import com.bainbridgetrails.resources.profile_hide_on
+import com.bainbridgetrails.resources.profile_hide_updated
+import com.bainbridgetrails.data.HideToggleMessage
+import com.bainbridgetrails.data.hideToggleMessage
+import com.bainbridgetrails.resources.profile_hide_title
+import com.bainbridgetrails.resources.error_offline_generic
 import com.bainbridgetrails.resources.provider_apple
 import com.bainbridgetrails.resources.provider_dev
 import com.bainbridgetrails.resources.provider_google
@@ -97,6 +107,7 @@ import com.bainbridgetrails.ui.components.NameEditor
 import com.bainbridgetrails.ui.components.PrimaryButton
 import com.bainbridgetrails.ui.components.SecondaryButton
 import com.bainbridgetrails.ui.components.SectionHeader
+import com.bainbridgetrails.ui.components.SettingSwitchRow
 import com.bainbridgetrails.ui.components.errorRes
 import com.bainbridgetrails.ui.theme.BtTheme
 import kotlinx.coroutines.launch
@@ -278,6 +289,45 @@ private fun SignedInContent(graph: AppGraph.Installed, auth: AuthState.SignedIn,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        // P1-8: saves at once (optimistic, reverted + snackbar on failure; ux.md §3.9).
+        val hidden = profile.me?.hiddenFromBoard == true
+        SettingSwitchRow(
+            stringResource(Res.string.profile_hide_title),
+            checked = hidden,
+            onCheckedChange = { hide ->
+                scope.launch {
+                    val r = graph.profile.setHiddenFromBoard(hide)
+                    val msg = when (r) {
+                        is ApiResult.Ok -> {
+                            graph.leaderboard.refresh()
+                            getString(
+                                when (hideToggleMessage(hide, r.value)) {
+                                    HideToggleMessage.HIDDEN -> Res.string.profile_hide_on
+                                    HideToggleMessage.SHOWN -> Res.string.profile_hide_off
+                                    HideToggleMessage.UPDATED -> Res.string.profile_hide_updated
+                                },
+                            )
+                        }
+                        is ApiResult.Failure -> getString(if (r.error is ApiError.Offline) Res.string.error_offline_generic else Res.string.profile_hide_failed)
+                    }
+                    snackbar.showSnackbar(msg)
+                }
+            },
+            modifier = Modifier.padding(top = BtTheme.spacing.md),
+            description = stringResource(Res.string.profile_hide_body),
+            enabled = profile.me != null,
+            horizontalPadding = 0.dp,
+        )
+        // P2-10: an admin hide outlives the toggle; say so neutrally instead of letting "off" look broken.
+        if (profile.me?.hiddenByModeration == true) {
+            Text(
+                stringResource(Res.string.profile_hide_moderation),
+                Modifier.padding(top = BtTheme.spacing.xs),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         SectionHeader(stringResource(Res.string.profile_sync), Modifier.padding(top = BtTheme.spacing.lg))
         SyncStatusLine(sync, onRetry = { graph.sync.syncNow() })

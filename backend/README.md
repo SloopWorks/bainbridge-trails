@@ -16,7 +16,8 @@ API contract for the app: [`docs/mvp/api.md`](../docs/mvp/api.md).
 | `src/users.ts` | user columns, rank key, lazy metric recompute |
 | `src/routes/board.ts`, `src/snapshot.ts` | leaderboard, community trail stats (daily snapshots), report-name |
 | `src/routes/me.ts`, `src/routes/admin.ts`, `src/apple.ts` | profile, deletion (+ Apple revoke), moderation/admin |
-| `src/routes/pages.ts` | public `GET /delete-account` page |
+| `src/routes/pages.ts` | public HTML pages: `/privacy`, `/terms`, `/support`, `/delete-account` |
+| `src/data/legal-pages.ts` | generated from `docs/legal/*.md` (see below) |
 | `src/moderation/blocklist.json`, `src/moderation/names.ts` | name rules (product §5 + TL-9), anon names (product §4) |
 | `src/data/segments.json` | generated segment metadata (see below) |
 | `migrations/` | D1 schema |
@@ -58,6 +59,23 @@ Only segments that count are kept (included, or on a named trail). Tick count/le
 changes, rebuild and commit the JSON together with the app's dataset bump. Uploads with another
 `datasetVersion` are still accepted (TL-7) and computed with the bundled dataset; ticks beyond a segment's
 current tick count are dropped.
+
+## Public pages (privacy policy, terms, support)
+
+`GET /privacy`, `/terms`, `/support` and `/delete-account` (also `HEAD`) are static HTML with no scripts or external
+resources (`content-security-policy: default-src 'none'`), sharing one style and footer nav. The first three are
+rendered at build time from `docs/legal/privacy-policy.md`, `terms.md` and `support.md` by
+`scripts/build-legal-pages.mjs` into `src/data/legal-pages.ts` (committed; no Markdown parser at runtime). After
+editing a doc:
+
+```sh
+npm run build:legal                 # regenerate src/data/legal-pages.ts, then commit both
+```
+
+`npm test` first runs `build-legal-pages.mjs --check` and fails if the module is stale. The script supports only
+the Markdown the docs use (headings, paragraphs, lists, pipe tables, bold, code, links) and errors on anything
+else. Store URLs: privacy policy `https://<host>/privacy`, App Store support `https://<host>/support`, Play
+account deletion `https://<host>/delete-account`.
 
 ## Plausibility (cheat limits: decisions TL-2, review P0-2/P1-3)
 
@@ -125,9 +143,14 @@ Edit `wrangler.jsonc` `vars`:
 - Optional, for Apple token revocation on account deletion (TL-10): `APPLE_TEAM_ID`, `APPLE_KEY_ID` vars and
   `npx wrangler secret put APPLE_PRIVATE_KEY` (contents of the Sign in with Apple `.p8` key). Without them,
   revocation is a no-op.
-- `SUPPORT_EMAIL`: shown on the public `GET /delete-account` page (Play Store account-deletion URL).
+- `SUPPORT_EMAIL`: shown on the public `GET /delete-account` page (Play Store account-deletion URL). Preset to
+  `privacy@sloopworks.com`, the address in the privacy policy (`docs/legal/*.md`). **TODO(owner):** route that
+  address (Cloudflare Email Routing) before publishing, or change it here and in `docs/legal/*.md` together.
 
-Then `npm run deploy`. The Worker is served at `https://bainbridge-trails-api.<account>.workers.dev`
+Then `npm run deploy`. It applies pending D1 migrations to the remote database first
+(`wrangler d1 migrations apply DB --remote`), then deploys the Worker, so new code never runs against an old
+schema. Migrations must stay backward compatible with the Worker version still serving during the deploy
+(additive columns/tables only). The Worker is served at `https://bainbridge-trails-api.<account>.workers.dev`
 (Cache API is a no-op on `workers.dev`; stats still send `Cache-Control: public, max-age=300`).
 Never set `ALLOW_DEV_AUTH` in `wrangler.jsonc` or as a production secret.
 
@@ -152,5 +175,10 @@ Server stores: provider + subject (no email/name from the token), display/anon n
 session token hashes with expiry, and (only if Apple revoke is configured) the Apple refresh token.
 Server-clock timestamps kept: `reached_at` (leaderboard tie-break, never returned), `last_walk_upload_at` (P1-3
 check), report time (admin triage). IPs are only stored as SHA-256(random daily salt + IP) in rate-limit keys;
-salts are deleted daily, rows after 2 days. No GPS, routes or walk times. `DELETE /v1/me` deletes every row for
+salts are deleted daily, rows after 2 days. No GPS, routes or walk times. Workers Logs (`observability` in `wrangler.jsonc`) keep request metadata, which can
+include the client IP, for a few days; the privacy policy discloses this (max 7 days). Turning invocation logs off
+would remove it. `DELETE /v1/me` deletes every row for
 the user (including their leaderboard snapshot row); aggregate per-trail counts drop them at the next rebuild.
+
+The public privacy policy (`docs/legal/privacy-policy.md`, served at `/privacy`) must stay in line with this
+section; update both together.

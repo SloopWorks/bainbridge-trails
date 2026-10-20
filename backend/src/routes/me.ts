@@ -25,7 +25,10 @@ export function meBody(u: UserRow) {
     anonName: u.anon_name,
     isAnonymous: publicName(u) === u.anon_name,
     nameStatus: nameStatus(u),
-    hiddenFromBoard: u.hidden === 1,
+    // The user's own toggle (P1-8). An admin hide is moderation state, reported separately (P2-10) so the app can
+    // explain why turning the toggle off doesn't bring the row back.
+    hiddenFromBoard: u.self_hidden === 1,
+    hiddenByModeration: u.hidden === 1,
     metrics: metricsJson(u),
   };
 }
@@ -33,7 +36,10 @@ export function meBody(u: UserRow) {
 export async function putMe(request: Request, env: Env, deps: Deps, user: UserRow): Promise<Response> {
   const body = await readJson(request, 4 * KB);
   if (!isObject(body)) throw badRequest("body must be an object");
-  if (!("anonName" in body) && !("displayName" in body)) throw badRequest("nothing to update: send displayName and/or anonName");
+  if (!("anonName" in body) && !("displayName" in body) && !("hiddenFromBoard" in body)) {
+    throw badRequest("nothing to update: send displayName, anonName and/or hiddenFromBoard");
+  }
+  if ("hiddenFromBoard" in body && typeof body.hiddenFromBoard !== "boolean") throw badRequest("hiddenFromBoard must be a boolean");
   let anon = user.anon_name;
   let custom = user.display_name;
   if ("anonName" in body) {
@@ -52,11 +58,25 @@ export async function putMe(request: Request, env: Env, deps: Deps, user: UserRo
       custom = check.name;
     }
   }
+  // Checked before any write so a 429 never leaves a half-applied update. Unchanged values don't count.
+  const hide = body.hiddenFromBoard === true ? 1 : 0;
+  const hideChanges = "hiddenFromBoard" in body && hide !== user.self_hidden;
+  if (hideChanges) {
+    await rateLimit(env, deps.now(), `hide:${user.id}`, LIMITS.hideTogglesPerUser.limit, LIMITS.hideTogglesPerUser.windowMs);
+  }
   if (anon !== user.anon_name || custom !== user.display_name) {
     const next = { display_name: custom, anon_name: anon };
     await env.DB.batch([
       env.DB.prepare("UPDATE users SET anon_name = ?, display_name = ? WHERE id = ?").bind(anon, custom, user.id),
       ...(publicName(next) !== publicName(user) ? snapshotRename(env, user.id, publicName(next)) : []),
+    ]);
+  }
+  if (hideChanges) {
+    // Hiding drops the row from the snapshot at once. Un-hiding shows the caller's live `you` row at once; others
+    // see the row again at the next daily rebuild (TL-11: no live numbers for others).
+    await env.DB.batch([
+      env.DB.prepare("UPDATE users SET self_hidden = ? WHERE id = ?").bind(hide, user.id),
+      ...(hide ? snapshotRemove(env, user.id) : []),
     ]);
   }
   return json(meBody((await getUser(env, user.id))!));
@@ -77,7 +97,7 @@ export async function deleteUser(env: Env, deps: Deps, user: UserRow): Promise<v
     env.DB.prepare("DELETE FROM name_reports WHERE reporter_id = ?1 OR target_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id),
     ...snapshotRemove(env, id),
-    env.DB.prepare("DELETE FROM rate_limits WHERE key IN (?1, ?2, ?3)").bind(`cov:${id}`, `name:${id}`, `report:${id}`),
+    env.DB.prepare("DELETE FROM rate_limits WHERE key IN (?1, ?2, ?3, ?4)").bind(`cov:${id}`, `name:${id}`, `report:${id}`, `hide:${id}`),
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id),
   ]);
 }

@@ -36,9 +36,15 @@ import com.bainbridgetrails.resources.board_col_rank
 import com.bainbridgetrails.resources.board_col_trails
 import com.bainbridgetrails.resources.board_more_a11y
 import com.bainbridgetrails.resources.board_report_name
+import com.bainbridgetrails.resources.board_hide_person
 import com.bainbridgetrails.resources.board_row_a11y
 import com.bainbridgetrails.resources.board_row_you_a11y
 import com.bainbridgetrails.resources.board_you_tag
+import com.bainbridgetrails.resources.board_you_hidden
+import com.bainbridgetrails.resources.board_you_hidden_a11y
+import com.bainbridgetrails.resources.board_you_hidden_action
+import com.bainbridgetrails.resources.board_you_hidden_body
+import androidx.compose.foundation.layout.Column
 import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PillShape
 import org.jetbrains.compose.resources.pluralStringResource
@@ -75,8 +81,8 @@ fun LeaderHeader(modifier: Modifier = Modifier) {
 
 /**
  * Leaderboard row (ux.md §3.8): rank (Fraunces, `primary` for the top 3 — no medals, no status hues), name, island %,
- * trails completed. [isYou] = `primaryContainer` with a 2dp `primary` bar and a "You" tag; [onReport] adds the ⋯ menu
- * (others' rows only).
+ * trails completed. [isYou] = `primaryContainer` with a 2dp `primary` bar and a "You" tag; [onReport] / [onHide] add the
+ * ⋯ menu (others' rows only): Report name, Hide this person (App Review 1.2 block, local).
  */
 @Composable
 fun LeaderRow(
@@ -87,6 +93,7 @@ fun LeaderRow(
     isYou: Boolean,
     modifier: Modifier = Modifier,
     onReport: (() -> Unit)? = null,
+    onHide: (() -> Unit)? = null,
 ) {
     val pct = boardPct(islandPct)
     val a11y = if (isYou) pluralStringResource(Res.plurals.board_row_you_a11y, trailsCompleted, rank, pct, trailsCompleted)
@@ -129,17 +136,55 @@ fun LeaderRow(
                 Text("$trailsCompleted", Modifier.width(TrailsW), style = BtTheme.type.numeric, color = sub, textAlign = TextAlign.End, maxLines = 1)
             }
             Box(Modifier.width(MenuW), contentAlignment = Alignment.Center) {
-                if (onReport != null) {
+                if (onReport != null || onHide != null) {
                     var open by remember { mutableStateOf(false) }
                     IconButton(onClick = { open = true }) {
                         BtIcon(BtIcons.MoreHoriz, stringResource(Res.string.board_more_a11y, name), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     DropdownMenu(open, onDismissRequest = { open = false }) {
-                        DropdownMenuItem(text = { Text(stringResource(Res.string.board_report_name)) }, onClick = { open = false; onReport() })
+                        if (onHide != null) DropdownMenuItem(text = { Text(stringResource(Res.string.board_hide_person)) }, onClick = { open = false; onHide() })
+                        if (onReport != null) DropdownMenuItem(text = { Text(stringResource(Res.string.board_report_name)) }, onClick = { open = false; onReport() })
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * "You" row while the user has hidden themselves (P1-8): the [LeaderRow] you treatment (primaryContainer, 3dp primary
+ * bar) with an eye-off glyph in the rank column, "You're hidden" and [onChange] to the Account toggle.
+ */
+@Composable
+fun HiddenYouRow(onChange: () -> Unit, modifier: Modifier = Modifier) {
+    val fg = MaterialTheme.colorScheme.onPrimaryContainer
+    val bar = MaterialTheme.colorScheme.primary
+    val a11y = stringResource(Res.string.board_you_hidden_a11y)
+    Row(
+        modifier.fillMaxWidth().background(MaterialTheme.colorScheme.primaryContainer)
+            .drawBehind { drawRect(bar, size = Size(3.dp.toPx(), size.height)) }
+            .heightIn(min = 56.dp).padding(start = BtTheme.spacing.sm, end = BtTheme.spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(BtTheme.spacing.sm),
+    ) {
+        Row(Modifier.weight(1f).clearAndSetSemantics { contentDescription = a11y }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(BtTheme.spacing.sm)) {
+            Box(Modifier.width(RankW), contentAlignment = Alignment.CenterEnd) {
+                BtIcon(BtIcons.VisibilityOff, null, size = 22.dp, tint = fg)
+            }
+            Column(Modifier.weight(1f).padding(start = 4.dp, top = 6.dp, bottom = 6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(stringResource(Res.string.board_you_hidden), style = MaterialTheme.typography.bodyLarge, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        stringResource(Res.string.board_you_tag),
+                        Modifier.background(MaterialTheme.colorScheme.primary, PillShape).padding(horizontal = 8.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+                Text(stringResource(Res.string.board_you_hidden_body), style = MaterialTheme.typography.bodySmall, color = fg.copy(alpha = 0.8f))
+            }
+        }
+        androidx.compose.material3.TextButton(onClick = onChange) { Text(stringResource(Res.string.board_you_hidden_action)) }
     }
 }
 

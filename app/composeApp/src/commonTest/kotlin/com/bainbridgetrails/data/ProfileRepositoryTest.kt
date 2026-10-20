@@ -32,6 +32,49 @@ class ProfileRepositoryTest {
     }
 
     @Test
+    fun hideFromBoardSavesAndRevertsOnFailure() = runTest {
+        server.on("GET /v1/me", Reply.json(Fixtures.me()))
+        val p = repo()
+        p.refresh()
+        server.on("PUT /v1/me", Reply.json(Fixtures.me().replace("\"hiddenFromBoard\":false", "\"hiddenFromBoard\":true")))
+        assertIs<com.bainbridgetrails.net.ApiResult.Ok<*>>(p.setHiddenFromBoard(true))
+        assertEquals("""{"hiddenFromBoard":true}""", server.last("PUT /v1/me").body)
+        assertTrue(p.profile.value!!.me!!.hiddenFromBoard)
+
+        // Offline: the optimistic flip is undone (no offline queue for this toggle).
+        server.online = false
+        assertIs<com.bainbridgetrails.net.ApiResult.Failure>(p.setHiddenFromBoard(false))
+        assertTrue(p.profile.value!!.me!!.hiddenFromBoard)
+    }
+
+    @Test
+    fun moderationHideIsReadAndMakesTheToggleMessageNeutral() = runTest {
+        val modHidden = Fixtures.me().replace("\"hiddenFromBoard\":false", "\"hiddenFromBoard\":false,\"hiddenByModeration\":true")
+        server.on("GET /v1/me", Reply.json(modHidden))
+        val p = repo()
+        p.refresh()
+        val me = p.profile.value!!.me!!
+        assertTrue(me.hiddenByModeration)
+        // Turning the toggle off doesn't bring the row back: no "You're back on the board".
+        assertEquals(HideToggleMessage.UPDATED, hideToggleMessage(hide = false, me))
+        assertEquals(HideToggleMessage.UPDATED, hideToggleMessage(hide = true, me))
+        val plain = me.copy(hiddenByModeration = false)
+        assertEquals(HideToggleMessage.HIDDEN, hideToggleMessage(hide = true, plain))
+        assertEquals(HideToggleMessage.SHOWN, hideToggleMessage(hide = false, plain))
+        // Older servers omit the field.
+        server.on("GET /v1/me", Reply.json(Fixtures.me()))
+        p.refresh()
+        assertEquals(false, p.profile.value!!.me!!.hiddenByModeration)
+    }
+
+    @Test
+    fun hideFromBoardNeedsSignIn() = runTest {
+        signedIn = false
+        assertIs<com.bainbridgetrails.net.ApiResult.Failure>(repo().setHiddenFromBoard(true))
+        assertEquals(0, server.requests.size)
+    }
+
+    @Test
     fun invalidCustomNameIsNotSent() = runTest {
         assertEquals(NameSaveResult.Invalid(NameCheck.TooShort), repo().saveCustomName("ab"))
         assertEquals(0, server.requests.size)

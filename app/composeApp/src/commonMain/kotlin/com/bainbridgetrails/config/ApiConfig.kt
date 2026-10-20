@@ -12,4 +12,7 @@ object ApiConfig {
     var resolver: () -> String = { PROD_BASE_URL }
 
     val baseUrl: String get() = resolver().trimEnd('/')
+
+    /** Public web pages served by the backend (store-required): `/privacy`, `/terms`, `/support`. */
+    fun pageUrl(path: String): String = baseUrl + "/" + path.trimStart('/')
 }

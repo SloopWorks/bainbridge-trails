@@ -2,6 +2,9 @@ package com.bainbridgetrails.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -54,6 +57,12 @@ import com.bainbridgetrails.resources.common_retry
 import com.bainbridgetrails.resources.error_offline_generic
 import com.bainbridgetrails.resources.error_server
 import com.bainbridgetrails.resources.report_body
+import com.bainbridgetrails.resources.board_shown_again
+import com.bainbridgetrails.resources.board_show_again
+import com.bainbridgetrails.resources.board_hidden_people_body
+import com.bainbridgetrails.resources.board_hidden_people
+import com.bainbridgetrails.resources.board_undo
+import com.bainbridgetrails.resources.board_hidden_snackbar
 import com.bainbridgetrails.resources.report_send
 import com.bainbridgetrails.resources.report_signin_required
 import com.bainbridgetrails.resources.report_thanks
@@ -64,6 +73,7 @@ import com.bainbridgetrails.ui.components.EmptyKind
 import com.bainbridgetrails.ui.components.EmptyState
 import com.bainbridgetrails.ui.components.LeaderHeader
 import com.bainbridgetrails.ui.components.LeaderRow
+import com.bainbridgetrails.ui.components.HiddenYouRow
 import com.bainbridgetrails.ui.components.OfflineNote
 import com.bainbridgetrails.ui.components.SignInPrompt
 import com.bainbridgetrails.ui.components.SkeletonLeaderRow
@@ -87,6 +97,10 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
     val listState = rememberLazyListState()
     var reporting by remember { mutableStateOf<LeaderboardEntryDto?>(null) }
     LaunchedEffect(signedIn) { graph.leaderboard.refresh() }
+    // P1-8: the hide toggle lives on the profile (GET /v1/me); refresh it with the board so the hidden row is current.
+    val profile by graph.profile.profile.collectAsStateWithLifecycle()
+    LaunchedEffect(signedIn) { if (signedIn) graph.profile.refresh() }
+    val hiddenSelf = signedIn && profile?.me?.hiddenFromBoard == true
 
     val board = state.board
     val entries = board?.entries.orEmpty()
@@ -115,6 +129,12 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
             }
         },
         bottomBar = when {
+            hiddenSelf -> { {
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    HiddenYouRow(onChange = onSignIn)
+                }
+            } }
             !signedIn -> { { SignInPrompt(stringResource(Res.string.board_signed_out_prompt), stringResource(Res.string.board_signin), onSignIn, Modifier.padding(horizontal = BtTheme.spacing.screenH, vertical = BtTheme.spacing.sm)) } }
             you != null && !youVisible -> { {
                 Column {
@@ -145,7 +165,7 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
                 if (board != null && board.totalRanked > 0) {
                     Text(pluralStringResource(Res.plurals.board_total, board.totalRanked, board.totalRanked), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (signedIn && board != null && you == null && state.error == null) {
+                if (signedIn && !hiddenSelf && board != null && you == null && state.error == null) {
                     Text(stringResource(Res.string.board_not_ranked), Modifier.padding(top = BtTheme.spacing.xs), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 }
             }
@@ -171,7 +191,33 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
                     LeaderRow(
                         e.rank, e.displayName, e.islandPct, e.trailsCompleted, e.isYou,
                         onReport = if (e.isYou) null else { { reporting = e } },
+                        onHide = if (e.isYou) null else { {
+                            scope.launch {
+                                graph.leaderboard.hidePerson(e.userId)
+                                val r = snackbar.showSnackbar(getString(Res.string.board_hidden_snackbar), actionLabel = getString(Res.string.board_undo), duration = SnackbarDuration.Short)
+                                if (r == SnackbarResult.ActionPerformed) graph.leaderboard.unhidePerson(e.userId)
+                            }
+                        } },
                     )
+                }
+            }
+        }
+        if (state.hiddenCount > 0) {
+            item(key = "hidden-people") {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = BtTheme.spacing.screenH, end = BtTheme.spacing.sm, top = BtTheme.spacing.md),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(Res.string.board_hidden_people, state.hiddenCount), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(Res.string.board_hidden_people_body), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = {
+                        scope.launch {
+                            graph.leaderboard.showHiddenAgain()
+                            snackbar.showSnackbar(getString(Res.string.board_shown_again))
+                        }
+                    }) { Text(stringResource(Res.string.board_show_again)) }
                 }
             }
         }

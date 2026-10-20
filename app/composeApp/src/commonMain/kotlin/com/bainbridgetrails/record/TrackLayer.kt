@@ -52,6 +52,25 @@ fun TrackLayer(track: List<Fix>, color: Color = Color(0xFF0B63CE), casing: Color
 }
 
 /**
+ * A finished walk's raw track (walk detail, P1-6), in pieces: read from the on-device session file only while it
+ * exists (30-day retention) and never sent anywhere. Same look as the live track.
+ */
+@Composable
+@MaplibreComposable
+fun WalkTrackLayer(pieces: List<List<List<Double>>>, color: Color = Color(0xFF0B63CE), casing: Color = Color.White) {
+    val json = remember(pieces) { com.bainbridgetrails.map.multiLineGeoJson(pieces) }
+    val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))
+    LineLayer(
+        id = "walk-track-casing", source = source, color = const(casing), width = const(7.dp),
+        cap = const(LineCap.Round), join = const(LineJoin.Round),
+    )
+    LineLayer(
+        id = "walk-track", source = source, color = const(color), width = const(3.5.dp),
+        cap = const(LineCap.Round), join = const(LineJoin.Round),
+    )
+}
+
+/**
  * Battery: the map's GeoJSON source is rebuilt (and re-tiled by MapLibre) at most every [MIN_INTERVAL_MS]
  * of fix time, or sooner once the walker has moved [MIN_MOVE_M] from the last drawn point.
  */
