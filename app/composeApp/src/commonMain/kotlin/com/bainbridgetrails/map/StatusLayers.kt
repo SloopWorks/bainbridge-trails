@@ -46,6 +46,12 @@ internal fun namedNotCountedLayerId(s: TrailStatus) = "app-trail-nc-${s.name.low
 /** The style layer the app's trail layers sit under, so trail names stay readable on top. */
 private const val LABEL_LAYER = "trail-label"
 
+/**
+ * Categories that only the roads dataset uses (docs/roads/data-spec.md); mirrors ROAD_CATS in
+ * scripts/build-map-styles.py. Empty on the trail dataset, so these checks cost nothing there.
+ */
+private val RoadCategories = listOf("state_route", "arterial", "collector", "residential", "lane", "driveway")
+
 /** A trail drawn with the selection treatment (ux.md §6.2): its segments' coordinates and its trail-level status. */
 data class SelectedTrail(val id: String, val lines: List<List<List<Double>>>, val status: TrailStatus)
 
@@ -94,8 +100,10 @@ fun StatusLayers(
     val namedNcFilters = remember(filters) { filters.mapValues { (_, f) -> all(!counted, named, f) } }
 
     Anchor.Below(LABEL_LAYER) {
-        // Unnamed paths outside the island total: faint hairlines, by category (styles.md).
-        val hair = all(!counted, !named)
+        // Unnamed paths outside the island total: faint hairlines, by category (styles.md). Uncounted *roads*
+        // (the roads dataset carries road_ids, so they all land here) are drawn by the style's own muted
+        // roads-ds-private / roads-ds-holdout layers instead, which say why they are out of the goal.
+        val hair = all(!counted, !named, !(const(RoadCategories).contains(feature["category"].asString(const("")))))
         val hairWidth = interpolate(linear(), zoom(), 12 to const(0.4.dp), 15 to const(1.0.dp), 18 to const(1.8.dp))
         LineLayer(
             id = "app-nc-hairline",

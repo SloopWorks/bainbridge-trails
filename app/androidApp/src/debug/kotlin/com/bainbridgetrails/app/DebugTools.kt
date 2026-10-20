@@ -2,11 +2,13 @@ package com.bainbridgetrails.app
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import com.bainbridgetrails.analytics.LogAnalytics
 import com.bainbridgetrails.auth.AuthConfig
 import com.bainbridgetrails.config.ApiConfig
+import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.log.AppLog
 import com.bainbridgetrails.log.LogLevel
@@ -43,7 +45,7 @@ object DebugTools {
                     Backend("prod", "Prod (temp workers.dev)", ApiConfig.PROD_BASE_URL),
                     Backend("local", "Local wrangler dev", LOCAL_BASE_URL),
                 ),
-                plugins = listOf(TrailsDataPlugin, CoveragePlugin(app), RecordingPlugin(app)),
+                plugins = listOf(DatasetPlugin(app), TrailsDataPlugin, CoveragePlugin(app), RecordingPlugin(app)),
             ),
             app,
         )
@@ -75,4 +77,30 @@ object DebugTools {
     }
 
     private const val LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
+
+    // --- dataset switch (the roads prototype, docs/roads/plan.md P1) ------------------------------
+    private const val PREFS = "bt-debug"
+    /** Must match MainActivity.DATASET_EXTRA (the launch extra) — the drawer stores the same key. */
+    private const val KEY_DATASET = "dataset"
+
+    /**
+     * Picks the dataset for this process from `--es dataset roads` (one launch, scripts and screenshots) or the
+     * drawer's stored choice. Must run before `AppGraph.warmUp()` and before any map composes.
+     */
+    fun selectDataset(context: Context, intent: Intent?) {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val fromIntent = intent?.getStringExtra(KEY_DATASET)
+        val profile = DatasetProfile.byKey(fromIntent ?: prefs.getString(KEY_DATASET, null)) ?: return
+        DatasetProfile.select(profile)
+    }
+
+    /** The drawer's stored choice; it takes effect on the next launch. */
+    fun storedDataset(context: Context): DatasetProfile =
+        DatasetProfile.byKey(context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_DATASET, null))
+            ?: DatasetProfile.Default
+
+    fun storeDataset(context: Context, profile: DatasetProfile) {
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_DATASET, profile.key).apply()
+    }
 }

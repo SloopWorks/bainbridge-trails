@@ -1,8 +1,10 @@
 package com.bainbridgetrails.coverage
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNames
 
 @Serializable
 data class TrailMeta(
@@ -17,11 +19,16 @@ data class TrailMeta(
     val displayLengthMi: Double get() = officialLengthMi ?: computedLengthMi
 }
 
+/**
+ * trails.json, or the roads dataset's roads.json: the roads rows carry the same `id`, `name`, `segment_ids` and
+ * `computed_length_mi` fields under a `roads` array, so the @JsonNames alias lets one model read either.
+ */
 @Serializable
 private data class TrailsFile(
     val version: String,
     @SerialName("island_total_shippable_m") val islandTotalShippableM: Double,
-    val trails: List<TrailMeta>,
+    @OptIn(ExperimentalSerializationApi::class)
+    @JsonNames("roads") val trails: List<TrailMeta>,
 )
 
 @Serializable
