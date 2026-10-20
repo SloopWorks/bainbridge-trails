@@ -1,1 +1,1 @@
-https://api.bainbridgetrails.app/privacy
+https://bainbridge-trails-api.patjackson52.workers.dev/privacy

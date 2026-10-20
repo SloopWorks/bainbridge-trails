@@ -1,1 +1,1 @@
-https://api.bainbridgetrails.app/support
+https://bainbridge-trails-api.patjackson52.workers.dev/support

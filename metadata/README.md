@@ -41,7 +41,7 @@ scripts/check-metadata.py          # prints each file's length; exit 1 on a miss
 
 ## Owner TODO before submission
 
-- `privacy_url.txt` / `support_url.txt` use the placeholder API host `api.bainbridgetrails.app` (same as
+- `privacy_url.txt` / `support_url.txt` use the TEMPORARY API host `bainbridge-trails-api.patjackson52.workers.dev` (switch to the final domain before submitting; was the placeholder `api.bainbridgetrails.app`) (same as
   `ApiConfig.PROD_BASE_URL`). Replace with the deployed Worker host (`https://<host>/privacy`, `/support`) once
   the domain is decided. The Worker serves `/privacy`, `/terms`, `/support` and `/delete-account`.
 - Screenshots, feature graphic and icon are not here yet (fastlane: `android/en-US/images/`,

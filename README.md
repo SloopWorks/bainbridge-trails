@@ -48,8 +48,9 @@ Point a debug build at the local backend: Android emulator via the debug drawer 
    backend's `APPLE_CLIENT_IDS` (optional `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` for revocation).
 3. **Backend:** a Cloudflare account; create the D1 database, apply migrations, set `ADMIN_TOKEN` and the vars
    above, deploy — step by step in [`backend/README.md`](backend/README.md#deploy-owner-only--agents-never-deploy).
-   Then set the app's `ApiConfig.PROD_BASE_URL` (today a placeholder, `https://api.bainbridgetrails.app`) to the
-   deployed Worker or custom domain.
+   **Done (temporary):** deployed 2026-10-20 to `https://bainbridge-trails-api.patjackson52.workers.dev` (D1 `bainbridge-trails`, migrations
+   applied, `ADMIN_TOKEN` set; local copy in `~/.config/bainbridge-trails/admin-token`). `ApiConfig.PROD_BASE_URL` and
+   the iOS metadata URLs point there. Before publishing: move to a custom domain and update both.
 4. **Privacy policy URL** (hosted page; the in-app Privacy screen is a summary) and the account-deletion URL
    (`GET /delete-account` on the Worker, `SUPPORT_EMAIL` var) for the store listings.
 5. **Store listings:** Play Console app + release signing key, foreground-service (location) declaration with
