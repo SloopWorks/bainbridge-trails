@@ -341,5 +341,6 @@ private suspend fun openDebugScreen(nav: NavController, graph: AppGraph.Installe
         "attribution" -> nav.navigate(AttributionRoute)
         "privacy" -> nav.navigate(PrivacyRoute)
         "onboarding" -> nav.navigate(OnboardingRoute)
+        else -> if (screen.startsWith("trail:")) nav.navigate(TrailDetailRoute(screen.substringAfter(':')))
     }
 }
