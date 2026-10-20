@@ -119,6 +119,13 @@
     <string name="board_signed_out_prompt">Sign in to appear on the board. Only your name, island % and trails completed are shown.</string>
     <string name="board_signin">Sign in</string>
     <string name="board_report_name">Report name</string>
+    <string name="board_hide_person">Hide this person</string>
+    <string name="board_hidden_snackbar">Hidden from your board</string>
+    <string name="board_undo">Undo</string>
+    <string name="board_hidden_people">Hidden people (%1$d)</string>
+    <string name="board_hidden_people_body">Only on this phone. They aren’t told.</string>
+    <string name="board_show_again">Show again</string>
+    <string name="board_shown_again">Everyone you hid is back on your board.</string>
     <string name="board_more_a11y">More options for %1$s</string>
     <string name="board_refresh_a11y">Refresh</string>
     <string name="board_you_hidden">You’re hidden</string>

@@ -2,6 +2,9 @@ package com.bainbridgetrails.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -54,6 +57,12 @@ import com.bainbridgetrails.resources.common_retry
 import com.bainbridgetrails.resources.error_offline_generic
 import com.bainbridgetrails.resources.error_server
 import com.bainbridgetrails.resources.report_body
+import com.bainbridgetrails.resources.board_shown_again
+import com.bainbridgetrails.resources.board_show_again
+import com.bainbridgetrails.resources.board_hidden_people_body
+import com.bainbridgetrails.resources.board_hidden_people
+import com.bainbridgetrails.resources.board_undo
+import com.bainbridgetrails.resources.board_hidden_snackbar
 import com.bainbridgetrails.resources.report_send
 import com.bainbridgetrails.resources.report_signin_required
 import com.bainbridgetrails.resources.report_thanks
@@ -182,7 +191,33 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
                     LeaderRow(
                         e.rank, e.displayName, e.islandPct, e.trailsCompleted, e.isYou,
                         onReport = if (e.isYou) null else { { reporting = e } },
+                        onHide = if (e.isYou) null else { {
+                            scope.launch {
+                                graph.leaderboard.hidePerson(e.userId)
+                                val r = snackbar.showSnackbar(getString(Res.string.board_hidden_snackbar), actionLabel = getString(Res.string.board_undo), duration = SnackbarDuration.Short)
+                                if (r == SnackbarResult.ActionPerformed) graph.leaderboard.unhidePerson(e.userId)
+                            }
+                        } },
                     )
+                }
+            }
+        }
+        if (state.hiddenCount > 0) {
+            item(key = "hidden-people") {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = BtTheme.spacing.screenH, end = BtTheme.spacing.sm, top = BtTheme.spacing.md),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(Res.string.board_hidden_people, state.hiddenCount), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(Res.string.board_hidden_people_body), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = {
+                        scope.launch {
+                            graph.leaderboard.showHiddenAgain()
+                            snackbar.showSnackbar(getString(Res.string.board_shown_again))
+                        }
+                    }) { Text(stringResource(Res.string.board_show_again)) }
                 }
             }
         }

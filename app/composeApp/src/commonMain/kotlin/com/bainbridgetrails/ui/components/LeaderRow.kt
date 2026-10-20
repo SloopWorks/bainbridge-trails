@@ -36,6 +36,7 @@ import com.bainbridgetrails.resources.board_col_rank
 import com.bainbridgetrails.resources.board_col_trails
 import com.bainbridgetrails.resources.board_more_a11y
 import com.bainbridgetrails.resources.board_report_name
+import com.bainbridgetrails.resources.board_hide_person
 import com.bainbridgetrails.resources.board_row_a11y
 import com.bainbridgetrails.resources.board_row_you_a11y
 import com.bainbridgetrails.resources.board_you_tag
@@ -80,8 +81,8 @@ fun LeaderHeader(modifier: Modifier = Modifier) {
 
 /**
  * Leaderboard row (ux.md §3.8): rank (Fraunces, `primary` for the top 3 — no medals, no status hues), name, island %,
- * trails completed. [isYou] = `primaryContainer` with a 2dp `primary` bar and a "You" tag; [onReport] adds the ⋯ menu
- * (others' rows only).
+ * trails completed. [isYou] = `primaryContainer` with a 2dp `primary` bar and a "You" tag; [onReport] / [onHide] add the
+ * ⋯ menu (others' rows only): Report name, Hide this person (App Review 1.2 block, local).
  */
 @Composable
 fun LeaderRow(
@@ -92,6 +93,7 @@ fun LeaderRow(
     isYou: Boolean,
     modifier: Modifier = Modifier,
     onReport: (() -> Unit)? = null,
+    onHide: (() -> Unit)? = null,
 ) {
     val pct = boardPct(islandPct)
     val a11y = if (isYou) pluralStringResource(Res.plurals.board_row_you_a11y, trailsCompleted, rank, pct, trailsCompleted)
@@ -134,13 +136,14 @@ fun LeaderRow(
                 Text("$trailsCompleted", Modifier.width(TrailsW), style = BtTheme.type.numeric, color = sub, textAlign = TextAlign.End, maxLines = 1)
             }
             Box(Modifier.width(MenuW), contentAlignment = Alignment.Center) {
-                if (onReport != null) {
+                if (onReport != null || onHide != null) {
                     var open by remember { mutableStateOf(false) }
                     IconButton(onClick = { open = true }) {
                         BtIcon(BtIcons.MoreHoriz, stringResource(Res.string.board_more_a11y, name), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     DropdownMenu(open, onDismissRequest = { open = false }) {
-                        DropdownMenuItem(text = { Text(stringResource(Res.string.board_report_name)) }, onClick = { open = false; onReport() })
+                        if (onHide != null) DropdownMenuItem(text = { Text(stringResource(Res.string.board_hide_person)) }, onClick = { open = false; onHide() })
+                        if (onReport != null) DropdownMenuItem(text = { Text(stringResource(Res.string.board_report_name)) }, onClick = { open = false; onReport() })
                     }
                 }
             }

@@ -29,6 +29,8 @@ data class LeaderboardState(
     val updatedAt: Long? = null,
     val loading: Boolean = false,
     val error: ApiError? = null,
+    /** People this user hid (reported or "Hide this person"), kept on this phone; footer "Hidden people (N)". */
+    val hiddenCount: Int = 0,
 )
 
 sealed interface ReportResult {
@@ -60,7 +62,7 @@ class LeaderboardRepository(
         val c = withContext(io) { cache.read() } ?: return
         hidden = c.hidden
         raw = c.board
-        _state.update { it.copy(board = c.board.withoutHidden(), updatedAt = c.fetchedAt) }
+        _state.update { it.copy(board = c.board.withoutHidden(), updatedAt = c.fetchedAt, hiddenCount = hidden.size) }
     }
 
     /** Fetches the board; on failure keeps showing the cache and sets [LeaderboardState.error]. */
@@ -73,7 +75,7 @@ class LeaderboardRepository(
                 is ApiResult.Ok -> {
                     val t = now()
                     raw = r.value
-                    _state.value = LeaderboardState(r.value.withoutHidden(), t, loading = false, error = null)
+                    _state.value = LeaderboardState(r.value.withoutHidden(), t, loading = false, error = null, hiddenCount = hidden.size)
                     withContext(io) { runCatching { cache.write(BoardCache(r.value, t, hidden)) } }
                 }
                 is ApiResult.Failure -> _state.update { it.copy(loading = false, error = r.error) }
@@ -104,11 +106,35 @@ class LeaderboardRepository(
         _state.update { it.copy(board = raw?.withoutHidden()) }
     }
 
+    /**
+     * "Hide this person" (App Review 1.2 block): their row disappears from this phone's board right away and stays
+     * hidden (local only, nothing is sent). Undo with [showHiddenAgain].
+     */
+    suspend fun hidePerson(userId: String) = hide(userId)
+
+    /** Undo of one [hidePerson]. */
+    suspend fun unhidePerson(userId: String) = mutex.withLock {
+        loadCache()
+        setHiddenLocked(hidden - userId)
+    }
+
+    /** "Show again": every hidden person (reported or hidden) is back on this phone's board. */
+    suspend fun showHiddenAgain() = setHidden(emptySet())
+
     private suspend fun hide(userId: String) = mutex.withLock {
         loadCache()
-        hidden = hidden + userId
-        _state.update { it.copy(board = raw?.withoutHidden()) }
-        val b = raw ?: return@withLock
+        setHiddenLocked(hidden + userId)
+    }
+
+    private suspend fun setHidden(next: Set<String>) = mutex.withLock {
+        loadCache()
+        setHiddenLocked(next)
+    }
+
+    private suspend fun setHiddenLocked(next: Set<String>) {
+        hidden = next
+        _state.update { it.copy(board = raw?.withoutHidden(), hiddenCount = hidden.size) }
+        val b = raw ?: return
         val t = _state.value.updatedAt ?: now()
         withContext(io) { runCatching { cache.write(BoardCache(b, t, hidden)) } }
     }
