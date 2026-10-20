@@ -100,7 +100,8 @@ class DatasetRepository(
         val bin = sources.datasetBin()
         val t0 = TimeSource.Monotonic.markNow()
         var format = "bin"
-        val dataset = bin?.let { bytes ->
+        // Rules apply to whichever path parsed the dataset (the elvis below binds tighter than a trailing call).
+        val dataset = (bin?.let { bytes ->
             try {
                 require(DatasetBinary.trailsJsonHash(bytes) == DatasetBinary.hash(trails)) { "not made from the bundled trails.json" }
                 Dataset.fromBinary(bytes)
@@ -111,7 +112,7 @@ class DatasetRepository(
         } ?: run {
             format = "json"
             Dataset.parse(trails.decodeToString(), sources.segmentsJson())
-        }.withRules(sources.rules)
+        }).withRules(sources.rules)
         val parseMs = t0.elapsedNow().inWholeMilliseconds
         val t1 = TimeSource.Monotonic.markNow()
         val index = SegmentIndex(dataset.segments, params, LocalProjection())
