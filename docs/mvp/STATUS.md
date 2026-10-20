@@ -25,7 +25,7 @@ Legend: **done** · **partial** · **not done**.
 | 12 | Leaderboard top 100, your rank, empty/offline states | done | |
 | 13 | Sign in (Google Android, Apple iOS, dev debug) | partial | code + backend verification done; real Google/Apple OAuth untested (needs owner's client ids / Apple team) |
 | 14 | Display name, anon generator, validation, blocklist | done | |
-| 15 | Report name + server auto-hide at 3 reports | done | |
+| 15 | Report name (flags for admin review; auto-hide cut per decisions.md) | done | |
 | 16 | Delete account (server + optional local) | done | |
 | 17 | Settings: units, attribution, privacy, version | partial | in-app privacy summary only; hosted privacy policy URL missing |
 | 18 | Sync up/down, union merge, offline queue | done | verified against local backend only |
@@ -42,7 +42,7 @@ Legend: **done** · **partial** · **not done**.
 | 4 | Admin endpoint for blocklist terms without deploy | not done (blocklist is bundled JSON; admin can hide/reset names) |
 | 5 | Raw track retention 30 days | done |
 | 6 | Walk history detail view | not done |
-| 7 | Hide reported rows for the reporter immediately | not done (server auto-hide works) |
+| 7 | Hide reported rows for the reporter immediately | not done (reports only flag for admin review) |
 | 8 | "Hide me from the leaderboard" toggle | not done (API exposes `hiddenFromBoard`; no UI) |
 | 9 | Island 100% celebration art | not done |
 | 10 | Debug drawer panels (dataset, coverage tools, recording) | done (Android only) |
