@@ -20,7 +20,14 @@ sealed interface Route
 @Serializable data object PrivacyRoute : Route
 @Serializable data object OnboardingRoute : Route
 /** Full-screen celebration for a walk's newly completed trails (dataset order). */
-@Serializable data class CelebrationRoute(val sessionId: String, val trailIds: List<String>) : Route
+@Serializable data class CelebrationRoute(
+    val sessionId: String,
+    val trailIds: List<String>,
+    /** The walk made the island whole (P1-9). */
+    val island: Boolean = false,
+    /** Debug only: island variant with final numbers. */
+    val preview: Boolean = false,
+) : Route
 
 /** Debug spike: the map style comparison screen (`screen=style` launch option). */
 @Serializable data object StyleSpikeRoute : Route

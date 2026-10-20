@@ -115,6 +115,10 @@ class CoveragePlugin(private val context: Context) : DebugPlugin {
                 val picks = snapshot?.trails?.filter { it.lengthMi >= 0.2 }?.sortedBy { it.lengthMi }?.take(3)?.map { it.trailId } ?: return@OutlinedButton
                 AppGraph.requestCelebration(AppGraph.Celebration("debug-multi-${picks.joinToString()}-${System.currentTimeMillis()}", picks))
             }) { Text("Show celebration (3 trails)") }
+            // P1-9: the whole-island variant with final numbers (100%, every trail), coverage untouched.
+            OutlinedButton(onClick = {
+                AppGraph.requestCelebration(AppGraph.Celebration("debug-island-${System.currentTimeMillis()}", emptyList(), island = true, preview = true))
+            }) { Text("Show island 100% celebration") }
             message?.let { Text(it) }
         }
     }
