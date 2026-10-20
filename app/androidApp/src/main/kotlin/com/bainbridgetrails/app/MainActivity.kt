@@ -6,6 +6,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.App
 import com.bainbridgetrails.auth.AuthConfig
 import com.bainbridgetrails.graph.AppGraph
@@ -30,7 +38,24 @@ class MainActivity : ComponentActivity() {
         AuthConfig.googleWebClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
         DebugTools.install(this) // debug: drawer + log/analytics/backend wiring + dev sign-in; release: nothing
         DebugTools.onActivityCreated(this) // debug + Local backend: local-network permission (Android 17+)
-        setContent { DebugDrawerHost { App(launch) } }
+        setContent {
+            Box(Modifier.fillMaxSize()) {
+                App(launch)
+                // Debug drawer (no-op in release) as a sibling overlay that stops well above the tab bar: its bubble
+                // docks BOTTOM_END of this box (the drawer offers corners only), so it sits on the lower right edge,
+                // clear of the "Me" tab label, the map's locate button and Trail detail's Start walk bar.
+                Box(
+                    Modifier.fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(bottom = DRAWER_BOTTOM_CLEARANCE),
+                ) { DebugDrawerHost {} }
+            }
+        }
+    }
+
+    private companion object {
+        /** BtTheme.spacing.bottomBarHeight (80 dp) plus room for the bottom-right map/sheet controls above it. */
+        val DRAWER_BOTTOM_CLEARANCE = 208.dp
     }
 
     override fun onNewIntent(intent: Intent) {
