@@ -409,7 +409,7 @@ Tone: friendly, local, short, plain. Sentence case. No exclamation marks except 
 | onboarding_2_title | Every step adds up |
 | onboarding_2_body | Record a walk and the trails you cover light up. Finish a trail across as many walks as you like, in any direction. A trail counts as complete at %1$d%%. |
 | onboarding_3_title | Your walks stay on your phone |
-| onboarding_3_body | GPS tracks never leave this phone. If you sign in, we only sync which trail sections you've covered, never where or when you walked. |
+| onboarding_3_body | We sync which trail sections you've covered — never your GPS track or walk times. (TL-3) |
 | onboarding_3_signin_hint | Sign in later from Me to join the leaderboard. |
 | onboarding_skip | Skip |
 | onboarding_next | Next |

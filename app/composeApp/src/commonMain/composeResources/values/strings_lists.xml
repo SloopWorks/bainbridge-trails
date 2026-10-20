@@ -163,6 +163,7 @@
     <string name="error_offline_generic">You’re offline. Try again when you’re connected.</string>
     <string name="error_offline_signin">Signing in needs a connection.</string>
     <string name="error_offline_delete">Deleting your account needs a connection.</string>
+    <string name="error_delete_signin_again">Your session expired. Sign in again to delete your account.</string>
     <string name="error_signin">Sign-in didn’t work. Please try again.</string>
     <string name="error_server">Our server isn’t responding. Try again in a bit.</string>
 
@@ -186,7 +187,7 @@
     <string name="privacy_account_title">If you sign in</string>
     <string name="privacy_account_body">We store your account id, your public name, and which trail sections you’ve covered (as on/off flags per 5 m of trail). From those we compute your island % and trails completed for the leaderboard.</string>
     <string name="privacy_board_title">On the leaderboard</string>
-    <string name="privacy_board_body">Others see only your name, island % and trails completed — never where or when you walked. Use a random name if you prefer.</string>
+    <string name="privacy_board_body">Others see only your name, island % and trails completed — never your GPS track or walk times. Use a random name if you prefer.</string>
     <string name="privacy_delete_title">Deleting</string>
     <string name="privacy_delete_body">Delete your account any time in Me → Account. It removes everything we store about you.</string>
 

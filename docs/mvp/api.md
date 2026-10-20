@@ -158,6 +158,10 @@ keys sorted. Server responses are always normalized this way.
   one per request), `id` = random UUID per walk, `durationS` = walk duration. The **first upload after sign-in
   (backfill) carries every local walk** (max 2000; later uploads max 200). Re-sending an already-credited id is
   harmless. The server stores only the id (no durations, no times).
+  Client: never split walks across uploads — after the first accepted upload a second batch sent right away
+  fails the elapsed-time check below. Each sync sends one upload (≤ 2000 walks for the backfill, ≤ 200 later,
+  also after `too_many_walks`); walks over the cap (longest kept) are dropped uncredited, their coverage still
+  goes. Known MVP limit: > 2000 local walks at first sign-in.
 - Plausibility: newly covered metres (after merge) ≤ **4.0 m/s × Σ durationS of new walk ids + 500 m**;
   the 500 m slack applies only when at least one new walk is sent, so coverage growth without a new walk is
   rejected. Each duration counts at most 6 h. After the first accepted upload, Σ new durations must fit in the

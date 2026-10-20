@@ -39,7 +39,7 @@
     <string name="onboarding_2_title">Every step adds up</string>
     <string name="onboarding_2_body">Record a walk and the trails you cover light up. Finish a trail across as many walks as you like, in any direction. A trail counts as complete at %1$d%.</string>
     <string name="onboarding_3_title">Your walks stay on your phone</string>
-    <string name="onboarding_3_body">GPS tracks never leave this phone. If you sign in, we only sync which trail sections you’ve covered, never where or when you walked.</string>
+    <string name="onboarding_3_body">We sync which trail sections you've covered — never your GPS track or walk times.</string>
     <string name="onboarding_3_signin_hint">Sign in later from Me to join the leaderboard.</string>
     <string name="onboarding_skip">Skip</string>
     <string name="onboarding_next">Next</string>
