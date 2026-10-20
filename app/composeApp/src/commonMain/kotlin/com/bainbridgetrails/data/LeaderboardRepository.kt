@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 @Serializable
-private data class BoardCache(val board: LeaderboardDto, val fetchedAt: Long, val hidden: Set<String> = emptySet())
+private data class BoardCache(val board: LeaderboardDto? = null, val fetchedAt: Long? = null, val hidden: Set<String> = emptySet())
 
 /**
  * [board] = last good response (from the network or the offline cache), with rows the user reported removed
@@ -29,7 +29,10 @@ data class LeaderboardState(
     val updatedAt: Long? = null,
     val loading: Boolean = false,
     val error: ApiError? = null,
-    /** People this user hid (reported or "Hide this person"), kept on this phone; footer "Hidden people (N)". */
+    /**
+     * Everyone this user hid (reported or "Hide this person") on this phone, whether or not they are on the current
+     * board (they stay hidden if they come back); footer "Hidden people (N)", whose "Show again" un-hides them all.
+     */
     val hiddenCount: Int = 0,
 )
 
@@ -62,7 +65,7 @@ class LeaderboardRepository(
         val c = withContext(io) { cache.read() } ?: return
         hidden = c.hidden
         raw = c.board
-        _state.update { it.copy(board = c.board.withoutHidden(), updatedAt = c.fetchedAt, hiddenCount = hidden.size) }
+        _state.update { it.copy(board = c.board?.withoutHidden(), updatedAt = c.fetchedAt, hiddenCount = hidden.size) }
     }
 
     /** Fetches the board; on failure keeps showing the cache and sets [LeaderboardState.error]. */
@@ -134,9 +137,9 @@ class LeaderboardRepository(
     private suspend fun setHiddenLocked(next: Set<String>) {
         hidden = next
         _state.update { it.copy(board = raw?.withoutHidden(), hiddenCount = hidden.size) }
-        val b = raw ?: return
-        val t = _state.value.updatedAt ?: now()
-        withContext(io) { runCatching { cache.write(BoardCache(b, t, hidden)) } }
+        // Saved even with no board yet (hidden before the first fetch), so the choice survives a restart.
+        val t = if (raw == null) null else _state.value.updatedAt ?: now()
+        withContext(io) { runCatching { cache.write(BoardCache(raw, t, hidden)) } }
     }
 
     private fun LeaderboardDto.withoutHidden(): LeaderboardDto =

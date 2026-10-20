@@ -98,6 +98,35 @@ class CommunityRepositoriesTest {
     }
 
     @Test
+    fun hidingBeforeAnyBoardWasFetchedStillPersists() = runTest {
+        server.online = false
+        val r = boardRepo()
+        r.refresh() // nothing cached, offline: no board yet
+        assertNull(r.state.value.board)
+        r.hidePerson("a")
+        assertEquals(1, r.state.value.hiddenCount)
+
+        server.online = true
+        server.on("GET /v1/leaderboard", Reply.json(board))
+        val restarted = boardRepo()
+        restarted.refresh()
+        assertEquals(listOf("b"), restarted.state.value.board!!.entries.map { it.userId })
+        assertEquals(1, restarted.state.value.hiddenCount)
+    }
+
+    @Test
+    fun hiddenCountIsEveryoneHiddenOnThisPhoneEvenIfOffTheCurrentBoard() = runTest {
+        server.on("GET /v1/leaderboard", Reply.json(board))
+        val r = boardRepo()
+        r.refresh()
+        r.hidePerson("a")
+        r.hidePerson("gone-from-top-100") // still hidden if they come back, so "Show again" must stay reachable
+        assertEquals(2, r.state.value.hiddenCount)
+        r.showHiddenAgain()
+        assertEquals(0, r.state.value.hiddenCount)
+    }
+
+    @Test
     fun reportOfAGoneUserCountsAsReportedAndHidesTheRow() = runTest {
         server.on("GET /v1/leaderboard", Reply.json(board))
         server.on("POST /v1/report-name", Reply.error(404, "not_found"))
