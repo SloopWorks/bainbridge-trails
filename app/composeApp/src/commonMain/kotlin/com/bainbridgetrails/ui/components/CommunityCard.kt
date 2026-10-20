@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.resources.Res
+import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.resources.common_retry
 import com.bainbridgetrails.resources.detail_community_completed
 import com.bainbridgetrails.resources.detail_community_error
@@ -70,12 +71,12 @@ fun CommunityCard(state: CommunityState, modifier: Modifier = Modifier, onRetry:
             is CommunityState.Loaded -> {
                 val n = state.completedCount
                 if (n == null) {
-                    Text(stringResource(Res.string.detail_community_few), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(LocalGoal.current.s(Res.string.detail_community_few)), style = MaterialTheme.typography.titleMedium)
                 } else {
                     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(n.toString(), style = BtTheme.type.statLarge)
                         Text(
-                            pluralStringResource(Res.plurals.detail_community_completed, n, n).removePrefix("$n").trim(),
+                            pluralStringResource(LocalGoal.current.p(Res.plurals.detail_community_completed), n, n).removePrefix("$n").trim(),
                             Modifier.padding(bottom = 5.dp),
                             style = MaterialTheme.typography.bodyMedium,
                         )

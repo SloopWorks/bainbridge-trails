@@ -186,8 +186,9 @@ fun StatusLayers(
             cap = const(LineCap.Butt), join = const(LineJoin.Round),
         )
 
-        if (spec.drawRoadEnds && roadEnds.isNotEmpty()) RoadEndPins(roadEnds, style)
         if (selected != null) SelectionLayers(selected, p, spec)
+        // Pins on top of the selection: a road end sits on its road's last metres.
+        if (spec.drawRoadEnds && roadEnds.isNotEmpty()) RoadEndPins(roadEnds, style)
     }
 }
 

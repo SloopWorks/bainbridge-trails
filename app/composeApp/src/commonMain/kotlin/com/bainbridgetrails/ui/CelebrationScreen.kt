@@ -349,7 +349,7 @@ private fun CelebrationContent(
                     val after = s.trailsCompleted
                     val before = (after - trails.size).coerceAtLeast(0)
                     val value = if (!reduced && islandBefore != null) (before + (after - before) * p).roundToInt() else after
-                    IslandCounter("$value", widest = "${s.trailCount}")
+                    IslandCounter("$value", widest = "${s.trailCount}", align = Alignment.Center)
                     Text(stringResource(Res.string.roads_celebrate_of_roads, s.trailCount), style = MaterialTheme.typography.titleMedium)
                 } else {
                     val value = if (islandBefore != null && !reduced) islandBefore + (island - islandBefore) * p else island
@@ -393,11 +393,11 @@ private fun phase(t: Float, from: Int, to: Int): Float = ((t - from) / (to - fro
  * reflow the layout while counting (ux.md §3.6); capped at 83sp (ux.md §5.3).
  */
 @Composable
-private fun IslandCounter(text: String, widest: String) {
+private fun IslandCounter(text: String, widest: String, align: Alignment = Alignment.CenterEnd) {
     val base = BtTheme.type.statHero
     val scale = LocalDensity.current.fontScale
     val style = if (base.fontSize.value * scale > 83f) base.copy(fontSize = (83f / scale).sp, lineHeight = (88f / scale).sp) else base
-    Box(contentAlignment = Alignment.CenterEnd) {
+    Box(contentAlignment = align) {
         Text(widest.replace(Regex("[0-9]"), "0"), style = style, modifier = Modifier.alpha(0f))
         Text(text, style = style, color = MaterialTheme.colorScheme.onSurface)
     }

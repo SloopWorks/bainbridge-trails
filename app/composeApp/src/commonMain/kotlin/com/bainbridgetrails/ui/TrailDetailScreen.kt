@@ -143,7 +143,7 @@ fun TrailDetailScreen(
         val meta = data.dataset.trails.firstOrNull { it.id == trailId }
         if (meta == null) {
             Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing), contentAlignment = Alignment.Center) {
-                EmptyState(stringResource(Res.string.detail_not_found), action = stringResource(Res.string.detail_back) to onBack)
+                EmptyState(stringResource(com.bainbridgetrails.data.LocalGoal.current.s(Res.string.detail_not_found)), action = stringResource(Res.string.detail_back) to onBack)
             }
         } else {
             TrailDetailContent(graph, settings, data, trailId, meta.name, onBack, onStartWalk, onShowOnMap)
