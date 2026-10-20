@@ -20,19 +20,22 @@ Follows `docs/mvp/decisions.md` (TL-*) over `product.md`.
 |---|---|---|
 | 400 | `bad_request` | missing/invalid field |
 | 400 | `invalid_json` | body is not JSON / empty |
-| 400 | `invalid_coverage` | bad segment id, bad base64, bits beyond tick count, `tickM != 5`, bad walk id/duration, too many segments/walks |
+| 400 | `invalid_coverage` | bad segment id, bad base64, bits beyond tick count, `tickM != 5`, bad walk id/duration, too many segments |
+| 400 | `too_many_walks` | more walks than allowed in one upload (`maxWalks`: 2000 before the first accepted upload, then 200) |
 | 400 | `name_invalid` | display name breaks a format rule, or bad `anonName` |
 | 400 | `name_rejected` | display name hits the blocklist |
 | 401 | `unauthorized` | no/invalid/expired session token |
 | 401 | `invalid_token` | Google/Apple ID token rejected (signature, `iss`, `aud`, `exp`, nonce) |
 | 403 | `forbidden` | admin token wrong |
 | 404 | `not_found` | unknown route; `/v1/auth/dev` when dev auth is off; unknown user |
-| 405 | `method_not_allowed` | wrong method on a known route |
+| 405 | `method_not_allowed` | wrong method on a known route (checked before auth; `Allow` header) |
 | 413 | `payload_too_large` | body too big |
-| 422 | `implausible` | coverage growth exceeds what the sent walks allow; body has `newlyCoveredM`, `allowedM` |
+| 422 | `implausible` | coverage growth exceeds what the new walks allow, or new walk time exceeds the time since the last upload; body has `newlyCoveredM`, `allowedM` |
+| 422 | `walk_limit` | account has 10,000 credited walk ids |
 | 429 | `rate_limited` | too many requests; `retryAfterSeconds` + `Retry-After` header |
 | 429 | `name_rate_limited` | > 5 display-name changes in 24 h (client copy `name_err_rate`) |
 | 502 | `provider_unavailable` | Google/Apple keys could not be fetched; retry |
+| 503 | `busy` | concurrent syncs of the same account collided; retry after `retryAfterSeconds` |
 | 503 | `provider_not_configured` | server has no client ids for that provider |
 | 500 | `internal` | bug; retry with backoff |
 
@@ -67,7 +70,8 @@ Apple token on account deletion (TL-10; ignored when the server has no Apple key
 
 ### `POST /v1/auth/dev` (local/debug only)
 
-Exists only when the server runs with `ALLOW_DEV_AUTH=true` (local `.dev.vars`); prod returns `404`.
+Exists only when the server runs with `ALLOW_DEV_AUTH=true` (local `.dev.vars`) **and** the request host is
+`localhost`, `127.0.0.1` or `10.0.2.2`; otherwise `404`.
 `{"deviceId": "emulator-pixel8", "anonName": "Calm Otter 77"}` — `deviceId` 1–128 chars `[A-Za-z0-9._:-]`.
 Same response as above. Same `deviceId` → same account.
 
@@ -150,12 +154,15 @@ keys sorted. Server responses are always normalized this way.
 ```
 
 - Send the whole local `CoverageState` (or any subset — the server ORs, never removes bits).
-- `walks` (TL-2): one entry per finished walk not yet acknowledged, `id` = random UUID per walk (no
-  timestamps), `durationS` = walk duration. The **first upload after sign-in (backfill) carries every local
-  walk**. Re-sending an already-credited id is harmless (deduplicated per user). Optional; max 5000.
-- Plausibility: newly covered metres (after merge) ≤ **4.0 m/s × Σ durationS of new walk ids + 500 m**,
-  else `422 implausible`: nothing is stored, walk ids are not credited. Keep local progress and show
-  `sync_rejected_notice`; don't retry the same payload in a loop.
+- `walks` (TL-2): **every** finished walk not yet acknowledged by a `200` (send them all in each upload, not
+  one per request), `id` = random UUID per walk, `durationS` = walk duration. The **first upload after sign-in
+  (backfill) carries every local walk** (max 2000; later uploads max 200). Re-sending an already-credited id is
+  harmless. The server stores only the id (no durations, no times).
+- Plausibility: newly covered metres (after merge) ≤ **4.0 m/s × Σ durationS of new walk ids + 500 m**;
+  the 500 m slack applies only when at least one new walk is sent, so coverage growth without a new walk is
+  rejected. Each duration counts at most 6 h. After the first accepted upload, Σ new durations must fit in the
+  time since the last walk upload (+ 15 min). Otherwise `422 implausible`: nothing is stored, walk ids are not
+  credited. Keep local progress and show `sync_rejected_notice`; don't retry the same payload in a loop.
 - Any `datasetVersion` is accepted (TL-7); the server computes with its bundled dataset (its version is
   returned). With a different version, ticks beyond the server's tick count are dropped.
 
@@ -188,8 +195,8 @@ Bearer required. `200`: same shape without `accepted`/`newlyCoveredM`/`ignoredSe
 ### `GET /v1/leaderboard?limit=100`
 
 Auth optional (send the bearer to get `isYou` and `you`; an invalid token → `401`). `limit` 1–100, default 100.
-Eligible: not hidden, island % > 0. Order: island % desc → trails completed desc → server-side reached time
-asc → user id. Ranks are unique 1..n.
+Eligible: not hidden, island % > 0. Order: island % **as displayed** (floored to 0.1 %) desc → trails
+completed desc → server time the user reached that displayed % asc → user id. Ranks are unique 1..n.
 
 TL-11: `entries` come from a **daily snapshot** (names, hides and deletions apply immediately). `you` is
 **live**: the caller's current numbers ranked against the snapshot, so it can differ from the caller's own
@@ -228,8 +235,9 @@ No auth (public, TL-4). From the daily snapshot. `Cache-Control: public, max-age
 
 Every trail in the dataset is present. `walkers` = non-hidden users with fraction > 0; `completedCount` =
 users with the trail in their completed set; `medianPct` = median fraction among walkers. A count below
-`minCount` (5) is `null` ("Be one of the first to finish this trail"); `medianPct` is `null` when
-`walkers` is.
+`minCount` (5) is `null` ("Be one of the first to finish this trail"); counts ≥ 5 are **rounded to the
+nearest 5** (8 → 10); `medianPct` is `null` when `walkers` is. Public endpoints allow 120 requests / 10 min
+per IP.
 
 ## Moderation
 
