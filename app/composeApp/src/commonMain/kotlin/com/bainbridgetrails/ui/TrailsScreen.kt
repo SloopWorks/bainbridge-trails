@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.data.AppSettings
+import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.trails_banner_dismiss
@@ -106,11 +107,18 @@ fun TrailsScreen(
     modifier: Modifier = Modifier,
 ) {
     val snapshot by graph.progress.snapshot.collectAsStateWithLifecycle()
+    val goal = LocalGoal.current
     Column(modifier.fillMaxSize()) {
-        BtTopBar(stringResource(Res.string.trails_title)) {
+        BtTopBar(stringResource(goal.s(Res.string.trails_title))) {
             IconButton(onClick = onLeaderboard) { BtIcon(BtIcons.Trophy, stringResource(Res.string.trails_board_a11y)) }
         }
         DatasetGate(Modifier.weight(1f)) { data ->
+            if (goal.isRoads) {
+                // Roads (docs/roads/ux.md §4): grouped by type, abbreviation-tolerant search, Not counted group.
+                val roads = remember(snapshot, data) { snapshot?.let { roadListItems(data, it) } }
+                RoadsContent(roads, settings, onTrail)
+                return@DatasetGate
+            }
             val parkById = remember(data) { data.dataset.trails.associate { it.id to it.park } }
             val items = remember(snapshot, parkById) {
                 snapshot?.trails?.map { TrailListItem(it.trailId, it.name, parkById[it.trailId], it.fraction, it.status, it.lengthMi) }

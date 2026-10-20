@@ -39,29 +39,37 @@ fun TrailRow(
     modifier: Modifier = Modifier,
     animationDelayMs: Int = 0,
     trailing: (@Composable () -> Unit)? = null,
+    /** Roads list (docs/roads/ux.md §4.3): 64dp, one-line name and subtitle; grows at font scale ≥ 1.5. */
+    dense: Boolean = false,
+    /** Screen-reader name when [name] is abbreviated for display ("Northeast", never "N E"). */
+    spokenName: String = name,
+    /** Replaces the ring (uncounted roads: their map pattern); [statusText] then replaces the status chip. */
+    leading: (@Composable () -> Unit)? = null,
+    statusText: String? = null,
 ) {
-    val statusLabel = stringResource(status.label)
-    val a11y = "$name, $subtitle, ${Format.percent(fraction)}, $statusLabel"
+    val statusLabel = statusText ?: stringResource(status.label)
+    val a11y = if (leading != null) "$spokenName, $subtitle, $statusLabel" else "$spokenName, $subtitle, ${Format.percent(fraction)}, $statusLabel"
     val bigText = LocalDensity.current.fontScale >= 1.5f
+    val lines = if (dense && !bigText) 1 else 2
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val compactChip = maxWidth < 360.dp
         Row(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = BtTheme.spacing.rowHeight)
+                .heightIn(min = if (dense && !bigText) 64.dp else BtTheme.spacing.rowHeight)
                 .clickable(onClick = onClick)
                 .clearAndSetSemantics { contentDescription = a11y; role = Role.Button }
-                .padding(horizontal = BtTheme.spacing.screenH, vertical = BtTheme.spacing.md),
+                .padding(horizontal = BtTheme.spacing.screenH, vertical = if (dense) BtTheme.spacing.sm else BtTheme.spacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(BtTheme.spacing.lg),
         ) {
-            ProgressRing(fraction, status, animationDelayMs = animationDelayMs)
+            if (leading != null) leading() else ProgressRing(fraction, status, animationDelayMs = animationDelayMs)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (bigText) StatusChip(status, Modifier.padding(top = 4.dp))
+                Text(name, style = MaterialTheme.typography.titleMedium, maxLines = lines, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = lines, overflow = TextOverflow.Ellipsis)
+                if (bigText && leading == null) StatusChip(status, Modifier.padding(top = 4.dp))
             }
-            if (trailing != null) trailing() else if (!bigText) StatusChip(status, compact = compactChip)
+            if (trailing != null) trailing() else if (!bigText && leading == null) StatusChip(status, compact = compactChip)
         }
     }
 }
