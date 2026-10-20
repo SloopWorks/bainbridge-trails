@@ -1,9 +1,8 @@
 package com.bainbridgetrails.ui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -70,8 +69,8 @@ internal fun IslandCelebrationArt(geometry: IslandGeometry, t: Float, modifier: 
     val coast = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
     val counted = remember(geometry) { geometry.trails.filter { it.counted }.map { it.xy } }
     Canvas(
-        modifier.widthIn(max = 340.dp).fillMaxWidth().heightIn(max = 300.dp)
-            .aspectRatio(max(0.6f, min(1.4f, geometry.aspect + 0.25f)))
+        // Fixed frame (the island is tall: an aspect-ratio box would outgrow the screen); the drawing fits inside it.
+        modifier.widthIn(max = 340.dp).fillMaxWidth().height(320.dp)
             .clearAndSetSemantics {}
             .drawBehind {
                 drawCircle(
