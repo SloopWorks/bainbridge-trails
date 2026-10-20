@@ -97,12 +97,24 @@ class CoveragePlugin(private val context: Context) : DebugPlugin {
                     AppLog.i("debug", "marked ${target.trailId} complete from debug drawer")
                 }
             }) { Text("Complete next unfinished trail") }
+            // Map screenshots: partial statuses on the next untouched trail (first 40% / 80% of its walk).
+            for ((label, share) in listOf("Partway (40%)" to 0.4, "Nearly done (80%)" to 0.8)) {
+                OutlinedButton(enabled = ready != null && snapshot != null, onClick = {
+                    val d = ready ?: return@OutlinedButton
+                    val target = snapshot?.trails?.firstOrNull { it.status == TrailStatus.NOT_STARTED } ?: return@OutlinedButton
+                    AppGraph.scope.launch {
+                        withContext(Dispatchers.IO) { CoverageStore(graph.trackingDir).inject(coverTrail(d, target.trailId, share)) }
+                        graph.coverageChanged()
+                        message = "$label: ${target.name}"
+                    }
+                }) { Text("$label next untouched trail") }
+            }
             message?.let { Text(it) }
         }
     }
 
     /** Coverage for every segment of [trailId]: a synthetic 1.5 m/s walk along each segment's geometry. */
-    private fun coverTrail(d: TrailData, trailId: String) = run {
+    private fun coverTrail(d: TrailData, trailId: String, share: Double = 1.0) = run {
         val trail = d.dataset.trails.first { it.id == trailId }
         val segments = d.dataset.segments.associateBy { it.id }
         var t = 0L
@@ -121,7 +133,7 @@ class CoveragePlugin(private val context: Context) : DebugPlugin {
             }
             t += 120_000 // a gap between segments: no spurious joins
         }
-        d.index.coverFixes(fixes)
+        d.index.coverFixes(if (share >= 1.0) fixes else fixes.take((fixes.size * share).toInt()))
     }
 }
 
