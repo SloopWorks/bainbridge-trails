@@ -172,6 +172,8 @@
     <string name="profile_hide_body">Your progress still syncs. Others won’t see your name, island % or rank.</string>
     <string name="profile_hide_on">You’re hidden from the board</string>
     <string name="profile_hide_off">You’re back on the board. Others will see you after the daily update.</string>
+    <string name="profile_hide_updated">Your board visibility is updated.</string>
+    <string name="profile_hide_moderation">Your account is currently hidden from the leaderboard after a review. Questions? Contact support.</string>
     <string name="profile_hide_failed">Couldn’t change that. Try again.</string>
     <string name="profile_sync">Sync</string>
     <string name="account_signed_in_as">Signed in with %1$s</string>

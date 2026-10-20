@@ -213,3 +213,16 @@ class ProfileRepository(
         }
     }
 }
+
+/** Snackbar after a successful "Hide me from the leaderboard" change. */
+enum class HideToggleMessage { HIDDEN, SHOWN, UPDATED }
+
+/**
+ * [me] = the server's reply. While an admin hide is in place (P2-10) neither "hidden" nor "back on the board" is true
+ * of what others see, so the message stays neutral.
+ */
+fun hideToggleMessage(hide: Boolean, me: MeDto): HideToggleMessage = when {
+    me.hiddenByModeration -> HideToggleMessage.UPDATED
+    hide -> HideToggleMessage.HIDDEN
+    else -> HideToggleMessage.SHOWN
+}

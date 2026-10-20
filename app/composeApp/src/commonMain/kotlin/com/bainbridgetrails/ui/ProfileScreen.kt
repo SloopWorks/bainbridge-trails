@@ -81,8 +81,12 @@ import com.bainbridgetrails.resources.profile_signed_out_title
 import com.bainbridgetrails.resources.profile_sync
 import com.bainbridgetrails.resources.profile_hide_body
 import com.bainbridgetrails.resources.profile_hide_failed
+import com.bainbridgetrails.resources.profile_hide_moderation
 import com.bainbridgetrails.resources.profile_hide_off
 import com.bainbridgetrails.resources.profile_hide_on
+import com.bainbridgetrails.resources.profile_hide_updated
+import com.bainbridgetrails.data.HideToggleMessage
+import com.bainbridgetrails.data.hideToggleMessage
 import com.bainbridgetrails.resources.profile_hide_title
 import com.bainbridgetrails.resources.error_offline_generic
 import com.bainbridgetrails.resources.provider_apple
@@ -297,7 +301,13 @@ private fun SignedInContent(graph: AppGraph.Installed, auth: AuthState.SignedIn,
                     val msg = when (r) {
                         is ApiResult.Ok -> {
                             graph.leaderboard.refresh()
-                            getString(if (hide) Res.string.profile_hide_on else Res.string.profile_hide_off)
+                            getString(
+                                when (hideToggleMessage(hide, r.value)) {
+                                    HideToggleMessage.HIDDEN -> Res.string.profile_hide_on
+                                    HideToggleMessage.SHOWN -> Res.string.profile_hide_off
+                                    HideToggleMessage.UPDATED -> Res.string.profile_hide_updated
+                                },
+                            )
                         }
                         is ApiResult.Failure -> getString(if (r.error is ApiError.Offline) Res.string.error_offline_generic else Res.string.profile_hide_failed)
                     }
@@ -309,6 +319,15 @@ private fun SignedInContent(graph: AppGraph.Installed, auth: AuthState.SignedIn,
             enabled = profile.me != null,
             horizontalPadding = 0.dp,
         )
+        // P2-10: an admin hide outlives the toggle; say so neutrally instead of letting "off" look broken.
+        if (profile.me?.hiddenByModeration == true) {
+            Text(
+                stringResource(Res.string.profile_hide_moderation),
+                Modifier.padding(top = BtTheme.spacing.xs),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         SectionHeader(stringResource(Res.string.profile_sync), Modifier.padding(top = BtTheme.spacing.lg))
         SyncStatusLine(sync, onRetry = { graph.sync.syncNow() })
