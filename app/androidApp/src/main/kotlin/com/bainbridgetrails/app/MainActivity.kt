@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.bainbridgetrails.App
+import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.SpikeLaunch
 import com.sloopworks.debugdrawer.DebugDrawerHost
 
@@ -13,6 +14,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge() // the shell draws behind system bars and applies insets itself
         super.onCreate(savedInstanceState)
+        AppGraph.warmUp() // dataset parse (off Main) overlaps the first composition instead of following it
         // Spike only, debuggable builds only (this activity is exported, so release must ignore extras):
         // `adb shell am start -n ... --es style DARK --es lat 47.655 --es lon -122.548 --es zoom 15`
         val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
