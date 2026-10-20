@@ -27,3 +27,4 @@ data/tracks/private/
 *.GPX
 *.fit
 *.FIT
+.claude/worktrees/

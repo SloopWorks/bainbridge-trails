@@ -1,10 +1,12 @@
 import { createLocalJWKSet, errors as joseErrors, jwtVerify } from "jose";
 import type { Deps } from "./deps";
-import { forgetJwks } from "./deps";
 import { ApiError, badRequest, bearer } from "./http";
 import { anonName, isAnonName } from "./moderation/names";
+import { META } from "./segments";
+import { USER_COLS, USER_COLS_U, type UserRow, freshUser } from "./users";
 import { base64UrlRandom, csv, sha256Hex } from "./util";
 
+export type { UserRow } from "./users";
 export type Provider = "google" | "apple" | "dev";
 
 interface ProviderConfig {
@@ -28,7 +30,7 @@ export const PROVIDERS: Record<"google" | "apple", ProviderConfig> = {
 
 export const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
-/** Verifies a Google/Apple ID token (RS256, JWKS, iss, aud, exp) and returns its subject. */
+/** Verifies a Google/Apple ID token (RS256, JWKS, iss, aud, exp, optional nonce); returns sub + matched aud. */
 export async function verifyIdToken(
   provider: "google" | "apple",
   idToken: string,
@@ -39,8 +41,8 @@ export async function verifyIdToken(
   const cfg = PROVIDERS[provider];
   const audience = cfg.audiences(env);
   if (audience.length === 0) throw new ApiError(503, "provider_not_configured", `${provider} sign-in is not configured`);
-  const verify = async () =>
-    jwtVerify(idToken, createLocalJWKSet(await deps.fetchJwks(cfg.jwksUrl)), {
+  const verify = async (refresh: boolean) =>
+    jwtVerify(idToken, createLocalJWKSet(await deps.fetchJwks(cfg.jwksUrl, refresh)), {
       issuer: cfg.issuers,
       audience,
       algorithms: ["RS256"],
@@ -50,11 +52,10 @@ export async function verifyIdToken(
   let payload;
   try {
     try {
-      ({ payload } = await verify());
+      ({ payload } = await verify(false));
     } catch (e) {
       if (!(e instanceof joseErrors.JWKSNoMatchingKey)) throw e;
-      forgetJwks(cfg.jwksUrl); // key rotation: refetch once
-      ({ payload } = await verify());
+      ({ payload } = await verify(true)); // key rotation: refetch (rate limited in deps)
     }
   } catch (e) {
     if (e instanceof joseErrors.JOSEError) throw new ApiError(401, "invalid_token", `ID token rejected: ${e.code}`);
@@ -66,42 +67,22 @@ export async function verifyIdToken(
   return { sub: payload.sub, aud: aud ?? audience[0]! };
 }
 
-export interface UserRow {
-  id: string;
-  provider: string;
-  display_name: string | null;
-  anon_name: string;
-  hidden: number;
-  created_at: number;
-  island_m: number;
-  covered_m: number;
-  trails_completed: number;
-  reached_at: number | null;
-  coverage_rev: number;
-  apple_refresh_token: string | null;
-  apple_client_id: string | null;
-}
-
 /** Finds or creates the user for (provider, sub), then issues a session. */
 export async function signIn(env: Env, deps: Deps, provider: Provider, sub: string, clientAnonName?: unknown) {
   const now = deps.now();
   const inserted = await env.DB.prepare(
-    "INSERT INTO users (id, provider, sub, anon_name, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (provider, sub) DO NOTHING",
+    `INSERT INTO users (id, provider, sub, anon_name, metrics_version) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (provider, sub) DO NOTHING`,
   )
-    .bind(crypto.randomUUID(), provider, sub, isAnonName(clientAnonName) ? clientAnonName : anonName(), now)
+    .bind(crypto.randomUUID(), provider, sub, isAnonName(clientAnonName) ? clientAnonName : anonName(), META.version)
     .run();
-  const user = await env.DB.prepare("SELECT * FROM users WHERE provider = ? AND sub = ?").bind(provider, sub).first<UserRow>();
-  if (!user) throw new ApiError(500, "internal", "user upsert failed");
+  const found = await env.DB.prepare(`SELECT ${USER_COLS} FROM users WHERE provider = ? AND sub = ?`).bind(provider, sub).first<UserRow>();
+  if (!found) throw new ApiError(500, "internal", "user upsert failed");
+  const user = await freshUser(env, found, now);
   const token = base64UrlRandom(32);
   const expiresAt = now + SESSION_TTL_MS;
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)").bind(
-      await sha256Hex(token),
-      user.id,
-      now,
-      expiresAt,
-    ),
-    // opportunistic cleanup of this user's expired sessions
+    env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").bind(await sha256Hex(token), user.id, expiresAt),
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ? AND expires_at < ?").bind(user.id, now),
   ]);
   return { token, expiresAt, user, isNewUser: inserted.meta.changes === 1 };
@@ -112,12 +93,12 @@ export async function optionalUser(request: Request, env: Env, deps: Deps): Prom
   const token = bearer(request);
   if (token === null) return null;
   const row = await env.DB.prepare(
-    "SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?",
+    `SELECT ${USER_COLS_U} FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?`,
   )
     .bind(await sha256Hex(token), deps.now())
     .first<UserRow>();
   if (!row) throw new ApiError(401, "unauthorized", "invalid or expired session");
-  return row;
+  return freshUser(env, row, deps.now());
 }
 
 export async function requireUser(request: Request, env: Env, deps: Deps): Promise<UserRow> {

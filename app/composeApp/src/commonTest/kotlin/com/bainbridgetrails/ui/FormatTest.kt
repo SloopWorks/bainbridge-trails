@@ -31,4 +31,26 @@ class FormatTest {
         assertEquals("12:04", Format.duration(724_000))
         assertEquals("1:05:09", Format.duration(3_909_000))
     }
+
+    @Test
+    fun wholePercentRoundsDown() {
+        assertEquals("0%", Format.percentWhole(0.0))
+        assertEquals("<1%", Format.percentWhole(0.004))
+        assertEquals("<1%", Format.percentWhole(0.0099), "never rounds a sub-1% value up to 1%")
+        assertEquals("1%", Format.percentWhole(0.01))
+        assertEquals("42%", Format.percentWhole(0.4299))
+        assertEquals("84%", Format.percentWhole(0.8499), "never shows 85% before Complete (TL-5)")
+        assertEquals("99%", Format.percentWhole(0.9999))
+        assertEquals("100%", Format.percentWhole(1.0))
+    }
+
+    @Test
+    fun spokenDurations() {
+        assertEquals("0 minutes", Format.durationSpoken(59_000))
+        assertEquals("1 minute", Format.durationSpoken(60_000))
+        assertEquals("12 minutes", Format.durationSpoken(12 * 60_000L + 30_000))
+        assertEquals("1 hour", Format.durationSpoken(3_600_000))
+        assertEquals("1 hour 8 minutes", Format.durationSpoken(4_102_000))
+        assertEquals("2 hours 1 minute", Format.durationSpoken(7_260_000))
+    }
 }

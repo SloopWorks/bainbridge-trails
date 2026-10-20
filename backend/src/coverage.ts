@@ -111,9 +111,9 @@ export function coveredClamped(meta: SegmentMeta, cov: CoverageMap, segmentId: s
 export function computeMetrics(meta: SegmentMeta, cov: CoverageMap): Metrics {
   let islandM = 0;
   let coveredM = 0;
-  for (const id of cov.keys()) {
-    const s = meta.segments[id];
-    if (!s) continue;
+  // iterate in dataset order (like Kotlin Progress) so float sums are order-stable
+  for (const [id, s] of Object.entries(meta.segments)) {
+    if (!cov.has(id)) continue;
     const c = coveredClamped(meta, cov, id);
     coveredM += c;
     if (s[3] === 1) islandM += c;

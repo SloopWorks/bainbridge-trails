@@ -13,6 +13,7 @@ API contract for the app: [`docs/mvp/api.md`](../docs/mvp/api.md).
 | `src/auth.ts`, `src/deps.ts` | Google/Apple ID-token verification (JWKS via `jose`), sessions, dev auth |
 | `src/coverage.ts`, `src/routes/coverage.ts` | bitset encode/decode/OR, metrics (mirrors Kotlin `Progress`), sync |
 | `src/plausibility.ts`, `src/ratelimit.ts` | cheat limits, D1 fixed-window rate limits |
+| `src/users.ts` | user columns, rank key, lazy metric recompute |
 | `src/routes/board.ts`, `src/snapshot.ts` | leaderboard, community trail stats (daily snapshots), report-name |
 | `src/routes/me.ts`, `src/routes/admin.ts`, `src/apple.ts` | profile, deletion (+ Apple revoke), moderation/admin |
 | `src/routes/pages.ts` | public `GET /delete-account` page |
@@ -58,27 +59,51 @@ changes, rebuild and commit the JSON together with the app's dataset bump. Uploa
 `datasetVersion` are still accepted (TL-7) and computed with the bundled dataset; ticks beyond a segment's
 current tick count are dropped.
 
-## Plausibility (cheat limits, decisions TL-2)
+## Plausibility (cheat limits: decisions TL-2, review P0-2/P1-3)
 
-Each `PUT /v1/coverage` carries `walks: [{id, durationS}]` (random UUID per walk, no timestamps). The server
-credits each walk id once per user (`walks` table) and requires
+Each `PUT /v1/coverage` carries `walks: [{id, durationS}]` (random UUID per walk). The server stores only the
+walk **id** (to credit it once); durations are used for the check and discarded. Rules:
 
 ```
-newly covered metres  <=  PLAUSIBLE_SPEED_MPS (4.0) x sum(durationS of walks not seen before)  +  PLAUSIBLE_SLACK_M (500)
+newly covered metres <= 4.0 m/s x sum(durationS of walks not credited before) + 500 m   (slack only if >= 1 new walk)
+each durationS is clamped to 6 h
+after the first accepted upload: sum(new durationS) <= seconds since the last walk-crediting upload + 15 min
+walks per upload: 2000 until the first accepted upload (sign-in backfill), then 200; 10,000 walk ids per account
 ```
 
-Newly covered metres are measured after the OR-merge over counted segments. Over the limit -> the whole upload
-is rejected (`422 implausible`), nothing is stored and the walk ids stay uncredited. Durations are capped at
-24 h per walk. Also rejected: malformed segment ids, bits beyond a segment's tick count (same dataset),
-`tickM != 5`, bodies > 512 KB; 30 uploads/hour/user.
+Speed and slack are `PLAUSIBLE_SPEED_MPS` / `PLAUSIBLE_SLACK_M` in `wrangler.jsonc`. A violation rejects the
+whole upload (`422 implausible`); nothing is stored and walk ids stay uncredited. Also rejected: malformed
+segment ids, bits beyond a segment's tick count (same dataset), `tickM != 5`, bodies > 512 KB; 30 uploads/hour/user.
+Known limits: a cheater can still invent walk ids/durations within these bounds (basic protection by design;
+Play Integrity / App Attest later).
 
-## Snapshots (decision TL-11)
+## Snapshots and caching (TL-11, review P1-6, P2-16)
 
-Other users' leaderboard rows and the community trail stats come from snapshot tables rebuilt by a daily
-Cron Trigger (`17 9 * * *` UTC) and on demand via `POST /v1/admin/snapshot`. The caller's own `you` row is
-live. Names, hidden flags and deletions are joined live. The snapshot is also built lazily the first time it
-is needed (fresh deploy / local dev). Locally: `curl -XPOST -H "Authorization: Bearer $ADMIN_TOKEN"
-localhost:8787/v1/admin/snapshot`, or `wrangler dev --test-scheduled` and `curl localhost:8787/__scheduled`.
+Others' leaderboard rows and community trail stats come from snapshot tables rebuilt by the daily Cron Trigger
+(`17 9 * * *` UTC), on demand via `POST /v1/admin/snapshot`, and automatically when missing or built with an
+older dataset. Renames, admin hide/reset and deletions edit the snapshot in place. Each isolate caches the
+snapshot in memory keyed by a random `snap_id`, so a public read costs one D1 row read. Public endpoints have a
+per-isolate in-memory IP limit (120 / 10 min). The caller's own `you` row is always live.
+
+Snapshot-diff inference: daily snapshots make it hard to tie a jump to a specific walk; community counts below 5
+are hidden and larger ones rounded to the nearest 5, so diffing two days rarely reveals a single walker.
+
+The cron also purges rate-limit rows older than 2 days, expired sessions and old IP salts, and recomputes
+metrics for users computed with an older dataset (P1-7; also done lazily when a user reads their own data).
+
+Locally: `curl -XPOST -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8787/v1/admin/snapshot`, or
+`wrangler dev --test-scheduled` then `curl localhost:8787/__scheduled`.
+
+## Known limits
+
+- **CPU (free tier: 10 ms CPU/request).** A coverage upload decodes and ORs at most ~1,600 counted segments and
+  recomputes metrics in one pass (not profiled yet; check with `wrangler tail` CPU time after deploy). A whole-island backfill with 2,000 walks is the worst case;
+  if it ever exceeds the limit, clients retry with smaller walk batches. Snapshot rebuilds run in the cron (15 min CPU).
+- **Nonce.** `nonce` is optional, so a leaked, still-valid ID token (≤ 1 h) could be replayed to sign in.
+  Clients should always send a nonce (Apple: SHA-256 nonce; Google Credential Manager: `setNonce`); the server
+  can make it mandatory once both clients do.
+- **Dev auth** needs `ALLOW_DEV_AUTH=true` **and** a request host of `localhost`, `127.0.0.1` or `10.0.2.2`.
+  A physical phone on the LAN can't use it; use an emulator or simulator, or `adb reverse tcp:8787 tcp:8787`.
 
 ## Deploy (owner only — agents never deploy)
 
@@ -122,9 +147,10 @@ an island-sized audience: an upload writes only changed segments + changed trail
 
 ## Privacy
 
-Server stores: provider + subject (no email/name from the token), display/anon name, per-segment tick
-bitsets, per-trail fractions, sticky completed trail ids, walk ids + durations (no start/end times), session
-token hashes, and (only if Apple revoke is configured) the Apple refresh token. No GPS, routes or walk times;
-the only timestamps are server-side (account creation, `reached_at` tie-break), and none are returned by
-public endpoints. `DELETE /v1/me` deletes every row for the user (including their leaderboard snapshot row);
-the aggregate per-trail counts drop them at the next daily rebuild.
+Server stores: provider + subject (no email/name from the token), display/anon name, per-segment tick bitsets
+(no timestamps), per-trail fractions, sticky completed trail ids, credited walk ids (no times, no durations),
+session token hashes with expiry, and (only if Apple revoke is configured) the Apple refresh token.
+Server-clock timestamps kept: `reached_at` (leaderboard tie-break, never returned), `last_walk_upload_at` (P1-3
+check), report time (admin triage). IPs are only stored as SHA-256(random daily salt + IP) in rate-limit keys;
+salts are deleted daily, rows after 2 days. No GPS, routes or walk times. `DELETE /v1/me` deletes every row for
+the user (including their leaderboard snapshot row); aggregate per-trail counts drop them at the next rebuild.

@@ -1,6 +1,6 @@
 import type { Deps } from "../deps";
 import { ApiError, KB, bearer, isObject, json, readJson } from "../http";
-import { rebuildSnapshots } from "../snapshot";
+import { snapshotRemove, snapshotRename, rebuildSnapshots } from "../snapshot";
 import { safeEqual } from "../util";
 
 export async function requireAdmin(request: Request, env: Env): Promise<void> {
@@ -10,9 +10,18 @@ export async function requireAdmin(request: Request, env: Env): Promise<void> {
   if (token === null || !(await safeEqual(token, env.ADMIN_TOKEN))) throw new ApiError(403, "forbidden", "admin token required");
 }
 
+const USER_ACTION = /^\/v1\/admin\/users\/([0-9a-f-]{36})\/(hide|reset-name|dismiss-reports)$/;
+
+/** Allowed method for an admin path, or null when the path is unknown. */
+export function adminMethod(path: string): string | null {
+  if (path === "/v1/admin/reports") return "GET";
+  if (path === "/v1/admin/snapshot" || USER_ACTION.test(path)) return "POST";
+  return null;
+}
+
 export async function adminRoute(request: Request, env: Env, deps: Deps, path: string): Promise<Response> {
   await requireAdmin(request, env);
-  if (path === "/v1/admin/reports" && request.method === "GET") {
+  if (path === "/v1/admin/reports") {
     const { results } = await env.DB.prepare(
       `SELECT u.id AS userId, u.display_name AS customName, u.anon_name AS anonName, u.hidden AS hidden,
               COUNT(r.reporter_id) AS reports
@@ -21,26 +30,26 @@ export async function adminRoute(request: Request, env: Env, deps: Deps, path: s
     ).run();
     return json({ reports: results });
   }
-  if (path === "/v1/admin/snapshot" && request.method === "POST") {
-    return json({ ok: true, ...(await rebuildSnapshots(env, deps.now())) });
-  }
-  const m = /^\/v1\/admin\/users\/([0-9a-f-]{36})\/(hide|reset-name|dismiss-reports)$/.exec(path);
-  if (!m || request.method !== "POST") throw new ApiError(404, "not_found", "no such endpoint");
+  if (path === "/v1/admin/snapshot") return json({ ok: true, ...(await rebuildSnapshots(env, deps.now())) });
+
+  const m = USER_ACTION.exec(path)!;
   const userId = m[1]!;
   const action = m[2]!;
+  const user = await env.DB.prepare("SELECT anon_name FROM users WHERE id = ?").bind(userId).first<{ anon_name: string }>();
+  if (!user) throw new ApiError(404, "not_found", "user not found");
   const stmts: D1PreparedStatement[] = [];
   if (action === "hide") {
     const body = request.headers.get("content-length") === "0" || !request.body ? {} : await readJson(request, 1 * KB);
     const hidden = isObject(body) && body.hidden === false ? 0 : 1;
     stmts.push(env.DB.prepare("UPDATE users SET hidden = ? WHERE id = ?").bind(hidden, userId));
+    if (hidden) stmts.push(...snapshotRemove(env, userId)); // unhide shows up at the next rebuild
   } else if (action === "reset-name") {
     stmts.push(env.DB.prepare("UPDATE users SET display_name = NULL WHERE id = ?").bind(userId));
     stmts.push(env.DB.prepare("DELETE FROM name_reports WHERE target_id = ?").bind(userId));
+    stmts.push(...snapshotRename(env, userId, user.anon_name));
   } else {
-    stmts.push(env.DB.prepare("UPDATE users SET id = id WHERE id = ?").bind(userId)); // existence check
     stmts.push(env.DB.prepare("DELETE FROM name_reports WHERE target_id = ?").bind(userId));
   }
-  const [res] = await env.DB.batch(stmts);
-  if (!res || res.meta.changes === 0) throw new ApiError(404, "not_found", "user not found");
+  await env.DB.batch(stmts);
   return json({ ok: true });
 }

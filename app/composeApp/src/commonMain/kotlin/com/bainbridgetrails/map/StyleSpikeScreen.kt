@@ -49,12 +49,14 @@ data class SpikeLaunch(
     val camera: CameraPosition = IslandCamera,
     val switchTo: MapStyle? = null,
     val switchAfterMs: Long = 4000,
+    /** Showcase page (`section=tokens|components|states`). */
+    val section: String? = null,
 ) {
-    enum class Screen { RECORD, STYLE }
+    enum class Screen { RECORD, STYLE, SHOWCASE }
 
     companion object {
         /**
-         * Parses `key=value` options: screen=record|style, style=TOPO|MINIMAL_LIGHT|DARK, lat, lon, zoom, switchTo,
+         * Parses `key=value` options: screen=record|style|showcase, section, style=TOPO|MINIMAL_LIGHT|DARK, lat, lon, zoom, switchTo,
          * switchAfterMs. Without `screen`, a `style` or `switchTo` option still opens the style spike (older scripts).
          */
         fun parse(options: Map<String, String>): SpikeLaunch {
@@ -65,6 +67,7 @@ data class SpikeLaunch(
             val screen = when (options["screen"]?.lowercase()) {
                 "style" -> Screen.STYLE
                 "record" -> Screen.RECORD
+                "showcase" -> Screen.SHOWCASE
                 else -> if ("style" in options || "switchTo" in options) Screen.STYLE else Screen.RECORD
             }
             return SpikeLaunch(
@@ -76,6 +79,7 @@ data class SpikeLaunch(
                 ),
                 switchTo = style(options["switchTo"]),
                 switchAfterMs = options["switchAfterMs"]?.toLongOrNull() ?: 4000,
+                section = options["section"],
             )
         }
     }

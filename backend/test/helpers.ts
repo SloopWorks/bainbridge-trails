@@ -4,6 +4,9 @@ import type { Deps } from "../src/deps";
 import { handle } from "../src/index";
 import { META } from "../src/segments";
 
+/** Local host: dev auth only answers on localhost / 127.0.0.1 / 10.0.2.2. */
+export const BASE = "http://localhost:8787";
+
 export class Clock {
   constructor(public t = Date.UTC(2026, 9, 19, 12, 0, 0)) {}
   advanceHours(h: number) {
@@ -45,7 +48,7 @@ export function harness(jwks: JSONWebKeySet = { keys: [] }): Harness {
         headers["content-type"] = "application/json";
       }
       const ctx = createExecutionContext();
-      const res = await handle(new Request(`https://api.test${path}`, { method, headers, body }), env, ctx, h.deps);
+      const res = await handle(new Request(`${BASE}${path}`, { method, headers, body }), env, ctx, h.deps);
       await waitOnExecutionContext(ctx);
       return res;
     },
@@ -108,6 +111,12 @@ export function walkFor(metres: number): { id: string; durationS: number } {
 }
 
 export const ADMIN = { token: "test-admin-token-0123456789" };
+
+/** Upload `segments` as the result of one new 1-hour walk (advances the clock by 1 h; allows 14.9 km). */
+export async function syncWalk(h: Harness, token: string, segments: Record<string, string>): Promise<Response> {
+  h.clock.advanceHours(1);
+  return h.call("PUT", "/v1/coverage", { token, body: upload(segments, [{ id: crypto.randomUUID(), durationS: 3600 }]) });
+}
 
 /** Full coverage for every segment of a trail. */
 export function trailFull(trailId: string): Record<string, string> {
