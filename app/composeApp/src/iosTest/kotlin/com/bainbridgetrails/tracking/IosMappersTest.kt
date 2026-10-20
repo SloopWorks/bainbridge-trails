@@ -77,7 +77,8 @@ class IosMappersTest {
 
     @Test
     fun staleFixesBeforeSessionStartAreDropped() {
-        assertFalse(IosMappers.isSessionFix(fixTimeMs = 999, sessionStartMs = 1_000))
+        assertFalse(IosMappers.isSessionFix(fixTimeMs = 6_999, sessionStartMs = 10_000))
+        assertTrue(IosMappers.isSessionFix(fixTimeMs = 7_000, sessionStartMs = 10_000)) // clock skew tolerance
         assertTrue(IosMappers.isSessionFix(fixTimeMs = 1_000, sessionStartMs = 1_000))
     }
 

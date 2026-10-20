@@ -48,7 +48,7 @@ Branch `spike4/location-activity`. Dev build published to channel `dev-spike4-lo
 - Live provisional % during the walk (today: results only at Finish).
 - Raw-track retention: propose keep 30 days after finalise, then delete (coverage store keeps the result).
 - `Dataset.parse` takes 5-8.6 s on a debug emulator; measure on release/device, consider a binary format.
-- R8 stale-fix filter compares `Location.time` to the wall clock; add a few seconds of skew tolerance.
+- R8 stale-fix filter compares `Location.time` to the wall clock: done, fixes up to 3 s before the start count (`SessionFix.CLOCK_SKEW_TOLERANCE_MS`).
 - Steps restart at 0 on resume.
 - The step heartbeat asserts "unchanged" every 30 s. If a step counter delivers late (sensor batching with the screen off) or the iOS pedometer query fails while live updates are withheld, a genuine walking window could be dropped; check the field-test step samples for this.
 - A session finalised by the stop-timeout path (before its Stop was written) is merged again on the next launch and its summary shown a second time.

@@ -250,6 +250,17 @@ class RecordingControllerTest {
     }
 
     @Test
+    fun fixJustBeforeStartWithinClockSkewCounts() = runTest {
+        val r = rig()
+        r.controller.onPermissions(Perm.entries.toSet())
+        r.controller.start()
+        // Provider time a little behind the wall clock that stamped Start: still this walk's fix.
+        val (lon, lat) = proj.toLonLat(Xy(0.0, 0.0))
+        r.controller.onFix(Fix(t0 - SessionFix.CLOCK_SKEW_TOLERANCE_MS, lon, lat, 5.0, false))
+        assertEquals(1, assertIs<RecordingState.Recording>(r.controller.state.value).fixCount)
+    }
+
+    @Test
     fun lostBeforeRecorderStartedGoesIdleWithReason() = runTest {
         val r = rig()
         val silent = object : Recorder {
