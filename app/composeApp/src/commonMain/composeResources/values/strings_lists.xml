@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Trails list, Me, Leaderboard, Profile, Settings/About and Onboarding copy (docs/mvp/product.md §3, decisions.md).
+  Keys already in strings.xml are not repeated here. Compose resources substitute %1$s / %1$d only: a literal
+  percent sign is a bare "%".
+-->
+<resources>
+    <!-- Units -->
+    <string name="length_ft">%1$d ft</string>
+    <string name="length_m">%1$d m</string>
+
+    <!-- Relative time -->
+    <string name="time_just_now">just now</string>
+    <string name="time_minutes_ago">%1$d min ago</string>
+    <string name="time_hours_ago">%1$d hr ago</string>
+    <plurals name="time_days_ago">
+        <item quantity="one">yesterday</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+
+    <!-- Trails list -->
+    <string name="trails_filter_park">Park</string>
+    <string name="trails_filter_park_all">All parks</string>
+    <string name="trails_filter_park_none">Not in a park</string>
+    <string name="trails_sort">Sort</string>
+    <string name="trails_sort_chip">Sort: %1$s</string>
+    <string name="trails_sort_name">Name</string>
+    <string name="trails_sort_progress">Progress</string>
+    <string name="trails_sort_length">Length</string>
+    <string name="trails_count_complete">%1$s · %2$d complete</string>
+    <string name="trails_empty_title">No trails match</string>
+    <string name="trails_empty_body">Try a different search or clear the filters.</string>
+    <string name="trails_clear_filters">Clear filters</string>
+    <string name="trails_empty_search_title">No trails called “%1$s”</string>
+    <string name="trails_clear_search">Clear search</string>
+    <string name="trails_first_walk_banner">Pick a trail and tap Start walk. Progress shows up here after your first walk.</string>
+    <string name="trails_banner_dismiss">Got it</string>
+    <string name="trails_board_a11y">Leaderboard</string>
+    <string name="trails_park_sheet_title">Filter by park</string>
+
+    <!-- Me -->
+    <string name="me_profile_a11y">Account and name</string>
+    <string name="me_settings_a11y">Settings</string>
+    <string name="me_signin_card_title">Join the leaderboard</string>
+    <string name="me_signin_card_body">Sign in to back up your progress and see how you rank. Your walks stay on this phone.</string>
+    <string name="me_signin">Sign in</string>
+    <string name="me_hero_caption">of the island’s trails walked</string>
+    <string name="me_hero_caption_new">Your first walk will start coloring this in</string>
+    <string name="me_hero_a11y">Island map of your trails: %1$s walked, %2$d of %3$d trails complete</string>
+    <string name="me_stat_miles_phone">Trail miles on this phone</string>
+    <string name="me_stat_km_phone">Trail km on this phone</string>
+    <string name="me_stat_walks">Walks on this phone</string>
+    <string name="me_stat_info_a11y">%1$s. What does this mean?</string>
+    <string name="stat_island_info">Share of the island’s counted trail length you’ve covered. Walking the same section twice counts once.</string>
+    <string name="stat_trails_info">Named trails you’ve covered at least %1$d% of.</string>
+    <string name="stat_miles_info">Distance you’ve walked on mapped trails and paths, across all walks on this phone. Repeats count.</string>
+    <string name="stat_walks_info">Walks recorded and saved on this phone. Walks from other phones aren’t listed, but their progress is included above.</string>
+    <string name="me_leaderboard_row">You’re #%1$d of %2$d</string>
+    <string name="me_leaderboard_row_unranked">Not on the board yet. Walk a trail to get ranked.</string>
+    <string name="me_leaderboard_see">See how islanders are doing</string>
+    <string name="me_leaderboard_as_of">as of %1$s</string>
+    <string name="me_in_progress_count">In progress (%1$d)</string>
+    <string name="me_see_all">See all</string>
+    <string name="me_history_other_devices">Walks recorded on other phones aren’t listed, but their progress is included above.</string>
+    <string name="me_history_unverified">Unverified</string>
+    <string name="me_history_more">Show more walks</string>
+    <string name="me_history_row_a11y">%1$s, %2$s, %3$s, %4$s</string>
+
+    <!-- Sync -->
+    <string name="sync_first_progress">Syncing your progress…</string>
+    <string name="sync_syncing">Syncing…</string>
+    <string name="sync_ok">Progress backed up</string>
+    <string name="sync_ok_at">Progress backed up %1$s</string>
+    <string name="sync_pending">Will sync when you’re online</string>
+    <string name="sync_failed">Sync didn’t finish. We’ll try again.</string>
+    <string name="sync_rejected_notice">Some progress couldn’t be added to the leaderboard because it looked faster than walking. It still shows on this phone.</string>
+    <string name="sync_now_a11y">Sync now</string>
+
+    <!-- Leaderboard -->
+    <string name="board_subtitle">Ranked by share of the island walked. Ties go to more trails completed.</string>
+    <string name="board_daily_note">Others update daily. Your row is live.</string>
+    <string name="board_daily_note_signed_out">The board updates daily.</string>
+    <string name="board_col_rank">#</string>
+    <string name="board_col_name">Name</string>
+    <string name="board_col_island">Island</string>
+    <string name="board_col_trails">Trails</string>
+    <string name="board_you_tag">You</string>
+    <string name="board_rank">#%1$d</string>
+    <plurals name="board_row_a11y">
+        <item quantity="one">Rank %1$d, %2$s, %3$s of the island, %4$d trail completed</item>
+        <item quantity="other">Rank %1$d, %2$s, %3$s of the island, %4$d trails completed</item>
+    </plurals>
+    <plurals name="board_row_you_a11y">
+        <item quantity="one">You. Rank %1$d, %2$s of the island, %3$d trail completed</item>
+        <item quantity="other">You. Rank %1$d, %2$s of the island, %3$d trails completed</item>
+    </plurals>
+    <string name="board_updated">Updated %1$s</string>
+    <plurals name="board_total">
+        <item quantity="one">%1$d ranked islander</item>
+        <item quantity="other">%1$d ranked islanders</item>
+    </plurals>
+    <string name="board_empty_title">The board is wide open</string>
+    <string name="board_empty_body">No one’s on it yet. Walk a trail and sign in to claim the top spot.</string>
+    <string name="board_offline_title">You’re offline</string>
+    <string name="board_offline_body">Connect to see the leaderboard.</string>
+    <string name="board_offline_note">Offline — board from %1$s</string>
+    <string name="board_error">Couldn’t load the leaderboard.</string>
+    <string name="board_not_ranked">Walk any counted trail to appear on the board.</string>
+    <string name="board_signed_out_prompt">Sign in to appear on the board. Only your name, island % and trails completed are shown.</string>
+    <string name="board_signin">Sign in</string>
+    <string name="board_report_name">Report name</string>
+    <string name="board_more_a11y">More options for %1$s</string>
+    <string name="board_refresh_a11y">Refresh</string>
+    <string name="report_title">Report this name?</string>
+    <string name="report_body">“%1$s” will be flagged for review and hidden from your board. Reports are anonymous.</string>
+    <string name="report_send">Send report</string>
+    <string name="report_thanks">Thanks. We’ll take a look.</string>
+    <string name="report_signin_required">Sign in to report a name.</string>
+
+    <!-- Profile / account -->
+    <string name="account_title">Account</string>
+    <string name="profile_signed_out_title">Sign in to sync your progress and join the leaderboard</string>
+    <string name="profile_signed_out_body">Walking works without an account.</string>
+    <string name="profile_privacy_note">We sync which trail sections you’ve covered — never your GPS track or walk times. Your public name is a random one unless you choose your own.</string>
+    <string name="signin_google">Sign in with Google</string>
+    <string name="signin_apple">Sign in with Apple</string>
+    <string name="signin_dev">Dev sign-in (debug)</string>
+    <string name="signin_not_configured">Sign-in isn’t set up in this build yet.</string>
+    <string name="name_title">On the leaderboard as</string>
+    <string name="name_body">This is how you appear on the leaderboard. Change it any time.</string>
+    <string name="name_choice_anon">Random name</string>
+    <string name="name_choice_own">My own name</string>
+    <string name="name_shuffle">Shuffle</string>
+    <string name="name_shuffle_a11y">Get a different random name</string>
+    <string name="name_use_this">Use this name</string>
+    <string name="name_field_label">Display name</string>
+    <string name="name_counter">%1$d/24</string>
+    <string name="name_save">Save</string>
+    <string name="name_saved">Name saved</string>
+    <string name="name_saved_offline">Saved. It’ll update on the board when you’re back online.</string>
+    <string name="name_err_short">Use at least 3 characters.</string>
+    <string name="name_err_long">Use 24 characters or fewer.</string>
+    <string name="name_err_chars">Use letters, numbers, spaces, and - ’ . _ only.</string>
+    <string name="name_err_letters">Include at least 2 letters.</string>
+    <string name="name_err_link">Names can’t include links or email addresses.</string>
+    <string name="name_err_blocked">That name isn’t allowed. Please choose another.</string>
+    <string name="name_err_rate">You’ve changed your name a lot today. Try again tomorrow.</string>
+    <string name="name_err_generic">Couldn’t save your name. Try again.</string>
+    <string name="name_reset_notice">Your name was reported and has been switched to %1$s. You can choose a new one here.</string>
+    <string name="profile_sync">Sync</string>
+    <string name="account_signed_in_as">Signed in with %1$s</string>
+    <string name="provider_apple">Apple</string>
+    <string name="provider_google">Google</string>
+    <string name="provider_dev">dev sign-in</string>
+    <string name="account_sign_out">Sign out</string>
+    <string name="signout_title">Sign out?</string>
+    <string name="signout_body">Your progress stays on this phone but stops syncing, and you won’t move on the leaderboard.</string>
+    <string name="signout_confirm">Sign out</string>
+    <string name="account_danger_zone">Danger zone</string>
+    <string name="account_delete">Delete account</string>
+    <string name="account_delete_offline">Connect to the internet to delete your account.</string>
+    <string name="delete_title">Delete your account</string>
+    <string name="delete_body">This removes your account, your name, your synced progress and your leaderboard entry from our server. It can’t be undone.</string>
+    <string name="delete_local_checkbox">Also delete walks and progress on this phone</string>
+    <string name="delete_confirm_button">Delete account</string>
+    <string name="delete_dialog_title">Delete for good?</string>
+    <string name="delete_dialog_body">Your account and leaderboard entry will be gone. This can’t be undone.</string>
+    <string name="delete_dialog_confirm">Delete</string>
+    <string name="delete_done">Account deleted</string>
+
+    <!-- Errors -->
+    <string name="error_offline_generic">You’re offline. Try again when you’re connected.</string>
+    <string name="error_offline_signin">Signing in needs a connection.</string>
+    <string name="error_offline_delete">Deleting your account needs a connection.</string>
+    <string name="error_delete_signin_again">Your session expired. Sign in again to delete your account.</string>
+    <string name="error_signin">Sign-in didn’t work. Please try again.</string>
+    <string name="error_server">Our server isn’t responding. Try again in a bit.</string>
+
+    <!-- Settings / about -->
+    <string name="settings_style_auto">Auto</string>
+    <string name="settings_style_auto_desc">Topo by day, Dark at night</string>
+    <string name="settings_style_topo_desc">Hillshade and contour lines</string>
+    <string name="settings_style_light_desc">Quiet base, focus on your progress</string>
+    <string name="settings_style_dark_desc">Night water, easy on the eyes</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_account_signed_out">Sign in to sync and join the board</string>
+    <string name="settings_attribution">Map and data credits</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_version">Version %1$s (%2$s)</string>
+    <string name="attribution_fonts_title">Fonts and icons</string>
+    <string name="attribution_unavailable">Credits couldn’t be loaded.</string>
+    <string name="privacy_title">Privacy</string>
+    <string name="privacy_lead">We sync which trail sections you’ve covered — never your GPS track or walk times.</string>
+    <string name="privacy_phone_title">On this phone</string>
+    <string name="privacy_phone_body">Your GPS tracks, walk times and walk history stay on this phone.</string>
+    <string name="privacy_account_title">If you sign in</string>
+    <string name="privacy_account_body">We store your account id, your public name, and which trail sections you’ve covered (as on/off flags per 5 m of trail). From those we compute your island % and trails completed for the leaderboard.</string>
+    <string name="privacy_board_title">On the leaderboard</string>
+    <string name="privacy_board_body">Others see only your name, island % and trails completed — never your GPS track or walk times. Use a random name if you prefer.</string>
+    <string name="privacy_delete_title">Deleting</string>
+    <string name="privacy_delete_body">Delete your account any time in Me → Account. It removes everything we store about you.</string>
+
+    <!-- Onboarding (TL-3 privacy copy) -->
+    <string name="onboarding_privacy_body">Your GPS tracks never leave this phone. We sync which trail sections you’ve covered — never your GPS track or walk times.</string>
+    <string name="onboarding_page_a11y">Page %1$d of %2$d</string>
+</resources>

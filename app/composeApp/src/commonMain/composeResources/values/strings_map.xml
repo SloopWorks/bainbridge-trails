@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Map tab + Trail detail copy (docs/mvp/product.md §3 Map / Trail detail; decisions.md TL-4, TL-6 override).
+  Compose resources substitute %1$s / %1$d only: a literal percent sign is a bare "%".
+-->
+<resources>
+    <!-- Map -->
+    <string name="map_search_hint">Find a trail</string>
+    <string name="map_a11y">Trail map. %1$d of %2$d trails complete.</string>
+    <string name="map_locate_denied">Location is off for this app.</string>
+    <string name="map_locate_unavailable">Can't find your location</string>
+    <string name="map_off_island">You're off the island</string>
+    <string name="map_open_settings">Open settings</string>
+    <string name="map_not_now">Not now</string>
+    <string name="map_close">Close</string>
+    <string name="map_legend">Legend</string>
+    <string name="map_legend_footnote">Colors show how much of each stretch you've walked.</string>
+    <string name="map_legend_named_not_counted">Outside the island total</string>
+    <string name="map_legend_not_counted_body">Shown on the map but not part of the island total (roads, informal paths).</string>
+    <string name="map_preview_open">View trail</string>
+    <string name="map_preview_multi_title">Trails on this section</string>
+    <string name="map_leaderboard_pill_signed_out">Leaderboard</string>
+    <string name="map_attribution_a11y">Map credits</string>
+    <string name="map_error_title">Map couldn't load</string>
+    <string name="map_loading_trails">Loading trails…</string>
+    <string name="map_error_open_link">Couldn't open the link.</string>
+    <string name="perm_locate_title">Show where you are</string>
+    <string name="perm_locate_body">See your spot on the map. Location is used only while the app is open.</string>
+    <string name="perm_locate_allow">Allow location</string>
+
+    <!-- Trail detail -->
+    <string name="detail_length">Length</string>
+    <string name="detail_length_official_note">Official length</string>
+    <string name="detail_gain">Elevation gain</string>
+    <string name="detail_covered">Covered</string>
+    <string name="detail_covered_value">%1$s of %2$s</string>
+    <string name="detail_walked">%1$s walked</string>
+    <string name="detail_managed_by">Managed by %1$s</string>
+    <string name="detail_trailheads">Trailheads (%1$d)</string>
+    <string name="detail_trailhead_row">Trailhead %1$d</string>
+    <string name="detail_directions">Directions</string>
+    <string name="detail_directions_a11y">Directions to %1$s</string>
+    <string name="detail_official_map">Official trail map</string>
+    <string name="detail_official_map_host">biparks.org</string>
+    <string name="detail_community_title">Community</string>
+    <plurals name="detail_community_completed">
+        <item quantity="one">%1$d person has completed this trail</item>
+        <item quantity="other">%1$d people have completed this trail</item>
+    </plurals>
+    <string name="detail_community_median">Typical progress: %1$s</string>
+    <string name="detail_community_few">Be one of the first to finish this trail</string>
+    <string name="detail_community_offline">Community stats need a connection.</string>
+    <string name="detail_community_error">Couldn't load community stats.</string>
+    <string name="detail_counts">Counts toward your island %</string>
+    <string name="detail_not_counted">Doesn't count toward your island %</string>
+    <string name="detail_partly_counted">Only part of this trail counts toward your island %</string>
+    <string name="detail_start_walk">Start walk</string>
+    <string name="detail_go_to_recording">Go to recording</string>
+    <string name="detail_map_a11y">Map of %1$s. Tap to open the full map.</string>
+    <string name="detail_not_found">Trail not found</string>
+    <string name="detail_back">Back</string>
+</resources>

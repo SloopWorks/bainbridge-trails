@@ -44,19 +44,34 @@ import org.maplibre.spatialk.geojson.Position
  * scripted, e.g. the iOS simulator).
  */
 data class SpikeLaunch(
+    val screen: Screen = Screen.RECORD,
     val style: MapStyle = MapStyle.Default,
     val camera: CameraPosition = IslandCamera,
     val switchTo: MapStyle? = null,
     val switchAfterMs: Long = 4000,
+    /** Showcase page (`section=tokens|components|states`). */
+    val section: String? = null,
 ) {
+    enum class Screen { RECORD, STYLE, SHOWCASE }
+
     companion object {
-        /** Parses `key=value` options: style=TOPO|MINIMAL_LIGHT|DARK, lat, lon, zoom, switchTo, switchAfterMs. */
+        /**
+         * Parses `key=value` options: screen=record|style|showcase, section, style=TOPO|MINIMAL_LIGHT|DARK, lat, lon, zoom, switchTo,
+         * switchAfterMs. Without `screen`, a `style` or `switchTo` option still opens the style spike (older scripts).
+         */
         fun parse(options: Map<String, String>): SpikeLaunch {
             fun style(v: String?) = v?.let { s -> MapStyle.entries.firstOrNull { it.name.equals(s, ignoreCase = true) } }
             val lat = options["lat"]?.toDoubleOrNull()
             val lon = options["lon"]?.toDoubleOrNull()
             val zoom = options["zoom"]?.toDoubleOrNull()
+            val screen = when (options["screen"]?.lowercase()) {
+                "style" -> Screen.STYLE
+                "record" -> Screen.RECORD
+                "showcase" -> Screen.SHOWCASE
+                else -> if ("style" in options || "switchTo" in options) Screen.STYLE else Screen.RECORD
+            }
             return SpikeLaunch(
+                screen = screen,
                 style = style(options["style"]) ?: MapStyle.Default,
                 camera = CameraPosition(
                     center = Position(longitude = lon ?: IslandCamera.center.longitude, latitude = lat ?: IslandCamera.center.latitude),
@@ -64,6 +79,7 @@ data class SpikeLaunch(
                 ),
                 switchTo = style(options["switchTo"]),
                 switchAfterMs = options["switchAfterMs"]?.toLongOrNull() ?: 4000,
+                section = options["section"],
             )
         }
     }

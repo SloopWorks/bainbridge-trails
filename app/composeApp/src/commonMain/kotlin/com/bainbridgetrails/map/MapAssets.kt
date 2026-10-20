@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.readString
+import kotlinx.io.readByteArray
 import kotlinx.io.write
 import kotlinx.io.writeString
 
@@ -17,7 +17,7 @@ import kotlinx.io.writeString
  * Bundled map data (copied into Compose resources by scripts/sync-app-assets.sh).
  *
  * MapLibre Native reads `pmtiles://` sources from real files, so on first launch, and whenever the
- * bundled trails.json `version` changes, the tile sets are copied to the app's private data dir.
+ * bundled trails.json changes (byte compare with the installed copy), the tile sets are copied to the app's private data dir.
  */
 internal object MapAssets {
     /** Style template placeholder -> bundled file under composeResources/files/. */
@@ -44,12 +44,13 @@ internal object MapAssets {
     private suspend fun installLocked(dir: Path): Map<String, String> {
         val fs = SystemFileSystem
         val bundledMeta = Res.readBytes("files/$METADATA")
-        val version = metadataVersion(bundledMeta.decodeToString())
         val stamp = Path(dir, STAMP)
-        val upToDate = fs.exists(stamp) &&
-            fs.source(stamp).buffered().use { it.readString() } == version &&
-            (tileSets.values + METADATA).all { fs.exists(Path(dir, it)) }
+        val installedMeta = Path(dir, METADATA)
+        // Up to date = complete install of this exact trails.json: a byte compare, no JSON parse on every launch.
+        val upToDate = fs.exists(stamp) && tileSets.values.all { fs.exists(Path(dir, it)) } && fs.exists(installedMeta) &&
+            fs.source(installedMeta).buffered().use { it.readByteArray() }.contentEquals(bundledMeta)
         if (!upToDate) {
+            val version = metadataVersion(bundledMeta.decodeToString())
             fs.createDirectories(dir)
             if (fs.exists(stamp)) fs.delete(stamp)
             for (name in tileSets.values) copyAtomically(Res.readBytes("files/$name"), Path(dir, name))

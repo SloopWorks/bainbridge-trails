@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG BUILDS ONLY. The trailhead geofence prototype (background location, boot receiver) is NOT here: it lives in
+  src/geofencePrototype/AndroidManifest.xml and is merged into debug builds only with -PgeofencePrototype=true.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Debug only: Android 17 (API 37) blocks an app's connections to private addresses such as the emulator's
+         host alias 10.0.2.2 (local wrangler dev) without this runtime permission; DebugTools asks for it when the
+         drawer's backend is Local. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <!-- Debug only: cleartext HTTP to a local `wrangler dev` (10.0.2.2 / localhost); release stays HTTPS-only. -->
+    <application android:networkSecurityConfig="@xml/network_security_config_debug" />
+
+</manifest>

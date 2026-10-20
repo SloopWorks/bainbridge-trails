@@ -188,6 +188,12 @@ Official mileage is set on 0 of 127 trails: no source has an agency mileage fiel
 | Dock Street road end |  |  | 1 |  | 0.002 | 0.0 | 0.0 |
 | Waterfront Trail |  |  | 1 |  | 0.001 | 0.0 | 0.0 |
 
+## Official vs computed length
+
+Official = agency-published mileage set in `trails_overrides.yaml` with a cited source. computed_mi = shippable segments (what the app can draw); agency_only_mi = private geometry. diff_% compares computed + agency-only with official; ⚠ = off by more than 15%.
+
+(no trail has an official length yet)
+
 ## Owner review
 
 ### Classification rule (`data/inclusion.yaml`)
@@ -356,6 +362,22 @@ Usually a name carried by a tiny OSM piece (bridge, road-end stub). Drop or merg
 - West Bridge to Creek Trail (0.029 mi)
 
 Shipped trails in `data/dist/trails.json` use shippable segments only (length, gain/loss, trailheads); `agency_only_length_mi` is the part still missing.
+
+### Tiny trails folded/hidden
+
+Trails under 30 m (9) are merged into the longest touching trail (segments within 1 m) or hidden when nothing touches them, so a tiny trail inside a neighbour's GPS buffer is not auto-completed. Segments and island totals are unchanged.
+
+| trail | folded into |
+|---|---|
+| Allan's Alley | hidden |
+| Dock Street road end | hidden |
+| Fairview Avenue Path | hidden |
+| Farm Trail | Farm Trail South |
+| Fletcher Landing Road End | hidden |
+| Gideon Trail | Gideon Park Trail |
+| Howley Cove Trail | hidden |
+| To The Learning Tree | hidden |
+| Waterfront Trail | West Loop Trail |
 
 ### Agency data licensing (your call)
 

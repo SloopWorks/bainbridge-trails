@@ -4,5 +4,18 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>TrailMatching</key>
+		<string>Precise location is needed to match your walk to trails.</string>
+	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Used only while you record a walk; your route stays on your phone.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Keeps bike and car rides from counting as walks.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>

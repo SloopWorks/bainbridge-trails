@@ -11,6 +11,8 @@ The app opens on **Topo** (`MapStyle.Default`); a segmented control at the top s
 
 ## Recommendation: Topo as the default
 
+Owner confirmed Topo as the default on 2026-10-18.
+
 1. **Status reads first.** The trails are the only saturated color on the map. The land is a cool
    lichen gray-green, the water is a muted Puget Sound teal, and roads are white. The four
    statuses stand out against all of it.
