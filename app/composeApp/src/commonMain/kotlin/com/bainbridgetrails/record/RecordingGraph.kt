@@ -20,6 +20,7 @@ import com.bainbridgetrails.graph.AppGraph
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
@@ -82,6 +83,23 @@ internal object RecordingGraph {
             it.onLaunch()
         }
     }.also { controller = it }
+
+    private var live: LiveCoverageSession? = null
+
+    /** A walk the user chose to "Count it" after a crash: its results show the recovered banner. */
+    var recoveredSessionId: String? = null
+
+    /**
+     * Provisional coverage for the recording [sessionId] (TL-8), kept for the process so minimising the Record
+     * screen does not lose it. The pre-walk state is read from the coverage store on first use (the walk itself is
+     * only merged when it is finalised).
+     */
+    fun liveCoverage(context: PlatformContext, sessionId: String): LiveCoverageSession =
+        live?.takeIf { it.sessionId == sessionId } ?: LiveCoverageSession(sessionId, create = {
+            val data = AppGraph.datasets.await()
+            val (pre, sticky) = withContext(Dispatchers.IO) { CoverageStore(trackingDir(context)).let { it.load() to it.completedIds() } }
+            LiveCoverage.forDataset(data, pre, sticky)
+        }).also { live = it }
 
     /** A failed load is not cached: the next call (the screen's Retry) starts over. */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
