@@ -1,0 +1,1 @@
+First release: offline trail map, walk recording, trail and island progress, optional leaderboard.
