@@ -56,3 +56,13 @@ The UI/UX is **not ready** for roads:
   - The roads debug build is installed on the Pixel with `adb`.
   - Shipyard needs a new package registration (`com.bainbridgetrails.roads.dev`), which is an admin action,
     so it's deferred to the owner.
+
+## Spec reconciliation (after product.md 2e6e856 and ux.md b4eb139)
+- **RD-9 Me headline:** road **miles covered** is the hero number (product RP: early completions are rare, so
+  miles move every walk). Roads completed (x / N counted) and island % are the secondary line. Visual
+  treatment follows ux.md.
+- **RD-10 Roads list:** grouped by category (ux.md) with product's type/status filters, sorts and
+  abbreviation-tolerant search. Uncounted roads go in a collapsed "Not counted" group. They are tappable with a
+  reason line and have no Start walk.
+- **RD-11** On any other conflict: ux.md decides visuals and interaction, product.md decides copy, which
+  milestones exist, and the stats math.
