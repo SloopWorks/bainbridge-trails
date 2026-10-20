@@ -193,7 +193,8 @@ private fun ResultsSync.label() = when (this) {
 /** Wide island tile: "Island  11.9% → 12.4%" with "+0.5 pts" in `positive` (polite live region, ux.md §5.5). */
 @Composable
 private fun IslandTile(before: Double, after: Double) {
-    val delta = stringResource(Res.string.results_delta_pts, deltaPoints(before, after))
+    val points = deltaPoints(before, after)
+    val delta = stringResource(Res.string.results_delta_pts, points)
     val spoken = stringResource(Res.string.results_island, Format.percent(before), Format.percent(after), delta)
     Row(
         Modifier.fillMaxWidth().heightIn(min = 72.dp)
@@ -210,7 +211,8 @@ private fun IslandTile(before: Double, after: Double) {
                 Text(Format.percent(after), style = BtTheme.type.statLarge)
             }
         }
-        Text(delta, style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"), color = BtTheme.colors.positive)
+        // No "+0.0 pts" for a walk that added nothing (the no-progress text below says so).
+        if (points != "0.0") Text(delta, style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"), color = BtTheme.colors.positive)
     }
 }
 
