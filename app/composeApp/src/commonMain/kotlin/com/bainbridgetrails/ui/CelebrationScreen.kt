@@ -62,6 +62,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bainbridgetrails.coverage.ProgressSnapshot
+import com.bainbridgetrails.log.AppLog
+import kotlinx.coroutines.CancellationException
 import com.bainbridgetrails.data.TrailData
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.resources.Res
@@ -121,9 +123,10 @@ fun CelebrationScreen(
 ) {
     FlowBackHandler { onContinue() }
     DatasetGate { data ->
-        // Fresh numbers: the walk's coverage was written just before this opened.
-        val snapshot by produceState(graph.progress.snapshot.value, graph) {
-            value = runCatching { graph.progress.refreshNow() }.getOrNull() ?: value
+        // Fresh numbers: the walk's coverage was written just before this opened. Wait for them (the cached snapshot
+        // only if the refresh fails) so the variant below is decided once, on post-walk numbers.
+        val snapshot by produceState<ProgressSnapshot?>(null, graph) {
+            value = runCatching { graph.progress.refreshNow() }.getOrNull() ?: graph.progress.snapshot.value
         }
         val islandBefore by produceState<Double?>(null, sessionId) {
             val done = runCatching { graph.controller().await() }.getOrNull()?.state?.value as? RecordingState.Done
@@ -137,15 +140,29 @@ fun CelebrationScreen(
         }
         if (trails.isEmpty() && !island) return@DatasetGate
         val countedIds = remember(data) { data.dataset.trails.filter { data.dataset.islandCredit(it.id) != IslandCredit.NONE }.mapTo(HashSet()) { it.id } }
-        val whole = remember(s, island, trailIds) { IslandCelebration.show(island, s, trailIds, countedIds) }
-        val geometry by produceState<IslandGeometry?>(null, data, whole) { if (whole) value = IslandGeometry.forDataset(data.dataset) }
+        // Frozen on first composition: a later snapshot change must not swap the variant mid-animation.
+        val whole = remember(island, trailIds) { IslandCelebration.show(island, s, trailIds, countedIds) }
+        // null = loading; a failure (or empty geometry) falls back to the trail glyph, still with the island text.
+        val geometry by produceState<Result<IslandGeometry>?>(null, data, whole) {
+            if (whole) {
+                value = try {
+                    Result.success(IslandGeometry.forDataset(data.dataset))
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    AppLog.e("celebrate", "island art unavailable: ${e.message}")
+                    Result.failure(e)
+                }
+            }
+        }
         if (whole && geometry == null) return@DatasetGate // a frame or two while the coastline loads
+        val art = geometry?.getOrNull()?.takeIf { it.land.isNotEmpty() || it.trails.isNotEmpty() }
         // Debug preview: final numbers whatever this phone's coverage is.
         val shown = if (preview) s.copy(islandFraction = 1.0, trailsCompleted = s.trailCount) else s
         val community = trails.singleOrNull()?.let { stats.forTrail(it.id)?.completedCount }?.takeIf { it >= COMMUNITY_MIN }
         CelebrationContent(
             data, shown, trails.map { it.id to it.name }, if (preview) null else islandBefore, community, onContinue, onViewTrail,
-            islandArt = if (whole) geometry else null,
+            wholeIsland = whole,
+            islandArt = if (whole) art else null,
         )
     }
 }
@@ -159,6 +176,7 @@ private fun CelebrationContent(
     community: Int?,
     onContinue: () -> Unit,
     onViewTrail: (String) -> Unit,
+    wholeIsland: Boolean = false,
     islandArt: IslandGeometry? = null,
 ) {
     val reduced = BtTheme.motion.reduced
@@ -179,7 +197,6 @@ private fun CelebrationContent(
 
     val single = trails.size == 1
     val island = s.islandFraction
-    val wholeIsland = islandArt != null
     val names = trails.map { it.second }
     val shownNames = names.take(3).joinToString("\n") + if (names.size > 3) "\n" + stringResource(Res.string.celebrate_more, names.size - 3) else ""
     val eyebrow = when {

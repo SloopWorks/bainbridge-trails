@@ -102,7 +102,15 @@ object AppGraph {
      * walk made the island whole (P1-9 variant, also with no newly completed trail); [preview] (debug tools only) shows
      * the island variant with final numbers (100%, every trail) whatever the real coverage.
      */
-    data class Celebration(val key: String, val trailIds: List<String>, val island: Boolean = false, val preview: Boolean = false)
+    data class Celebration(val key: String, val trailIds: List<String>, val island: Boolean = false, val preview: Boolean = false) {
+        companion object {
+            /** Summed segment fractions can land a hair under 1.0 with everything covered. */
+            private const val WHOLE = 1.0 - 1e-9
+
+            /** True when this walk took the island from not whole to whole (island fractions, 0..1). */
+            fun islandReached(before: Double, after: Double): Boolean = before < WHOLE && after >= WHOLE
+        }
+    }
 
     private val _celebrations = MutableSharedFlow<Celebration>(replay = 1, extraBufferCapacity = 4)
     /** Celebrations to show (finished walks, debug tools). Replay 1 so one emitted before the shell exists still shows. */
@@ -231,7 +239,7 @@ object AppGraph {
                         s.summary.newlyCompleted.forEach { analytics.track(AnalyticsEvents.TRAIL_COMPLETED, mapOf("trail" to it)) }
                         graph.coverageChanged()
                         graph.sync.walkFinished() // F11: upload after each finished walk (queued when offline)
-                        val island = s.summary.islandBefore < 1.0 && s.summary.islandAfter >= 1.0
+                        val island = Celebration.islandReached(s.summary.islandBefore, s.summary.islandAfter)
                         requestCelebration(Celebration(s.summary.sessionId, s.summary.newlyCompleted, island = island))
                     }
                     else -> Unit
