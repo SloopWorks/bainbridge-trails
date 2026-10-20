@@ -53,6 +53,16 @@ import com.bainbridgetrails.resources.settings_attribution_dataset
 import com.bainbridgetrails.resources.settings_attribution_fonts
 import com.bainbridgetrails.resources.settings_map
 import com.bainbridgetrails.resources.settings_privacy
+import com.bainbridgetrails.resources.settings_privacy_policy
+import com.bainbridgetrails.resources.settings_terms
+import com.bainbridgetrails.resources.settings_support
+import com.bainbridgetrails.resources.settings_link_failed
+import com.bainbridgetrails.config.ApiConfig
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.SnackbarHostState
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
 import com.bainbridgetrails.resources.settings_show_intro
 import com.bainbridgetrails.resources.settings_style
 import com.bainbridgetrails.resources.settings_style_auto
@@ -116,7 +126,10 @@ fun SettingsScreen(
     val context = rememberPlatformContext()
     val version = remember(context) { appVersion(context) }
     val choice = settings.styleChoice()
-    ListScreen(stringResource(Res.string.settings_title), onBack = onBack) {
+    val uri = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
+    ListScreen(stringResource(Res.string.settings_title), onBack = onBack, snackbar = snackbar) {
         item { Group(stringResource(Res.string.settings_map)) }
         item {
             Text(
@@ -168,6 +181,22 @@ fun SettingsScreen(
         }
         item { Group(stringResource(Res.string.settings_about)) }
         item { NavRow(stringResource(Res.string.settings_privacy), onPrivacy, icon = BtIcons.Lock) }
+        // Store requirement: the hosted policy, terms and support pages (the summary above stays in-app).
+        for ((label, path) in listOf(
+            Res.string.settings_privacy_policy to "privacy",
+            Res.string.settings_terms to "terms",
+            Res.string.settings_support to "support",
+        )) {
+            item(key = "web-$path") {
+                NavRow(stringResource(label), onClick = {
+                    try {
+                        uri.openUri(ApiConfig.pageUrl(path))
+                    } catch (e: Exception) {
+                        scope.launch { snackbar.showSnackbar(getString(Res.string.settings_link_failed)) }
+                    }
+                }, trailingIcon = BtIcons.OpenInNew)
+            }
+        }
         item { NavRow(stringResource(Res.string.settings_attribution), onAttribution, icon = BtIcons.Info) }
         item { NavRow(stringResource(Res.string.settings_show_intro), onShowIntro, icon = BtIcons.Hiking, trailingIcon = null) }
         item {
