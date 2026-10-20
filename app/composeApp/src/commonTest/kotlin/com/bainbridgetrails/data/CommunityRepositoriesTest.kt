@@ -63,6 +63,16 @@ class CommunityRepositoriesTest {
     }
 
     @Test
+    fun reportOfAGoneUserCountsAsReportedAndHidesTheRow() = runTest {
+        server.on("GET /v1/leaderboard", Reply.json(board))
+        server.on("POST /v1/report-name", Reply.error(404, "not_found"))
+        val r = boardRepo()
+        r.refresh()
+        assertEquals(ReportResult.Reported, r.reportName("a"))
+        assertEquals(listOf("b"), r.state.value.board!!.entries.map { it.userId })
+    }
+
+    @Test
     fun reportNeedsSignIn() = runTest {
         signedIn = false
         assertEquals(ReportResult.SignInRequired, boardRepo().reportName("a"))

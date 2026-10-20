@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android-only system UI copy (product.md notif_*); read by services, so Android string resources. -->
+<resources>
+    <string name="notif_channel_recording">Walk recording</string>
+    <string name="notif_channel_recording_desc">Shows while a walk is being recorded.</string>
+    <string name="notif_recording_title">Recording your walk</string>
+    <string name="notif_recording_tap">Tap to open</string>
+    <string name="notif_recording_stop">Stop</string>
+</resources>

@@ -100,7 +100,7 @@ fun StateChip(text: String, modifier: Modifier = Modifier, icon: DrawableResourc
         m.heightIn(min = 32.dp)
             .shadow(3.dp, PillShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh, PillShape)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),

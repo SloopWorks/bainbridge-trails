@@ -85,12 +85,14 @@ class LeaderboardRepository(
     /** F9c: report [userId]'s name; the row disappears for this user immediately (and stays hidden). */
     suspend fun reportName(userId: String): ReportResult {
         if (!isSignedIn()) return ReportResult.SignInRequired
-        return when (val r = api.reportName(userId)) {
-            is ApiResult.Ok -> {
+        val r = api.reportName(userId)
+        return when {
+            // 404: the user is gone (account deleted since the board was fetched): nothing to report, hide the row.
+            r is ApiResult.Ok || (r is ApiResult.Failure && r.error is ApiError.NotFound) -> {
                 hide(userId)
                 ReportResult.Reported
             }
-            is ApiResult.Failure -> ReportResult.Failed(r.error)
+            else -> ReportResult.Failed((r as ApiResult.Failure).error)
         }
     }
 
