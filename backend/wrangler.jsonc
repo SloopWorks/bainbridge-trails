@@ -22,7 +22,7 @@
   // ALLOW_DEV_AUTH must NEVER be set here; it only lives in local .dev.vars.
   "vars": {
     // Comma-separated Google OAuth client ids accepted as `aud` (Android/web client id, iOS client id).
-    "GOOGLE_CLIENT_IDS": "",
+    "GOOGLE_CLIENT_IDS": "625389296418-9uitrnng7sv7dm2tcppsm0gdssbsacfj.apps.googleusercontent.com",
     // Comma-separated Apple audiences (iOS bundle id, Services ID).
     "APPLE_CLIENT_IDS": "",
     // Apple token revocation on account deletion (TL-10). Leave empty to disable (no-op).

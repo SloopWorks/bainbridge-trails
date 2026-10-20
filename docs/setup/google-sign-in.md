@@ -1,15 +1,15 @@
 # Google sign-in setup (Android)
 
-Status: **pending**. The OAuth clients have not been created yet. Fill in the table below when they are.
+Status: **configured 2026-10-20**. Project, consent screen (Testing), web client and Android dev client exist. No release Android client yet.
 
 ## What exists where
 
 | Item | Value | Stored in | Secret? |
 |---|---|---|---|
-| Google Cloud project | _TBD_ | this doc | no |
+| Google Cloud project | `bainbridge-trails` (project ID) | this doc | no |
 | OAuth consent screen | External, **Testing**; test user `patjackson52@gmail.com` | Cloud Console | no |
-| Web client ID (the `aud` of ID tokens) | _TBD_ | `app/gradle.properties` → `googleWebClientId`; `backend/wrangler.jsonc` → `GOOGLE_CLIENT_IDS` | no (public identifier) |
-| Android client, debug/dev | package `com.bainbridgetrails.app.dev`, SHA-1 `E2:3C:BB:C8:93:30:EB:66:CA:73:02:B3:7B:BA:6F:D9:3B:79:33:A2` (debug keystore on the build Mac; also signs Shipyard dev builds) | Cloud Console only | no |
+| Web client ID (the `aud` of ID tokens) | `625389296418-9uitrnng7sv7dm2tcppsm0gdssbsacfj.apps.googleusercontent.com` ("Bainbridge Trails server") | `app/gradle.properties` → `googleWebClientId`; `backend/wrangler.jsonc` → `GOOGLE_CLIENT_IDS` | no (public identifier) |
+| Android client, debug/dev | "Bainbridge Trails Android dev": package `com.bainbridgetrails.app.dev`, SHA-1 `E2:3C:BB:C8:93:30:EB:66:CA:73:02:B3:7B:BA:6F:D9:3B:79:33:A2` (debug keystore on the build Mac; also signs Shipyard dev builds) | Cloud Console only | no |
 | Android client, release | package `com.bainbridgetrails.app`, SHA-1 of the release key (or of the Play App Signing key) | Cloud Console only | no |
 | Web client **secret** | not used: Credential Manager and the Worker only need the client ID | **never commit**; if it is ever needed, `~/.config/bainbridge-trails/google-web-client-secret` (0600) | **yes** |
 
