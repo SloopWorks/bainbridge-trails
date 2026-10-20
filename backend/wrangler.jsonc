@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "bainbridge-trails-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-19",
+  "compatibility_flags": ["nodejs_compat"],
+  // Free tier only: one Worker + one D1 database. No paid features (no Durable Objects, no Queues).
+  "workers_dev": true,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bainbridge-trails",
+      // PLACEHOLDER: replace with the id printed by `npx wrangler d1 create bainbridge-trails` (see README).
+      // Local dev / tests ignore it and use a local SQLite file under .wrangler/.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Non-secret config. OAuth client ids are public identifiers, not secrets.
+  // ADMIN_TOKEN is a secret: `npx wrangler secret put ADMIN_TOKEN`.
+  // ALLOW_DEV_AUTH must NEVER be set here; it only lives in local .dev.vars.
+  "vars": {
+    // Comma-separated Google OAuth client ids accepted as `aud` (Android/web client id, iOS client id).
+    "GOOGLE_CLIENT_IDS": "",
+    // Comma-separated Apple audiences (iOS bundle id, Services ID).
+    "APPLE_CLIENT_IDS": "",
+    // Cheat limits (see README "Plausibility").
+    "PLAUSIBLE_SPEED_KMH": "7",
+    "BURST_KM_PER_DAY": "15",
+    "INITIAL_IMPORT_KM": "40"
+  }
+}

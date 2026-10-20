@@ -1,0 +1,8 @@
+# Copy to .dev.vars for `npm run dev` (wrangler dev). Never commit .dev.vars.
+# Enables POST /v1/auth/dev (emulator/simulator testing without real OAuth). Local only.
+ALLOW_DEV_AUTH=true
+# Admin bearer token for /v1/admin/* locally.
+ADMIN_TOKEN=local-admin-token-change-me
+# Optional: real client ids to test real sign-in against local wrangler dev.
+# GOOGLE_CLIENT_IDS=1234-abc.apps.googleusercontent.com
+# APPLE_CLIENT_IDS=com.sloopworks.bainbridgetrails
