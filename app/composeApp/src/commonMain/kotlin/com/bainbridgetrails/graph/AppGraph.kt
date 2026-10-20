@@ -4,6 +4,7 @@ import com.bainbridgetrails.analytics.Analytics
 import com.bainbridgetrails.analytics.AnalyticsEvents
 import com.bainbridgetrails.analytics.NoOpAnalytics
 import com.bainbridgetrails.data.DatasetRepository
+import com.bainbridgetrails.data.DatasetSources
 import com.bainbridgetrails.data.ProgressRepository
 import com.bainbridgetrails.data.SettingsRepository
 import com.bainbridgetrails.data.StoredCoverage
@@ -18,6 +19,7 @@ import com.bainbridgetrails.tracking.CoverageStore
 import com.bainbridgetrails.tracking.RecordingController
 import com.bainbridgetrails.tracking.RecordingState
 import com.bainbridgetrails.tracking.WalkIndex
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -62,11 +64,32 @@ object AppGraph {
 
     /** Ruling R1: the bundled dataset, parsed once per process off Main. */
     val datasets: DatasetRepository by lazy {
-        DatasetRepository(scope, readSources = {
-            withContext(Dispatchers.IO) {
-                Res.readBytes("files/trails.json").decodeToString() to Res.readBytes("files/coverage_segments.json").decodeToString()
-            }
-        })
+        // Res.readBytes reads on the calling thread: keep every read on IO.
+        DatasetRepository(
+            scope,
+            DatasetSources(
+                trailsJson = { withContext(Dispatchers.IO) { Res.readBytes("files/trails.json") } },
+                segmentsJson = { withContext(Dispatchers.IO) { Res.readBytes("files/coverage_segments.json").decodeToString() } },
+                datasetBin = {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            Res.readBytes("files/dataset.bin")
+                        } catch (e: Exception) { // not synced (scripts/sync-app-assets.sh): fall back to the JSON
+                            if (e is CancellationException) throw e
+                            null
+                        }
+                    }
+                },
+            ),
+        )
+    }
+
+    /**
+     * Starts the dataset load before any UI exists (platform entry points call it first thing), so parsing overlaps
+     * the first composition instead of following it. Context-free and idempotent.
+     */
+    fun warmUp() {
+        datasets.load()
     }
 
     /** Debug builds swap this for a logging implementation; release keeps [NoOpAnalytics] (spec: no analytics). */
@@ -190,7 +213,18 @@ object AppGraph {
             }
             controller.state.distinctUntilChanged { a, b -> a::class == b::class }.collect { s ->
                 when (s) {
-                    is RecordingState.Recording -> analytics.track(AnalyticsEvents.WALK_STARTED)
+                    is RecordingState.Recording -> {
+                        analytics.track(AnalyticsEvents.WALK_STARTED)
+                        // Build the matching geometry during the walk, not at startup or when it is finalized.
+                        scope.launch(Dispatchers.Default) {
+                            try {
+                                datasets.await().index.prepare()
+                            } catch (e: Exception) {
+                                if (e is CancellationException) throw e
+                                AppLog.e("graph", "index prepare failed: ${e.message}") // finalizing retries (lazy)
+                            }
+                        }
+                    }
                     is RecordingState.Done -> {
                         analytics.track(AnalyticsEvents.WALK_FINISHED, mapOf("verified" to s.summary.verified.toString(), "trails" to s.summary.trails.size.toString()))
                         s.summary.newlyCompleted.forEach { analytics.track(AnalyticsEvents.TRAIL_COMPLETED, mapOf("trail" to it)) }

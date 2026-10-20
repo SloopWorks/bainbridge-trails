@@ -2,6 +2,7 @@ package com.bainbridgetrails.data
 
 import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.Dataset
+import com.bainbridgetrails.coverage.DatasetBinary
 import com.bainbridgetrails.coverage.LocalProjection
 import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
@@ -28,18 +29,31 @@ class TrailData(
     /** Wall time of [Dataset.parse] / [SegmentIndex] construction (debug drawer, perf notes). */
     val parseMs: Long,
     val indexMs: Long,
+    /** What was parsed: "bin" (dataset.bin) or "json" (the fallback). */
+    val format: String = "json",
 ) {
     val progress: Progress = Progress(dataset, index, params)
 }
 
 /**
- * Parses the bundled dataset once per process on [compute] (never Main) and builds the segment index right after.
+ * The bundled dataset files (resources in the app, strings in tests); each reader may suspend on I/O.
+ * [datasetBin] (dataset.bin, [DatasetBinary]) is preferred; coverage_segments.json is read and the JSON parsed only
+ * when the binary is absent, unreadable, or was not made from these trails.json bytes (stale).
+ */
+class DatasetSources(
+    val trailsJson: suspend () -> ByteArray,
+    val segmentsJson: suspend () -> String,
+    val datasetBin: suspend () -> ByteArray? = { null },
+)
+
+/**
+ * Parses the bundled dataset once per process on [compute] (never Main) and builds the segment index right after
+ * (tick counts only, all [Progress] needs; matching geometry builds on first use or [SegmentIndex.prepare]).
  * [load] is idempotent while loading/loaded; after a failure it starts over (the UI's Retry).
  */
 class DatasetRepository(
     private val scope: CoroutineScope,
-    /** Reads trails.json and coverage_segments.json (resources); may suspend on I/O. */
-    private val readSources: suspend () -> Pair<String, String>,
+    private val sources: DatasetSources,
     private val params: CoverageParams = CoverageParams(),
     private val compute: CoroutineDispatcher = Dispatchers.Default,
 ) {
@@ -79,15 +93,28 @@ class DatasetRepository(
 
     private suspend fun build(): TrailData {
         parseCount++
-        val (trails, segments) = readSources()
+        val trails = sources.trailsJson()
+        val bin = sources.datasetBin()
         val t0 = TimeSource.Monotonic.markNow()
-        val dataset = Dataset.parse(trails, segments)
+        var format = "bin"
+        val dataset = bin?.let { bytes ->
+            try {
+                require(DatasetBinary.trailsJsonHash(bytes) == DatasetBinary.hash(trails)) { "not made from the bundled trails.json" }
+                Dataset.fromBinary(bytes)
+            } catch (e: Exception) { // stale, corrupt or truncated
+                AppLog.w(TAG, "dataset.bin unusable (${e.message}); parsing the JSON")
+                null
+            }
+        } ?: run {
+            format = "json"
+            Dataset.parse(trails.decodeToString(), sources.segmentsJson())
+        }
         val parseMs = t0.elapsedNow().inWholeMilliseconds
         val t1 = TimeSource.Monotonic.markNow()
         val index = SegmentIndex(dataset.segments, params, LocalProjection())
         val indexMs = t1.elapsedNow().inWholeMilliseconds
-        AppLog.i(TAG, "dataset ${dataset.version}: ${dataset.trails.size} trails, ${dataset.segments.size} segments; parse $parseMs ms, index $indexMs ms")
-        return TrailData(dataset, index, params, parseMs, indexMs)
+        AppLog.i(TAG, "dataset ${dataset.version}: ${dataset.trails.size} trails, ${dataset.segments.size} segments; parse ($format) $parseMs ms, index $indexMs ms")
+        return TrailData(dataset, index, params, parseMs, indexMs, format)
     }
 
     private companion object {
