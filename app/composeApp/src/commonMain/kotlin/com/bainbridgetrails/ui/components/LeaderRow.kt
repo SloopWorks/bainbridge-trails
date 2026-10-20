@@ -41,6 +41,7 @@ import com.bainbridgetrails.resources.board_row_you_a11y
 import com.bainbridgetrails.resources.board_you_tag
 import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PillShape
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 private val RankW = 40.dp
@@ -88,8 +89,8 @@ fun LeaderRow(
     onReport: (() -> Unit)? = null,
 ) {
     val pct = boardPct(islandPct)
-    val a11y = if (isYou) stringResource(Res.string.board_row_you_a11y, rank, pct, trailsCompleted)
-    else stringResource(Res.string.board_row_a11y, rank, name, pct, trailsCompleted)
+    val a11y = if (isYou) pluralStringResource(Res.plurals.board_row_you_a11y, trailsCompleted, rank, pct, trailsCompleted)
+    else pluralStringResource(Res.plurals.board_row_a11y, trailsCompleted, rank, name, pct, trailsCompleted)
     val bg = if (isYou) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
     val fg = if (isYou) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
     val sub = if (isYou) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant

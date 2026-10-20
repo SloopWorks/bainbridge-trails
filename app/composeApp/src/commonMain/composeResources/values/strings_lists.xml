@@ -86,10 +86,19 @@
     <string name="board_col_trails">Trails</string>
     <string name="board_you_tag">You</string>
     <string name="board_rank">#%1$d</string>
-    <string name="board_row_a11y">Rank %1$d, %2$s, %3$s of the island, %4$d trails completed</string>
-    <string name="board_row_you_a11y">You. Rank %1$d, %2$s of the island, %3$d trails completed</string>
+    <plurals name="board_row_a11y">
+        <item quantity="one">Rank %1$d, %2$s, %3$s of the island, %4$d trail completed</item>
+        <item quantity="other">Rank %1$d, %2$s, %3$s of the island, %4$d trails completed</item>
+    </plurals>
+    <plurals name="board_row_you_a11y">
+        <item quantity="one">You. Rank %1$d, %2$s of the island, %3$d trail completed</item>
+        <item quantity="other">You. Rank %1$d, %2$s of the island, %3$d trails completed</item>
+    </plurals>
     <string name="board_updated">Updated %1$s</string>
-    <string name="board_total">%1$d ranked islanders</string>
+    <plurals name="board_total">
+        <item quantity="one">%1$d ranked islander</item>
+        <item quantity="other">%1$d ranked islanders</item>
+    </plurals>
     <string name="board_empty_title">The board is wide open</string>
     <string name="board_empty_body">No one’s on it yet. Walk a trail and sign in to claim the top spot.</string>
     <string name="board_offline_title">You’re offline</string>

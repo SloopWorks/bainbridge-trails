@@ -77,6 +77,12 @@ class GeofencesTest {
     }
 
     @Test
+    fun arrivalTextSingularTrail() {
+        val t = th("a", 0.0, 0.0, listOf("T1"))
+        assertEquals("You're at Head a — 0 of 1 trail here complete", Geofences.arrivalText(t, CoverageState.EMPTY, progress))
+    }
+
+    @Test
     fun parseReadsDistSchema() {
         val text = """{"version":"v1","trailheads":[{"id":"th-1","lon":-122.5,"lat":47.6,"name":"X","trail_ids":["t-a"],"source":"road_access"}]}"""
         assertEquals(listOf(Trailhead("th-1", -122.5, 47.6, "X", listOf("t-a"))), Geofences.parse(text))

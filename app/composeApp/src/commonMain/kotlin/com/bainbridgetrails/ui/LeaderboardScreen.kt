@@ -70,6 +70,7 @@ import com.bainbridgetrails.ui.components.SkeletonLeaderRow
 import com.bainbridgetrails.ui.theme.BtTheme
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -142,7 +143,7 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
                     }
                 }
                 if (board != null && board.totalRanked > 0) {
-                    Text(stringResource(Res.string.board_total, board.totalRanked), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(pluralStringResource(Res.plurals.board_total, board.totalRanked, board.totalRanked), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (signedIn && board != null && you == null && state.error == null) {
                     Text(stringResource(Res.string.board_not_ranked), Modifier.padding(top = BtTheme.spacing.xs), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
