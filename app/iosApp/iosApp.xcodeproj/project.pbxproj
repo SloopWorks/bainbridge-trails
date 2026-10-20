@@ -10,6 +10,7 @@
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E1D0C9B8A7F6E5D4C3B2A1 /* AppleSignIn.swift */; };
 		307C2654CD5972A25FB7FD87 /* iOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 668CECA83ACC03A83C85A623 /* iOSApp.swift */; };
 		56B0305B5D3847FC6B326502 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8509E5A49E4A5CAAEB3ADB /* ContentView.swift */; };
+		5A0C1E2D3F4B5A6978C1D2E3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6B1D2F3E4A5C6B7A89D2E3F4 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -18,6 +19,7 @@
 		86038AE1032E284E79B32AD6 /* iosApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C117AD187833E2513BD2F553 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CE8509E5A49E4A5CAAEB3ADB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		6B1D2F3E4A5C6B7A89D2E3F4 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -28,6 +30,7 @@
 				C117AD187833E2513BD2F553 /* Info.plist */,
 				668CECA83ACC03A83C85A623 /* iOSApp.swift */,
 				F2E1D0C9B8A7F6E5D4C3B2A1 /* AppleSignIn.swift */,
+				6B1D2F3E4A5C6B7A89D2E3F4 /* PrivacyInfo.xcprivacy */,
 			);
 			path = iosApp;
 			sourceTree = "<group>";
@@ -57,6 +60,7 @@
 			buildPhases = (
 				4B44A75E2FD10EFE3C97FCF5 /* Compile Kotlin Framework */,
 				297B59D9CE634556D6007C40 /* Sources */,
+				7C2E3A4F5B6D7C8B9AE3F4A5 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -120,6 +124,17 @@
 			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\nif [ -z \"$JAVA_HOME\" ]; then\n  JAVA_HOME=\"$(/usr/libexec/java_home -v 17+ 2>/dev/null || /usr/libexec/java_home 2>/dev/null)\"\n  if [ -z \"$JAVA_HOME\" ]; then\n    for d in /opt/homebrew/opt/openjdk@17 /opt/homebrew/opt/openjdk /usr/local/opt/openjdk@17 /usr/local/opt/openjdk; do\n      if [ -d \"$d/libexec/openjdk.jdk/Contents/Home\" ]; then JAVA_HOME=\"$d/libexec/openjdk.jdk/Contents/Home\"; break; fi\n    done\n  fi\n  if [ -z \"$JAVA_HOME\" ]; then\n    echo \"error: JDK 17+ not found; set JAVA_HOME (see app/README.md)\"\n    exit 1\n  fi\n  export JAVA_HOME\nfi\ncd \"$SRCROOT/..\"\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode\n";
 		};
 /* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7C2E3A4F5B6D7C8B9AE3F4A5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5A0C1E2D3F4B5A6978C1D2E3 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		297B59D9CE634556D6007C40 /* Sources */ = {

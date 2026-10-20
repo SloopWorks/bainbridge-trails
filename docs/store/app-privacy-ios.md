@@ -54,12 +54,15 @@ Coarse Location: not separately (precise covers it).
 > in (Sign in with Apple, optional) the server receives only which trail sections were covered. Account deletion:
 > Me > Account > Delete account (also revokes the Apple token). The app works fully without signing in.
 
-## Privacy manifest (owner/dev TODO, not in this change)
+## Privacy manifest
 
-There is no `PrivacyInfo.xcprivacy` in `app/iosApp`. Add one before submission with `NSPrivacyTracking` false,
-`NSPrivacyCollectedDataTypes` matching the table above, and any required-reason APIs the binary uses
-(Kotlin/Native and Compose runtime may touch file timestamps, `UserDefaults` or system boot time; check Xcode's
-privacy report on an archive). Third-party SDK manifests (MapLibre) come with their frameworks.
+`app/iosApp/iosApp/PrivacyInfo.xcprivacy` (in the iosApp target's Resources phase): `NSPrivacyTracking` false, no
+tracking domains, collected types = the table above (Precise Location, User ID, Fitness, Other User Content; all
+linked, App Functionality, not tracking). Required-reason APIs: UserDefaults `CA92.1` (launch args / app defaults),
+File timestamp `C617.1` (kotlinx-io `stat` of files in the app container), System boot time `35F9.1`
+(Kotlin/Native and Compose monotonic clocks). Before submission, compare with Xcode's privacy report on an archive
+(Product > Archive > Generate Privacy Report) and add any category it lists. MapLibre's manifest ships in its
+framework.
 
 ## Privacy policy URL
 
