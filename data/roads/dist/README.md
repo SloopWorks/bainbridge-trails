@@ -15,7 +15,7 @@ scripts/build-roads-tiles.sh                  # -> roads.pmtiles
 | `roads.json` | app metadata: `version`, island totals, one row per road (segment ids, miles, climb, ownership, surface, speed, `counted`, `agency_only_length_mi`) recomputed from shippable segments only |
 | `segments.tiles.geojson` | tippecanoe input: `id`, `category`, `ownership`, `road_ids`, `name`, `included` |
 | `roads.pmtiles` | vector tiles, layer `segments`, z10–16 (built by `scripts/build-roads-tiles.sh`) |
-| `coverage_segments.json` | per-segment 6-dp geometry for on-device map matching and coverage; same contract as the trail dataset's file with `road_ids` in place of `trail_ids` |
+| `coverage_segments.json` | per-segment 6-dp geometry for on-device map matching and coverage; same contract as the trail dataset's file with `road_ids` in place of `trail_ids`; road segments first, then the trail dataset's segments (minus sidewalks/crossings/walkways) as matching-only competitors (`seg-*` ids, `included: false`, `road_ids: []`; not tiled). Needs `data/dist/coverage_segments.json` (`bitrails dist`) |
 | `road_ends.json` | public road ends within 40 m of the shoreline, derived from shipping geometry; `city_*` fields are attributes from the City's road-end layer (its coordinates are never used) |
 | `ATTRIBUTION.md` | required credits, split into geometry sources and attribute-only sources |
 

@@ -19,8 +19,8 @@ off `main`. The v1 MVP work on `v1/mvp` is untouched; no file outside `data/road
 | trail dataset, for comparison (v1 app, shippable) | 105.4 | 65.5 |
 
 Counted = `state_route`, `arterial`, `collector`, `residential` in public ownership
-(state, city, county, parks, school). 777 named roads of which 442 are counted; 664 of those roads have shippable geometry and so reach
-the app (430 counted). 2261 canonical segments.
+(state, city, county, parks, school). 743 named roads of which 436 are counted; 664 of those roads have shippable geometry and so reach
+the app. 3818 canonical segments after the ~120 m split (RD-2a; 2261 before).
 
 Independent cross-check of the denominator: WSDOT's Local Agency Public Road inventory gives
 152.3 mi of City-jurisdiction roads + ~8 mi of SR 305 + 1.1 mi of parks/school roads = **161.4 mi**,
@@ -42,7 +42,8 @@ Outputs the app would consume, all generated: `roads.json` (664 road rows with m
 ownership, surface, speed), `roads.pmtiles` (675 KB, z10–16), `coverage_segments.json` (same
 contract as the trail dataset with `road_ids` in place of `trail_ids`), `road_ends.json`
 (21 public road ends at the shoreline, 17 of them corroborated by the City's own road-end layer),
-`ATTRIBUTION.md`.
+`ATTRIBUTION.md`. Since RD-2b `coverage_segments.json` also carries the trail dataset's segments as
+matching-only competitors (2.4 MB).
 
 Road segment ids are namespaced `rseg-000001…`, so they can never collide with the trail dataset's
 `seg-000001…` in the backend's `coverage(user_id, segment_id)` table.
@@ -133,6 +134,18 @@ This is a pipeline fix, not an app fix: split road segments at a target length (
 `pipeline/src/bitrails/roads/` after junction splitting. Ids are issued per segment, so doing it **before** a roads
 release is much cheaper than after — `rseg-*` ids are never reused and the backend keys coverage by them.
 
+**Fixed (RD-2a, 2026-10-20).** `roads/split.py` cuts every segment over 150 m into equal pieces of ~120 m before the
+registry issues ids (all segments, so the geometry never depends on the inclusion rule). 878 `rseg-*` ids retired,
+2435 issued, `supersedes` recorded. Island total unchanged (264.3 km).
+
+| counted segments | n | median | mean | p90 | max | share of length in segments > 200 m | > 400 m |
+|---|---|---|---|---|---|---|---|
+| roads, before | 1462 | 122 m | 179 m | 398 m | 1674 m | 64 % | 33 % |
+| **roads, after** | **2619** | **109 m** | **100 m** | **133 m** | **150 m** | **0 %** | **0 %** |
+
+Island Center Road NE's 1108 m segment is now 9 pieces of 123 m, so the replayed 494 m walk paints at most one
+partway piece past where the walker stopped instead of 751 m of unwalked road.
+
 **2. Does `bufferM = 30` over-credit parallel streets or the other side of a two-sided road? No.**
 
 Sweeping the app's own matcher over the roads dataset (1328 simulated walks per row, HMM, `smoothWindowS = 10`,
@@ -152,7 +165,7 @@ very few parallel carriageways to confuse. One walk in 1328 falsely completed an
 
 So `bufferM = 30` is not the problem *inside* the roads dataset. It is the problem *across* datasets:
 
-**3. Does a walk on a trail falsely paint a nearby road? Yes — badly. This is the one blocker.**
+**3. Does a walk on a trail falsely paint a nearby road? Yes — badly. This was the one blocker; fixed (RD-2b).**
 
 New tool for this: `coverage-eval cross --data <roads dist> --meta roads.json --walk-data <trail dist>` walks every
 trail chain with the app's matcher and scores it against the roads dataset.
@@ -161,6 +174,7 @@ trail chain with the app's matcher and scores it against the roads dataset.
 |---|---|---|
 | roads dataset as it ships today | **19.4 km** | **9.7 %** |
 | same, with trail segments injected as `included: false` competitors | 0.6–2.3 km | 0.3–1.2 % |
+| **as shipped since RD-2b** (split + trail competitors, sidewalks/crossings/walkways left out) | **0.67–2.43 km** | **0.33–1.21 %** |
 
 And the buffer ladder shows exactly where it comes from (1 seed, σ = 5 m):
 
@@ -181,6 +195,22 @@ redistributable geometry), no id collision (`seg-*` vs `rseg-*`), and `SegmentGe
 segment matching-only, so it can never be credited or drawn as progress. Cost: `coverage_segments.json` grows from
 788 KB to roughly 2.5 MB and `dataset.bin` likewise. Caveat on the 0.3–1.2 %: a simulated walk follows the trail
 centreline exactly, so the injected competitor is a perfect match; expect a real walk to do somewhat worse.
+
+**Fixed (RD-2b, 2026-10-20)** exactly as recommended, with one refinement: the trail dataset's road-proxy footways
+(sidewalks, crossings, walkways, traffic islands, links, access aisles — 2689 segments, 56.6 km) are **not** shipped as
+competitors, because walking a sidewalk is walking the road and should credit it. Including them bought nothing on
+trail walks (0.33–1.20 % vs 0.33–1.21 %) and cost road walks 1.5–4.1 points of completion. Shipped: 4848 competitors
+(228.3 km); `coverage_segments.json` 0.8 → 2.4 MB, `roads_dataset.bin` 468 KB → 1.3 MB.
+
+Within-roads check (sweep, 1328 walks, HMM, smooth 10 s, threshold 0.85, buffer 30 m), not worse:
+
+| | σ = 5 m: false credit | complete rate | σ = 10 m: false credit | complete rate |
+|---|---|---|---|---|
+| before | 0.64 % | 96.3 % | 1.80 % | 89.3 % |
+| after RD-2 (split + competitors) | 0.63 % | 96.1 % | 1.82 % | 88.6 % |
+
+The split alone moves neither number (0.64 % / 96.2 %, 1.85 % / 89.9 %); the remaining ~0.5 point of completion is
+road walks beside a real trail, where the trail now takes some of the credit — the intended trade.
 
 ### Other things the prototype exposed
 
@@ -213,7 +243,8 @@ from "second tab" is everything *around* the dataset — strings, the goal numbe
 question, and a backend that can hold two island totals. Option 1 (second app, shared code) still looks right, and
 nothing here argues for merging the goals. The two things that should happen **before** any roads release, because
 they are expensive afterwards, are the segment split (P0, ids are permanent) and the trail competitors (P0, it is a
-correctness bug a user would see as their map painting itself).
+correctness bug a user would see as their map painting itself). **Both done (RD-2, 2026-10-20)** — see the "Fixed"
+notes under questions 1 and 3.
 
 ## Decisions the owner has to make
 

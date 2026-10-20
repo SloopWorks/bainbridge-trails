@@ -206,9 +206,14 @@ class Registry:
         for new in sorted(self._new):
             buf = self._geom_utm(new).buffer(OVERLAP_BUFFER_M)
             sup = set(self.entries[new]["supersedes"])
+            g = self._geom_utm(new)
             for old in sorted(i for i in self._retired_now if self._has_geom(i)):
                 o = self._geom_utm(old)
+                # most of the old line under the new one (a rerouted segment), or most of the new line under the
+                # old one (a piece of a segment that was split)
                 if o.length > 0 and o.intersection(buf).length / o.length > OVERLAP_FRAC:
+                    sup.add(old)
+                elif g.length > 0 and g.intersection(o.buffer(OVERLAP_BUFFER_M)).length / g.length > OVERLAP_FRAC:
                     sup.add(old)
             self.entries[new]["supersedes"] = sorted(sup)
         self._seen, self._new, self._retired_now = set(), set(), set()
