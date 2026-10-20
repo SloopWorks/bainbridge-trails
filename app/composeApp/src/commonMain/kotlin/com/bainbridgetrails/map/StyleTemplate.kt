@@ -1,8 +1,7 @@
 package com.bainbridgetrails.map
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import com.bainbridgetrails.coverage.Dataset
+import kotlinx.serialization.SerializationException
 
 private val placeholder = Regex("""\{\{([A-Za-z0-9_]+)\}\}""")
 
@@ -27,7 +26,10 @@ internal fun pmtilesFileUrl(absolutePath: String): String {
     return "pmtiles://file://$encoded"
 }
 
-/** The top-level `version` of a trails.json document. */
+/** The top-level `version` of a trails.json document (decoded without building a JSON tree). */
 internal fun metadataVersion(trailsJson: String): String =
-    Json.parseToJsonElement(trailsJson).jsonObject["version"]?.jsonPrimitive?.content
-        ?: error("trails.json has no version")
+    try {
+        Dataset.trailsVersion(trailsJson)
+    } catch (e: SerializationException) {
+        error("trails.json has no version (${e.message})")
+    }

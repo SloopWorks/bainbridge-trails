@@ -22,6 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bainbridgetrails.resources.Res
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.withContext
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.map.CameraConstraints
 import org.maplibre.compose.map.MapState
@@ -78,7 +81,8 @@ fun TrailMap(
     val load by produceState<StyleLoad>(StyleLoad.Loading, style, dataDir) {
         value = try {
             val urls = MapAssets.install(dataDir)
-            StyleLoad.Ready(renderStyleTemplate(Res.readBytes(style.assetPath).decodeToString(), urls))
+            // Res.readBytes reads on the calling thread (here Main): read and render the template on IO.
+            StyleLoad.Ready(withContext(Dispatchers.IO) { renderStyleTemplate(Res.readBytes(style.assetPath).decodeToString(), urls) })
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

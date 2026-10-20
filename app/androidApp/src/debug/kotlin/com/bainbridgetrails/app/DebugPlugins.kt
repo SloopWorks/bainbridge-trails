@@ -48,7 +48,7 @@ object TrailsDataPlugin : DebugPlugin {
                     Text("Trails: ${dataset.trails.size}")
                     Text("Segments: ${dataset.segments.size} (${dataset.segments.count { it.included }} counted)")
                     Text("Island total: ${Format.oneDecimal(dataset.islandTotalM / 1000)} km")
-                    Text("Parse: $parseMs ms · index: $indexMs ms")
+                    Text("Parse ($segmentsFormat): $parseMs ms · index: $indexMs ms")
                     Text("Parses this process: ${AppGraph.datasets.parseCount}")
                 }
             }

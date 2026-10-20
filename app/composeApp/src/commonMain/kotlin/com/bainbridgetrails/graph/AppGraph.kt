@@ -4,6 +4,7 @@ import com.bainbridgetrails.analytics.Analytics
 import com.bainbridgetrails.analytics.AnalyticsEvents
 import com.bainbridgetrails.analytics.NoOpAnalytics
 import com.bainbridgetrails.data.DatasetRepository
+import com.bainbridgetrails.data.DatasetSources
 import com.bainbridgetrails.data.ProgressRepository
 import com.bainbridgetrails.data.SettingsRepository
 import com.bainbridgetrails.data.StoredCoverage
@@ -18,6 +19,7 @@ import com.bainbridgetrails.tracking.CoverageStore
 import com.bainbridgetrails.tracking.RecordingController
 import com.bainbridgetrails.tracking.RecordingState
 import com.bainbridgetrails.tracking.WalkIndex
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -43,11 +45,24 @@ object AppGraph {
 
     /** Ruling R1: the bundled dataset, parsed once per process off Main. */
     val datasets: DatasetRepository by lazy {
-        DatasetRepository(scope, readSources = {
-            withContext(Dispatchers.IO) {
-                Res.readBytes("files/trails.json").decodeToString() to Res.readBytes("files/coverage_segments.json").decodeToString()
-            }
-        })
+        // Res.readBytes reads on the calling thread: keep every read on IO.
+        DatasetRepository(
+            scope,
+            DatasetSources(
+                trails = { withContext(Dispatchers.IO) { Res.readBytes("files/trails.json").decodeToString() } },
+                segmentsJson = { withContext(Dispatchers.IO) { Res.readBytes("files/coverage_segments.json").decodeToString() } },
+                segmentsBin = {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            Res.readBytes("files/coverage_segments.bin")
+                        } catch (e: Exception) { // not synced (scripts/sync-app-assets.sh): fall back to the JSON
+                            if (e is CancellationException) throw e
+                            null
+                        }
+                    }
+                },
+            ),
+        )
     }
 
     /** Debug builds swap this for a logging implementation; release keeps [NoOpAnalytics] (spec: no analytics). */

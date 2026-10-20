@@ -112,11 +112,13 @@ class SegmentIndex(
     }
 
     /**
-     * Builds tick positions, bearings and the grid now instead of on first [coverFixes] / [cover]; idempotent and
-     * thread-safe. Call it off the main thread once the UI is up so the first match is fast.
+     * Builds tick positions, bearings and the grid (and, for [Matcher.HMM], the tick graph) now instead of on first
+     * [coverFixes] / [cover]; idempotent and thread-safe. Call it off the main thread once the UI is up so the first
+     * match is fast.
      */
     fun prepare() {
         ticks
+        if (params.matcher == Matcher.HMM) hmm
     }
 
     private fun count(s: Int): Int = tickStart[s + 1] - tickStart[s]
