@@ -67,21 +67,25 @@ class Finalizer(
         val session = store.load(sessionId)
         val gate = Gating.gate(session, index.projection)
         val before = coverage.load()
+        val sticky = coverage.completedIds()
         val walked = index.coverFixes(gate.fixes)
         val after = before.union(walked)
-        coverage.merge(sessionId, after, gate.verified, finalized = session.finished)
 
         val rose = mutableListOf<TrailResult>()
         val completed = mutableListOf<String>()
+        val nowComplete = HashSet<String>()
         for (t in dataset.trails) {
             val b = progress.trailFraction(before, t.id)
             val a = progress.trailFraction(after, t.id)
+            if (progress.status(a) == TrailStatus.COMPLETE) nowComplete += t.id
             if (a > b) {
                 val status = progress.status(a)
                 rose += TrailResult(t.id, t.name, b, a, status)
-                if (status == TrailStatus.COMPLETE && progress.status(b) != TrailStatus.COMPLETE) completed += t.id
+                // TL-7: celebrate only the walk that first completes a trail; sticky completions never repeat.
+                if (status == TrailStatus.COMPLETE && progress.status(b) != TrailStatus.COMPLETE && t.id !in sticky) completed += t.id
             }
         }
+        coverage.merge(sessionId, after, gate.verified, finalized = session.finished, completed = nowComplete)
         val sorted = rose.sortedByDescending { it.after }
         val startedAt = session.startMs ?: session.fixes.minOfOrNull { it.timeMs } ?: startOf(sessionId)
         val endedAt = session.stopMs ?: session.fixes.maxOfOrNull { it.timeMs } ?: startedAt

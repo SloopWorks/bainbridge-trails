@@ -15,6 +15,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+/** What progress is computed from: merged coverage + sticky completed trail ids (decisions.md TL-7). */
+data class StoredCoverage(val state: CoverageState, val stickyCompleted: Set<String> = emptySet())
+
 /**
  * The user's progress, recomputed only when the stored [CoverageState] changes (memoized by value), off Main.
  * Call [refresh] at start and after anything that writes coverage (finalized walk, debug tools, sync).
@@ -24,7 +27,7 @@ class ProgressRepository(
     private val scope: CoroutineScope,
     private val data: DatasetRepository,
     /** Reads the persisted coverage (blocking file I/O; runs on [io]). */
-    private val loadCoverage: () -> CoverageState,
+    private val loadCoverage: () -> StoredCoverage,
     private val io: CoroutineDispatcher = Dispatchers.Default,
     private val compute: CoroutineDispatcher = Dispatchers.Default,
 ) {
@@ -32,7 +35,7 @@ class ProgressRepository(
     val snapshot: StateFlow<ProgressSnapshot?> = _snapshot.asStateFlow()
 
     private val mutex = Mutex()
-    private var lastState: CoverageState? = null
+    private var lastState: StoredCoverage? = null
 
     /** Snapshot computations so far (tests: proves memoization). */
     var computeCount: Int = 0
@@ -56,7 +59,7 @@ class ProgressRepository(
         val state = withContext(io) { loadCoverage() }
         val cached = _snapshot.value
         if (cached != null && state == lastState) return cached
-        val next = withContext(compute) { trailData.progress.snapshot(state) }
+        val next = withContext(compute) { trailData.progress.snapshot(state.state, state.stickyCompleted) }
         computeCount++
         lastState = state
         _snapshot.value = next

@@ -56,8 +56,9 @@ class RepositoriesTest {
         val data = datasets()
         val trailData = data.await()
         var coverage = CoverageState.EMPTY
+        var sticky = emptySet<String>()
         val d = StandardTestDispatcher(testScheduler)
-        val repo = ProgressRepository(backgroundScope, data, { coverage }, io = d, compute = d)
+        val repo = ProgressRepository(backgroundScope, data, { StoredCoverage(coverage, sticky) }, io = d, compute = d)
         assertNull(repo.snapshot.value)
 
         val empty = repo.refreshNow()
@@ -76,6 +77,11 @@ class RepositoriesTest {
         assertEquals(1, after.trailsCompleted)
         assertTrue(after.islandFraction in 0.45..0.5, "island ${after.islandFraction}")
         assertEquals(after, repo.snapshot.value)
+
+        // A new sticky completion (no coverage change) also recomputes: B counts as completed.
+        sticky = setOf("B")
+        assertEquals(2, repo.refreshNow().trailsCompleted)
+        assertEquals(3, repo.computeCount)
     }
 
     @Test

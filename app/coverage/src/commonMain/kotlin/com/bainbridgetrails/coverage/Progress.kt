@@ -16,6 +16,11 @@ data class ProgressSnapshot(
     val trailsCompleted: Int,
     /** Covered metres on included (island-total) segments; shared segments count once. */
     val coveredM: Double,
+    /**
+     * Segment ids by their **own** covered fraction's status (decisions.md TL-1: one map layer per bucket,
+     * `filter = id in literal(ids)`). Only covered buckets are present; untouched segments are the base layer.
+     */
+    val segmentBuckets: Map<TrailStatus, List<String>> = emptyMap(),
 ) {
     private val byId: Map<String, TrailProgress> by lazy { trails.associateBy { it.trailId } }
 
@@ -78,12 +83,22 @@ class Progress(
     fun trailsOn(state: CoverageState, segmentId: String): List<String> =
         if (state.covered(segmentId).isEmpty()) emptyList() else trailsBySegment[segmentId].orEmpty()
 
-    /** One pass over segments and trails: per-trail fraction + status, island fraction, completed count, covered metres. */
-    fun snapshot(state: CoverageState): ProgressSnapshot {
+    /**
+     * One pass over segments and trails: per-trail fraction + status, island fraction, completed count, covered metres,
+     * segment status buckets. [stickyCompleted] (decisions.md TL-7) are trails completed before: they stay COMPLETE
+     * whatever the current coverage, and count toward [ProgressSnapshot.trailsCompleted].
+     */
+    fun snapshot(state: CoverageState, stickyCompleted: Set<String> = emptySet()): ProgressSnapshot {
         val coveredBySegment = HashMap<String, Double>()
         fun covered(id: String) = coveredBySegment.getOrPut(id) { coveredClamped(state, id) }
         var islandCovered = 0.0
-        for (s in dataset.segments) if (s.included) islandCovered += covered(s.id)
+        val buckets = HashMap<TrailStatus, MutableList<String>>()
+        for (s in dataset.segments) {
+            val c = covered(s.id)
+            if (s.included) islandCovered += c
+            val len = index.segments[s.id]?.lengthM ?: s.lengthM
+            if (c > 0.0 && len > 0.0) buckets.getOrPut(status(c / len)) { ArrayList() } += s.id
+        }
         val trails = dataset.trails.map { t ->
             var total = 0.0
             var cov = 0.0
@@ -92,10 +107,10 @@ class Progress(
                 cov += covered(s)
             }
             val f = if (total <= 0.0) 0.0 else (cov / total).coerceIn(0.0, 1.0)
-            TrailProgress(t.id, t.name, f, status(f), t.displayLengthMi)
+            TrailProgress(t.id, t.name, f, if (t.id in stickyCompleted) TrailStatus.COMPLETE else status(f), t.displayLengthMi)
         }
         val island = if (dataset.islandTotalM <= 0.0) 0.0 else (islandCovered / dataset.islandTotalM).coerceIn(0.0, 1.0)
-        return ProgressSnapshot(trails, island, trails.count { it.status == TrailStatus.COMPLETE }, islandCovered)
+        return ProgressSnapshot(trails, island, trails.count { it.status == TrailStatus.COMPLETE }, islandCovered, buckets)
     }
 }
 

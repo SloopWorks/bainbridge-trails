@@ -6,6 +6,7 @@ import com.bainbridgetrails.analytics.NoOpAnalytics
 import com.bainbridgetrails.data.DatasetRepository
 import com.bainbridgetrails.data.ProgressRepository
 import com.bainbridgetrails.data.SettingsRepository
+import com.bainbridgetrails.data.StoredCoverage
 import com.bainbridgetrails.data.WalkHistoryRepository
 import com.bainbridgetrails.data.appDataDir
 import com.bainbridgetrails.log.AppLog
@@ -56,7 +57,7 @@ object AppGraph {
 
     class Installed internal constructor(val context: PlatformContext) {
         val trackingDir: String by lazy { trackingDir(context) }
-        val progress = ProgressRepository(scope, datasets, loadCoverage = { CoverageStore(trackingDir).load() }, io = Dispatchers.IO)
+        val progress = ProgressRepository(scope, datasets, loadCoverage = { CoverageStore(trackingDir).let { StoredCoverage(it.load(), it.completedIds()) } }, io = Dispatchers.IO)
         val walks = WalkHistoryRepository(scope, read = { WalkIndex(trackingDir).all() }, io = Dispatchers.IO)
         val settings = SettingsRepository(appDataDir(context) + "/settings.json", scope, io = Dispatchers.IO)
 

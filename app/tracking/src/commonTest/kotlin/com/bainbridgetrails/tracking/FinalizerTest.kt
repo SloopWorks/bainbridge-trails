@@ -147,4 +147,25 @@ class FinalizerTest {
         record(store, "p", 0.0, 0.0, 10.0)
         assertFalse(fin(dir).finalize("p").approximateLocation)
     }
+
+    @Test
+    fun completionIsStickyAndCelebratedOnce() = runTest {
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        record(store, "s1", 0.0, 0.0, 200.0)
+        val first = Finalizer(ds, index, store, CoverageStore(dir)).finalize("s1")
+        assertEquals(listOf("A"), first.newlyCompleted)
+        assertEquals(setOf("A"), CoverageStore(dir).completedIds())
+
+        // Coverage lost (e.g. reset) but the completion stays: walking A again does not celebrate it again.
+        CoverageStore(dir).merge("x", CoverageState.EMPTY, verified = false, finalized = false, completed = setOf("B"))
+        assertEquals(setOf("A", "B"), CoverageStore(dir).completedIds(), "union only")
+        val dir2 = tmpDir()
+        CoverageStore(dir2).merge("old", CoverageState.EMPTY, verified = false, completed = setOf("A"))
+        val store2 = SessionStore(dir2)
+        record(store2, "s2", 0.0, 0.0, 200.0)
+        val again = Finalizer(ds, index, store2, CoverageStore(dir2)).finalize("s2")
+        assertTrue(again.newlyCompleted.isEmpty(), "A was already complete (sticky)")
+    }
 }
+

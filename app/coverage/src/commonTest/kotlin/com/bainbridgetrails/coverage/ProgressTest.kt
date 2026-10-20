@@ -117,5 +117,23 @@ class ProgressTest {
         assertEquals(0, snap.trailsCompleted)
         assertTrue(snap.trails.all { it.status == TrailStatus.NOT_STARTED })
     }
+
+    @Test
+    fun stickyCompletionCountsWithoutCoverage() {
+        val snap = progress.snapshot(CoverageState.EMPTY, stickyCompleted = setOf("T2"))
+        assertEquals(TrailStatus.COMPLETE, snap.trail("T2")?.status)
+        assertEquals(0.0, snap.trail("T2")?.fraction)
+        assertEquals(1, snap.trailsCompleted)
+    }
+
+    @Test
+    fun segmentsBucketByOwnFraction() {
+        // s2 fully walked, s1 half walked (own fractions), the rest untouched.
+        val st = index.cover(walkOf(1000.0) + listOf(listOf(Xy(0.0, 0.0), Xy(50.0, 0.0))))
+        val snap = progress.snapshot(st)
+        assertEquals(listOf("s2"), snap.segmentBuckets[TrailStatus.COMPLETE])
+        assertEquals(listOf("s1"), snap.segmentBuckets[TrailStatus.PARTWAY])
+        assertEquals(null, snap.segmentBuckets[TrailStatus.NOT_STARTED], "not-started is the base layer")
+    }
 }
 
