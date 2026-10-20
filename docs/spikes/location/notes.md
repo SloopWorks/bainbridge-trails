@@ -16,7 +16,7 @@ Branch `spike4/location-activity`. Dev build published to channel `dev-spike4-lo
 | Android | FINE + COARSE location | first Start |
 | | POST_NOTIFICATIONS (33+) | first Start (FGS notification) |
 | | ACTIVITY_RECOGNITION (+ `com.google.android.gms.permission.ACTIVITY_RECOGNITION`, API <= 28) | first Start; optional, denial = unverified walk |
-| | ACCESS_BACKGROUND_LOCATION | **debug manifest only** (R2), geofence opt-in |
+| | ACCESS_BACKGROUND_LOCATION | **debug + `-PgeofencePrototype=true` only** (R2), geofence opt-in |
 | | Precise (FINE) required | approximate-only shows "Precise location is off — needed to match trails" and asks for precise once; if the user keeps approximate, "Open settings" |
 | iOS | When-in-use location | first Start |
 | | Temporary full accuracy (`TrailMatching` purpose key) | at Start, only if the user turned Precise off; still reduced = recorded but flagged ("Approximate location" chip, warning in results) |
@@ -24,7 +24,7 @@ Branch `spike4/location-activity`. Dev build published to channel `dev-spike4-lo
 | | Always | only in the optional geofence opt-in, **debug builds only** (R11) |
 
 ## Store review
-- **Play.** FGS `location` type: justified as a user-started, visible walk recording (ongoing notification with Stop). Background location is declared in the debug manifest only, so release has no geofence surface (receivers and `RECEIVE_BOOT_COMPLETED` are debug-only too). Targeting SDK 34+, the FGS `location` type also needs the Play Console foreground-service declaration (with a video), and background location needs a privacy policy. To ship geofences: (1) move the permission, receivers and boot receiver to the main manifest; (2) complete the Play Console background-location declaration; (3) record a video showing the in-app prominent disclosure and the permission flow; (4) justify the core feature (trailhead arrival prompt) and why foreground-only is insufficient; (5) keep the opt-in disclosure text current.
+- **Play.** FGS `location` type: justified as a user-started, visible walk recording (ongoing notification with Stop). Background location is declared only in debug builds made with `-PgeofencePrototype=true` (`androidApp/src/geofencePrototype/AndroidManifest.xml`), so release and default debug builds have no geofence surface (receivers and `RECEIVE_BOOT_COMPLETED` come with it). Targeting SDK 34+, the FGS `location` type also needs the Play Console foreground-service declaration (with a video), and background location needs a privacy policy. To ship geofences: (1) move the permission, receivers and boot receiver to the main manifest; (2) complete the Play Console background-location declaration; (3) record a video showing the in-app prominent disclosure and the permission flow; (4) justify the core feature (trailhead arrival prompt) and why foreground-only is insufficient; (5) keep the opt-in disclosure text current.
 - **App Store.** When-in-use plus `UIBackgroundModes: location` (walk recording with the screen off). Motion string explains bike/car filtering. Geofences are debug-only on iOS too (ruling R11, mirroring Android R2): `IosGeofences.supported` requires `Platform.isDebugBinary`, so release builds show no toggle, never request Always and never monitor regions. The `NSLocationAlwaysAndWhenInUseUsageDescription` key stays in Info.plist (harmless without a request); shipping geofences means dropping the debug guard and justifying Always for the opt-in trailhead feature in review.
 
 ## Gating rules and limits
@@ -85,7 +85,7 @@ Install the dev-channel build before 2026-10-21T13:05Z (it expires after 48 h); 
 2. **Slow bike ride** (under 14 km/h, at least 10 min, ending the session while still riding): the real activity-gating test. Expect bike fixes dropped (BICYCLE activity and/or too few steps).
 3. **5 min car ride** with recording on (drive, then Finish). This mostly exercises the coverage speed filter (`maxSpeedMps` 4 m/s = 14.4 km/h drops faster fixes regardless of activity); vehicle labels are a bonus. A slow bike ride stays under that filter, which is why step 2 is the real gating test.
 4. **Walk along a road beside a trail** (about 10 min). Note whether road fixes credit the trail.
-5. **Trailhead arrival with geofence on**: enable it in Record > Settings, leave 500 m+ away, drive or walk in. Note latency from arrival to notification.
+5. **Trailhead arrival with geofence on**: the geofence prototype is compiled out by default (a debug APK declaring background location hit Play Protect's `INSTALL_FAILED_VERIFICATION_FAILURE` on the owner's phone). Build it in explicitly: Android `cd app && ./gradlew :androidApp:installDebug -PgeofencePrototype=true` (adds ACCESS_BACKGROUND_LOCATION, RECEIVE_BOOT_COMPLETED and the geofence/boot receivers to the debug manifest only); iOS Debug with `SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG GEOFENCE_PROTOTYPE"` (xcodebuild argument or the target's build setting). Without it Record > Settings has no geofence toggle. Then enable it in Record > Settings, leave 500 m+ away, drive or walk in. Note latency from arrival to notification.
 6. **Pull the session files** (debuggable build):
    ```
    adb shell run-as com.bainbridgetrails.app.dev ls no_backup/tracking/sessions

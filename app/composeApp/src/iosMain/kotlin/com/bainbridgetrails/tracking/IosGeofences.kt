@@ -79,7 +79,7 @@ object IosGeofences {
     private val notificationDelegate = NotificationDelegate()
     private var authWaiter: CompletableDeferred<Unit>? = null
 
-    /** Debug app builds only (Swift `#if DEBUG`); null in release, so geofences are unsupported there. */
+    /** Debug app builds with the GEOFENCE_PROTOTYPE condition only (Swift `#if DEBUG && GEOFENCE_PROTOTYPE`); null otherwise, so geofences are unsupported there. */
     var alwaysRequester: AlwaysAuthorizationRequester? = null
 
     /**

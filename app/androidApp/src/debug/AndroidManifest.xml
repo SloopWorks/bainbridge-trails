@@ -1,14 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  DEBUG BUILDS ONLY (ruling R2). The opt-in trailhead geofence prototype (Spike 4 Task 7) needs background
-  location; it is declared here so it merges into debug builds only. The release manifest must never contain
-  ACCESS_BACKGROUND_LOCATION. The app hides the opt-in toggle when the permission is not declared
-  (AndroidGeofences.declared), so release builds have no geofence feature at all.
+  DEBUG BUILDS ONLY. The trailhead geofence prototype (background location, boot receiver) is NOT here: it lives in
+  src/geofencePrototype/AndroidManifest.xml and is merged into debug builds only with -PgeofencePrototype=true.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Debug only: Android 17 (API 37) blocks an app's connections to private addresses such as the emulator's
          host alias 10.0.2.2 (local wrangler dev) without this runtime permission; DebugTools asks for it when the
@@ -16,20 +11,6 @@
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
     <!-- Debug only: cleartext HTTP to a local `wrangler dev` (10.0.2.2 / localhost); release stays HTTPS-only. -->
-    <application android:networkSecurityConfig="@xml/network_security_config_debug">
-        <!-- Geofence transitions from Play services (explicit PendingIntent): not exported. -->
-        <receiver
-            android:name="com.bainbridgetrails.tracking.GeofenceReceiver"
-            android:exported="false" />
-        <!-- Re-registers geofences after reboot / app update; acts only on those actions. -->
-        <receiver
-            android:name="com.bainbridgetrails.tracking.GeofenceBootReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
-    </application>
+    <application android:networkSecurityConfig="@xml/network_security_config_debug" />
 
 </manifest>

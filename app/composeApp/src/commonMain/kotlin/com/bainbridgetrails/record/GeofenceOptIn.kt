@@ -38,7 +38,8 @@ import kotlinx.coroutines.launch
  * recording: its notification only opens the app on the Record screen.
  */
 interface GeofencePlatform {
-    /** False hides the toggle entirely (Android: ACCESS_BACKGROUND_LOCATION not declared, i.e. release builds). */
+    /** False hides the toggle entirely (Android: ACCESS_BACKGROUND_LOCATION not declared: release and default debug builds;
+     *  only -PgeofencePrototype=true debug builds declare it. iOS: no Always requester without GEOFENCE_PROTOTYPE). */
     val supported: Boolean
 
     /** The system's wording for background access, quoted in the disclosure. */

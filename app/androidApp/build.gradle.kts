@@ -20,6 +20,12 @@ if (providers.gradleProperty("shipyardDeployPluginRepository").isPresent) {
     apply(plugin = "works.sloop.shipyard.deploy")
 }
 
+// Trailhead geofence prototype (background location + boot receiver): debug builds only, and only with
+// -PgeofencePrototype=true (default off: a debug APK requesting ACCESS_BACKGROUND_LOCATION trips Play Protect's
+// INSTALL_FAILED_VERIFICATION_FAILURE on sideloads). Adds src/geofencePrototype/AndroidManifest.xml to the debug
+// variant; without it the app hides the opt-in (AndroidGeofences.declared is false). Never in release.
+val geofencePrototype = providers.gradleProperty("geofencePrototype").orNull == "true"
+
 android {
     namespace = "com.bainbridgetrails.app"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -47,14 +53,22 @@ android {
     buildTypes {
         getByName("debug") {
             applicationIdSuffix = ".dev"
+            buildConfigField("boolean", "GEOFENCE_PROTOTYPE", geofencePrototype.toString())
         }
         getByName("release") {
             isMinifyEnabled = false
+            buildConfigField("boolean", "GEOFENCE_PROTOTYPE", "false")
         }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        if (geofencePrototype) variant.sources.manifests.addStaticManifestFile("src/geofencePrototype/AndroidManifest.xml")
     }
 }
 

@@ -1,14 +1,16 @@
 import SwiftUI
 import ComposeApp
-#if DEBUG
+#if DEBUG && GEOFENCE_PROTOTYPE
 import CoreLocation
 #endif
 
 @main
 struct iOSApp: App {
     init() {
-        #if DEBUG
-        // TL-10: the Always request exists only in debug builds; release has no requestAlwaysAuthorization call.
+        #if DEBUG && GEOFENCE_PROTOTYPE
+        // TL-10: the Always request exists only in debug builds that opt into the geofence prototype
+        // (SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG GEOFENCE_PROTOTYPE"; default off). Without it the Kotlin side
+        // has no requester, so the opt-in is hidden; release has no requestAlwaysAuthorization call at all.
         IosGeofences.shared.alwaysRequester = DebugAlwaysAuthorization()
         #endif
         // Opt-in trailhead geofences: install CoreLocation/notification delegates at every launch, including a
@@ -27,8 +29,8 @@ struct iOSApp: App {
     }
 }
 
-#if DEBUG
-/// Debug-only geofence prototype (R11): asks for Always through the Kotlin side's retained manager.
+#if DEBUG && GEOFENCE_PROTOTYPE
+/// Debug-only geofence prototype (R11), compiled only with the GEOFENCE_PROTOTYPE condition: asks for Always through the Kotlin side's retained manager.
 final class DebugAlwaysAuthorization: NSObject, AlwaysAuthorizationRequester {
     func requestAlways(manager: CLLocationManager) {
         manager.requestAlwaysAuthorization()

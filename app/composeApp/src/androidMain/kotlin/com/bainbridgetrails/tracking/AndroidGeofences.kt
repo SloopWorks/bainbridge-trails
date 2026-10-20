@@ -24,7 +24,8 @@ import kotlin.coroutines.resumeWithException
 /**
  * Opt-in trailhead geofences (Task 7 prototype) on Play services [com.google.android.gms.location.GeofencingClient].
  *
- * Ruling R2: ACCESS_BACKGROUND_LOCATION is declared only in the debug manifest, so in release [declared] is false,
+ * Ruling R2: ACCESS_BACKGROUND_LOCATION is declared only in debug builds made with -PgeofencePrototype=true
+ * (androidApp/src/geofencePrototype), so elsewhere [declared] is false,
  * the toggle is hidden and nothing here registers. Geofences are ENTER-only, re-registered at app start and on boot
  * ([GeofenceBootReceiver]); [GeofenceReceiver] posts the arrival notification, which only opens the app (never starts
  * a recording). Never logs coordinates.

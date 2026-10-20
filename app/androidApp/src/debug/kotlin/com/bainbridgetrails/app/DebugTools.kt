@@ -60,7 +60,7 @@ object DebugTools {
         }
         AppGraph.analytics = LogAnalytics()
         AuthConfig.devSignInEnabled = true // `signin_dev` → POST /v1/auth/dev (local wrangler dev only)
-        AppLog.i("debug", "debug tools installed; backend ${ApiConfig.baseUrl}")
+        AppLog.i("debug", "debug tools installed; backend ${ApiConfig.baseUrl}; geofencePrototype=${BuildConfig.GEOFENCE_PROTOTYPE}")
     }
 
     /**
