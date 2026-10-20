@@ -30,8 +30,17 @@ data class SessionSummary(
     val endedAt: Long = 0,
     /** Gated, filtered GPS path length. */
     val distanceM: Double = 0.0,
-    /** Distinct matched ticks of this walk on any mapped segment × tick length. */
+    /** Distinct matched ticks of this walk on the goal's mapped segments × tick length (roads: `rseg-` only, RP-18). */
     val matchedM: Double = 0.0,
+    /**
+     * Counted roads/trails complete (by coverage or sticky, TL-7) just before and just after this walk's merge, read
+     * under the coverage lock: the walk's own numbers for milestones (roads product.md §5.3), whatever sync does later.
+     */
+    val completedBefore: Int = 0,
+    val completedAfter: Int = 0,
+    /** After the walk: complete counted rows per category / counted rows per category (rows without a category skipped). */
+    val completedByCategory: Map<String, Int> = emptyMap(),
+    val countedByCategory: Map<String, Int> = emptyMap(),
 )
 
 /**
@@ -78,7 +87,7 @@ class Finalizer(
         val startedAt = session.startMs ?: session.fixes.minOfOrNull { it.timeMs } ?: startOf(sessionId)
         val endedAt = session.stopMs ?: session.fixes.maxOfOrNull { it.timeMs } ?: startedAt
         val distanceM = WalkIndex.distanceM(gate.fixes, index.projection, params)
-        val matchedM = walked.totalCoveredM(index)
+        val matchedM = dataset.rules.matchedM(walked, index)
         afterMatch()
 
         CoverageStore.writeLock.withLock {
@@ -89,10 +98,24 @@ class Finalizer(
             val rose = mutableListOf<TrailResult>()
             val completed = mutableListOf<String>()
             val nowComplete = HashSet<String>()
+            var completedBefore = 0
+            var completedAfter = 0
+            val doneByCategory = HashMap<String, Int>()
+            val countedByCategory = HashMap<String, Int>()
             for (t in dataset.trails) {
+                // Roads (RP-3): uncounted roads never rise, complete or celebrate.
+                if (!progress.counts(t.id)) continue
                 val b = progress.trailFraction(before, t.id)
                 val a = progress.trailFraction(after, t.id)
                 if (progress.status(a) == TrailStatus.COMPLETE) nowComplete += t.id
+                val doneBefore = t.id in sticky || progress.status(b) == TrailStatus.COMPLETE
+                val doneAfter = doneBefore || t.id in nowComplete
+                if (doneBefore) completedBefore++
+                if (doneAfter) completedAfter++
+                t.category?.let { cat ->
+                    countedByCategory[cat] = (countedByCategory[cat] ?: 0) + 1
+                    if (doneAfter) doneByCategory[cat] = (doneByCategory[cat] ?: 0) + 1
+                }
                 if (a > b) {
                     val status = progress.status(a)
                     rose += TrailResult(t.id, t.name, b, a, status)
@@ -135,6 +158,10 @@ class Finalizer(
                 endedAt = endedAt,
                 distanceM = distanceM,
                 matchedM = matchedM,
+                completedBefore = completedBefore,
+                completedAfter = completedAfter,
+                completedByCategory = doneByCategory,
+                countedByCategory = countedByCategory,
             )
         }
     } }

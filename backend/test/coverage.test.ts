@@ -155,7 +155,7 @@ describe("PUT/GET /v1/coverage", () => {
     const h = harness();
     const { userId } = await devLogin(h);
     const stale = env.DB.prepare(
-      "UPDATE users SET coverage_rev = CASE WHEN coverage_rev = ?2 THEN coverage_rev + 1 ELSE NULL END, island_m = 5 WHERE id = ?1",
+      "UPDATE user_metrics SET coverage_rev = CASE WHEN coverage_rev = ?2 THEN coverage_rev + 1 ELSE NULL END, island_m = 5 WHERE user_id = ?1",
     ).bind(userId, 99);
     const write = env.DB.prepare("INSERT INTO coverage (user_id, segment_id, bits) VALUES (?, 'seg-x', 'AQ==')").bind(userId);
     await expect(env.DB.batch([stale, write])).rejects.toThrow(/NOT NULL constraint failed/);
@@ -198,7 +198,7 @@ describe("PUT/GET /v1/coverage", () => {
   it("stores no walk times/durations and no coverage timestamps (P0-1)", async () => {
     const cols = async (t: string) =>
       ((await env.DB.prepare(`SELECT name FROM pragma_table_info('${t}')`).all<{ name: string }>()).results.map((r) => r.name));
-    expect(await cols("walks")).toEqual(["user_id", "walk_id"]);
+    expect(await cols("walks_v2")).toEqual(["user_id", "dataset", "walk_id"]);
     expect(await cols("coverage")).toEqual(["user_id", "segment_id", "bits"]);
   });
 });
@@ -271,7 +271,7 @@ describe("plausibility limits (TL-2 + review P1-3)", () => {
   it("caps stored walk ids per account", async () => {
     const h = harness();
     const { token, userId } = await devLogin(h);
-    await env.DB.prepare("UPDATE users SET walk_count = 9999 WHERE id = ?").bind(userId).run();
+    await env.DB.prepare("UPDATE user_metrics SET walk_count = 9999 WHERE user_id = ? AND dataset = 'trails'").bind(userId).run();
     const r = await h.call("PUT", "/v1/coverage", { token, body: upload({}, [walkFor(1), walkFor(1)]) });
     expect(r.status).toBe(422);
     expect(((await r.json()) as ErrRes).error.code).toBe("walk_limit");
@@ -307,11 +307,15 @@ describe("dataset updates (P1-7)", () => {
     const h = harness();
     const { token, userId } = await devLogin(h);
     await syncWalk(h, token, trailFull(ROTARY));
-    await env.DB.prepare("UPDATE users SET metrics_version = 'old', island_m = 0, island_rank = 0, trails_completed = 0 WHERE id = ?").bind(userId).run();
+    await env.DB.prepare("UPDATE user_metrics SET metrics_version = 'old', island_m = 0, island_rank = 0, trails_completed = 0 WHERE user_id = ?")
+      .bind(userId)
+      .run();
     const me = (await (await h.call("GET", "/v1/me", { token })).json()) as { metrics: CovRes["metrics"] };
     expect(me.metrics.islandCoveredM).toBeCloseTo(30.8, 0);
     expect(me.metrics.trailsCompleted).toBe(1);
-    const row = await env.DB.prepare("SELECT metrics_version FROM users WHERE id = ?").bind(userId).first<{ metrics_version: string }>();
+    const row = await env.DB.prepare("SELECT metrics_version FROM user_metrics WHERE user_id = ? AND dataset = 'trails'")
+      .bind(userId)
+      .first<{ metrics_version: string }>();
     expect(row!.metrics_version).toBe(META.version);
   });
 });

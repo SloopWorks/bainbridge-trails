@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Road-screen copy that docs/roads/product.md §3 has no key for (docs/roads/ux.md labels for the road detail, roads
+  list, Me milestones, results card and celebration). Owned by the road screens; the vocabulary table lives in
+  strings_roads.xml. Compose resources substitute %1$s / %1$d only: a literal percent sign is a bare "%".
+-->
+<resources>
+    <!-- map legend (ux.md §2.7) -->
+    <string name="roads_legend_not_walked">Not walked yet</string>
+    <string name="roads_legend_type_ramp">Main road → side street</string>
+    <string name="roads_legend_road_end">Road end at the water</string>
+
+    <!-- road detail (ux.md §3) -->
+    <string name="roads_badge_counts">Counts toward the island</string>
+    <string name="roads_badge_private">Private — not counted</string>
+    <string name="roads_badge_unknown">Not counted — ownership unconfirmed</string>
+    <string name="roads_badge_lane">Not counted — lane or alley</string>
+    <string name="roads_badge_sheet_counts">Every public road on Bainbridge counts toward your island total, whatever its type. Walk it in any direction, across as many walks as you like.</string>
+    <string name="roads_speed_a11y">Speed limit %1$d miles per hour</string>
+    <string name="roads_road_end_supporting">%1$s to shore</string>
+    <string name="roads_road_end_directions_a11y">Directions to road end</string>
+    <string name="roads_road_end_show_a11y">Show road end on the map</string>
+    <string name="roads_detail_road_ends">Road ends to the water (%1$d)</string>
+
+    <!-- roads list (ux.md §4) -->
+    <string name="roads_group_main">Main roads</string>
+    <string name="roads_group_collectors">Collectors</string>
+    <string name="roads_group_residential">Residential streets</string>
+    <string name="roads_group_not_counted">Not counted</string>
+    <string name="roads_group_count">%1$d of %2$d</string>
+    <string name="roads_group_header_a11y">%1$s, %2$d of %3$d complete</string>
+    <string name="roads_group_expand_a11y">Show roads that don’t count</string>
+    <string name="roads_group_collapse_a11y">Hide roads that don’t count</string>
+    <string name="roads_not_counted_private">Private road</string>
+    <string name="roads_not_counted_unknown">Ownership unconfirmed</string>
+    <string name="roads_not_counted_lane">Lane or alley</string>
+    <string name="roads_sort_grouped">By type, A–Z</string>
+
+    <!-- Me + milestones (ux.md §5) -->
+    <string name="roads_me_milestones">Milestones</string>
+    <string name="roads_me_milestones_all">All</string>
+    <string name="roads_milestones_title">Milestones</string>
+    <string name="roads_milestones_ladder_miles">Road walked</string>
+    <string name="roads_milestones_ladder_roads">Roads complete</string>
+    <string name="roads_milestones_ladder_types">Every road of a type</string>
+    <string name="roads_milestone_earned_a11y">%1$s, earned</string>
+    <string name="roads_milestone_next_a11y">Next: %1$s, %2$s of %3$s</string>
+    <string name="roads_milestone_locked_a11y">%1$s, not yet</string>
+    <string name="roads_milestone_more">+%1$d more</string>
+    <string name="roads_milestone_progress">%1$s / %2$s</string>
+    <string name="roads_me_hero_a11y_roads">Island map of your roads: %1$s of public road walked, %2$s of the island, %3$d of %4$d roads complete.</string>
+
+    <!-- celebration (ux.md §6.2) -->
+    <plurals name="roads_celebrate_count_title">
+        <item quantity="one">%1$d road</item>
+        <item quantity="other">%1$d roads</item>
+    </plurals>
+    <string name="roads_celebrate_of_roads">of %1$d roads</string>
+    <string name="roads_celebrate_stats">%1$s · %2$s of the island</string>
+    <string name="roads_celebrate_a11y_multi">%1$d roads complete: %2$s. %3$d of %4$d roads walked.</string>
+</resources>

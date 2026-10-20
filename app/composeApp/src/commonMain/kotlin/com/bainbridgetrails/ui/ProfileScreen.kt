@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -191,7 +192,7 @@ private fun PrivacyNote() {
         horizontalArrangement = Arrangement.spacedBy(BtTheme.spacing.md),
     ) {
         BtIcon(BtIcons.Lock, null, size = 20.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(stringResource(Res.string.profile_privacy_note), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(LocalGoal.current.s(Res.string.profile_privacy_note)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

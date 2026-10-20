@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -36,8 +37,8 @@ fun DatasetGate(modifier: Modifier = Modifier, content: @Composable (TrailData) 
         Loadable.Loading -> LoadingState(modifier.windowInsetsPadding(WindowInsets.safeDrawing))
         is Loadable.Failed -> Column(modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing), verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             ErrorState(
-                title = stringResource(Res.string.error_dataset_title),
-                body = stringResource(Res.string.error_dataset_body),
+                title = stringResource(LocalGoal.current.s(Res.string.error_dataset_title)),
+                body = stringResource(LocalGoal.current.s(Res.string.error_dataset_body)),
                 retryLabel = stringResource(Res.string.common_retry),
                 onRetry = { AppGraph.datasets.load() },
             )

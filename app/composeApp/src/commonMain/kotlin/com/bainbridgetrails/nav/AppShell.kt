@@ -1,5 +1,6 @@
 package com.bainbridgetrails.nav
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -232,6 +233,11 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     onMap = { nav.selectTab(MapRoute) },
                     onSeeAllInProgress = {
                         TrailsListState.query = TrailListQuery(statuses = setOf(TrailStatus.PARTWAY, TrailStatus.NEARLY_DONE))
+                        com.bainbridgetrails.ui.RoadsListState.query = com.bainbridgetrails.ui.RoadListQuery(statuses = setOf(TrailStatus.PARTWAY, TrailStatus.NEARLY_DONE))
+                        nav.selectTab(TrailsRoute)
+                    },
+                    onRoadType = { group ->
+                        com.bainbridgetrails.ui.RoadsListState.query = com.bainbridgetrails.ui.RoadListQuery(groups = setOf(group))
                         nav.selectTab(TrailsRoute)
                     },
                 )
@@ -280,10 +286,18 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             composable<ShowcaseRoute> { ShowcaseScreen(section = launch?.section) }
         }
         if (showBar) {
-            fun Tab.item(label: String) = BarItem(label, icon, selectedIcon, destination.isTab(route), { nav.selectTab(route) })
+            // Roads (ux.md 1.3): the list tab shows a road, not a hiker.
+            val roads = LocalGoal.current.isRoads
+            fun Tab.item(label: String) = BarItem(
+                label,
+                if (roads && route == TrailsRoute) BtIcons.Road else icon,
+                if (roads && route == TrailsRoute) BtIcons.RoadFilled else selectedIcon,
+                destination.isTab(route),
+                { nav.selectTab(route) },
+            )
             BtBottomBar(
-                start = StartTabs.map { it.item(stringResource(it.label)) },
-                end = EndTabs.map { it.item(stringResource(it.label)) },
+                start = StartTabs.map { it.item(stringResource(LocalGoal.current.s(it.label))) },
+                end = EndTabs.map { it.item(stringResource(LocalGoal.current.s(it.label))) },
                 recordLabel = stringResource(if (recording) Res.string.nav_recording else Res.string.nav_record),
                 recording = recording,
                 onRecord = { nav.openRecord() },

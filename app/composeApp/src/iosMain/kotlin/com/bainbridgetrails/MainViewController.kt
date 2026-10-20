@@ -5,6 +5,7 @@ import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.SpikeLaunch
 import com.bainbridgetrails.record.debugAutostartRecording
 import com.bainbridgetrails.config.ApiConfig
+import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.nav.DebugLaunch
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.Platform
@@ -32,7 +33,8 @@ private fun spikeLaunchFromArguments(): SpikeLaunch? {
 /**
  * Debug binaries only: `-apiBaseUrl http://127.0.0.1:8798` (a launch argument, so it lasts for that launch) points the
  * API at a local `wrangler dev` (iOS has no debug drawer backend switch; release always uses the production URL), and
- * `-btScreen`/`-btScroll`/`-btPage`/`-btDevSignIn` fill [DebugLaunch] for simulator screenshots.
+ * `-btScreen`/`-btScroll`/`-btPage`/`-btDevSignIn` fill [DebugLaunch] for simulator screenshots, and
+ * `-btDataset roads` runs this launch on the roads dataset ([DatasetProfile]; the roads prototype, docs/roads/plan.md).
  */
 @OptIn(ExperimentalNativeApi::class)
 private fun debugApiBaseUrl() {
@@ -42,6 +44,8 @@ private fun debugApiBaseUrl() {
     DebugLaunch.scroll = d.integerForKey("btScroll").toInt()
     DebugLaunch.page = d.integerForKey("btPage").toInt()
     DebugLaunch.devSignIn = d.boolForKey("btDevSignIn")
+    // Before AppGraph.warmUp(): the first read of DatasetProfile.current fixes the dataset for the process.
+    DatasetProfile.byKey(d.stringForKey("btDataset"))?.let { DatasetProfile.select(it) }
     val url = d.stringForKey("apiBaseUrl")?.takeIf { it.startsWith("http") } ?: return
     ApiConfig.resolver = { url }
 }

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.data.AppSettings
+import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.trails_banner_dismiss
@@ -106,11 +107,18 @@ fun TrailsScreen(
     modifier: Modifier = Modifier,
 ) {
     val snapshot by graph.progress.snapshot.collectAsStateWithLifecycle()
+    val goal = LocalGoal.current
     Column(modifier.fillMaxSize()) {
-        BtTopBar(stringResource(Res.string.trails_title)) {
+        BtTopBar(stringResource(goal.s(Res.string.trails_title))) {
             IconButton(onClick = onLeaderboard) { BtIcon(BtIcons.Trophy, stringResource(Res.string.trails_board_a11y)) }
         }
         DatasetGate(Modifier.weight(1f)) { data ->
+            if (goal.isRoads) {
+                // Roads (docs/roads/ux.md §4): grouped by type, abbreviation-tolerant search, Not counted group.
+                val roads = remember(snapshot, data) { snapshot?.let { roadListItems(data, it) } }
+                RoadsContent(roads, settings, onTrail)
+                return@DatasetGate
+            }
             val parkById = remember(data) { data.dataset.trails.associate { it.id to it.park } }
             val items = remember(snapshot, parkById) {
                 snapshot?.trails?.map { TrailListItem(it.trailId, it.name, parkById[it.trailId], it.fraction, it.status, it.lengthMi) }
@@ -140,7 +148,7 @@ private fun TrailsContent(items: List<TrailListItem>?, settings: AppSettings, on
             SearchField(
                 query.search,
                 { state.query = state.query.copy(search = it) },
-                stringResource(Res.string.trails_search_hint),
+                stringResource(LocalGoal.current.s(Res.string.trails_search_hint)),
                 Modifier.padding(horizontal = BtTheme.spacing.screenH),
             )
             FilterChipRow(
@@ -155,11 +163,11 @@ private fun TrailsContent(items: List<TrailListItem>?, settings: AppSettings, on
                 }
                 DropdownChip(parkLabel, { parkSheet = true }, active = query.park != ParkFilter.All)
                 Box {
-                    DropdownChip(stringResource(Res.string.trails_sort_chip, stringResource(query.sort.label)), { sortMenu = true }, active = query.sort != TrailSort.NAME)
+                    DropdownChip(stringResource(Res.string.trails_sort_chip, stringResource(LocalGoal.current.s(query.sort.label))), { sortMenu = true }, active = query.sort != TrailSort.NAME)
                     DropdownMenu(sortMenu, onDismissRequest = { sortMenu = false }) {
                         for (s in TrailSort.entries) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(s.label)) },
+                                text = { Text(stringResource(LocalGoal.current.s(s.label))) },
                                 onClick = { state.query = state.query.copy(sort = s); sortMenu = false },
                                 trailingIcon = { if (s == query.sort) BtIcon(BtIcons.Check, null, size = 20.dp, tint = MaterialTheme.colorScheme.primary) },
                             )
@@ -172,7 +180,7 @@ private fun TrailsContent(items: List<TrailListItem>?, settings: AppSettings, on
                 return@Column
             }
             val complete = items.count { it.status == TrailStatus.COMPLETE }
-            val count = stringResource(Res.string.trails_count, shown.size, items.size)
+            val count = stringResource(LocalGoal.current.s(Res.string.trails_count), shown.size, items.size)
             Text(
                 if (complete > 0) stringResource(Res.string.trails_count_complete, count, complete) else count,
                 Modifier.padding(horizontal = BtTheme.spacing.screenH, vertical = BtTheme.spacing.md).semantics { liveRegion = LiveRegionMode.Polite },
@@ -190,13 +198,13 @@ private fun TrailsContent(items: List<TrailListItem>?, settings: AppSettings, on
                         val q = query.search.trim()
                         if (query.hasSearch && !query.hasFilters) {
                             EmptyState(
-                                stringResource(Res.string.trails_empty_search_title, q),
+                                stringResource(LocalGoal.current.s(Res.string.trails_empty_search_title), q),
                                 body = stringResource(Res.string.trails_empty_body),
                                 action = stringResource(Res.string.trails_clear_search) to { state.query = state.query.copy(search = "") },
                             )
                         } else {
                             EmptyState(
-                                stringResource(Res.string.trails_empty_title),
+                                stringResource(LocalGoal.current.s(Res.string.trails_empty_title)),
                                 body = stringResource(Res.string.trails_empty_body),
                                 action = stringResource(Res.string.trails_clear_filters) to { state.query = state.query.withoutFilters().copy(search = "") },
                             )
@@ -233,7 +241,7 @@ private fun FirstWalkBanner(onDismiss: () -> Unit) {
     ) {
         BtIcon(BtIcons.DirectionsWalk, null, size = 20.dp, tint = MaterialTheme.colorScheme.onSecondaryContainer)
         Column(Modifier.weight(1f).padding(start = BtTheme.spacing.md)) {
-            Text(stringResource(Res.string.trails_first_walk_banner), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text(stringResource(LocalGoal.current.s(Res.string.trails_first_walk_banner)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDismiss) { Text(stringResource(Res.string.trails_banner_dismiss)) }
             }

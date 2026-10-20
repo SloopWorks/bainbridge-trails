@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.SpikeLaunch
 import com.bainbridgetrails.nav.AppShell
@@ -35,10 +37,13 @@ fun App(launch: SpikeLaunch? = null) {
         onStopOrDispose { }
     }
     val settings by graph.settings.settings.collectAsStateWithLifecycle()
-    BtTheme {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            // Settings are a tiny file read off Main; the shell waits for it to choose onboarding vs Map.
-            settings?.let { AppShell(graph, it, launch) }
+    // The goal (trails / roads) fixes the words (GoalVocabulary) for the whole tree.
+    CompositionLocalProvider(LocalGoal provides AppGraph.goal) {
+        BtTheme {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                // Settings are a tiny file read off Main; the shell waits for it to choose onboarding vs Map.
+                settings?.let { AppShell(graph, it, launch) }
+            }
         }
     }
 }

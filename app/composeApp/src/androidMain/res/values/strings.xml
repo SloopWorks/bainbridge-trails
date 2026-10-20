@@ -6,4 +6,7 @@
     <string name="notif_recording_title">Recording your walk</string>
     <string name="notif_recording_tap">Tap to open</string>
     <string name="notif_recording_stop">Stop</string>
+    <!-- Trailhead geofence prototype (debug, -PgeofencePrototype=true, trails only). -->
+    <string name="notif_channel_trailheads">Trailhead arrivals</string>
+    <string name="notif_trailhead_title">Trailhead nearby</string>
 </resources>

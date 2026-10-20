@@ -123,7 +123,7 @@ actual fun stopRecordingService(context: PlatformContext) = IosRecorder.stop()
 @OptIn(ExperimentalForeignApi::class)
 actual fun trackingDir(context: PlatformContext): String {
     val base = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, true).first() as String
-    val dir = "$base/tracking"
+    val dir = "$base/${com.bainbridgetrails.data.DatasetProfile.current.storeName("tracking")}"
     NSFileManager.defaultManager.createDirectoryAtPath(dir, withIntermediateDirectories = true, attributes = null, error = null)
     excludeFromBackup(dir)
     return dir

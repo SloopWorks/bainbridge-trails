@@ -52,7 +52,7 @@ cd backend && npm run deploy
 
 ## Verify
 
-- `./gradlew :androidApp:assembleDebug`, install, then Profile → **Continue with Google** (as a test user).
+- `./gradlew :androidApp:assembleTrailsDebug`, install, then Profile → **Continue with Google** (as a test user).
   You should be signed in, the backfill sync should return 200, and you should appear on the leaderboard after
   `POST /v1/admin/snapshot` (admin token in `~/.config/bainbridge-trails/admin-token`).
 - `npx wrangler tail` shows `POST /v1/auth/google 200`.

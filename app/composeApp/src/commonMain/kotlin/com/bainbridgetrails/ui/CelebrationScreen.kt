@@ -78,6 +78,22 @@ import com.bainbridgetrails.resources.celebrate_island_a11y
 import com.bainbridgetrails.resources.celebrate_island_eyebrow
 import com.bainbridgetrails.map.IslandCredit
 import com.bainbridgetrails.map.islandCredit
+import com.bainbridgetrails.map.MapStyle
+import com.bainbridgetrails.map.RoadBedColors
+import com.bainbridgetrails.map.roadBeds
+import com.bainbridgetrails.map.trailLines
+import com.bainbridgetrails.data.LocalGoal
+import com.bainbridgetrails.resources.roads_celebrate_a11y_multi
+import com.bainbridgetrails.resources.roads_celebrate_count_title
+import com.bainbridgetrails.resources.roads_celebrate_of_roads
+import com.bainbridgetrails.resources.roads_celebrate_stats
+import com.bainbridgetrails.resources.roads_milestone_a11y
+import com.bainbridgetrails.ui.components.BtIcon
+import com.bainbridgetrails.ui.components.BtIcons
+import com.bainbridgetrails.ui.components.milestoneTitle
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.layout.Row
+import kotlin.math.roundToInt
 import com.bainbridgetrails.ui.components.IslandGeometry
 import com.bainbridgetrails.resources.celebrate_island_label
 import com.bainbridgetrails.resources.celebrate_island_title
@@ -107,6 +123,18 @@ private const val COMMUNITY_MIN = 5
 private const val TIMELINE_MS = 2400
 
 /**
+ * What differs in the completion celebration per goal (docs/roads/ux.md §6.2): roads draw over a plain category bed
+ * instead of a dotted ghost, count *roads complete* instead of the island %, and fold three or more completions into
+ * one combined page (roads are short: one walk can finish many).
+ */
+data class CelebrationSpec(val bedGhost: Boolean, val roadsCounter: Boolean, val combineFrom: Int) {
+    companion object {
+        val TRAILS = CelebrationSpec(bedGhost = false, roadsCounter = false, combineFrom = Int.MAX_VALUE)
+        val ROADS = CelebrationSpec(bedGhost = true, roadsCounter = true, combineFrom = 3)
+    }
+}
+
+/**
  * Celebration (F6 step 3, ux.md §3.6): one full-screen page for every trail this walk completed (TL-4: one screen,
  * plural variant). The trail's own geometry draws itself, water lines ripple out once, the island % counts up;
  * reduced motion shows the final frame. [sessionId] is the walk (or a debug key) whose results show underneath.
@@ -128,10 +156,14 @@ fun CelebrationScreen(
         val snapshot by produceState<ProgressSnapshot?>(null, graph) {
             value = runCatching { graph.progress.refreshNow() }.getOrNull() ?: graph.progress.snapshot.value
         }
-        val islandBefore by produceState<Double?>(null, sessionId) {
+        val summary by produceState<com.bainbridgetrails.tracking.SessionSummary?>(null, sessionId) {
             val done = runCatching { graph.controller().await() }.getOrNull()?.state?.value as? RecordingState.Done
-            value = done?.summary?.takeIf { it.sessionId == sessionId }?.islandBefore
+            value = done?.summary?.takeIf { it.sessionId == sessionId }
         }
+        val islandBefore = summary?.islandBefore
+        val settings by graph.settings.settings.collectAsStateWithLifecycle()
+        val units = settings?.units ?: com.bainbridgetrails.data.Units.MILES
+        val goal = LocalGoal.current
         val stats by graph.trailStats.state.collectAsStateWithLifecycle()
         LaunchedEffect(Unit) { runCatching { graph.trailStats.get() } }
         val s = snapshot ?: return@DatasetGate
@@ -159,10 +191,21 @@ fun CelebrationScreen(
         // Debug preview: final numbers whatever this phone's coverage is.
         val shown = if (preview) s.copy(islandFraction = 1.0, trailsCompleted = s.trailCount) else s
         val community = trails.singleOrNull()?.let { stats.forTrail(it.id)?.completedCount }?.takeIf { it >= COMMUNITY_MIN }
+        // Roads (docs/roads/product.md §5.3): up to two milestone lines under the body, island > type > roads > miles.
+        // From the walk's own summary (no summary = a debug celebration: no milestone lines).
+        val milestones = remember(summary, whole) {
+            val sum = summary
+            if (!goal.isRoads || preview || sum == null) emptyList()
+            else walkMilestones(data, sum, units, islandReached = whole).filter { it != Milestone.Island }.take(2)
+        }
         CelebrationContent(
             data, shown, trails.map { it.id to it.name }, if (preview) null else islandBefore, community, onContinue, onViewTrail,
             wholeIsland = whole,
             islandArt = if (whole) art else null,
+            spec = if (goal.isRoads) CelebrationSpec.ROADS else CelebrationSpec.TRAILS,
+            milestones = milestones,
+            units = units,
+            style = settings?.effectiveMapStyle(androidx.compose.foundation.isSystemInDarkTheme()),
         )
     }
 }
@@ -178,7 +221,12 @@ private fun CelebrationContent(
     onViewTrail: (String) -> Unit,
     wholeIsland: Boolean = false,
     islandArt: IslandGeometry? = null,
+    spec: CelebrationSpec = CelebrationSpec.TRAILS,
+    milestones: List<Milestone> = emptyList(),
+    units: com.bainbridgetrails.data.Units = com.bainbridgetrails.data.Units.MILES,
+    style: MapStyle? = null,
 ) {
+    val goal = LocalGoal.current
     val reduced = BtTheme.motion.reduced
     val haptics = LocalHapticFeedback.current
     val clock = remember { Animatable(if (reduced) TIMELINE_MS.toFloat() else 0f) }
@@ -196,25 +244,35 @@ private fun CelebrationContent(
     val t = clock.value
 
     val single = trails.size == 1
+    val combined = !wholeIsland && trails.size >= spec.combineFrom
     val island = s.islandFraction
     val names = trails.map { it.second }
     val shownNames = names.take(3).joinToString("\n") + if (names.size > 3) "\n" + stringResource(Res.string.celebrate_more, names.size - 3) else ""
     val eyebrow = when {
-        wholeIsland -> stringResource(Res.string.celebrate_island_eyebrow)
-        single -> stringResource(Res.string.celebrate_eyebrow)
-        else -> pluralStringResource(Res.plurals.celebrate_eyebrow_multi, trails.size, trails.size)
+        wholeIsland -> goal.string(Res.string.celebrate_island_eyebrow)
+        single -> goal.string(Res.string.celebrate_eyebrow)
+        else -> goal.plural(Res.plurals.celebrate_eyebrow_multi, trails.size, trails.size)
     }
     val walked = if (single) stringResource(Res.string.celebrate_walked, Format.percentWhole(s.trail(trails[0].first)?.fraction ?: 1.0)) else null
-    val trailsLine = stringResource(Res.string.celebrate_trails_count, s.trailsCompleted, s.trailCount)
+    val trailsLine = goal.string(Res.string.celebrate_trails_count, s.trailsCompleted, s.trailCount)
     val communityLine = community?.let { pluralStringResource(Res.plurals.celebrate_community, it, it) }
+    val milestoneLines = milestones.map { milestoneTitle(it) }
     val announcement = if (wholeIsland) {
-        stringResource(Res.string.celebrate_island_a11y, Format.percent(island), s.trailsCompleted, s.trailCount)
+        goal.string(Res.string.celebrate_island_a11y, Format.percent(island), s.trailsCompleted, s.trailCount)
     } else buildString {
         append(
-            if (single) stringResource(Res.string.celebrate_a11y_announcement, names[0], Format.percent(island), s.trailsCompleted, s.trailCount)
-            else stringResource(Res.string.celebrate_a11y_announcement_multi, trails.size, names.joinToString(", "), Format.percent(island)),
+            when {
+                single -> goal.string(Res.string.celebrate_a11y_announcement, names[0], Format.percent(island), s.trailsCompleted, s.trailCount)
+                combined -> stringResource(
+                    Res.string.roads_celebrate_a11y_multi, trails.size,
+                    names.take(3).joinToString(", ") + if (names.size > 3) ", " + stringResource(Res.string.celebrate_more, names.size - 3) else "",
+                    s.trailsCompleted, s.trailCount,
+                )
+                else -> goal.string(Res.string.celebrate_a11y_announcement_multi, trails.size, names.joinToString(", "), Format.percent(island))
+            },
         )
         communityLine?.let { append(' ').append(it) }
+        for (m in milestoneLines) append(' ').append(stringResource(Res.string.roads_milestone_a11y, m))
     }
 
     val complete = BtTheme.colors.complete
@@ -229,7 +287,15 @@ private fun CelebrationContent(
         ) {
             Spacer(Modifier.heightIn(min = 8.dp))
             if (islandArt != null) IslandCelebrationArt(islandArt, t)
-            else TrailGlyph(data, trails.map { it.first }, t, reduced, complete.accent, complete.container)
+            else {
+                val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+                val beds = style?.roadBeds ?: if (dark) RoadBedColors.Dark else RoadBedColors.Light
+                TrailGlyph(
+                    data, trails.map { it.first }, t, reduced, complete.accent, complete.container,
+                    combine = combined,
+                    bedOf = if (spec.bedGhost) ({ id -> beds.of(data.dataset.trails.firstOrNull { it.id == id }?.category) }) else null,
+                )
+            }
             Spacer(Modifier.heightIn(min = 8.dp))
             // Heading node: the whole announcement, read once on appear (assertive live region, ux.md §3.6).
             val rise = phase(t, 600, 900)
@@ -248,13 +314,17 @@ private fun CelebrationContent(
                 )
                 if (wholeIsland) {
                     // P1-9: Fraunces headline (upright), the body line under it.
-                    Text(stringResource(Res.string.celebrate_island_title), style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
+                    Text(stringResource(LocalGoal.current.s(Res.string.celebrate_island_title)), style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
                     Text(
-                        stringResource(Res.string.celebrate_island_body),
+                        stringResource(LocalGoal.current.s(Res.string.celebrate_island_body)),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
+                } else if (combined) {
+                    // ≥ 3 roads (docs/roads/ux.md §6.2): one page, "4 roads", up to three names + "+N more".
+                    Text(pluralStringResource(Res.plurals.roads_celebrate_count_title, trails.size, trails.size), style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
+                    Text(shownNames, style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic), textAlign = TextAlign.Center, maxLines = 4, overflow = TextOverflow.Ellipsis)
                 } else Text(
                     shownNames,
                     style = (if (single) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium).copy(fontStyle = FontStyle.Italic),
@@ -263,14 +333,30 @@ private fun CelebrationContent(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (!wholeIsland) walked?.let { Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center) }
+                // Milestone lines (product.md §5.3): primary, never a status hue.
+                for (line in milestoneLines) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        BtIcon(BtIcons.Verified, null, size = 18.dp, tint = MaterialTheme.colorScheme.primary)
+                        Text(line, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
             Spacer(Modifier.heightIn(min = 12.dp))
             Column(Modifier.clearAndSetSemantics {}, horizontalAlignment = Alignment.CenterHorizontally) {
                 // Counter old → new (900–1700 ms); only when the walk's "before" value is known.
                 val p = BtEasing.emphasizedDecelerate.transform(phase(t, 900, 1700))
-                val value = if (islandBefore != null && !reduced) islandBefore + (island - islandBefore) * p else island
-                IslandCounter(Format.percent(value), widest = listOfNotNull(islandBefore, island).map { Format.percent(it) }.maxBy { it.length })
-                Text(stringResource(Res.string.celebrate_island_label), style = MaterialTheme.typography.bodyMedium)
+                if (spec.roadsCounter && !wholeIsland) {
+                    // Roads (ux.md §6.2): roads complete counts up by this walk's completions; island % is secondary.
+                    val after = s.trailsCompleted
+                    val before = (after - trails.size).coerceAtLeast(0)
+                    val value = if (!reduced && islandBefore != null) (before + (after - before) * p).roundToInt() else after
+                    IslandCounter("$value", widest = "${s.trailCount}", align = Alignment.Center)
+                    Text(stringResource(Res.string.roads_celebrate_of_roads, s.trailCount), style = MaterialTheme.typography.titleMedium)
+                } else {
+                    val value = if (islandBefore != null && !reduced) islandBefore + (island - islandBefore) * p else island
+                    IslandCounter(Format.percent(value), widest = listOfNotNull(islandBefore, island).map { Format.percent(it) }.maxBy { it.length })
+                    Text(stringResource(Res.string.celebrate_island_label), style = MaterialTheme.typography.bodyMedium)
+                }
             }
             val tail = phase(t, 1700, 2000)
             Column(
@@ -278,7 +364,12 @@ private fun CelebrationContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(trailsLine, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                if (spec.roadsCounter && !wholeIsland) {
+                    Text(
+                        stringResource(Res.string.roads_celebrate_stats, Format.distance(s.coveredM, units), Format.percent(island)),
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
+                    )
+                } else Text(trailsLine, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
                 communityLine?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center) }
             }
             Spacer(Modifier.heightIn(min = 16.dp))
@@ -287,7 +378,7 @@ private fun CelebrationContent(
                 PrimaryButton(stringResource(Res.string.celebrate_continue), onClick = onContinue, modifier = Modifier.fillMaxWidth())
                 if (single && !wholeIsland) {
                     TextButton(onClick = { onViewTrail(trails[0].first) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text(stringResource(Res.string.celebrate_view_trail))
+                        Text(goal.string(Res.string.celebrate_view_trail))
                     }
                 }
             }
@@ -303,23 +394,24 @@ private fun phase(t: Float, from: Int, to: Int): Float = ((t - from) / (to - fro
  * reflow the layout while counting (ux.md §3.6); capped at 83sp (ux.md §5.3).
  */
 @Composable
-private fun IslandCounter(text: String, widest: String) {
+private fun IslandCounter(text: String, widest: String, align: Alignment = Alignment.CenterEnd) {
     val base = BtTheme.type.statHero
     val scale = LocalDensity.current.fontScale
     val style = if (base.fontSize.value * scale > 83f) base.copy(fontSize = (83f / scale).sp, lineHeight = (88f / scale).sp) else base
-    Box(contentAlignment = Alignment.CenterEnd) {
+    Box(contentAlignment = align) {
         Text(widest.replace(Regex("[0-9]"), "0"), style = style, modifier = Modifier.alpha(0f))
         Text(text, style = style, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
 /** The trails' segments as polylines in a unit-free local projection, chained so the draw runs along the trail. */
-private fun glyphLines(data: TrailData, trailIds: List<String>): List<List<Offset>> {
+private fun glyphLines(data: TrailData, trailIds: List<String>, origin: Pair<Double, Double>? = null): List<List<Offset>> {
     val byId = data.dataset.segments.associateBy { it.id }
     val raw = trailIds.flatMap { id -> data.dataset.trails.firstOrNull { it.id == id }?.segmentIds.orEmpty() }
         .distinct().mapNotNull { byId[it]?.coords?.takeIf { c -> c.size >= 2 } }
     if (raw.isEmpty()) return emptyList()
-    val (lon0, lat0) = raw.first().first().let { it[0] to it[1] }
+    // A shared [origin] keeps several trails in one frame (combined roads page).
+    val (lon0, lat0) = origin ?: raw.first().first().let { it[0] to it[1] }
     val k = cos(lat0 * PI / 180)
     // Relative to the first point in doubles first: absolute degrees in Float would lose ~1 m.
     val lines = raw.map { c -> c.map { Offset(((it[0] - lon0) * k).toFloat(), (lat0 - it[1]).toFloat()) } }.toMutableList()
@@ -347,9 +439,27 @@ private fun glyphLines(data: TrailData, trailIds: List<String>): List<List<Offse
  * itself in `complete.accent` (6dp, pulse to 8dp), then three water lines (offset outlines) rippling out once.
  */
 @Composable
-private fun TrailGlyph(data: TrailData, trailIds: List<String>, t: Float, reduced: Boolean, accent: Color, container: Color) {
+private fun TrailGlyph(
+    data: TrailData,
+    trailIds: List<String>,
+    t: Float,
+    reduced: Boolean,
+    accent: Color,
+    container: Color,
+    /** All [trailIds] fitted together in one frame, drawn in sequence (roads ≥ 3, docs/roads/ux.md §6.2). */
+    combine: Boolean = false,
+    /** Roads: the ghost is the road's plain category bed ("plain road becomes painted road"), not dots. */
+    bedOf: ((String) -> Color)? = null,
+) {
     // One glyph per trail (up to 3, side by side): trails far apart would shrink to dots in one shared frame.
-    val groups = remember(trailIds, data) { trailIds.take(3).map { glyphLines(data, listOf(it)) }.filter { it.isNotEmpty() } }
+    val ids = if (combine) trailIds else trailIds.take(3)
+    val perTrail = remember(trailIds, data, combine) {
+        val origin = if (combine) data.dataset.trailLines(ids.first()).firstOrNull()?.firstOrNull()?.let { it[0] to it[1] } else null
+        ids.map { it to glyphLines(data, listOf(it), origin) }.filter { it.second.isNotEmpty() }
+    }
+    val groups = remember(perTrail, combine) { if (combine) listOf(perTrail.flatMap { it.second }) else perTrail.map { it.second } }
+    // Bed color per path, in path order.
+    val pathBeds = remember(perTrail, bedOf) { bedOf?.let { f -> perTrail.flatMap { (id, lines) -> List(lines.size) { f(id) } } } }
     val ghost = BtTheme.colors.notStarted.accent
     val water = BtTheme.colors.waterLine
     Canvas(
@@ -372,7 +482,13 @@ private fun TrailGlyph(data: TrailData, trailIds: List<String>, t: Float, reduce
         }
         val lengths = paths.map { PathMeasure().apply { setPath(it, false) }.length }
         val total = lengths.sum()
-        val sw = 6.dp.toPx()
+        val sw = (if (pathBeds != null) 5 else 6).dp.toPx()
+
+        // Roads: the plain steel bed under everything, as on the map before a walk.
+        pathBeds?.let { beds ->
+            val bed = Stroke(10.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            paths.forEachIndexed { i, p -> drawPath(p, beds.getOrElse(i) { beds.last() }.copy(alpha = 0.6f), style = bed) }
+        }
 
         // Water lines (behind the glyph).
         if (reduced) {
@@ -387,7 +503,7 @@ private fun TrailGlyph(data: TrailData, trailIds: List<String>, t: Float, reduce
 
         // Ghost: the not-started dotted pattern, which the solid line then covers ("dots become solid").
         val dots = Stroke(sw * 0.5f, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(0.01f, sw * 1.4f)))
-        if (!reduced && t < 1300) paths.forEach { drawPath(it, ghost.copy(alpha = 0.7f), style = dots) }
+        if (!reduced && t < 1300 && pathBeds == null) paths.forEach { drawPath(it, ghost.copy(alpha = 0.7f), style = dots) }
 
         val drawn = total * BtEasing.emphasizedDecelerate.transform(phase(t, 100, 1300))
         val pulse = if (reduced) 0f else sin(PI * phase(t, 1100, 1400)).toFloat()

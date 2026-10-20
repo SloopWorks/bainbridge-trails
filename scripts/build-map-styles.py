@@ -32,6 +32,48 @@ STATUSES = ["not_started", "partway", "nearly_done", "complete"]
 COUNTED = ["==", ["get", "included"], True]
 NOT_COUNTED = ["!=", ["get", "included"], True]
 
+# --- roads dataset (the roads prototype, docs/roads/plan.md) ---------------------------------------
+# The "trails" source is whichever dataset the app installed (DatasetProfile): data/dist/trails.pmtiles or
+# data/roads/dist/roads.pmtiles, both with layer "segments". These categories exist only in the roads dataset, so
+# the layers below are inert on the trail dataset and no second style is needed.
+ROAD_CATS = ("state_route", "arterial", "collector", "residential", "lane", "driveway")
+IS_ROAD = ["in", ["get", "category"], ["literal", list(ROAD_CATS)]]
+PRIVATE = ["==", ["get", "ownership"], "private"]
+# Class factor on the bed width: a state route reads wider than a residential street at the same zoom.
+# MapLibre requires the zoom interpolation to be the outermost expression of a paint property, so the factor is
+# applied per stop (a nested ["*", interpolate, match] is invalid and the native renderer drops the layer).
+ROAD_CLASS_FACTOR = {"state_route": 2.1, "arterial": 1.7, "collector": 1.35}
+
+
+def road_bed_width(stops: dict[float, float]) -> list:
+    expr: list = ["interpolate", ["linear"], ["zoom"]]
+    for z, w in stops.items():
+        match: list = ["match", ["get", "category"]]
+        for cat, f in ROAD_CLASS_FACTOR.items():
+            match += [cat, round(w * f, 2)]
+        expr += [z, match + [w]]
+    return expr
+
+
+# Bed opacity per class (docs/roads/ux.md §2.3): at island zoom state routes and arterials read as the skeleton,
+# collectors as the secondary web, residential streets as faint fill. Same per-stop shape as road_bed_width.
+ROAD_BED_OPACITY = {
+    "collector": {10: 0.75, 12: 0.85, 13: 0.95, 15: 1.0, 18: 1.0},
+    "residential": {10: 0.55, 12: 0.7, 13: 0.85, 15: 1.0, 18: 1.0},
+}
+
+
+def road_bed_opacity(scale: float = 1.0) -> list:
+    expr: list = ["interpolate", ["linear"], ["zoom"]]
+    for z in (10, 12, 13, 15, 18):
+        expr += [z, [
+            "match", ["get", "category"],
+            "collector", round(ROAD_BED_OPACITY["collector"][z] * scale, 3),
+            "residential", round(ROAD_BED_OPACITY["residential"][z] * scale, 3),
+            round(scale, 3),
+        ]]
+    return expr
+
 
 # --- status encoding (shared by all styles; colors per style) --------------------------------------
 # Width stops (zoom -> px). Encoding never relies on color alone:
@@ -205,6 +247,31 @@ def build(p: dict) -> dict:
         "line-dasharray": [3, 2.5],
     }, kind_in("ferry")))
 
+    # ---- roads dataset (inert on the trail dataset) ------------------------------------------------
+    # Counted roads get a category-coloured bed under the app's status lines, so class is readable while coverage
+    # keeps the status ramp. Uncounted roads are the style's job entirely: private ones dashed, the ownership
+    # holdouts (unknown / lane / driveway, out of the goal until settled) dotted and fainter.
+    rd = p["road_dataset"]
+    L.append(line("roads-ds-bed", "trails", "segments", {
+        "line-color": ["match", ["get", "category"],
+                       "state_route", rd["state_route"], "arterial", rd["arterial"],
+                       "collector", rd["collector"], rd["residential"]],
+        "line-width": road_bed_width({10: 0.6, 12: 1.2, 13: 2.0, 15: 5.5, 18: 11.0}),
+        "line-opacity": road_bed_opacity(rd.get("bed_opacity", 1.0)),
+    }, ["all", COUNTED, IS_ROAD], minzoom=10))
+    L.append(line("roads-ds-private", "trails", "segments", {
+        "line-color": rd["private"],
+        "line-opacity": rd["muted_opacity"],
+        "line-width": interp({10: 0.6, 14: 1.6, 18: 3.4}),
+        "line-dasharray": [2.2, 1.8],
+    }, ["all", NOT_COUNTED, IS_ROAD, PRIVATE], minzoom=12))
+    L.append(line("roads-ds-holdout", "trails", "segments", {
+        "line-color": rd["holdout"],
+        "line-opacity": rd["muted_opacity"] * 0.75,
+        "line-width": interp({10: 0.5, 14: 1.3, 18: 2.6}),
+        "line-dasharray": [0.01, 2.4],
+    }, ["all", NOT_COUNTED, IS_ROAD, ["!", PRIVATE]], minzoom=13))
+
     # ---- trails -----------------------------------------------------------------------------------
     # decisions.md TL-1: status, not-counted, selected-halo and dim layers are NOT in the style. The app
     # declares them as Compose LineLayers over this style's "trails" source (source-layer "segments"),
@@ -314,6 +381,11 @@ TOPO = {
         "not_counted": {"color": "#7D8679", "opacity": 0.75, "beach": "#4F8797", "closed": "#A6564A"},
     },
     "labels": {"water": "#4C7682", "trail": "#2F3A33", "place": "#46504A", "halo": "#ECEFE6"},
+    # Roads dataset: a cool steel family for class, so it never reads as the status ramp (gold/tangerine/violet).
+    "road_dataset": {
+        "state_route": "#5F86A6", "arterial": "#85A6BE", "collector": "#A6BFCB", "residential": "#C2D1D1",
+        "bed_opacity": 1.0, "private": "#8E9890", "holdout": "#A2998A", "muted_opacity": 0.85,
+    },
 }
 
 MINIMAL_LIGHT = {
@@ -332,6 +404,10 @@ MINIMAL_LIGHT = {
         "not_counted": {"color": "#9AA19A", "opacity": 0.85, "beach": "#7FA6B3", "closed": "#BB8077"},
     },
     "labels": {"water": "#6F8E9A", "trail": "#3A4247", "place": "#5F676C", "halo": "#E8EBE7"},
+    "road_dataset": {
+        "state_route": "#6E95B3", "arterial": "#93B2C6", "collector": "#B3C8D1", "residential": "#CDD9D8",
+        "bed_opacity": 1.0, "private": "#9AA29B", "holdout": "#ADA596", "muted_opacity": 0.85,
+    },
 }
 
 DARK = {
@@ -352,6 +428,10 @@ DARK = {
         "not_counted": {"color": "#5E6E66", "opacity": 0.8, "beach": "#3F7486", "closed": "#8A5048"},
     },
     "labels": {"water": "#5F8694", "trail": "#DCE6E1", "place": "#A9B8B1", "halo": "#1D2925"},
+    "road_dataset": {
+        "state_route": "#6E90A8", "arterial": "#567A90", "collector": "#42606F", "residential": "#33505A",
+        "bed_opacity": 1.0, "private": "#5A6861", "holdout": "#5E5A4E", "muted_opacity": 0.85,
+    },
 }
 
 

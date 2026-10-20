@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.coverage.Dataset
 import com.bainbridgetrails.coverage.SegmentGeom
 import com.bainbridgetrails.coverage.TrailStatus
+import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.ui.theme.BtTheme
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,35 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 
+/**
+ * How the island chart draws a dataset (docs/roads/ux.md §5.1): one code path, values per goal. Roads are ~2400
+ * short lines on a 280dp island, so they draw thinner and simpler, skip uncounted roads, and put a land-colored
+ * halo under progress so it separates from the pale plat of not-started streets. [TRAILS] = the v1 values.
+ */
+@Immutable
+data class ChartSpec(
+    /** Point-drop tolerance in chart units (island height = 1). */
+    val tolerance: Float,
+    val drawUncounted: Boolean,
+    val notStartedWidthDp: Float,
+    val notStartedAlpha: Float,
+    val partwayWidthDp: Float,
+    val partwayDashDp: Pair<Float, Float>,
+    val nearlyDoneWidthDp: Float,
+    val nearlyDoneCasingDp: Float,
+    val completeWidthDp: Float,
+    /** Extra width of a land-colored halo under progress paths; 0 = none. */
+    val progressHaloDp: Float,
+) {
+    companion object {
+        val TRAILS = ChartSpec(0.0015f, true, 1.2f, 1f, 1.8f, 4f to 2.5f, 2.0f, 3.4f, 2.8f, 0f)
+        val ROADS = ChartSpec(0.003f, false, 0.6f, 0.45f, 1.4f, 3f to 2f, 1.7f, 2.9f, 2.4f, 1.2f)
+
+        fun of(profile: DatasetProfile): ChartSpec = if (profile == DatasetProfile.ROADS) ROADS else TRAILS
+        val current: ChartSpec get() = of(DatasetProfile.current)
+    }
+}
+
 /** One polyline in chart units (height 1, width [IslandGeometry.aspect]); [xy] = x0,y0,x1,y1,… */
 @Immutable
 class ChartLine(val id: String, val xy: FloatArray, val counted: Boolean)
@@ -51,7 +81,12 @@ class IslandGeometry(val aspect: Float, val land: List<FloatArray>, val trails: 
          * drops points closer than [tolerance] (chart units) to the previous kept one. [coastline] = rings of
          * [lon, lat] (scripts/build-coastline.sh); the frame covers coastline and segments together.
          */
-        fun build(segments: List<SegmentGeom>, coastline: List<List<DoubleArray>> = emptyList(), tolerance: Float = 0.0015f): IslandGeometry {
+        fun build(
+            segments: List<SegmentGeom>,
+            coastline: List<List<DoubleArray>> = emptyList(),
+            tolerance: Float = 0.0015f,
+            drawUncounted: Boolean = true,
+        ): IslandGeometry {
             if (segments.isEmpty() && coastline.isEmpty()) return IslandGeometry(1f, emptyList(), emptyList())
             var minLon = Double.MAX_VALUE; var maxLon = -Double.MAX_VALUE
             var minLat = Double.MAX_VALUE; var maxLat = -Double.MAX_VALUE
@@ -81,7 +116,7 @@ class IslandGeometry(val aspect: Float, val land: List<FloatArray>, val trails: 
             val land = coastline.map { project(it, keepLast = false) }.filter { it.size >= 6 }
             val trails = ArrayList<ChartLine>()
             for (s in segments) {
-                if (!s.included && s.trailIds.isEmpty()) continue
+                if (!s.included && (s.trailIds.isEmpty() || !drawUncounted)) continue
                 trails += ChartLine(s.id, project(s.coords.map { doubleArrayOf(it[0], it[1]) }, keepLast = true), s.included)
             }
             return IslandGeometry(aspect, land, trails)
@@ -104,7 +139,8 @@ class IslandGeometry(val aspect: Float, val land: List<FloatArray>, val trails: 
         suspend fun forDataset(dataset: Dataset): IslandGeometry = lock.withLock {
             cached?.takeIf { it.first === dataset }?.second ?: run {
                 val coast = withContext(Dispatchers.IO) { runCatching { Res.readBytes("files/coastline.json").decodeToString() }.getOrNull() }
-                withContext(Dispatchers.Default) { build(dataset.segments, coast?.let(::parseCoastline).orEmpty()) }
+                val spec = ChartSpec.current
+                withContext(Dispatchers.Default) { build(dataset.segments, coast?.let(::parseCoastline).orEmpty(), spec.tolerance, spec.drawUncounted) }
                     .also { cached = dataset to it }
             }
         }
@@ -128,6 +164,7 @@ fun IslandChart(
     contentDescription: String,
     modifier: Modifier = Modifier,
     land: Color = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+    spec: ChartSpec = ChartSpec.current,
 ) {
     val colors = BtTheme.colors
     val ring = colors.waterLine
@@ -163,7 +200,7 @@ fun IslandChart(
                 val uncountedPath = pathOf(uncounted)
 
                 fun stroke(w: Float, effect: PathEffect? = null): Stroke = Stroke(w, cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = effect)
-                val dashed = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 2.5.dp.toPx()))
+                val dashed = PathEffect.dashPathEffect(floatArrayOf(spec.partwayDashDp.first.dp.toPx(), spec.partwayDashDp.second.dp.toPx()))
                 val alphas = floatArrayOf(0.85f, 0.55f, 0.3f)
                 val hasLand = geometry.land.isNotEmpty()
                 onDrawBehind {
@@ -179,12 +216,19 @@ fun IslandChart(
                         drawPath(landPath, ring, style = stroke(ringW))
                     }
                     // Status lines, weakest first so progress sits on top (map width hierarchy, ux.md §0).
-                    drawPath(uncountedPath, notCounted, style = stroke(0.8.dp.toPx()))
-                    drawPath(paths.getValue(TrailStatus.NOT_STARTED), colors.notStarted.line, style = stroke(1.2.dp.toPx()))
-                    drawPath(paths.getValue(TrailStatus.PARTWAY), colors.partway.line, style = stroke(1.8.dp.toPx(), dashed))
-                    drawPath(paths.getValue(TrailStatus.NEARLY_DONE), colors.nearlyDoneCasing, style = stroke(3.4.dp.toPx()))
-                    drawPath(paths.getValue(TrailStatus.NEARLY_DONE), colors.nearlyDone.line, style = stroke(2.dp.toPx()))
-                    drawPath(paths.getValue(TrailStatus.COMPLETE), colors.complete.line, style = stroke(2.8.dp.toPx()))
+                    if (spec.drawUncounted) drawPath(uncountedPath, notCounted, style = stroke(0.8.dp.toPx()))
+                    drawPath(paths.getValue(TrailStatus.NOT_STARTED), colors.notStarted.line.copy(alpha = spec.notStartedAlpha), style = stroke(spec.notStartedWidthDp.dp.toPx()))
+                    if (spec.progressHaloDp > 0f) {
+                        // Land-colored gap under progress (ux.md §5.1): progress pops off the dense gray plat.
+                        val halo = spec.progressHaloDp.dp.toPx()
+                        drawPath(paths.getValue(TrailStatus.PARTWAY), land, style = stroke(spec.partwayWidthDp.dp.toPx() + halo))
+                        drawPath(paths.getValue(TrailStatus.NEARLY_DONE), land, style = stroke(spec.nearlyDoneCasingDp.dp.toPx() + halo))
+                        drawPath(paths.getValue(TrailStatus.COMPLETE), land, style = stroke(spec.completeWidthDp.dp.toPx() + halo))
+                    }
+                    drawPath(paths.getValue(TrailStatus.PARTWAY), colors.partway.line, style = stroke(spec.partwayWidthDp.dp.toPx(), dashed))
+                    drawPath(paths.getValue(TrailStatus.NEARLY_DONE), colors.nearlyDoneCasing, style = stroke(spec.nearlyDoneCasingDp.dp.toPx()))
+                    drawPath(paths.getValue(TrailStatus.NEARLY_DONE), colors.nearlyDone.line, style = stroke(spec.nearlyDoneWidthDp.dp.toPx()))
+                    drawPath(paths.getValue(TrailStatus.COMPLETE), colors.complete.line, style = stroke(spec.completeWidthDp.dp.toPx()))
                 }
             },
     )

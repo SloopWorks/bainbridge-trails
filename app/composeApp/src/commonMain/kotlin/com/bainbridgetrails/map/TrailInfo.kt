@@ -1,6 +1,7 @@
 package com.bainbridgetrails.map
 
 import com.bainbridgetrails.coverage.Dataset
+import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.data.Units
 import com.bainbridgetrails.resources.Res
 import kotlinx.coroutines.Dispatchers
@@ -8,9 +9,11 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNames
 import kotlin.math.floor
 import kotlin.math.roundToLong
 
@@ -20,7 +23,10 @@ data class Trailhead(val name: String?, val lat: Double, val lon: Double)
 /** How much of a named trail counts toward the island total (decisions.md TL-6). */
 enum class IslandCredit { FULL, PARTIAL, NONE }
 
-/** Trail facts the map and detail screens show beyond [com.bainbridgetrails.coverage.TrailMeta]. */
+/**
+ * Trail facts the map and detail screens show beyond [com.bainbridgetrails.coverage.TrailMeta]. [roadEnds] = the
+ * row's public road ends at the shore (roads dataset; road_ends.json), nearest the water first.
+ */
 data class TrailFacts(
     val id: String,
     val park: String?,
@@ -30,14 +36,16 @@ data class TrailFacts(
     val officialLengthMi: Double?,
     val computedLengthMi: Double,
     val trailheads: List<Trailhead>,
+    val roadEnds: List<RoadEnd> = emptyList(),
 ) {
     /** Official length when the agency publishes one, else computed (product F4 step 3). */
     val lengthMi: Double get() = officialLengthMi ?: computedLengthMi
     val isOfficialLength: Boolean get() = officialLengthMi != null
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
-private data class FactsFile(val trails: List<FactsRow>)
+private data class FactsFile(@JsonNames("roads") val trails: List<FactsRow>)
 
 @Serializable
 private data class FactsRow(
@@ -72,7 +80,11 @@ private val json = Json { ignoreUnknownKeys = true }
  * Parses trails.json facts + trailheads.json. A trail's trailheads are the named trailheads.json entries that list it
  * (duplicate names numbered); a trail without any falls back to the unnamed points in trails.json.
  */
-fun parseTrailFacts(trailsJson: String, trailheadsJson: String?): Map<String, TrailFacts> {
+fun parseTrailFacts(
+    trailsJson: String,
+    trailheadsJson: String?,
+    roadEnds: Map<String, List<RoadEnd>> = emptyMap(),
+): Map<String, TrailFacts> {
     val rows = json.decodeFromString(FactsFile.serializer(), trailsJson).trails
     val named = HashMap<String, MutableList<TrailheadRow>>()
     if (trailheadsJson != null) {
@@ -91,22 +103,27 @@ fun parseTrailFacts(trailsJson: String, trailheadsJson: String?): Map<String, Tr
                 Trailhead(label, th.lat, th.lon)
             }
         } ?: r.trailheads.filter { it.coordinates.size >= 2 }.map { Trailhead(null, it.coordinates[1], it.coordinates[0]) }
-        r.id to TrailFacts(r.id, r.park, r.manager, r.gainM, r.officialMapUrl, r.officialLengthMi, r.computedLengthMi, heads)
+        r.id to TrailFacts(r.id, r.park, r.manager, r.gainM, r.officialMapUrl, r.officialLengthMi, r.computedLengthMi, heads, roadEnds[r.id].orEmpty())
     }
 }
 
-/** Bundled trail facts, parsed once per process off Main. */
+/** Bundled facts of the active dataset ([DatasetProfile]), parsed once per process off Main. */
 object TrailFactsRepository {
     private val lock = Mutex()
     private var cached: Map<String, TrailFacts>? = null
 
     suspend fun all(): Map<String, TrailFacts> = lock.withLock {
         cached ?: withContext(Dispatchers.IO) {
-            val trails = Res.readBytes("files/trails.json").decodeToString()
-            val heads = runCatching { Res.readBytes("files/trailheads.json").decodeToString() }.getOrNull()
-            parseTrailFacts(trails, heads)
+            val profile = DatasetProfile.current
+            val trails = Res.readBytes("files/${profile.metadataFile}").decodeToString()
+            val heads = if (profile == DatasetProfile.TRAILS) runCatching { Res.readBytes("files/trailheads.json").decodeToString() }.getOrNull() else null
+            val ends = roadEndsFile(profile)?.let { f -> runCatching { Res.readBytes("files/$f").decodeToString() }.getOrNull() }
+            parseTrailFacts(trails, heads, ends?.let(::parseRoadEnds).orEmpty())
         }.also { cached = it }
     }
+
+    /** Cached facts if already loaded (no suspension), for synchronous callers that can wait. */
+    val loaded: Map<String, TrailFacts>? get() = cached
 }
 
 /** TL-6: does this trail's ground count toward the island %? (By its segments' `included` flags.) */

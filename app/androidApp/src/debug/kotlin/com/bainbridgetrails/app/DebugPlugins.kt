@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bainbridgetrails.coverage.Fix
 import com.bainbridgetrails.coverage.TrailStatus
+import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.data.Loadable
 import com.bainbridgetrails.data.TrailData
 import com.bainbridgetrails.graph.AppGraph
@@ -32,6 +33,45 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+/**
+ * The roads prototype (docs/roads/plan.md P1): runs the whole app on `data/roads/dist` instead of the trail dataset.
+ *
+ * The dataset is parsed, indexed and rendered into the map style once per process (ruling R1), so the switch stores
+ * the choice and takes effect on the next launch. `adb shell am start -n <pkg>/.MainActivity --es dataset roads` does
+ * the same for one launch without the drawer.
+ */
+class DatasetPlugin(private val context: Context) : DebugPlugin {
+    override val id = "bt-dataset"
+    override val title = "Dataset"
+
+    @Composable
+    override fun Content(scope: DebugScope) {
+        val running = remember { DatasetProfile.current }
+        var stored by remember { mutableStateOf(DebugTools.storedDataset(context)) }
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Running: ${running.key}")
+            Text(running.goal)
+            if (DatasetProfile.isFixed) {
+                Text("Fixed by the ${BuildConfig.GOAL} flavour (RD-1). Install the trails debug build to switch.")
+                return@Column
+            }
+            Text("Next launch: ${stored.key}")
+            for (p in DatasetProfile.entries) OutlinedButton(
+                enabled = p != stored,
+                onClick = {
+                    DebugTools.storeDataset(context, p)
+                    stored = p
+                    AppLog.w("debug", "dataset for the next launch: ${p.key}")
+                },
+            ) { Text("Use ${p.things} (${p.metadataFile})") }
+            if (stored != running) {
+                Text("Kill and relaunch the app to run on ${stored.key}.")
+                Button(onClick = { kotlin.system.exitProcess(0) }) { Text("Kill the app now") }
+            }
+        }
+    }
+}
+
 /** Dataset version, counts and load timings (parse once per process: ruling R1). */
 object TrailsDataPlugin : DebugPlugin {
     override val id = "bt-trails-data"
@@ -45,8 +85,8 @@ object TrailsDataPlugin : DebugPlugin {
                 Loadable.Loading -> Text("Loading…")
                 is Loadable.Failed -> Text("Failed: ${s.message}")
                 is Loadable.Ready -> with(s.value) {
-                    Text("Dataset version: ${dataset.version}")
-                    Text("Trails: ${dataset.trails.size}")
+                    Text("Dataset: ${DatasetProfile.current.key} ${dataset.version}")
+                    Text("${DatasetProfile.current.things.replaceFirstChar { it.uppercase() }}: ${dataset.trails.size}")
                     Text("Segments: ${dataset.segments.size} (${dataset.segments.count { it.included }} counted)")
                     Text("Island total: ${Format.oneDecimal(dataset.islandTotalM / 1000)} km")
                     Text("Parse ($format): $parseMs ms · index: $indexMs ms")

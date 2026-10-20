@@ -6,6 +6,7 @@
 #
 #   scripts/sim-route.sh <trail-id> [max-seconds]
 #   e.g. SIM=<udid> scripts/sim-route.sh trail-gazzam-lake-main-trail 300
+#   e.g. DIST=data/roads/dist scripts/sim-route.sh road-battle-point-drive-northeast 600  (the roads dataset)
 #
 # Segments are chained greedily (nearest unused endpoint next, reversed as needed), so a branching trail is walked
 # as one continuous line with short straight hops between branches. Positions are simulated on a public trail;
@@ -21,11 +22,16 @@ WAYPOINTS="$(mktemp -t sim-route)"
 trap 'rm -f "$WAYPOINTS"' EXIT
 
 python3 -I - "$DIST" "$1" "${2:-0}" "$SPEED" > "$WAYPOINTS" <<'PY'
-import json, math, sys
+import json, math, os, sys
 
 dist, trail_id, max_s, speed = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4])
 
-trails = {t["id"]: t for t in json.load(open(f"{dist}/trails.json"))["trails"]}
+# The roads dataset (data/roads/dist) is the same contract under other names: DIST=data/roads/dist works.
+meta = next((f"{dist}/{n}" for n in ("trails.json", "roads.json") if os.path.isfile(f"{dist}/{n}")), None)
+if meta is None:
+    sys.exit(f"no trails.json or roads.json in {dist}")
+doc = json.load(open(meta))
+trails = {t["id"]: t for t in (doc.get("trails") or doc["roads"])}
 if trail_id not in trails:
     close = [t for t in trails if trail_id.split("-")[1] in t] if "-" in trail_id else []
     sys.exit(f"unknown trail {trail_id!r}; similar: {close[:8]}")

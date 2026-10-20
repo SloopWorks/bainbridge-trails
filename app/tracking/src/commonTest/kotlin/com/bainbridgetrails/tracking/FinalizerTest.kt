@@ -170,6 +170,36 @@ class FinalizerTest {
     }
 
     @Test
+    fun roadsSummaryCarriesCountedCompletionsBeforeAndAfter() = runTest {
+        // Milestones (product.md §5.3) come from these numbers, read under the lock, never from a later snapshot.
+        val rsegs = listOf(seg("rseg-a", 0.0, listOf("A")), seg("rseg-b", 1000.0, listOf("B")), seg("rseg-p", 2000.0, listOf("P")))
+        val roads = listOf(
+            TrailMeta("A", "A", listOf("rseg-a"), 0.1, category = "residential"),
+            TrailMeta("B", "B", listOf("rseg-b"), 0.1, category = "residential"),
+            TrailMeta("C", "C", listOf("rseg-b"), 0.1, category = "collector"),
+            TrailMeta("P", "P", listOf("rseg-p"), 0.1, counted = false, category = "residential", ownership = "private"),
+        )
+        val rds = Dataset(roads, 400.0, rsegs, rules = com.bainbridgetrails.coverage.GoalRules.ROADS)
+        val rindex = SegmentIndex(rsegs, params, proj)
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        // B arrived complete from sync before this walk (sticky): counted before, not newly completed.
+        CoverageStore(dir).merge("sync", CoverageState.EMPTY, verified = false, finalized = false, completed = setOf("B"))
+        record(store, "s1", 0.0, 0.0, 200.0) // walks A
+        val f = Finalizer(rds, rindex, store, CoverageStore(dir))
+        val s1 = f.finalize("s1")
+        assertEquals(listOf("A"), s1.newlyCompleted)
+        assertEquals(1, s1.completedBefore)
+        assertEquals(2, s1.completedAfter)
+        assertEquals(mapOf("residential" to 2), s1.completedByCategory)
+        assertEquals(mapOf("residential" to 2, "collector" to 1), s1.countedByCategory, "uncounted P is not in the totals")
+        record(store, "s2", 2000.0, 0.0, 200.0) // walks private P: nothing counted changes
+        val s2 = f.finalize("s2")
+        assertEquals(2, s2.completedBefore)
+        assertEquals(2, s2.completedAfter)
+    }
+
+    @Test
     fun coverageMergedDuringMatchingIsSeenAsBefore() = runTest {
         // P2-9: a sync merge landing while the walk is being matched counts as "before" (no repeat celebration).
         val dir = tmpDir()

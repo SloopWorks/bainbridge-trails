@@ -30,7 +30,8 @@ and coverage tools).
 ```sh
 scripts/sync-app-assets.sh                         # copy map data + dataset from data/dist/ into the app
 cd backend && npm install && cp .dev.vars.example .dev.vars && npm run dev   # local API on :8787
-cd app && ./gradlew :androidApp:installDebug       # Android (debug id com.bainbridgetrails.app.dev)
+cd app && ./gradlew :androidApp:installTrailsDebug # Android trails (debug id com.bainbridgetrails.app.dev)
+cd app && ./gradlew :androidApp:installRoadsDebug  # Android roads (debug id com.bainbridgetrails.roads.dev)
 xcodebuild -project app/iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' build   # iOS simulator
 ```

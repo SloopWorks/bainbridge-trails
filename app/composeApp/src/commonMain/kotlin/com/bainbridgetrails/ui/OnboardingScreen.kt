@@ -54,6 +54,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.data.Loadable
+import com.bainbridgetrails.data.LocalGoal
+import com.bainbridgetrails.data.Units
+import com.bainbridgetrails.resources.roads_onboarding_2_milestones
+import com.bainbridgetrails.ui.components.milestoneDistance
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.nav.DebugLaunch
 import com.bainbridgetrails.resources.Res
@@ -92,6 +96,10 @@ fun OnboardingScreen(onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
     val completePct = (CoverageParams().completionThreshold * 100).roundToInt()
     val last = pager.currentPage == PAGES - 1
+    val goal = LocalGoal.current
+    // RD-4/RP-20: the "over N miles" number comes from the dataset (blank for the moment before it has loaded).
+    val datasetState by AppGraph.datasets.state.collectAsStateWithLifecycle()
+    val islandTotalM = (datasetState as? Loadable.Ready)?.value?.dataset?.islandTotalM
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).windowInsetsPadding(WindowInsets.safeDrawing), contentAlignment = Alignment.TopCenter) {
         Column(Modifier.fillMaxSize().widthIn(max = BtTheme.spacing.contentMaxWidth)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = BtTheme.spacing.xs), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
@@ -105,19 +113,29 @@ fun OnboardingScreen(onDone: () -> Unit) {
                     Spacer(Modifier.weight(1f))
                     Box(Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
                         when (page) {
-                            0 -> IslandIllustration(Modifier.fillMaxSize())
-                            1 -> TrailFillIllustration(pager.currentPage == 1, Modifier.fillMaxWidth())
+                            0 -> IslandIllustration(Modifier.fillMaxSize(), roads = goal.isRoads)
+                            1 -> if (goal.isRoads) RoadGridFillIllustration(pager.currentPage == 1, Modifier.fillMaxWidth())
+                            else TrailFillIllustration(pager.currentPage == 1, Modifier.fillMaxWidth())
                             else -> PrivacyIllustration(Modifier.fillMaxSize())
                         }
                     }
                     Spacer(Modifier.height(BtTheme.spacing.xl))
                     val (title, body) = when (page) {
-                        0 -> stringResource(Res.string.onboarding_1_title) to stringResource(Res.string.onboarding_1_body)
-                        1 -> stringResource(Res.string.onboarding_2_title) to stringResource(Res.string.onboarding_2_body, completePct)
-                        else -> stringResource(Res.string.onboarding_3_title) to stringResource(Res.string.onboarding_privacy_body)
+                        0 -> goal.string(Res.string.onboarding_1_title) to (islandTotalM?.let { goal.string(Res.string.onboarding_1_body, goal.islandTotalOver(it)) } ?: "")
+                        1 -> stringResource(Res.string.onboarding_2_title) to goal.string(Res.string.onboarding_2_body, completePct)
+                        else -> stringResource(Res.string.onboarding_3_title) to goal.string(Res.string.onboarding_privacy_body)
                     }
                     Text(title, Modifier.fillMaxWidth().semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
                     Text(body, Modifier.fillMaxWidth().padding(top = BtTheme.spacing.md), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (page == 1 && goal.isRoads) {
+                        // product.md §3.2: the milestone promise under the fill-in page (default unit: miles).
+                        Text(
+                            stringResource(Res.string.roads_onboarding_2_milestones, milestoneDistance(5, Units.MILES)),
+                            Modifier.fillMaxWidth().padding(top = BtTheme.spacing.md),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     if (page == 2) {
                         Text(
                             stringResource(Res.string.onboarding_3_signin_hint),
@@ -153,13 +171,16 @@ fun OnboardingScreen(onDone: () -> Unit) {
 
 /** Page 1: the real island network, trails shown in all four statuses (decorative). Water lines until data is ready. */
 @Composable
-private fun IslandIllustration(modifier: Modifier) {
+private fun IslandIllustration(modifier: Modifier, roads: Boolean) {
     val state by AppGraph.datasets.state.collectAsStateWithLifecycle()
     val data = (state as? Loadable.Ready)?.value
     val built by produceState<Pair<IslandGeometry, Map<String, TrailStatus>>?>(null, data) {
         if (data == null) return@produceState
         val g = IslandGeometry.forDataset(data.dataset)
         value = withContext(Dispatchers.Default) {
+            // Roads (docs/roads/ux.md §7 P1): the whole counted plat not started, "a little colored in" around
+            // Winslow (segments within 1.2 km of the ferry terminal), so it reads as a real island of streets.
+            if (roads) return@withContext g to OnboardingArt.winslowDemo(data.dataset)
             // Every named trail gets a status in turn, so the drawing shows the whole legend.
             val cycle = listOf(TrailStatus.COMPLETE, TrailStatus.PARTWAY, TrailStatus.NOT_STARTED, TrailStatus.NEARLY_DONE, TrailStatus.NOT_STARTED)
             val status = HashMap<String, TrailStatus>()

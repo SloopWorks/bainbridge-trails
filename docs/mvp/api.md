@@ -14,6 +14,8 @@ Follows `docs/mvp/decisions.md` (TL-*) over `product.md`.
 - Request size limits: coverage 512 KB, auth 16 KB, other bodies 1–4 KB (`413 payload_too_large`).
 - No CORS (mobile only). No timestamps, locations or walk data in any public response.
 - Percentages (`islandPct`, `medianPct`) are 0–100 with 1 decimal, **rounded down** (TL-5).
+- Datasets (RD-7): see [Datasets](#datasets-trails-and-roads). Everything defaults to `trails`; the roads app
+  adds `dataset=roads`.
 
 ## Error codes
 
@@ -21,7 +23,8 @@ Follows `docs/mvp/decisions.md` (TL-*) over `product.md`.
 |---|---|---|
 | 400 | `bad_request` | missing/invalid field |
 | 400 | `invalid_json` | body is not JSON / empty |
-| 400 | `invalid_coverage` | bad segment id, bad base64, bits beyond tick count, `tickM != 5`, bad walk id/duration, too many segments |
+| 400 | `invalid_dataset` | `dataset` not `trails`/`roads`, or body and query disagree |
+| 400 | `invalid_coverage` | bad segment id (incl. the other dataset's prefix), bad base64, bits beyond tick count, `tickM != 5`, bad walk id/duration, too many segments |
 | 400 | `too_many_walks` | more walks than allowed in one upload (`maxWalks`: 2000 before the first accepted upload, then 200) |
 | 400 | `name_invalid` | display name breaks a format rule, or bad `anonName` |
 | 400 | `name_rejected` | display name hits the blocklist |
@@ -142,8 +145,8 @@ a name longer than 24 chars) → 47 adjectives × 47 nouns × NN 10–99. The cl
 
 ### `DELETE /v1/me`
 
-Deletes the account and **all** server data (coverage, trail fractions, completions, walk ids, sessions,
-reports by/against, leaderboard row); revokes the Apple token when configured. `204`. Local data is the
+Deletes the account and **all** server data in every dataset (coverage, trail/road fractions, completions,
+metrics, walk ids, sessions, reports by/against, leaderboard rows); revokes the Apple token when configured. `204`. Local data is the
 client's decision (D12). Signing in again creates a fresh account.
 
 Public web page for store listings: `GET /delete-account` (HTML, no `/v1`).
@@ -158,6 +161,7 @@ keys sorted. Server responses are always normalized this way.
 
 ```json
 {
+  "dataset": "trails",
   "datasetVersion": "2026-10-18+aad9d16e",
   "tickM": 5,
   "segments": { "seg-000099": "Hw==", "seg-006755": "/////w8=" },
@@ -165,6 +169,7 @@ keys sorted. Server responses are always normalized this way.
 }
 ```
 
+- `dataset`: `trails` (default when absent) or `roads`; `?dataset=` works too. Roads sends only `rseg-*` ids.
 - Send the whole local `CoverageState` (or any subset — the server ORs, never removes bits).
 - `walks` (TL-2): **every** finished walk not yet acknowledged by a `200` (send them all in each upload, not
   one per request), `id` = random UUID per walk, `durationS` = walk duration. The **first upload after sign-in
@@ -185,6 +190,7 @@ keys sorted. Server responses are always normalized this way.
 `200`:
 ```json
 {
+  "dataset": "trails",
   "datasetVersion": "2026-10-18+aad9d16e",
   "tickM": 5,
   "segments": { "seg-000099": "Hw==", "seg-000412": "Aw==", "seg-006755": "/////w8=" },
@@ -199,17 +205,21 @@ keys sorted. Server responses are always normalized this way.
 - Union the returned `segments` into local state (this is how a new device gets history) and union
   `completedTrailIds` into the local sticky `completedTrailIds` (TL-7). The server's set is union-only too.
 - Only segments that count (included, or on a named trail) are stored. Other well-formed ids are accepted
-  and listed in `ignoredSegments` (not stored, not returned). Ids not matching `seg-NNNNNN` → `400`.
-- `429 rate_limited`: 30 uploads/hour. Upload per finished walk + once on sign-in, not continuously.
+  and listed in `ignoredSegments` (not stored, not returned). Ids not matching `seg-NNNNNN` (roads:
+  `rseg-NNNNNN`) → `400`.
+- `429 rate_limited`: 30 uploads/hour per account and dataset. Upload per finished walk + once on
+  sign-in, not continuously.
 
-### `GET /v1/coverage`
+### `GET /v1/coverage?dataset=trails|roads`
 
-Bearer required. `200`: same shape without `accepted`/`newlyCoveredM`/`ignoredSegments`.
+Bearer required. `200`: same shape without `accepted`/`newlyCoveredM`/`ignoredSegments`. `dataset` defaults to
+`trails`.
 
 ## Leaderboard
 
-### `GET /v1/leaderboard?limit=100`
+### `GET /v1/leaderboard?limit=100&dataset=trails|roads`
 
+`dataset` defaults to `trails`; each dataset has its own board (same rules). The response echoes `"dataset"`.
 Auth optional (send the bearer to get `isYou` and `you`; an invalid token → `401`). `limit` 1–100, default 100.
 Eligible: not hidden, island % > 0. Order: island % **as displayed** (floored to 0.1 %) desc → trails
 completed desc → server time the user reached that displayed % asc → user id. Ranks are unique 1..n.
@@ -220,6 +230,7 @@ row inside `entries`. Show `you` for the caller.
 
 ```json
 {
+  "dataset": "trails",
   "entries": [
     { "rank": 1, "userId": "8a3f…", "displayName": "Trail Fox", "islandPct": 41.2, "trailsCompleted": 30, "isYou": false },
     { "rank": 2, "userId": "c1d2…", "displayName": "Mossy Heron 42", "islandPct": 40.9, "trailsCompleted": 33, "isYou": true }
@@ -233,12 +244,14 @@ row inside `entries`. Show `you` for the caller.
 
 ## Community trail stats
 
-### `GET /v1/trails/stats`
+### `GET /v1/stats?dataset=trails|roads` (alias: `GET /v1/trails/stats` = trails)
 
-No auth (public, TL-4). From the daily snapshot. `Cache-Control: public, max-age=300`.
+No auth (public, TL-4). From the daily snapshot. `Cache-Control: public, max-age=300`. `dataset` defaults to
+`trails`; for roads, `trails` is keyed by counted road id.
 
 ```json
 {
+  "dataset": "trails",
   "datasetVersion": "2026-10-18+aad9d16e",
   "completionThreshold": 0.85,
   "minCount": 5,
@@ -271,11 +284,33 @@ review only (auto-hide was cut). Duplicate reports by the same user are no-ops. 
 | `POST /v1/admin/users/{id}/hide` (`{"hidden": false}` to unhide) | remove from leaderboard (immediately) + community stats (next snapshot) |
 | `POST /v1/admin/users/{id}/reset-name` | clear custom name (anon shown), clear reports |
 | `POST /v1/admin/users/{id}/dismiss-reports` | clear reports, keep name |
-| `POST /v1/admin/snapshot` | rebuild leaderboard + stats snapshots now (dev/tests) |
+| `POST /v1/admin/snapshot` | rebuild leaderboard + stats snapshots of every dataset now (dev/tests); `{ok, ranked, trails, datasets: {trails: {ranked, trails}, roads: {…}}}` |
+
+## Datasets (trails and roads)
+
+RD-7 (`docs/roads/decisions.md`): one account, two goals. `dataset` = `trails` (default) | `roads`.
+
+| | trails | roads |
+|---|---|---|
+| segment ids | `seg-NNNNNN` | `rseg-NNNNNN` |
+| `completedTrailIds`, stats keys | `trail-*` | `road-*` (counted roads only) |
+| `metrics.trailsCompleted` / `trailsTotal` | trails | **roads** (same field names) |
+| `metrics.islandTotalM` | trails `island_total_shippable_m` | roads `island_total_shippable_m` |
+
+- Per dataset: coverage, metrics, sticky completions, walk-id crediting and plausibility state, leaderboard,
+  community stats. A road's fraction is measured over its counted (included) segments only; completion
+  threshold 0.85, sticky (TL-7).
+- Per account (all datasets): sign-in, name, `hiddenFromBoard`, admin hide, reports, deletion. (The 30/h upload limit is per dataset.)
+- `GET /v1/me` `metrics` stay the **trails** dataset's; the roads app reads its metrics from
+  `GET /v1/coverage?dataset=roads` (and every `PUT` response).
+- Client changes for the roads build: send `"dataset": "roads"` in `PUT /v1/coverage`, add `?dataset=roads` to
+  `GET /v1/coverage`, `GET /v1/leaderboard`, and use `GET /v1/stats?dataset=roads`; compare `datasetVersion`
+  against `datasets.roads.datasetVersion` from `/v1/health`. The trails build needs no change.
 
 ## Other
 
-`GET /v1/health` → `{"ok": true, "datasetVersion": "…", "tickM": 5}`.
+`GET /v1/health` → `{"ok": true, "datasetVersion": "…", "tickM": 5, "datasets": {"trails": {"datasetVersion": "…", "tickM": 5}, "roads": {…}}}`
+(top-level `datasetVersion` is the trails dataset's).
 
 ## Public web pages (not JSON, no `/v1`)
 

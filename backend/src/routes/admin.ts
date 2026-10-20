@@ -30,7 +30,11 @@ export async function adminRoute(request: Request, env: Env, deps: Deps, path: s
     ).run();
     return json({ reports: results });
   }
-  if (path === "/v1/admin/snapshot") return json({ ok: true, ...(await rebuildSnapshots(env, deps.now())) });
+  if (path === "/v1/admin/snapshot") {
+    const built = await rebuildSnapshots(env, deps.now());
+    // top-level ranked/trails stay the trails dataset's (pre-RD-7 shape); every dataset under `datasets`
+    return json({ ok: true, ranked: built.trails.ranked, trails: built.trails.trails, datasets: built });
+  }
 
   const m = USER_ACTION.exec(path)!;
   const userId = m[1]!;

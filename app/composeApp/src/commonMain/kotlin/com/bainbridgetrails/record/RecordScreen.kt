@@ -1,5 +1,6 @@
 package com.bainbridgetrails.record
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -193,12 +194,12 @@ fun RecordScreen(
             TopControls(recording = false, onClose = onClose, chips = {}, locate = null)
             BottomCard(Modifier.align(Alignment.BottomCenter)) {
                 if (l is Load.Failed) {
-                    Text(stringResource(Res.string.record_loading_failed), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(LocalGoal.current.s(Res.string.record_loading_failed)), style = MaterialTheme.typography.titleMedium)
                     PrimaryButton(stringResource(Res.string.common_retry), onClick = { attempt++ }, modifier = Modifier.fillMaxWidth())
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         BusyIndicator(24.dp)
-                        Text(stringResource(Res.string.common_loading_trails), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(LocalGoal.current.s(Res.string.common_loading_trails)), style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
@@ -299,6 +300,16 @@ private fun RecordContent(
                 val auth = graph?.auth?.state?.collectAsStateWithLifecycle()?.value
                 val sync = graph?.sync?.state?.collectAsStateWithLifecycle()?.value
                 val data = AppGraph.datasets.state.collectAsStateWithLifecycle().value as? Loadable.Ready
+                val isRoads = com.bainbridgetrails.data.LocalGoal.current.isRoads
+                // Roads milestones (product.md §5.3), from this walk's own summary numbers; nothing stored.
+                val milestones = remember(s.summary, data, settings.units, isRoads) {
+                    val d = data?.value
+                    if (!isRoads || d == null) emptyList()
+                    else com.bainbridgetrails.ui.walkMilestones(
+                        d, s.summary, settings.units,
+                        islandReached = AppGraph.Celebration.islandReached(s.summary.islandBefore, s.summary.islandAfter),
+                    )
+                }
                 ResultsSheet(
                     summary = s.summary,
                     units = settings.units,
@@ -308,6 +319,8 @@ private fun RecordContent(
                     recovered = RecordingGraph.recoveredSessionId == s.summary.sessionId,
                     onSignIn = { done(); onSignIn() },
                     onDone = ::done,
+                    milestones = milestones,
+                    islandTotalM = data?.value?.dataset?.islandTotalM ?: 0.0,
                 )
             }
             is RecordingState.Recover -> AlertDialog(
@@ -332,7 +345,7 @@ private fun RecordContent(
                         Banner(stringResource(Res.string.record_stopped_reason, s.reason), Res.drawable.ic_warning, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
                     }
                     BusyIndicator(48.dp)
-                    Text(stringResource(Res.string.record_matching), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(LocalGoal.current.s(Res.string.record_matching)), style = MaterialTheme.typography.titleMedium)
                 }
             }
             is RecordingState.Recording -> BottomSheetSurface(bottom, maxFraction = 0.7f) {
@@ -347,7 +360,7 @@ private fun RecordContent(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Text(
-                            stringResource(if (approximate) Res.string.perm_precise_body else Res.string.record_needs_location),
+                            stringResource(if (approximate) LocalGoal.current.s(Res.string.perm_precise_body) else Res.string.record_needs_location),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                         )
@@ -369,7 +382,7 @@ private fun RecordContent(
             AlertDialog(
                 onDismissRequest = { confirmFinish = false },
                 title = { Text(stringResource(Res.string.record_finish_title)) },
-                text = { Text(stringResource(Res.string.record_finish_body)) },
+                text = { Text(stringResource(LocalGoal.current.s(Res.string.record_finish_body))) },
                 confirmButton = {
                     TextButton(onClick = {
                         confirmFinish = false
@@ -457,7 +470,7 @@ private fun RecordingChips(r: RecordingState.Recording) {
 @Composable
 private fun IdleContent(onStart: () -> Unit, onSettings: (() -> Unit)?) {
     Text(stringResource(Res.string.record_idle_title), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
-    Text(stringResource(Res.string.record_idle_what), style = MaterialTheme.typography.bodyMedium)
+    Text(stringResource(LocalGoal.current.s(Res.string.record_idle_what)), style = MaterialTheme.typography.bodyMedium)
     PrimaryButton(stringResource(Res.string.record_start), onClick = onStart, modifier = Modifier.fillMaxWidth(), icon = Res.drawable.ic_play_arrow, large = true)
     Text(stringResource(Res.string.record_idle_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -532,12 +545,12 @@ private fun RecordingSheet(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (rows.isEmpty()) stringResource(Res.string.record_live_header) else stringResource(Res.string.record_live_header_count, rows.size),
+                if (rows.isEmpty()) stringResource(LocalGoal.current.s(Res.string.record_live_header)) else stringResource(LocalGoal.current.s(Res.string.record_live_header_count), rows.size),
                 Modifier.weight(1f).semantics { heading() },
                 style = MaterialTheme.typography.titleMedium,
             )
             if (canExpand) {
-                val a11y = stringResource(if (expanded) Res.string.record_live_collapse_a11y else Res.string.record_live_expand_a11y)
+                val a11y = stringResource(if (expanded) LocalGoal.current.s(Res.string.record_live_collapse_a11y) else LocalGoal.current.s(Res.string.record_live_expand_a11y))
                 BtIcon(BtIcons.ExpandMore, a11y, Modifier.rotate(if (expanded) 0f else 180f), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -547,7 +560,7 @@ private fun RecordingSheet(
                 .padding(horizontal = BtTheme.spacing.screenH),
         ) {
             if (rows.isEmpty()) {
-                Text(stringResource(Res.string.record_live_empty), Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(LocalGoal.current.s(Res.string.record_live_empty)), Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 Text(stringResource(Res.string.record_live_provisional), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 for (row in if (expanded) rows else rows.take(2)) {

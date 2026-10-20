@@ -4,8 +4,9 @@ import type { Deps } from "../deps";
 import { ApiError, KB, badRequest, isObject, json, readJson } from "../http";
 import { publicName } from "../moderation/public-name";
 import { LIMITS, rateLimit } from "../ratelimit";
-import { META } from "../segments";
+import { type Dataset, METAS, parseDataset } from "../segments";
 import { type BoardSnapRow, getSnapshot } from "../snapshot";
+import { metricsFor } from "../users";
 import { floorTo } from "../util";
 
 /** Community counts below this are hidden (TL-4 / TL-11). */
@@ -25,11 +26,15 @@ function ahead(a: { island_rank: number; trails_completed: number; reached_at: n
   return a.id < b.id;
 }
 
-export async function leaderboard(url: URL, env: Env, deps: Deps, me: UserRow | null): Promise<Response> {
+/** GET /v1/leaderboard?dataset=trails|roads (default trails). Entry fields are shared (roads: trailsCompleted = roads). */
+export async function leaderboard(url: URL, env: Env, deps: Deps, me0: UserRow | null): Promise<Response> {
+  const dataset = parseDataset(url.searchParams.get("dataset") ?? undefined);
   const limitParam = url.searchParams.get("limit");
   const limit = limitParam === null ? 100 : Number(limitParam);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw badRequest("limit must be an integer 1-100");
-  const snap = await getSnapshot(env, deps.now());
+  const snap = await getSnapshot(env, deps.now(), dataset);
+  const mm = me0 ? await metricsFor(env, me0.id, dataset, deps.now()) : null;
+  const me = me0 && mm ? { ...me0, ...mm } : null;
 
   // entries are snapshot values (also the caller's own entry); `you` below is live
   const entries = snap.board.slice(0, limit).map((r, i) => ({
@@ -57,14 +62,18 @@ export async function leaderboard(url: URL, env: Env, deps: Deps, me: UserRow | 
     if (!inSnapshot) totalRanked += 1;
     you = { rank, userId: me.id, displayName: publicName(me), islandPct: me.island_rank / 10, trailsCompleted: me.trails_completed, isYou: true };
   }
-  return json({ entries, you, totalRanked });
+  return json({ dataset, entries, you, totalRanked });
 }
 
-/** GET /v1/trails/stats — from the daily snapshot; counts below 5 are null, larger ones rounded to 5. */
-export async function trailStats(env: Env, deps: Deps): Promise<Response> {
-  const snap = await getSnapshot(env, deps.now());
+/**
+ * GET /v1/stats?dataset=trails|roads (default trails); GET /v1/trails/stats is the trails alias.
+ * From the daily snapshot; counts below 5 are null, larger ones rounded to 5. Roads: `trails` is keyed by road id.
+ */
+export async function trailStats(env: Env, deps: Deps, dataset: Dataset): Promise<Response> {
+  const meta = METAS[dataset];
+  const snap = await getSnapshot(env, deps.now(), dataset);
   const trails: Record<string, { walkers: number | null; completedCount: number | null; medianPct: number | null }> = {};
-  for (const trailId of Object.keys(META.trails)) {
+  for (const trailId of Object.keys(meta.trails)) {
     const r = snap.stats.get(trailId);
     const walkers = communityCount(r?.walkers ?? 0);
     trails[trailId] = {
@@ -74,7 +83,7 @@ export async function trailStats(env: Env, deps: Deps): Promise<Response> {
     };
   }
   return json(
-    { datasetVersion: META.version, completionThreshold: COMPLETION_THRESHOLD, minCount: MIN_COMMUNITY_COUNT, trails },
+    { dataset, datasetVersion: meta.version, completionThreshold: COMPLETION_THRESHOLD, minCount: MIN_COMMUNITY_COUNT, trails },
     200,
     { "cache-control": "public, max-age=300" },
   );

@@ -46,19 +46,61 @@ npm run types       # regenerate worker-configuration.d.ts after editing wrangle
 ## Segment metadata
 
 The server needs per-segment length, tick count, tick length and `included`, plus trail -> segments, to
-recompute metrics. `scripts/build-segment-meta.mjs` builds `src/data/segments.json` (~80 KB, committed) from
-`data/dist/coverage_segments.json` + `data/dist/trails.json`:
+recompute metrics. `scripts/build-segment-meta.mjs` builds one committed file per dataset (RD-7):
+
+| Dataset | Source | Output |
+|---|---|---|
+| `trails` | `data/dist/{trails,coverage_segments}.json` | `src/data/segments.json` (~80 KB) |
+| `roads` | `data/roads/dist/{roads,coverage_segments}.json` | `src/data/segments.roads.json` (~165 KB) |
 
 ```sh
-npm run build:segments              # reads ../data/dist
-node scripts/build-segment-meta.mjs /path/to/dist
+npm run build:segments              # trails, reads ../data/dist
+npm run build:segments:roads        # roads, reads ../data/roads/dist
+node scripts/build-segment-meta.mjs [--dataset roads] /path/to/dist   # e.g. the main checkout's dist from a worktree
 ```
 
-Only segments that count are kept (included, or on a named trail). Tick count/length replicate the Kotlin
+Trails: only segments that count are kept (included, or on a named trail). Roads (`docs/roads/product.md`):
+only **counted** roads (`counted == true`) and only **included** `rseg-*` segments; a counted road keeps only
+its included segment ids, so its fraction is measured over its public part. The script fails if a segment id
+has the wrong prefix (`seg-` for trails, `rseg-` for roads). **Regenerate the roads file whenever the roads
+dataset is rebuilt** (segment re-splits mint new `rseg` ids), run `npm test`, and commit it with the app's
+roads dataset bump. Tick count/length replicate the Kotlin
 `SegmentIndex`/`resample` (same projection, `tickM = 5`). `data/dist` is gitignored; when the dataset
 changes, rebuild and commit the JSON together with the app's dataset bump. Uploads with another
 `datasetVersion` are still accepted (TL-7) and computed with the bundled dataset; ticks beyond a segment's
 current tick count are dropped.
+
+## Datasets (RD-7: trails and roads)
+
+One account can play two goals. Requests carry `dataset` = `trails` (default, so pre-RD-7 clients are
+unchanged) or `roads`: `PUT /v1/coverage` body field (or `?dataset=`), `GET /v1/coverage?dataset=`,
+`GET /v1/leaderboard?dataset=`, `GET /v1/stats?dataset=` (`/v1/trails/stats` = trails). Scoping:
+
+- `coverage` rows stay keyed by segment id alone; a dataset only accepts its own prefix (`seg-` / `rseg-`), and
+  reads use the prefix range, so the datasets never mix.
+- `user_metrics (user_id, dataset)` holds island metres/rank, completed count, `reached_at`, `metrics_version`,
+  `coverage_rev` (CAS) and walk state. The matching `users` columns are legacy (migration 0003 backfilled them
+  into `trails` rows with `metrics_version` NULL, so each is recomputed from `coverage` once; no longer read).
+  A new row also starts with `metrics_version` NULL (one recompute on first read).
+- `user_trails` / `user_completed` carry `dataset`; walk ids live in `walks_v2 (user_id, dataset, walk_id)` and
+  are credited per dataset. The upload rate limit is per dataset (`cov:<dataset>:<user>`, 30/h each).
+- Snapshots (`leaderboard_snapshot_v2`, `stats_snapshot_v2`, `snapshot_meta_v2`) are keyed by dataset; the cron
+  and `POST /v1/admin/snapshot` rebuild both. Name, hide-me, admin hide, reports and deletion are per user (all
+  datasets). `GET /v1/me` metrics stay the trails dataset's.
+
+### Rolling out migration 0003 (RD-7)
+
+0003 is additive: the previous Worker keeps working between `migrate:remote` and the Worker upload (it still
+writes `users` metrics, `walks` and the old snapshot tables; `test/migrations.test.ts` runs its statements on a
+migrated database). Steps:
+
+1. `npm run deploy` (applies 0003, then uploads the Worker).
+2. Right away: `curl -XPOST -H "Authorization: Bearer $ADMIN_TOKEN" https://<host>/v1/admin/snapshot`, so the
+   first public leaderboard/stats read doesn't build the new per-dataset snapshots inline.
+3. Once the new Worker is the only one serving (a few minutes later), apply the destructive cleanup:
+   `git mv migrations/0004_cleanup.sql.pending migrations/0004_cleanup.sql && npm run migrate:remote`, commit.
+   It copies walk ids the old Worker credited in the window into `walks_v2`, drops `walks` and the old snapshot
+   tables, and zeroes the legacy `users` metric columns.
 
 ## Public pages (privacy policy, terms, support)
 
@@ -114,7 +156,9 @@ Locally: `curl -XPOST -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8787/v1/
 
 ## Known limits
 
-- **CPU (free tier: 10 ms CPU/request).** A coverage upload decodes and ORs at most ~1,600 counted segments and
+- **CPU (free tier: 10 ms CPU/request).** Both segment-meta files (~245 KB JSON) are parsed once per isolate at
+  startup, not per request. A coverage upload decodes and ORs at most ~1,600 counted trail segments (trails) or
+  ~2,600 included road segments (roads, 2,619 after the RD-2 re-split; 430 counted roads) and
   recomputes metrics in one pass (not profiled yet; check with `wrangler tail` CPU time after deploy). A whole-island backfill with 2,000 walks is the worst case;
   if it ever exceeds the limit, clients retry with smaller walk batches. Snapshot rebuilds run in the cron (15 min CPU).
 - **Nonce.** `nonce` is optional, so a leaked, still-valid ID token (≤ 1 h) could be replayed to sign in.

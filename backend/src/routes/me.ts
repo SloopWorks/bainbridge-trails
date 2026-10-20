@@ -6,7 +6,8 @@ import { checkDisplayName, isAnonName, isBlocked } from "../moderation/names";
 import { publicName } from "../moderation/public-name";
 import { LIMITS, rateLimit } from "../ratelimit";
 import { snapshotRemove, snapshotRename } from "../snapshot";
-import { getUser } from "../users";
+import { META } from "../segments";
+import { type MetricsRow, getUser, metricsFor } from "../users";
 import { metricsJson } from "./coverage";
 
 export { publicName };
@@ -16,7 +17,8 @@ export function nameStatus(u: Pick<UserRow, "display_name">): "anonymous" | "ok"
   return isBlocked(u.display_name) ? "blocked" : "ok";
 }
 
-export function meBody(u: UserRow) {
+/** `metrics` are the trails dataset's (contract predates RD-7); roads metrics come with GET /v1/coverage?dataset=roads. */
+export function meBody(u: UserRow, trails: MetricsRow) {
   return {
     userId: u.id,
     provider: u.provider,
@@ -29,7 +31,7 @@ export function meBody(u: UserRow) {
     // explain why turning the toggle off doesn't bring the row back.
     hiddenFromBoard: u.self_hidden === 1,
     hiddenByModeration: u.hidden === 1,
-    metrics: metricsJson(u),
+    metrics: metricsJson(META, trails),
   };
 }
 
@@ -79,7 +81,11 @@ export async function putMe(request: Request, env: Env, deps: Deps, user: UserRo
       ...(hide ? snapshotRemove(env, user.id) : []),
     ]);
   }
-  return json(meBody((await getUser(env, user.id))!));
+  return json(meBody((await getUser(env, user.id))!, await metricsFor(env, user.id, "trails", deps.now())));
+}
+
+export async function getMe(env: Env, deps: Deps, user: UserRow): Promise<Response> {
+  return json(meBody(user, await metricsFor(env, user.id, "trails", deps.now())));
 }
 
 /** Account deletion: revoke Apple (best effort, TL-10), then remove every row tied to the user. */
@@ -93,11 +99,18 @@ export async function deleteUser(env: Env, deps: Deps, user: UserRow): Promise<v
     env.DB.prepare("DELETE FROM coverage WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM user_trails WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM user_completed WHERE user_id = ?").bind(id),
-    env.DB.prepare("DELETE FROM walks WHERE user_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM walks_v2 WHERE user_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM user_metrics WHERE user_id = ?").bind(id), // every dataset
     env.DB.prepare("DELETE FROM name_reports WHERE reporter_id = ?1 OR target_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id),
     ...snapshotRemove(env, id),
-    env.DB.prepare("DELETE FROM rate_limits WHERE key IN (?1, ?2, ?3, ?4)").bind(`cov:${id}`, `name:${id}`, `report:${id}`, `hide:${id}`),
+    env.DB.prepare("DELETE FROM rate_limits WHERE key IN (?1, ?2, ?3, ?4, ?5)").bind(
+      `cov:trails:${id}`,
+      `cov:roads:${id}`,
+      `name:${id}`,
+      `report:${id}`,
+      `hide:${id}`,
+    ),
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id),
   ]);
 }
