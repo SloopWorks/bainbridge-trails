@@ -7,6 +7,7 @@ import com.bainbridgetrails.coverage.LocalProjection
 import com.bainbridgetrails.coverage.Matcher
 import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
+import com.bainbridgetrails.coverage.SegmentsBinary
 import com.bainbridgetrails.coverage.filterFixes
 import com.bainbridgetrails.tracking.Gating
 import com.bainbridgetrails.tracking.SessionStore
@@ -19,10 +20,16 @@ private const val USAGE = """usage:
         [--smooth 0,10,20] [--sigmas 5,10,20] [--intervals 1,5,10] [--seeds 3] [--threshold 0.90]
         [--matchers competitive,hmm] [--hmm-sigmas 10] [--hmm-betas 5] [--off-network 25]  (HMM rows only)
   gpx --data DIR FILE.gpx...
-  session --data DIR FILE.jsonl   (re-gate a recorded session; prints counts and per-trail %, no coordinates)"""
+  session --data DIR FILE.jsonl   (re-gate a recorded session; prints counts and per-trail %, no coordinates)
+  pack-segments IN.json OUT.bin   (coverage_segments.json -> the app's coverage_segments.bin, verified by re-reading)"""
 
 fun main(args: Array<String>) {
     if (args.isEmpty()) usage()
+    if (args[0] == "pack-segments") {
+        if (args.size != 3) usage("pack-segments takes IN.json OUT.bin")
+        packSegments(File(args[1]), File(args[2]))
+        return
+    }
     val flags = HashMap<String, String>()
     val positional = ArrayList<String>()
     var i = 1
@@ -60,6 +67,18 @@ private fun usage(msg: String? = null): Nothing {
     msg?.let { System.err.println(it) }
     System.err.println(USAGE)
     exitProcess(2)
+}
+
+/** Writes [out] (atomically) from [input]; fails unless it decodes back to the same segments. */
+internal fun packSegments(input: File, out: File) {
+    val (version, segments) = Dataset.parseSegments(input.readText()).let { it.version to it.segments }
+    val bytes = SegmentsBinary.encode(version, segments)
+    val back = SegmentsBinary.decode(bytes)
+    check(back.version == version && back.segments == segments) { "pack-segments: round trip differs" }
+    val tmp = File(out.parentFile, out.name + ".part")
+    tmp.writeBytes(bytes)
+    check(tmp.renameTo(out)) { "pack-segments: cannot write $out" }
+    println("pack-segments: ${segments.size} segments, ${input.length() / 1024} KiB -> ${bytes.size / 1024} KiB ($version)")
 }
 
 private fun doubles(s: String) = s.split(",").map { it.trim().toDouble() }
