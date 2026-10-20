@@ -5,7 +5,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -56,7 +59,7 @@ class IslandGeometry(val aspect: Float, val land: List<FloatArray>, val trails: 
                     val x = ((c[0] - minLon) * k / h).toFloat()
                     val y = ((maxLat - c[1]) / h).toFloat()
                     val last = i == s.coords.lastIndex
-                    if (lx.isNaN() || last || abs(x - lx) + abs(y - ly) >= tolerance) {
+                    if (lx.isNaN() || (last && (x != lx || y != ly)) || abs(x - lx) + abs(y - ly) >= tolerance) {
                         out += x; out += y; lx = x; ly = y
                     }
                 }
@@ -87,9 +90,9 @@ fun IslandChart(
     water: Color,
     contentDescription: String,
     modifier: Modifier = Modifier,
+    land: Color = androidx.compose.material3.MaterialTheme.colorScheme.surface,
 ) {
     val colors = BtTheme.colors
-    val land = androidx.compose.material3.MaterialTheme.colorScheme.surface
     val ring = colors.waterLine
     val notCounted = colors.notCounted
     Spacer(
@@ -103,18 +106,21 @@ fun IslandChart(
                 val scale = min((size.width - 2 * pad) / geometry.aspect, size.height - 2 * pad).coerceAtLeast(1f)
                 val ox = (size.width - geometry.aspect * scale) / 2
                 val oy = (size.height - scale) / 2
-                fun pathOf(lines: Iterable<FloatArray>): Path = Path().apply {
+                fun pathOf(lines: Iterable<FloatArray>, joinless: Boolean = false): Path = Path().apply {
                     for (xy in lines) {
                         if (xy.size < 2) continue
                         moveTo(ox + xy[0] * scale, oy + xy[1] * scale)
                         if (xy.size == 2) lineTo(ox + xy[0] * scale + 0.1f, oy + xy[1] * scale)
                         var i = 2
                         while (i < xy.size) {
+                            // Joinless: each piece is its own contour (round caps only). Wide strokes on hairpin
+                            // vertices otherwise grow miter spikes on some renderers.
+                            if (joinless && i > 2) moveTo(ox + xy[i - 2] * scale, oy + xy[i - 1] * scale)
                             lineTo(ox + xy[i] * scale, oy + xy[i + 1] * scale); i += 2
                         }
                     }
                 }
-                val landPath = pathOf(geometry.land)
+                val landPath = pathOf(geometry.land, joinless = true)
                 val byStatus = HashMap<TrailStatus, MutableList<FloatArray>>()
                 val uncounted = ArrayList<FloatArray>()
                 for (t in geometry.trails) {
@@ -128,7 +134,9 @@ fun IslandChart(
                 val dotted = PathEffect.dashPathEffect(floatArrayOf(0.01f, 3.dp.toPx()))
                 val dashed = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 2.5.dp.toPx()))
                 val alphas = floatArrayOf(0.85f, 0.55f, 0.3f)
-                onDrawBehind {
+                // Drawn once into a bitmap per size/state: scrolling the Me list then only blits it.
+                val bitmap = ImageBitmap(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1))
+                CanvasDrawScope().draw(this, layoutDirection, Canvas(bitmap), size) {
                     // Water lines: offset outlines of the land union, outermost first, each cut back to water.
                     for (i in 2 downTo 0) {
                         val w = landW + 2 * ringGap * (i + 1)
@@ -145,6 +153,7 @@ fun IslandChart(
                     drawPath(paths.getValue(TrailStatus.NEARLY_DONE), colors.nearlyDone.line, style = stroke(2.dp.toPx()))
                     drawPath(paths.getValue(TrailStatus.COMPLETE), colors.complete.line, style = stroke(2.8.dp.toPx()))
                 }
+                onDrawBehind { drawImage(bitmap) }
             },
     )
 }

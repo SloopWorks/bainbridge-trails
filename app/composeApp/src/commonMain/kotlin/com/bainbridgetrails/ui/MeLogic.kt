@@ -84,6 +84,19 @@ object ListFormat {
         return if (d.year == now.year) base else "$base, ${d.year}"
     }
 
+    /** Walk-history duration, minute precision: "40 min", "1 hr 6 min", "2 hr" ("<1 min" under a minute). */
+    fun walkDuration(ms: Long): String {
+        val totalMin = ms.coerceAtLeast(0) / 60_000
+        if (totalMin == 0L) return "<1 min"
+        val h = totalMin / 60
+        val m = totalMin % 60
+        return when {
+            h == 0L -> "$m min"
+            m == 0L -> "$h hr"
+            else -> "$h hr $m min"
+        }
+    }
+
     /** Relative age of a timestamp, bucketed for "Updated …" lines. */
     fun age(thenMs: Long, nowMs: Long): Age {
         val min = ((nowMs - thenMs).coerceAtLeast(0) / 60_000).toInt()

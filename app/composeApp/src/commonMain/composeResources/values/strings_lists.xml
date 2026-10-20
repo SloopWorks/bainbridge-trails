@@ -47,8 +47,8 @@
     <string name="me_hero_caption">of the island’s trails walked</string>
     <string name="me_hero_caption_new">Your first walk will start coloring this in</string>
     <string name="me_hero_a11y">Island map of your trails: %1$s walked, %2$d of %3$d trails complete</string>
-    <string name="me_stat_miles_phone">Trail miles walked on this phone</string>
-    <string name="me_stat_km_phone">Trail km walked on this phone</string>
+    <string name="me_stat_miles_phone">Trail miles on this phone</string>
+    <string name="me_stat_km_phone">Trail km on this phone</string>
     <string name="me_stat_walks">Walks on this phone</string>
     <string name="me_stat_info_a11y">%1$s. What does this mean?</string>
     <string name="stat_island_info">Share of the island’s counted trail length you’ve covered. Walking the same section twice counts once.</string>
@@ -79,6 +79,7 @@
     <!-- Leaderboard -->
     <string name="board_subtitle">Ranked by share of the island walked. Ties go to more trails completed.</string>
     <string name="board_daily_note">Others update daily. Your row is live.</string>
+    <string name="board_daily_note_signed_out">The board updates daily.</string>
     <string name="board_col_rank">#</string>
     <string name="board_col_name">Name</string>
     <string name="board_col_island">Island</string>

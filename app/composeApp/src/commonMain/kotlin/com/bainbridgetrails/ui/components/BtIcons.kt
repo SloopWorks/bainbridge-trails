@@ -33,6 +33,10 @@ import com.bainbridgetrails.resources.ic_open_in_new
 import com.bainbridgetrails.resources.ic_person
 import com.bainbridgetrails.resources.ic_person_filled
 import com.bainbridgetrails.resources.ic_search
+import com.bainbridgetrails.resources.ic_refresh
+import com.bainbridgetrails.resources.ic_shuffle
+import com.bainbridgetrails.resources.ic_cloud_done
+import com.bainbridgetrails.resources.ic_sync
 import com.bainbridgetrails.resources.ic_settings
 import com.bainbridgetrails.resources.ic_verified_filled
 import org.jetbrains.compose.resources.DrawableResource
@@ -67,6 +71,10 @@ object BtIcons {
     val Person = Res.drawable.ic_person
     val PersonFilled = Res.drawable.ic_person_filled
     val Search = Res.drawable.ic_search
+    val Refresh = Res.drawable.ic_refresh
+    val Shuffle = Res.drawable.ic_shuffle
+    val CloudDone = Res.drawable.ic_cloud_done
+    val Sync = Res.drawable.ic_sync
     val Settings = Res.drawable.ic_settings
     val Verified = Res.drawable.ic_verified_filled
 }
