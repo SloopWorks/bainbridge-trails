@@ -158,8 +158,8 @@ private fun IslandIllustration(modifier: Modifier) {
     val data = (state as? Loadable.Ready)?.value
     val built by produceState<Pair<IslandGeometry, Map<String, TrailStatus>>?>(null, data) {
         if (data == null) return@produceState
+        val g = IslandGeometry.forDataset(data.dataset)
         value = withContext(Dispatchers.Default) {
-            val g = IslandGeometry.build(data.dataset.segments)
             // Every named trail gets a status in turn, so the drawing shows the whole legend.
             val cycle = listOf(TrailStatus.COMPLETE, TrailStatus.PARTWAY, TrailStatus.NOT_STARTED, TrailStatus.NEARLY_DONE, TrailStatus.NOT_STARTED)
             val status = HashMap<String, TrailStatus>()

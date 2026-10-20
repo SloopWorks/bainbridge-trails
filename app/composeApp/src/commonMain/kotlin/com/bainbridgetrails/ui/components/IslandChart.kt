@@ -5,10 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -17,9 +14,20 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.bainbridgetrails.coverage.Dataset
 import com.bainbridgetrails.coverage.SegmentGeom
 import com.bainbridgetrails.coverage.TrailStatus
+import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.ui.theme.BtTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -31,57 +39,85 @@ import kotlin.math.min
 class ChartLine(val id: String, val xy: FloatArray, val counted: Boolean)
 
 /**
- * The island drawn small (ux.md §3.7 hero): [land] = every mapped segment (its fat-stroked union reads as the island's
- * outline), [trails] = segments that can carry status (included, or on a named trail). Built once per dataset.
+ * The island drawn small (ux.md §3.7 hero): [land] = the coastline as closed rings (outer first, then holes),
+ * [trails] = segments that can carry status (included, or on a named trail). Built once per dataset ([forDataset]).
  */
 @Immutable
 class IslandGeometry(val aspect: Float, val land: List<FloatArray>, val trails: List<ChartLine>) {
     companion object {
         /**
          * Projects lon/lat to an equirectangular plane at the island's mean latitude, normalizes to height 1 and
-         * drops points closer than [tolerance] (chart units) to the previous kept one.
+         * drops points closer than [tolerance] (chart units) to the previous kept one. [coastline] = rings of
+         * [lon, lat] (scripts/build-coastline.sh); the frame covers coastline and segments together.
          */
-        fun build(segments: List<SegmentGeom>, tolerance: Float = 0.0015f): IslandGeometry {
-            if (segments.isEmpty()) return IslandGeometry(1f, emptyList(), emptyList())
+        fun build(segments: List<SegmentGeom>, coastline: List<List<DoubleArray>> = emptyList(), tolerance: Float = 0.0015f): IslandGeometry {
+            if (segments.isEmpty() && coastline.isEmpty()) return IslandGeometry(1f, emptyList(), emptyList())
             var minLon = Double.MAX_VALUE; var maxLon = -Double.MAX_VALUE
             var minLat = Double.MAX_VALUE; var maxLat = -Double.MAX_VALUE
-            for (s in segments) for (c in s.coords) {
-                minLon = min(minLon, c[0]); maxLon = max(maxLon, c[0])
-                minLat = min(minLat, c[1]); maxLat = max(maxLat, c[1])
+            fun extend(lon: Double, lat: Double) {
+                minLon = min(minLon, lon); maxLon = max(maxLon, lon)
+                minLat = min(minLat, lat); maxLat = max(maxLat, lat)
             }
+            for (s in segments) for (c in s.coords) extend(c[0], c[1])
+            for (r in coastline) for (c in r) extend(c[0], c[1])
             val k = cos((minLat + maxLat) / 2 * PI / 180)
             val h = (maxLat - minLat).coerceAtLeast(1e-9)
             val aspect = ((maxLon - minLon) * k / h).toFloat()
-            fun project(s: SegmentGeom): FloatArray {
-                val out = ArrayList<Float>(s.coords.size * 2)
+            fun project(coords: List<DoubleArray>, keepLast: Boolean): FloatArray {
+                val out = FloatArray(coords.size * 2)
+                var n = 0
                 var lx = Float.NaN; var ly = Float.NaN
-                s.coords.forEachIndexed { i, c ->
+                coords.forEachIndexed { i, c ->
                     val x = ((c[0] - minLon) * k / h).toFloat()
                     val y = ((maxLat - c[1]) / h).toFloat()
-                    val last = i == s.coords.lastIndex
+                    val last = keepLast && i == coords.lastIndex
                     if (lx.isNaN() || (last && (x != lx || y != ly)) || abs(x - lx) + abs(y - ly) >= tolerance) {
-                        out += x; out += y; lx = x; ly = y
+                        out[n++] = x; out[n++] = y; lx = x; ly = y
                     }
                 }
-                return out.toFloatArray()
+                return out.copyOf(n)
             }
-            val land = ArrayList<FloatArray>(segments.size)
+            val land = coastline.map { project(it, keepLast = false) }.filter { it.size >= 6 }
             val trails = ArrayList<ChartLine>()
             for (s in segments) {
-                val xy = project(s)
-                land += xy
-                if (s.included || s.trailIds.isNotEmpty()) trails += ChartLine(s.id, xy, s.included)
+                if (!s.included && s.trailIds.isEmpty()) continue
+                trails += ChartLine(s.id, project(s.coords.map { doubleArrayOf(it[0], it[1]) }, keepLast = true), s.included)
             }
             return IslandGeometry(aspect, land, trails)
+        }
+
+        /** Parses coastline.json (`{"rings": [[[lon, lat], …], …]}`); empty on any error (the chart then shows trails only). */
+        fun parseCoastline(json: String): List<List<DoubleArray>> = runCatching {
+            Json.parseToJsonElement(json).jsonObject.getValue("rings").jsonArray.map { ring ->
+                ring.jsonArray.map { p -> p.jsonArray.let { doubleArrayOf(it[0].jsonPrimitive.double, it[1].jsonPrimitive.double) } }
+            }
+        }.getOrDefault(emptyList())
+
+        private val lock = Mutex()
+        private var cached: Pair<Dataset, IslandGeometry>? = null
+
+        /**
+         * The geometry for [dataset], built once per process (Me and onboarding re-enter composition on every visit):
+         * reads coastline.json on IO and projects on Default, never on Main.
+         */
+        suspend fun forDataset(dataset: Dataset): IslandGeometry = lock.withLock {
+            cached?.takeIf { it.first === dataset }?.second ?: run {
+                val coast = withContext(Dispatchers.IO) { runCatching { Res.readBytes("files/coastline.json").decodeToString() }.getOrNull() }
+                withContext(Dispatchers.Default) { build(dataset.segments, coast?.let(::parseCoastline).orEmpty()) }
+                    .also { cached = dataset to it }
+            }
         }
     }
 }
 
 /**
- * Me hero drawing (ux.md §3.7): the island as the union of all mapped paths, ringed by three water lines (the Topo
- * coastline motif), with every counted segment in its own status color and map pattern (dotted / dashed / solid with
- * casing / thick). [water] must be the surface behind the chart (the rings are cut out of it).
+ * Me hero drawing (ux.md §3.7): the island's coastline filled in [land], ringed by three water lines (the Topo
+ * coastline motif), with every counted segment as a polyline in its status color and map pattern (solid hairline /
+ * dashed / solid with casing / thick). [water] must be the surface behind the chart (the rings are cut out of it).
  * [segmentStatus] = covered segments' own status (snapshot buckets); everything else is Not started.
+ *
+ * Drawn straight into the display list (rendered on the render thread), not into a software bitmap on Main: the
+ * old bitmap path stroked every mapped segment 8× with ~30 dp round caps and blocked Main ~1.5 s per Me visit.
  */
 @Composable
 fun IslandChart(
@@ -100,27 +136,22 @@ fun IslandChart(
             .clearAndSetSemantics { this.contentDescription = contentDescription }
             .drawWithCache {
                 val ringW = 1.dp.toPx()
-                val landW = 7.dp.toPx()
                 val ringGap = 4.dp.toPx()
-                val pad = landW / 2 + 3 * ringGap + ringW
+                val pad = 3 * ringGap + ringW + 2.dp.toPx()
                 val scale = min((size.width - 2 * pad) / geometry.aspect, size.height - 2 * pad).coerceAtLeast(1f)
                 val ox = (size.width - geometry.aspect * scale) / 2
                 val oy = (size.height - scale) / 2
-                fun pathOf(lines: Iterable<FloatArray>, joinless: Boolean = false): Path = Path().apply {
+                fun pathOf(lines: Iterable<FloatArray>, closed: Boolean = false): Path = Path().apply {
                     for (xy in lines) {
                         if (xy.size < 2) continue
                         moveTo(ox + xy[0] * scale, oy + xy[1] * scale)
                         if (xy.size == 2) lineTo(ox + xy[0] * scale + 0.1f, oy + xy[1] * scale)
                         var i = 2
-                        while (i < xy.size) {
-                            // Joinless: each piece is its own contour (round caps only). Wide strokes on hairpin
-                            // vertices otherwise grow miter spikes on some renderers.
-                            if (joinless && i > 2) moveTo(ox + xy[i - 2] * scale, oy + xy[i - 1] * scale)
-                            lineTo(ox + xy[i] * scale, oy + xy[i + 1] * scale); i += 2
-                        }
+                        while (i < xy.size) { lineTo(ox + xy[i] * scale, oy + xy[i + 1] * scale); i += 2 }
+                        if (closed) close()
                     }
                 }
-                val landPath = pathOf(geometry.land, joinless = true)
+                val landPath = pathOf(geometry.land, closed = true)
                 val byStatus = HashMap<TrailStatus, MutableList<FloatArray>>()
                 val uncounted = ArrayList<FloatArray>()
                 for (t in geometry.trails) {
@@ -131,29 +162,29 @@ fun IslandChart(
                 val uncountedPath = pathOf(uncounted)
 
                 fun stroke(w: Float, effect: PathEffect? = null): Stroke = Stroke(w, cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = effect)
-                val dotted = PathEffect.dashPathEffect(floatArrayOf(0.01f, 3.dp.toPx()))
                 val dashed = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 2.5.dp.toPx()))
                 val alphas = floatArrayOf(0.85f, 0.55f, 0.3f)
-                // Drawn once into a bitmap per size/state: scrolling the Me list then only blits it.
-                val bitmap = ImageBitmap(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1))
-                CanvasDrawScope().draw(this, layoutDirection, Canvas(bitmap), size) {
-                    // Water lines: offset outlines of the land union, outermost first, each cut back to water.
-                    for (i in 2 downTo 0) {
-                        val w = landW + 2 * ringGap * (i + 1)
-                        drawPath(landPath, ring.copy(alpha = alphas[i]), style = stroke(w + ringW * 2))
-                        drawPath(landPath, water, style = stroke(w))
+                val hasLand = geometry.land.isNotEmpty()
+                onDrawBehind {
+                    if (hasLand) {
+                        // Water lines at ringGap, 2·ringGap, 3·ringGap off the coast: a stroke centred on the coastline
+                        // reaches w/2 outside it, so ring i is a (2d + ringW) stroke with a (2d − ringW) water cut-out.
+                        for (i in 2 downTo 0) {
+                            val d = ringGap * (i + 1)
+                            drawPath(landPath, ring.copy(alpha = alphas[i]), style = stroke(2 * d + ringW))
+                            drawPath(landPath, water, style = stroke(2 * d - ringW))
+                        }
+                        drawPath(landPath, land)
+                        drawPath(landPath, ring, style = stroke(ringW))
                     }
-                    drawPath(landPath, ring, style = stroke(landW + ringW * 2))
-                    drawPath(landPath, land, style = stroke(landW))
                     // Status lines, weakest first so progress sits on top (map width hierarchy, ux.md §0).
-                    drawPath(uncountedPath, notCounted, style = stroke(1.dp.toPx()))
-                    drawPath(paths.getValue(TrailStatus.NOT_STARTED), colors.notStarted.line, style = stroke(1.4.dp.toPx(), dotted))
+                    drawPath(uncountedPath, notCounted, style = stroke(0.8.dp.toPx()))
+                    drawPath(paths.getValue(TrailStatus.NOT_STARTED), colors.notStarted.line, style = stroke(1.2.dp.toPx()))
                     drawPath(paths.getValue(TrailStatus.PARTWAY), colors.partway.line, style = stroke(1.8.dp.toPx(), dashed))
                     drawPath(paths.getValue(TrailStatus.NEARLY_DONE), colors.nearlyDoneCasing, style = stroke(3.4.dp.toPx()))
                     drawPath(paths.getValue(TrailStatus.NEARLY_DONE), colors.nearlyDone.line, style = stroke(2.dp.toPx()))
                     drawPath(paths.getValue(TrailStatus.COMPLETE), colors.complete.line, style = stroke(2.8.dp.toPx()))
                 }
-                onDrawBehind { drawImage(bitmap) }
             },
     )
 }

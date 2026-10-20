@@ -110,8 +110,6 @@ import com.bainbridgetrails.ui.components.TrailRow
 import com.bainbridgetrails.ui.components.bySegment
 import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PillShape
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.datetime.TimeZone
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -147,7 +145,7 @@ fun MeScreen(
             IconButton(onClick = onSettings) { BtIcon(BtIcons.Settings, stringResource(Res.string.me_settings_a11y)) }
         }
         DatasetGate(Modifier.weight(1f)) { data ->
-            val geometry by produceState<IslandGeometry?>(null, data) { value = withContext(Dispatchers.Default) { IslandGeometry.build(data.dataset.segments) } }
+            val geometry by produceState<IslandGeometry?>(null, data) { value = IslandGeometry.forDataset(data.dataset) }
             val s = snapshot
             val walks = history?.walks.orEmpty()
             val stats = MeLogic.stats(s?.islandFraction ?: 0.0, s?.trailsCompleted ?: 0, data.dataset.trails.size, walks)
