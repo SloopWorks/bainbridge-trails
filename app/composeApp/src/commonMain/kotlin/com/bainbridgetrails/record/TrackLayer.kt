@@ -27,16 +27,16 @@ internal fun trackGeoJson(track: List<Fix>): String = buildString {
     append("]}")
 }
 
-/** The live track of the current session, drawn above the style (in memory only). */
+/** The live track of the current session, drawn above the style (in memory only): `userTrack` 4dp + 2dp casing. */
 @Composable
 @MaplibreComposable
-fun TrackLayer(track: List<Fix>) {
+fun TrackLayer(track: List<Fix>, color: Color = Color(0xFF0B63CE), casing: Color = Color.White) {
     val json = remember(track) { trackGeoJson(track) }
     val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))
     LineLayer(
         id = "live-track-casing",
         source = source,
-        color = const(Color.White),
+        color = const(casing),
         width = const(8.dp),
         cap = const(LineCap.Round),
         join = const(LineJoin.Round),
@@ -44,8 +44,8 @@ fun TrackLayer(track: List<Fix>) {
     LineLayer(
         id = "live-track",
         source = source,
-        color = const(Color(0xFF0B63CE)),
-        width = const(4.5.dp),
+        color = const(color),
+        width = const(4.dp),
         cap = const(LineCap.Round),
         join = const(LineJoin.Round),
     )

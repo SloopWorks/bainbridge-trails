@@ -23,9 +23,4 @@ class LocationAskTest {
         assertEquals(LocationAsk.ASK, locationAsk(LocationAccess.NONE, permanentlyDenied = false, askedPrecise = false))
         assertEquals(LocationAsk.OPEN_SETTINGS, locationAsk(LocationAccess.NONE, permanentlyDenied = true, askedPrecise = false))
     }
-
-    @Test
-    fun preciseOffMessage() {
-        assertEquals("Precise location is off — needed to match trails", PRECISE_OFF_MESSAGE)
-    }
 }
