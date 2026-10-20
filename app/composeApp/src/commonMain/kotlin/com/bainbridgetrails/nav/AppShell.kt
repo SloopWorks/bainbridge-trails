@@ -173,6 +173,14 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
         if (!blocked) nav.openRecord()
     }
 
+    // Recording notification tapped: open the Record flow over whatever is showing (not over onboarding).
+    val openRecordRequested by NavRequests.openRecord.collectAsState()
+    LaunchedEffect(openRecordRequested, destination?.route) {
+        if (!openRecordRequested || destination == null || destination.isTab(OnboardingRoute)) return@LaunchedEffect
+        NavRequests.consumeOpenRecord()
+        if (!destination.isTab(RecordRoute) && !destination.hasRoute(CelebrationRoute::class)) nav.openRecord()
+    }
+
     // ux.md §3.4: the bar stays visible under Trail detail (its Start walk sits above it).
     val showBar = BarRoutes.any { destination.isTab(it) } || destination?.hasRoute(TrailDetailRoute::class) == true
     val reduced = BtTheme.motion.reduced

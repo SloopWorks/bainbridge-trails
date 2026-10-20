@@ -1,5 +1,6 @@
 package com.bainbridgetrails.app
 
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,6 +10,7 @@ import com.bainbridgetrails.App
 import com.bainbridgetrails.auth.AuthConfig
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.SpikeLaunch
+import com.bainbridgetrails.nav.NavRequests
 import com.sloopworks.debugdrawer.DebugDrawerHost
 
 class MainActivity : ComponentActivity() {
@@ -20,6 +22,7 @@ class MainActivity : ComponentActivity() {
         // Spike only, debuggable builds only (this activity is exported, so release must ignore extras):
         // `adb shell am start -n ... --es style DARK --es lat 47.655 --es lon -122.548 --es zoom 15`
         val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        handleNavIntent(intent)
         val extras = if (debuggable) intent.extras else null
         val options = extras?.keySet()?.associateWith { extras.getString(it).orEmpty() }.orEmpty()
         // No options = normal launch (tab shell). Any option = spike launch (scripts): screen/style/camera.
@@ -27,6 +30,17 @@ class MainActivity : ComponentActivity() {
         AuthConfig.googleWebClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
         DebugTools.install(this) // debug: drawer + log/analytics/backend wiring + dev sign-in; release: nothing
         setContent { DebugDrawerHost { App(launch) } }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNavIntent(intent)
+    }
+
+    /** The recording notification's tap (RecordingService) asks for the Record flow. */
+    private fun handleNavIntent(intent: Intent?) {
+        if (intent?.action == NavRequests.ACTION_OPEN_RECORD) NavRequests.requestOpenRecord()
     }
 
     /**

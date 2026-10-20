@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import com.bainbridgetrails.nav.NavRequests
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -259,7 +260,10 @@ class RecordingService : Service() {
             Intent(this, RecordingService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        // Tap → the running activity (singleTop + clearTop: onNewIntent, no second copy) opens the Record flow.
         val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
+            it.setAction(NavRequests.ACTION_OPEN_RECORD).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            it.removeCategory(Intent.CATEGORY_LAUNCHER)
             PendingIntent.getActivity(this, REQUEST_OPEN, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
         val notification = Notification.Builder(this, CHANNEL_ID)
