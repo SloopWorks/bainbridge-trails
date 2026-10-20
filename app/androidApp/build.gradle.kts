@@ -26,6 +26,23 @@ if (providers.gradleProperty("shipyardDeployPluginRepository").isPresent) {
 // variant; without it the app hides the opt-in (AndroidGeofences.declared is false). Never in release.
 val geofencePrototype = providers.gradleProperty("geofencePrototype").orNull == "true"
 
+// Release signing: keystore + passwords from Gradle properties or the environment (CI secrets), never from the repo.
+// All four present -> release is signed; otherwise assembleRelease produces androidApp-release-unsigned.apk.
+// -PreleaseSignWithDebugKey=true signs release with the local debug key instead (on-device testing of an R8 build
+// only; such an APK must never be distributed).
+fun releaseSetting(name: String): String? =
+    (providers.gradleProperty(name).orNull ?: providers.environmentVariable(name).orNull)?.takeIf { it.isNotBlank() }
+val releaseStoreFile = releaseSetting("BT_RELEASE_STORE_FILE")
+val releaseStorePassword = releaseSetting("BT_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = releaseSetting("BT_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = releaseSetting("BT_RELEASE_KEY_PASSWORD")
+val hasReleaseKey = listOf(releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword).all { it != null }
+val releaseSignWithDebugKey = providers.gradleProperty("releaseSignWithDebugKey").orNull == "true"
+
+// Version: -PbtVersionCode=<int> -PbtVersionName=<string> (CI/release), else the defaults below.
+val btVersionCode = providers.gradleProperty("btVersionCode").orNull?.toInt() ?: 1
+val btVersionName = providers.gradleProperty("btVersionName").orNull ?: "1.0"
+
 android {
     namespace = "com.bainbridgetrails.app"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -34,8 +51,8 @@ android {
         applicationId = "com.bainbridgetrails.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = btVersionCode
+        versionName = btVersionName
         // Google OAuth *web* client id for Sign in with Google (Credential Manager `serverClientId`; the backend's
         // GOOGLE_CLIENT_IDS must include it). `-PgoogleWebClientId=…` or gradle.properties; empty = the Google
         // button shows "not configured" (debug builds still offer dev sign-in).
@@ -50,14 +67,31 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         getByName("debug") {
             applicationIdSuffix = ".dev"
             buildConfigField("boolean", "GEOFENCE_PROTOTYPE", geofencePrototype.toString())
         }
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("boolean", "GEOFENCE_PROTOTYPE", "false")
+            signingConfig = when {
+                releaseSignWithDebugKey -> signingConfigs.getByName("debug")
+                hasReleaseKey -> signingConfigs.getByName("release")
+                else -> null
+            }
         }
     }
     compileOptions {
