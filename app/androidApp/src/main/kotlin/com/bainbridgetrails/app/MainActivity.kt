@@ -15,6 +15,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge() // the shell draws behind system bars and applies insets itself
         super.onCreate(savedInstanceState)
         AppGraph.warmUp() // dataset parse (off Main) overlaps the first composition instead of following it
+        preloadMapNative()
         // Spike only, debuggable builds only (this activity is exported, so release must ignore extras):
         // `adb shell am start -n ... --es style DARK --es lat 47.655 --es lon -122.548 --es zoom 15`
         val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
@@ -24,5 +25,18 @@ class MainActivity : ComponentActivity() {
         val launch = if (options.isEmpty()) null else SpikeLaunch.parse(options)
         DebugTools.install(this) // debug: drawer + log/analytics/backend wiring; release: nothing
         setContent { DebugDrawerHost { App(launch) } }
+    }
+
+    /**
+     * MapLibre's first use loads its native library through JavaCPP's Loader in a static initializer (~200 ms on a
+     * debug emulator), on Main inside the first map composition. Running that initializer on a background thread
+     * now moves the work off Main; if the map gets there first it simply waits for it (class-init lock). Best
+     * effort: a renamed class in a library update only loses the head start.
+     */
+    private fun preloadMapNative() {
+        val loader = classLoader
+        Thread({
+            runCatching { Class.forName("org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC", true, loader) }
+        }, "map-native-preload").start()
     }
 }

@@ -47,7 +47,7 @@ Branch `spike4/location-activity`. Dev build published to channel `dev-spike4-lo
 - iOS diag (UIDevice battery) unverified at runtime.
 - Live provisional % during the walk (today: results only at Finish).
 - Raw-track retention: propose keep 30 days after finalise, then delete (coverage store keeps the result).
-- `Dataset.parse` takes 5-8.6 s on a debug emulator; measure on release/device, consider a binary format.
+- `Dataset.parse` took 5-8.6 s on a debug emulator: done, the app loads `dataset.bin` (`DatasetBinary`, ~0.5-1 s there, JSON kept as fallback and for coverage-eval).
 - R8 stale-fix filter compares `Location.time` to the wall clock: done, fixes up to 3 s before the start count (`SessionFix.CLOCK_SKEW_TOLERANCE_MS`).
 - Steps restart at 0 on resume.
 - The step heartbeat asserts "unchanged" every 30 s. If a step counter delivers late (sensor batching with the screen off) or the iOS pedometer query fails while live updates are withheld, a genuine walking window could be dropped; check the field-test step samples for this.
