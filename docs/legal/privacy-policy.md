@@ -98,7 +98,7 @@ security. These logs are kept for no more than 7 days.
 - **Service providers** that run parts of the service for us:
   - Cloudflare, Inc. hosts our server and database (United States and Cloudflare's global network).
   - Google and Apple handle sign-in when you choose to sign in with them, under their own privacy policies.
-  - The map's label fonts are downloaded from GitHub Pages (GitHub, Inc.) the first time the map needs them.
+  - The map's label fonts are downloaded from GitHub Pages (GitHub, Inc.) when the map needs them.
     That request contains no location or account information, but GitHub sees your IP address as with any web
     request. The map tiles and trail data themselves are built into the app.
   - If you tap Directions, your phone's maps app opens with the trailhead location; that app's own policy
