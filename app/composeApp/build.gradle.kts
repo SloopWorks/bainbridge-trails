@@ -6,6 +6,11 @@ plugins {
 }
 
 kotlin {
+    compilerOptions {
+        // PlatformContext (expect abstract class / actual typealias) — the Coil pattern.
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     android {
         namespace = "com.bainbridgetrails.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -35,8 +40,14 @@ kotlin {
             implementation(libs.maplibre.compose)
             implementation(libs.kotlinx.io.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(project(":tracking"))
+            // Already on the classpath via Compose; explicit because RecordScreen uses LifecycleResumeEffect.
+            implementation(libs.androidx.lifecycle.runtime.compose)
         }
         androidMain.dependencies {
+            implementation(libs.play.services.location)
+            implementation(libs.androidx.activity.compose)
             // MapLibre Native render backend. OpenGL ES: widest device + emulator support.
             runtimeOnly(libs.maplibre.compose.runtime.opengl.android)
         }

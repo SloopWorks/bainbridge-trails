@@ -4,6 +4,7 @@
 *.iml
 local.properties
 .gradle/
+.kotlin/
 build/
 .venv/
 __pycache__/
@@ -16,3 +17,12 @@ data/dist/*
 # map data copied into the app by scripts/sync-app-assets.sh
 app/composeApp/src/commonMain/composeResources/files/*.pmtiles
 app/composeApp/src/commonMain/composeResources/files/trails.json
+app/composeApp/src/commonMain/composeResources/files/coverage_segments.json
+app/composeApp/src/commonMain/composeResources/files/trailheads.json
+
+# real GPS tracks: never committed
+data/tracks/private/
+*.gpx
+*.GPX
+*.fit
+*.FIT

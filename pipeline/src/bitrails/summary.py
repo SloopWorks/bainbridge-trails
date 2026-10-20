@@ -80,7 +80,35 @@ def manager_stats(features: list[dict], private: Path) -> dict[str, list]:
     return acc
 
 
-def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclusion_path: Path) -> str:
+OFFICIAL_GAP = 0.15
+
+
+def official_vs_computed_rows(trails: list[dict]) -> list[list]:
+    """Rows for trails with an official length. Each trail dict: name, official_length_mi, official_length_source,
+    computed_mi (shippable), agency_only_mi. diff_% = (computed + agency_only - official) / official;
+    flagged with a warning sign when |diff| exceeds OFFICIAL_GAP."""
+    rows = []
+    for t in sorted(trails, key=lambda t: t["name"]):
+        off = t.get("official_length_mi")
+        if off is None:
+            continue
+        diff = (t["computed_mi"] + t["agency_only_mi"] - off) / off
+        flag = " ⚠" if abs(diff) > OFFICIAL_GAP else ""
+        rows.append([t["name"], off, round(t["computed_mi"], 3), round(t["agency_only_mi"], 3),
+                     f"{diff * 100:+.0f}%{flag}", t.get("official_length_source") or ""])
+    return rows
+
+
+def tiny_trail_rows(canon_trails: list[dict], dist_trails: list[dict], ship_ids: set[str]) -> list[list]:
+    """[name, receiver name | "hidden"] for named canonical trails with shippable segments that dist folded or hid."""
+    kept = {t["id"] for t in dist_trails}
+    into = {f: t["name"] for t in dist_trails for f in t.get("folded_from", [])}
+    return [[t["name"], into.get(t["id"], "hidden")] for t in canon_trails
+            if t["id"] not in kept and (t.get("name") or "").strip() and any(i in ship_ids for i in t["segment_ids"])]
+
+
+def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclusion_path: Path,
+                  dist_trails: list[dict] | None = None) -> str:
     doc = json.loads((canonical / "trails.json").read_text())
     ds, trails = doc["dataset"], doc["trails"]
     feats = json.loads((canonical / "segments.geojson").read_text())["features"]
@@ -117,6 +145,18 @@ def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclu
                   t["official_length_mi"] if t["official_length_mi"] is not None else "", t["computed_length_mi"],
                   t.get("gain_m", ""), t.get("loss_m", "")]
                  for t in sorted(trails, key=lambda t: (-t["computed_length_mi"], t["id"]))])
+    ship_len = {f["properties"]["id"]: f["properties"]["length_m"] for f in feats}
+    ovc = []
+    for t in trails:
+        comp = sum(ship_len.get(i, 0.0) for i in t["segment_ids"]) / MI
+        ovc.append({**t, "computed_mi": comp, "agency_only_mi": max(0.0, t["computed_length_mi"] - comp)})
+    orows = official_vs_computed_rows(ovc)
+    L += ["", "## Official vs computed length", "",
+          "Official = agency-published mileage set in `trails_overrides.yaml` with a cited source. computed_mi = "
+          "shippable segments (what the app can draw); agency_only_mi = private geometry. diff_% compares "
+          "computed + agency-only with official; ⚠ = off by more than 15%.", ""]
+    L += _table(["trail", "official_mi", "computed_mi", "agency_only_mi", "diff_%", "source"], orows) \
+        if orows else ["(no trail has an official length yet)"]
     L += ["", "## Owner review", "",
           "### Classification rule (`data/inclusion.yaml`)", "",
           "A segment counts toward the island total when its public_access is not `no` and its category is in "
@@ -149,6 +189,14 @@ def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclu
     L += [f"- {t['name']} ({t['computed_length_mi']} mi)" for t in dropped] or ["(none)"]
     L += ["", "Shipped trails in `data/dist/trails.json` use shippable segments only (length, gain/loss, trailheads); "
           "`agency_only_length_mi` is the part still missing.", ""]
+    if dist_trails is not None:
+        tiny = tiny_trail_rows(trails, dist_trails, ship_ids)
+        L += ["### Tiny trails folded/hidden", "",
+              f"Trails under 30 m ({len(tiny)}) are merged into the longest touching trail (segments within 1 m) "
+              "or hidden when nothing touches them, so a tiny trail inside a neighbour's GPS buffer is not "
+              "auto-completed. Segments and island totals are unchanged.", ""]
+        L += _table(["trail", "folded into"], tiny) if tiny else ["(none)"]
+        L += [""]
     srcs = yaml.safe_load(sources_path.read_text())["sources"]
     L += ["### Agency data licensing (your call)", "",
           "BIMPRD, City and STO datasets have `redistribution: unknown` in sources.yaml. Shipped geometry comes "
@@ -169,6 +217,6 @@ def build_summary(canonical: Path, conflicts_md: Path, sources_path: Path, inclu
 
 def write_summary(canonical: Path = DATA / "canonical", out: Path = DATA / "reports" / "summary.md",
                   conflicts_md: Path = DATA / "reports" / "conflicts.md", sources_path: Path = DATA / "sources.yaml",
-                  inclusion_path: Path = DATA / "inclusion.yaml") -> Path:
-    out.write_text(build_summary(canonical, conflicts_md, sources_path, inclusion_path))
+                  inclusion_path: Path = DATA / "inclusion.yaml", dist_trails: list[dict] | None = None) -> Path:
+    out.write_text(build_summary(canonical, conflicts_md, sources_path, inclusion_path, dist_trails))
     return out

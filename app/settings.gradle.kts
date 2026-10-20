@@ -30,3 +30,6 @@ dependencyResolutionManagement {
 
 include(":composeApp")
 include(":androidApp")
+include(":coverage")
+include(":coverage-eval")
+include(":tracking")

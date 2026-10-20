@@ -11,6 +11,15 @@ class SpikeLaunchTest {
         assertEquals(MapStyle.Default, l.style)
         assertEquals(IslandCamera, l.camera)
         assertNull(l.switchTo)
+        assertEquals(SpikeLaunch.Screen.RECORD, l.screen)
+    }
+
+    @Test
+    fun picksScreen() {
+        assertEquals(SpikeLaunch.Screen.STYLE, SpikeLaunch.parse(mapOf("screen" to "style")).screen)
+        assertEquals(SpikeLaunch.Screen.STYLE, SpikeLaunch.parse(mapOf("style" to "dark")).screen)
+        assertEquals(SpikeLaunch.Screen.RECORD, SpikeLaunch.parse(mapOf("screen" to "record", "style" to "dark")).screen)
+        assertEquals(SpikeLaunch.Screen.RECORD, SpikeLaunch.parse(mapOf("lat" to "47.6", "lon" to "-122.5")).screen)
     }
 
     @Test

@@ -105,7 +105,7 @@ def cmd_build(args: argparse.Namespace) -> int:
 def cmd_dist(args: argparse.Namespace) -> int:
     doc = run_dist(args.canonical, args.out_dir, args.sources)
     print(f"dist: version {doc['version']}, {len(doc['trails'])} trails -> {args.out_dir}")
-    print(f"summary: {write_summary(args.canonical, args.summary, args.report, args.sources)}")
+    print(f"summary: {write_summary(args.canonical, args.summary, args.report, args.sources, dist_trails=doc['trails'])}")
     return 0
 
 

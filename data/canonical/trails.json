@@ -97,6 +97,7 @@
       "manager": null,
       "name": "Allan's Alley",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -121,6 +122,7 @@
       "manager": null,
       "name": "Arbor Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -137,6 +139,7 @@
       "manager": "BIMPRD",
       "name": "Bainbridge Island Japanese American Memorial Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/52/638894530550170000",
       "park": "Pritchard Park",
       "segment_ids": [
@@ -159,6 +162,7 @@
       "manager": "BIMPRD",
       "name": "Battle Point",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/48/638894530544230000",
       "park": "Battle Point Park",
       "segment_ids": [
@@ -217,6 +221,7 @@
       "manager": "BIMPRD",
       "name": "Battle Point Equestrial Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/48/638894530544230000",
       "park": "Battle Point Park",
       "segment_ids": [
@@ -236,6 +241,7 @@
       "manager": "BIMPRD",
       "name": "Battle Point Park Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/48/638894530544230000",
       "park": "Battle Point Park",
       "segment_ids": [
@@ -252,6 +258,7 @@
       "manager": "BIMPRD",
       "name": "Blakely Harbor Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Blakely Harbor Park",
       "segment_ids": [
@@ -281,6 +288,7 @@
       "manager": "BIMPRD",
       "name": "Blakely Hills Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/64/638894530567570000",
       "park": null,
       "segment_ids": [
@@ -310,6 +318,7 @@
       "manager": "BIMPRD",
       "name": "Blakely to Eagledale Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -333,6 +342,7 @@
       "manager": "BIMPRD",
       "name": "Blakely Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Blakely Harbor Park",
       "segment_ids": [
@@ -357,6 +367,7 @@
       "manager": "BIMPRD",
       "name": "Blakley Cemetary Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -375,6 +386,7 @@
       "manager": "BIMPRD",
       "name": "Bluff Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -401,6 +413,7 @@
       "manager": "BIMPRD",
       "name": "Bristle Ridge Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -419,6 +432,7 @@
       "manager": "BIMPRD",
       "name": "Cambridge Crest Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -435,6 +449,7 @@
       "manager": null,
       "name": "Camelia Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -452,6 +467,7 @@
       "manager": "BIMPRD",
       "name": "Camp Yeomalt Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Camp Yeomalt",
       "segment_ids": [
@@ -472,6 +488,7 @@
       "manager": "City of Bainbridge Island",
       "name": "Cave Ave to Curtis Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -497,6 +514,7 @@
       "manager": null,
       "name": "City Hall Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -520,6 +538,7 @@
       "manager": "BIMPRD",
       "name": "Close Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -546,6 +565,7 @@
       "manager": "BIMPRD",
       "name": "Creek to 305 Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
       "park": "Sakai Park",
       "segment_ids": [
@@ -562,6 +582,7 @@
       "manager": null,
       "name": "Dock Street road end",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -578,6 +599,7 @@
       "manager": "BIMPRD",
       "name": "East Bridge to Lookout Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
       "park": "Sakai Park",
       "segment_ids": [
@@ -595,6 +617,7 @@
       "manager": null,
       "name": "Fairview Avenue Path",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -611,6 +634,7 @@
       "manager": "BIMPRD",
       "name": "Fairy Dell Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -644,6 +668,7 @@
       "manager": "BIMPRD",
       "name": "Farm Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -661,6 +686,7 @@
       "manager": "BIMPRD",
       "name": "Farm Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -678,6 +704,7 @@
       "manager": "BIMPRD",
       "name": "Farm Trail Grace Church",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -696,6 +723,7 @@
       "manager": "BIMPRD",
       "name": "Farm Trail North",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -712,6 +740,7 @@
       "manager": "BIMPRD",
       "name": "Farm Trail South",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -728,6 +757,7 @@
       "manager": null,
       "name": "Fletcher Landing Road End",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -746,6 +776,7 @@
       "manager": "BIMPRD",
       "name": "Forest to Sky Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -782,6 +813,7 @@
       "manager": "BIMPRD",
       "name": "Fort Ward Fence Line Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
       "park": "Fort Ward Park",
       "segment_ids": [
@@ -799,6 +831,7 @@
       "manager": "BIMPRD",
       "name": "Fort Ward to Blakely Harbor Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
       "park": "Blakely Harbor Park",
       "segment_ids": [
@@ -822,6 +855,7 @@
       "manager": "BIMPRD",
       "name": "Fort Ward Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
       "park": null,
       "segment_ids": [
@@ -838,6 +872,7 @@
       "manager": "BIMPRD",
       "name": "Fort Ward Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
       "park": null,
       "segment_ids": [
@@ -854,6 +889,7 @@
       "manager": "BIMPRD",
       "name": "Fort Ward Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
       "park": "Fort Ward Park",
       "segment_ids": [
@@ -890,6 +926,7 @@
       "manager": "BIMPRD",
       "name": "Gazzam Lake Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -907,6 +944,7 @@
       "manager": "BIMPRD",
       "name": "Gazzam Lake Main Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -938,6 +976,7 @@
       "manager": "BIMPRD",
       "name": "Gazzam to Veterane",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -957,6 +996,7 @@
       "manager": "BIMPRD",
       "name": "Gideon Park Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Gideon Park",
       "segment_ids": [
@@ -977,6 +1017,7 @@
       "manager": "BIMPRD",
       "name": "Gideon Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Gideon Park",
       "segment_ids": [
@@ -993,6 +1034,7 @@
       "manager": "BIMPRD",
       "name": "Grand Forest East Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -1030,6 +1072,7 @@
       "manager": "BIMPRD",
       "name": "Grand Forest North",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -1048,6 +1091,7 @@
       "manager": "BIMPRD",
       "name": "Grand Forest North Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -1068,6 +1112,7 @@
       "manager": "BIMPRD",
       "name": "Grand Forest to Miller connection",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -1084,6 +1129,7 @@
       "manager": "BIMPRD",
       "name": "Grand Forest West",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -1125,6 +1171,7 @@
       "manager": "BIMPRD",
       "name": "Grand Foreste East Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -1142,6 +1189,7 @@
       "manager": "BIMPRD",
       "name": "Hawley Cove Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/42/638894530535930000",
       "park": "Hawley Cove Park",
       "segment_ids": [
@@ -1161,6 +1209,7 @@
       "manager": "BIMPRD",
       "name": "Hayano Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/50/638894530547330000",
       "park": "Moritani Preserve",
       "segment_ids": [
@@ -1180,6 +1229,7 @@
       "manager": null,
       "name": "Heyday Farm Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1197,6 +1247,7 @@
       "manager": "BIMPRD",
       "name": "Hidden Cove Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/60/638894530560930000",
       "park": null,
       "segment_ids": [
@@ -1215,6 +1266,7 @@
       "manager": "BIMPRD",
       "name": "Hidden Cove to Spargur Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/60/638894530560930000",
       "park": null,
       "segment_ids": [
@@ -1231,6 +1283,7 @@
       "manager": "BIMPRD",
       "name": "Hidden Cove Trails",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/60/638894530560930000",
       "park": null,
       "segment_ids": [
@@ -1261,6 +1314,7 @@
       "manager": "BIMPRD",
       "name": "Hidden Cove Trails",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/60/638894530560930000",
       "park": null,
       "segment_ids": [
@@ -1277,6 +1331,7 @@
       "manager": "BIMPRD",
       "name": "Hilltop Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1296,6 +1351,7 @@
       "manager": "BIMPRD",
       "name": "Hilltop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -1325,6 +1381,7 @@
       "manager": null,
       "name": "Himalayan Birch Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1343,6 +1400,7 @@
       "manager": null,
       "name": "Horseshoe Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1359,6 +1417,7 @@
       "manager": "BIMPRD",
       "name": "Howley Cove Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/42/638894530535930000",
       "park": "Hawley Cove Park",
       "segment_ids": [
@@ -1375,6 +1434,7 @@
       "manager": "City of Bainbridge Island",
       "name": "Ihland Way Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1392,6 +1452,7 @@
       "manager": "BIMPRD",
       "name": "John Nelson Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/62/638894530564470000",
       "park": "John Nelson Park",
       "segment_ids": [
@@ -1415,6 +1476,7 @@
       "manager": "BIMPRD",
       "name": "Kallgren Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/56/638894530555600000",
       "park": "Ted Olson Nature Preserve",
       "segment_ids": [
@@ -1431,6 +1493,7 @@
       "manager": "BIMPRD",
       "name": "Knudsen Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -1455,6 +1518,7 @@
       "manager": "BIMPRD",
       "name": "Kojima Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1472,6 +1536,7 @@
       "manager": "BIMPRD",
       "name": "Koura to Yukio Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1488,6 +1553,7 @@
       "manager": null,
       "name": "Liz Orr Meditation Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1505,6 +1571,7 @@
       "manager": null,
       "name": "Lost Valley Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1526,6 +1593,7 @@
       "manager": "BIMPRD",
       "name": "Lower Fort Ward Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
       "park": "Fort Ward Park",
       "segment_ids": [
@@ -1545,6 +1613,7 @@
       "manager": "City of Bainbridge Island",
       "name": "Lower Veterane Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -1561,6 +1630,7 @@
       "manager": "BIMPRD",
       "name": "Main Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -1599,6 +1669,7 @@
       "manager": "BIMPRD",
       "name": "Manzanita Park",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/44/638894530538700000",
       "park": "Manzanita Park",
       "segment_ids": [
@@ -1637,6 +1708,7 @@
       "manager": "BIMPRD",
       "name": "Manzanita Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/44/638894530538700000",
       "park": "Manzanita Park",
       "segment_ids": [
@@ -1657,6 +1729,7 @@
       "manager": "BIMPRD",
       "name": "McRedmond Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1678,6 +1751,7 @@
       "manager": "BIMPRD",
       "name": "Meigs Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Meigs Park",
       "segment_ids": [
@@ -1716,6 +1790,7 @@
       "manager": null,
       "name": "Morgan Road Path",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1733,6 +1808,7 @@
       "manager": null,
       "name": "Moss Garden",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1749,6 +1825,7 @@
       "manager": "BIMPRD",
       "name": "North Loop to Boardwalk Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
       "park": "Sakai Park",
       "segment_ids": [
@@ -1767,6 +1844,7 @@
       "manager": "BIMPRD",
       "name": "North Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
       "park": "Sakai Park",
       "segment_ids": [
@@ -1787,6 +1865,7 @@
       "manager": "BIMPRD",
       "name": "Nutes Pond Trails",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Nute's Pond",
       "segment_ids": [
@@ -1809,6 +1888,7 @@
       "manager": "Bainbridge Island Parks & Trails Foundation",
       "name": "Nutes to Sunny Hill Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1835,6 +1915,7 @@
       "manager": "BIMPRD",
       "name": "Nutes Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Nute's Pond",
       "segment_ids": [
@@ -1853,6 +1934,7 @@
       "manager": "BIMPRD",
       "name": "Oddfellow's Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1870,6 +1952,7 @@
       "manager": "BIMPRD",
       "name": "Old Mill Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1886,6 +1969,7 @@
       "manager": "BIMPRD",
       "name": "Opal Ridge Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -1904,6 +1988,7 @@
       "manager": "BIMPRD",
       "name": "Penny Place Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1921,6 +2006,7 @@
       "manager": "BIMPRD",
       "name": "Peter's Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -1946,6 +2032,7 @@
       "manager": null,
       "name": "Port Madison Water Company Trail #1",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1962,6 +2049,7 @@
       "manager": null,
       "name": "Port Madison Water Company Trail #2",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -1979,6 +2067,7 @@
       "manager": "BIMPRD",
       "name": "Pritchard Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/52/638894530550170000",
       "park": "Pritchard Park",
       "segment_ids": [
@@ -2021,6 +2110,7 @@
       "manager": "BIMPRD",
       "name": "Ridge Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/58/638894530558400000",
       "park": "Fort Ward Park",
       "segment_ids": [
@@ -2039,6 +2129,7 @@
       "manager": "BIMPRD",
       "name": "Rotary Park Trails",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Rotary Park",
       "segment_ids": [
@@ -2056,6 +2147,7 @@
       "manager": "BIMPRD",
       "name": "Rotary Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Rotary Park",
       "segment_ids": [
@@ -2074,6 +2166,7 @@
       "manager": "BIMPRD",
       "name": "Sakai Bridge to Small Bridge Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
       "park": "Sakai Park",
       "segment_ids": [
@@ -2092,6 +2185,7 @@
       "manager": null,
       "name": "Sakai Forest Learning Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
       "park": null,
       "segment_ids": [
@@ -2110,6 +2204,7 @@
       "manager": null,
       "name": "Sakai Salmon Stream Amphitheater",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
       "park": null,
       "segment_ids": [
@@ -2133,6 +2228,7 @@
       "manager": "BIMPRD",
       "name": "Schel Chelb Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2160,6 +2256,7 @@
       "manager": null,
       "name": "Sound to Olympics Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2213,6 +2310,7 @@
       "manager": null,
       "name": "Sound to Olympics Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2229,6 +2327,7 @@
       "manager": "BIMPRD",
       "name": "South Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
       "park": "Sakai Park",
       "segment_ids": [
@@ -2245,6 +2344,7 @@
       "manager": "BIMPRD",
       "name": "Springridge Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -2264,6 +2364,7 @@
       "manager": "BIMPRD",
       "name": "Sunny Hill Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2286,6 +2387,7 @@
       "manager": "BIMPRD",
       "name": "Tani Creek Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2302,6 +2404,7 @@
       "manager": "BIMPRD",
       "name": "Taylor Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2318,6 +2421,7 @@
       "manager": "BIMPRD",
       "name": "T'Chookwop Park Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "T'Chookwop Park",
       "segment_ids": [
@@ -2334,6 +2438,7 @@
       "manager": "BIMPRD",
       "name": "Ted Olson Nature Preserve",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/56/638894530555600000",
       "park": "Ted Olson Nature Preserve",
       "segment_ids": [
@@ -2354,6 +2459,7 @@
       "manager": "BIMPRD",
       "name": "Ted Olson Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/56/638894530555600000",
       "park": "Ted Olson Nature Preserve",
       "segment_ids": [
@@ -2372,6 +2478,7 @@
       "manager": null,
       "name": "To The Learning Tree",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2388,6 +2495,7 @@
       "manager": "BIMPRD",
       "name": "Trillium Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/40/638894530533130000",
       "park": "Grand Forest",
       "segment_ids": [
@@ -2408,6 +2516,7 @@
       "manager": "BIMPRD",
       "name": "Upper Veterane Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2424,6 +2533,7 @@
       "manager": "BIMPRD",
       "name": "Upper Veterane Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -2446,6 +2556,7 @@
       "manager": "BIMPRD",
       "name": "Veterane Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -2466,6 +2577,7 @@
       "manager": "BIMPRD",
       "name": "Vincent Road to Gazzam Lake Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2482,6 +2594,7 @@
       "manager": null,
       "name": "Wagon Wheel",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2501,6 +2614,7 @@
       "manager": "BIMPRD",
       "name": "Wardwell Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Meigs Park",
       "segment_ids": [
@@ -2518,6 +2632,7 @@
       "manager": null,
       "name": "Waterfront Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2534,6 +2649,7 @@
       "manager": "BIMPRD",
       "name": "Waypoint Woods Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "Waypoint Woods",
       "segment_ids": [
@@ -2554,6 +2670,7 @@
       "manager": "BIMPRD",
       "name": "West Bridge to Creek Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/54/638894530552670000",
       "park": "Sakai Park",
       "segment_ids": [
@@ -2570,6 +2687,7 @@
       "manager": null,
       "name": "West Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2593,6 +2711,7 @@
       "manager": null,
       "name": "West Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2616,6 +2735,7 @@
       "manager": "BIMPRD",
       "name": "West Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2637,6 +2757,7 @@
       "manager": null,
       "name": "West Loop Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2654,6 +2775,7 @@
       "manager": "BIMPRD",
       "name": "West Port Madison Nature Preserve",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "West Port Madison Nature Preserve",
       "segment_ids": [
@@ -2674,6 +2796,7 @@
       "manager": "BIMPRD",
       "name": "West Port Madison Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": "West Port Madison Nature Preserve",
       "segment_ids": [
@@ -2698,6 +2821,7 @@
       "manager": "BIMPRD",
       "name": "Westwood Link Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": "https://www.biparks.org/home/showpublisheddocument/70/638894530576500000",
       "park": "Gazzam Lake Preserve",
       "segment_ids": [
@@ -2714,6 +2838,7 @@
       "manager": null,
       "name": "Wharf Street road end",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2730,6 +2855,7 @@
       "manager": null,
       "name": "Woodland Drive road end",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [
@@ -2754,6 +2880,7 @@
       "manager": "BIMPRD",
       "name": "Wyatt to Shepard Trail",
       "official_length_mi": null,
+      "official_length_source": null,
       "official_map_url": null,
       "park": null,
       "segment_ids": [

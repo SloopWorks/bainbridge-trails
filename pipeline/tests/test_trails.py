@@ -1,3 +1,4 @@
+import pytest
 from shapely.geometry import LineString, Polygon
 
 from bitrails.classify import Area, InclusionRule, classify, island_total_m
@@ -88,11 +89,26 @@ def test_overrides_rename_and_drop():
     segs = classify([osm(1, line((0, 0), (300, 0)), highway="path", name="Loop Trail"),
                      osm(2, line((0, 5000), (300, 5000)), highway="path", name="Junk Trail")], parks=[PARK_A])
     trails = build_trails(segs, overrides={"trails": {"trail-loop-trail": {"name": "Fort Ward Loop",
-                                                                            "official_length_mi": 0.5},
+                                                                            "official_length_mi": 0.5,
+                                                                            "official_length_source": "https://x"},
                                                       "trail-junk-trail": {"drop": True}}})
     (t,) = trails
     assert (t.id, t.name, t.official_length_mi) == ("trail-loop-trail", "Fort Ward Loop", 0.5)
     assert next(s for s in segs if s.id == "seg-000002").trail_ids == []
+
+
+def test_override_official_length_requires_source():
+    segs = classify([osm(1, line((0, 0), (300, 0)), highway="path", name="Loop Trail")], parks=[PARK_A])
+    with pytest.raises(ValueError, match="trail-loop-trail"):
+        build_trails(segs, overrides={"trails": {"trail-loop-trail": {"official_length_mi": 1.2}}})
+
+
+@pytest.mark.parametrize("mi", [0, -1.5])
+def test_override_official_length_must_be_positive(mi):
+    segs = classify([osm(1, line((0, 0), (300, 0)), highway="path", name="Loop Trail")], parks=[PARK_A])
+    with pytest.raises(ValueError, match="trail-loop-trail"):
+        build_trails(segs, overrides={"trails": {"trail-loop-trail": {"official_length_mi": mi,
+                                                                       "official_length_source": "https://x"}}})
 
 
 def test_slugify():

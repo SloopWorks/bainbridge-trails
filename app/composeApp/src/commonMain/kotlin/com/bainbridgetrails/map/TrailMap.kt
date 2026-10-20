@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
@@ -30,6 +31,7 @@ import org.maplibre.compose.overlay.DisappearingCompassButton
 import org.maplibre.compose.overlay.DisappearingScaleBar
 import org.maplibre.compose.overlay.MaplibreLogo
 import org.maplibre.compose.style.BaseStyle
+import org.maplibre.compose.util.MaplibreComposable
 import org.maplibre.spatialk.geojson.BoundingBox
 import org.maplibre.spatialk.geojson.Position
 
@@ -49,6 +51,9 @@ private sealed interface StyleLoad {
     data class Failed(val message: String) : StyleLoad
 }
 
+/** Zoom the camera moves in to (at least) when it starts following a position. */
+private const val FOLLOW_MIN_ZOOM = 15.0
+
 /** Credits for everything the map draws (see data/dist/ATTRIBUTION.md). */
 private const val ATTRIBUTION = "© OpenStreetMap contributors, Protomaps, USGS"
 
@@ -58,6 +63,7 @@ private const val ATTRIBUTION = "© OpenStreetMap contributors, Protomaps, USGS"
  * Changing [style] restyles the live map in place (camera kept): the previous style stays on screen
  * until the new template is rendered, then `rememberMapState` pushes the new [BaseStyle] (it calls
  * `updateBaseStyle` on every recomposition, so only the initial *camera* is first-composition-only).
+ * [content] adds sources/layers on top of the style; [follow] re-centres the camera whenever it changes.
  */
 @Composable
 fun TrailMap(
@@ -65,6 +71,8 @@ fun TrailMap(
     modifier: Modifier = Modifier,
     initialCamera: CameraPosition = IslandCamera,
     controlsTopPadding: Dp = 0.dp,
+    follow: Position? = null,
+    content: @Composable @MaplibreComposable () -> Unit = {},
 ) {
     val dataDir = rememberMapDataDir()
     val load by produceState<StyleLoad>(StyleLoad.Loading, style, dataDir) {
@@ -82,7 +90,11 @@ fun TrailMap(
             StyleLoad.Loading -> Box(Modifier.fillMaxSize().background(if (style.isDark) Color(0xFF1D2925) else Color(0xFFECEFE6)))
             is StyleLoad.Failed -> Text(l.message, Modifier.align(Alignment.Center).padding(16.dp))
             is StyleLoad.Ready -> {
-                val state = rememberMapState(baseStyle = BaseStyle.Json(l.json), initialCameraPosition = initialCamera)
+                val state = rememberMapState(baseStyle = BaseStyle.Json(l.json), initialCameraPosition = initialCamera, content = content)
+                LaunchedEffect(state, follow) {
+                    val p = follow ?: return@LaunchedEffect
+                    state.setCameraPosition(CameraPosition(center = p, zoom = maxOf(state.cameraPosition.zoom, FOLLOW_MIN_ZOOM)))
+                }
                 MaplibreMap(
                     modifier = Modifier.fillMaxSize(),
                     state = state,
