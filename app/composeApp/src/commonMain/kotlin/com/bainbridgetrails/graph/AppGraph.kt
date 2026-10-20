@@ -153,14 +153,14 @@ object AppGraph {
             ProfileRepository(api, appDataDir(context) + "/profile.json", isSignedIn = { auth.token() != null }, io = Dispatchers.IO)
         }
         val leaderboard: LeaderboardRepository by lazy {
-            LeaderboardRepository(api, "$privateDir/leaderboard.json", isSignedIn = { auth.token() != null }, now = clock, io = Dispatchers.IO)
+            LeaderboardRepository(api, "$privateDir/${DatasetProfile.current.storeName("leaderboard.json")}", isSignedIn = { auth.token() != null }, now = clock, io = Dispatchers.IO)
         }
         val trailStats: TrailStatsRepository by lazy { TrailStatsRepository(api, clock) }
         val sync: SyncRepository by lazy {
             SyncRepository(
                 scope = scope,
                 api = api,
-                queuePath = "$privateDir/sync.json",
+                queuePath = "$privateDir/${DatasetProfile.current.storeName("sync.json")}",
                 currentUserId = { (auth.state.value as? AuthState.SignedIn)?.session?.userId },
                 coverage = StoreCoverage(trackingDir),
                 datasetVersion = { datasets.await().dataset.version },

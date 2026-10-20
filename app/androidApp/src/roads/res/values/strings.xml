@@ -1,0 +1,4 @@
+<resources>
+    <!-- RD-1 roads flavour launcher label (ux.md 1.2). -->
+    <string name="app_name">Bainbridge Roads</string>
+</resources>

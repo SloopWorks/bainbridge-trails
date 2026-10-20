@@ -59,6 +59,21 @@ android {
         val googleWebClientId = providers.gradleProperty("googleWebClientId").orElse("").get()
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"" + googleWebClientId.replace("\"", "") + "\"")
     }
+    // RD-1: one app per goal. The flavour fixes the DatasetProfile (BuildConfig.GOAL, read by BtApplication) and the
+    // launcher label (src/<flavour>/res). Variants: trailsDebug, trailsRelease, roadsDebug, roadsRelease.
+    flavorDimensions += "goal"
+    productFlavors {
+        create("trails") {
+            dimension = "goal"
+            applicationId = "com.bainbridgetrails.app"
+            buildConfigField("String", "GOAL", "\"trails\"")
+        }
+        create("roads") {
+            dimension = "goal"
+            applicationId = "com.bainbridgetrails.roads"
+            buildConfigField("String", "GOAL", "\"roads\"")
+        }
+    }
     buildFeatures {
         buildConfig = true // VERSION_NAME / BUILD_TYPE for the debug drawer's build info
     }
@@ -100,9 +115,24 @@ android {
     }
 }
 
+// Bundled datasets per flavour (scripts/sync-app-assets.sh installs both into composeApp's resources). The roads APK
+// drops the trail dataset (its coverage_segments already carries the trail competitors it needs, RD-2b); trailsRelease
+// drops the roads dataset. trailsDebug keeps both for the debug drawer's dataset switch. Patterns match file names.
+val trailDatasetAssets = listOf("trails.json", "coverage_segments.json", "dataset.bin", "trails.pmtiles")
+val roadDatasetAssets = listOf("roads.json", "roads_coverage_segments.json", "roads_dataset.bin", "roads.pmtiles")
+
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
         if (geofencePrototype) variant.sources.manifests.addStaticManifestFile("src/geofencePrototype/AndroidManifest.xml")
+    }
+    onVariants { variant ->
+        val goal = variant.productFlavors.single { it.first == "goal" }.second
+        val drop = when {
+            goal == "roads" -> trailDatasetAssets
+            variant.buildType == "release" -> roadDatasetAssets
+            else -> emptyList()
+        }
+        variant.androidResources.ignoreAssetsPatterns.addAll(drop)
     }
 }
 

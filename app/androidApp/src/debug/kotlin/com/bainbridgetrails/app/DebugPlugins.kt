@@ -51,6 +51,10 @@ class DatasetPlugin(private val context: Context) : DebugPlugin {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Running: ${running.key}")
             Text(running.goal)
+            if (DatasetProfile.isFixed) {
+                Text("Fixed by the ${BuildConfig.GOAL} flavour (RD-1). Install the trails debug build to switch.")
+                return@Column
+            }
             Text("Next launch: ${stored.key}")
             for (p in DatasetProfile.entries) OutlinedButton(
                 enabled = p != stored,
