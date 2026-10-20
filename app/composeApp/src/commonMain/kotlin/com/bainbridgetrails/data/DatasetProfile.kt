@@ -1,5 +1,6 @@
 package com.bainbridgetrails.data
 
+import com.bainbridgetrails.coverage.GoalRules
 import com.bainbridgetrails.log.AppLog
 
 /**
@@ -31,6 +32,8 @@ enum class DatasetProfile(
     val things: String,
     /** The goal, for the debug drawer read-out and the docs. */
     val goal: String,
+    /** How progress counts for this goal (RP-18: roads count only counted roads / segments). */
+    val rules: GoalRules,
 ) {
     TRAILS(
         key = "trails",
@@ -41,6 +44,7 @@ enum class DatasetProfile(
         segmentIdPrefix = "seg-",
         thing = "trail", things = "trails",
         goal = "Walk every public trail on Bainbridge Island (65.5 mi)",
+        rules = GoalRules.TRAILS,
     ),
     ROADS(
         key = "roads",
@@ -51,6 +55,7 @@ enum class DatasetProfile(
         segmentIdPrefix = "rseg-",
         thing = "road", things = "roads",
         goal = "Walk or run every public road on Bainbridge Island (162.5 mi shippable of 164.2 mi)",
+        rules = GoalRules.ROADS,
     ),
     ;
 

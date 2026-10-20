@@ -88,6 +88,7 @@ object AppGraph {
                         }
                     }
                 },
+                rules = profile.rules,
             ),
         )
     }

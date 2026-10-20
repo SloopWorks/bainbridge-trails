@@ -21,10 +21,13 @@ data class ProgressSnapshot(
      * `filter = id in literal(ids)`). Only covered buckets are present; untouched segments are the base layer.
      */
     val segmentBuckets: Map<TrailStatus, List<String>> = emptyMap(),
+    /**
+     * The "x of N" denominator: trails in the goal. Trails: every trail. Roads: counted roads only (RP-3), while
+     * [trails] still lists every road (uncounted ones carry a fraction for the map, but never count).
+     */
+    val trailCount: Int = trails.size,
 ) {
     private val byId: Map<String, TrailProgress> by lazy { trails.associateBy { it.trailId } }
-
-    val trailCount: Int get() = trails.size
 
     fun trail(id: String): TrailProgress? = byId[id]
 
@@ -39,6 +42,25 @@ class Progress(
     private val params: CoverageParams,
 ) {
     private val trailsById: Map<String, TrailMeta> = dataset.trails.associateBy { it.id }
+    private val rules: GoalRules = dataset.rules
+
+    /**
+     * The segments a trail's fraction is measured over. Trails: all of them. Roads (RP-4): only its counted
+     * (`included`) segments, so a partly private road completes on its public part; all segments when none counts.
+     */
+    private val fractionSegments: Map<String, List<String>> = run {
+        val included = if (rules.countedOnly) dataset.segments.filter { it.included }.mapTo(HashSet()) { it.id } else emptySet()
+        dataset.trails.associate { t ->
+            val all = t.segmentIds.distinct()
+            t.id to if (rules.countedOnly) all.filter { it in included }.ifEmpty { all } else all
+        }
+    }
+
+    /** Whether [trailId] is part of the goal: completable, in the completed count and the denominator (RP-3). */
+    fun counts(trailId: String): Boolean = !rules.countedOnly || trailsById[trailId]?.counted == true
+
+    /** Trails in the goal (the "x of N" N). */
+    val countedTrailCount: Int = dataset.trails.count { counts(it.id) }
 
     /** segment id -> trails whose segment_ids contain it, in dataset trail order. */
     private val trailsBySegment: Map<String, List<String>> = buildMap<String, MutableList<String>> {
@@ -51,10 +73,10 @@ class Progress(
     }
 
     fun trailFraction(state: CoverageState, trailId: String): Double {
-        val trail = trailsById[trailId] ?: return 0.0
+        val segs = fractionSegments[trailId] ?: return 0.0
         var total = 0.0
         var covered = 0.0
-        for (s in trail.segmentIds.distinct()) {
+        for (s in segs) {
             total += index.segments[s]?.lengthM ?: continue
             covered += coveredClamped(state, s)
         }
@@ -77,7 +99,7 @@ class Progress(
     }
 
     fun trailsCompleted(state: CoverageState): Int =
-        dataset.trails.count { status(trailFraction(state, it.id)) == TrailStatus.COMPLETE }
+        dataset.trails.count { counts(it.id) && status(trailFraction(state, it.id)) == TrailStatus.COMPLETE }
 
     /** Every trail using [segmentId] when that segment has any covered tick; else empty. */
     fun trailsOn(state: CoverageState, segmentId: String): List<String> =
@@ -102,7 +124,7 @@ class Progress(
         val trails = dataset.trails.map { t ->
             var total = 0.0
             var cov = 0.0
-            for (s in t.segmentIds.distinct()) {
+            for (s in fractionSegments.getValue(t.id)) {
                 total += index.segments[s]?.lengthM ?: continue
                 cov += covered(s)
             }
@@ -110,7 +132,8 @@ class Progress(
             TrailProgress(t.id, t.name, f, if (t.id in stickyCompleted) TrailStatus.COMPLETE else status(f), t.displayLengthMi)
         }
         val island = if (dataset.islandTotalM <= 0.0) 0.0 else (islandCovered / dataset.islandTotalM).coerceIn(0.0, 1.0)
-        return ProgressSnapshot(trails, island, trails.count { it.status == TrailStatus.COMPLETE }, islandCovered, buckets)
+        val completed = trails.count { it.status == TrailStatus.COMPLETE && counts(it.trailId) }
+        return ProgressSnapshot(trails, island, completed, islandCovered, buckets, countedTrailCount)
     }
 }
 

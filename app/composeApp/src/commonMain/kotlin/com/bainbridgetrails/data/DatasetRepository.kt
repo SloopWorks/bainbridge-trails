@@ -2,6 +2,7 @@ package com.bainbridgetrails.data
 
 import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.Dataset
+import com.bainbridgetrails.coverage.GoalRules
 import com.bainbridgetrails.coverage.DatasetBinary
 import com.bainbridgetrails.coverage.LocalProjection
 import com.bainbridgetrails.coverage.Progress
@@ -44,6 +45,8 @@ class DatasetSources(
     val trailsJson: suspend () -> ByteArray,
     val segmentsJson: suspend () -> String,
     val datasetBin: suspend () -> ByteArray? = { null },
+    /** How the goal counts progress (RP-18); applied to the parsed dataset. */
+    val rules: GoalRules = GoalRules.TRAILS,
 )
 
 /**
@@ -108,7 +111,7 @@ class DatasetRepository(
         } ?: run {
             format = "json"
             Dataset.parse(trails.decodeToString(), sources.segmentsJson())
-        }
+        }.withRules(sources.rules)
         val parseMs = t0.elapsedNow().inWholeMilliseconds
         val t1 = TimeSource.Monotonic.markNow()
         val index = SegmentIndex(dataset.segments, params, LocalProjection())
