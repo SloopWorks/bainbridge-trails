@@ -90,8 +90,12 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
     val board = state.board
     val entries = board?.entries.orEmpty()
     val you = board?.you
-    // Live "you" values replace the snapshot's copy of your row.
-    val rows = remember(entries, you) { entries.map { if (it.isYou && you != null) you.copy(isYou = true) else it } }
+    // Live "you" values replace the snapshot's copy of your row. Before the daily snapshot includes anyone (a new
+    // board), your live row is the list: never "No one's on it yet" above your own rank-1 row.
+    val rows = remember(entries, you) {
+        if (entries.isEmpty() && you != null) listOf(you.copy(isYou = true))
+        else entries.map { if (it.isYou && you != null) you.copy(isYou = true) else it }
+    }
     val youIndex = rows.indexOfFirst { it.isYou }
     val youVisible by remember(youIndex) {
         derivedStateOf { youIndex >= 0 && listState.layoutInfo.visibleItemsInfo.any { it.key == "row-$youIndex" } }
