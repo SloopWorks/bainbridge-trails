@@ -20,3 +20,6 @@ sealed interface Route
 
 /** Debug spike: the map style comparison screen (`screen=style` launch option). */
 @Serializable data object StyleSpikeRoute : Route
+
+/** Debug: design-system showcase (`screen=showcase` launch option). */
+@Serializable data object ShowcaseRoute : Route

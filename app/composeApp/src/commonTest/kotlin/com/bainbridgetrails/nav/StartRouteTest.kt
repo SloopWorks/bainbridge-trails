@@ -13,5 +13,6 @@ class StartRouteTest {
         assertEquals<Route>(RecordRoute, startRouteFor(SpikeLaunch.parse(mapOf("screen" to "record"))))
         assertEquals<Route>(RecordRoute, startRouteFor(SpikeLaunch.parse(mapOf("lat" to "47.6", "lon" to "-122.5"))))
         assertEquals<Route>(StyleSpikeRoute, startRouteFor(SpikeLaunch.parse(mapOf("style" to "dark"))))
+        assertEquals<Route>(ShowcaseRoute, startRouteFor(SpikeLaunch.parse(mapOf("screen" to "showcase"))))
     }
 }

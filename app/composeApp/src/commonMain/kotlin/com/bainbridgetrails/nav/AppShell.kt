@@ -1,23 +1,21 @@
 package com.bainbridgetrails.nav
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -37,7 +35,7 @@ import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.nav_map
 import com.bainbridgetrails.resources.nav_me
 import com.bainbridgetrails.resources.nav_record
-import com.bainbridgetrails.resources.nav_record_active_a11y
+import com.bainbridgetrails.resources.nav_recording
 import com.bainbridgetrails.resources.nav_trails
 import com.bainbridgetrails.tracking.RecordingController
 import com.bainbridgetrails.tracking.RecordingState
@@ -49,25 +47,31 @@ import com.bainbridgetrails.ui.OnboardingScreen
 import com.bainbridgetrails.ui.ProfileScreen
 import com.bainbridgetrails.ui.SettingsScreen
 import com.bainbridgetrails.ui.TrailDetailScreen
+import com.bainbridgetrails.ui.ShowcaseScreen
 import com.bainbridgetrails.ui.TrailsScreen
+import com.bainbridgetrails.ui.components.BarItem
+import com.bainbridgetrails.ui.components.BtBottomBar
+import com.bainbridgetrails.ui.components.BtIcons
+import com.bainbridgetrails.ui.theme.BtTheme
+import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-private class Tab(val route: Route, val label: StringResource, val glyph: String)
+private class Tab(val route: Route, val label: StringResource, val icon: DrawableResource, val selectedIcon: DrawableResource)
 
-// Placeholder glyphs until the icon set lands with the UX spec (no icon dependency yet).
-private val Tabs = listOf(
-    Tab(MapRoute, Res.string.nav_map, "◎"),
-    Tab(TrailsRoute, Res.string.nav_trails, "≡"),
-    Tab(RecordRoute, Res.string.nav_record, "●"),
-    Tab(MeRoute, Res.string.nav_me, "☺"),
+private val StartTabs = listOf(
+    Tab(MapRoute, Res.string.nav_map, BtIcons.Map, BtIcons.MapFilled),
+    Tab(TrailsRoute, Res.string.nav_trails, BtIcons.Hiking, BtIcons.HikingFilled),
 )
+private val EndTabs = listOf(Tab(MeRoute, Res.string.nav_me, BtIcons.Person, BtIcons.PersonFilled))
+private val BarRoutes = listOf<Route>(MapRoute, TrailsRoute, RecordRoute, MeRoute)
 
 /** Debug launch options (spike scripts) pick the first screen; a normal launch starts on Map. */
 internal fun startRouteFor(launch: SpikeLaunch?): Route = when (launch?.screen) {
     null -> MapRoute
     SpikeLaunch.Screen.RECORD -> RecordRoute
     SpikeLaunch.Screen.STYLE -> StyleSpikeRoute
+    SpikeLaunch.Screen.SHOWCASE -> ShowcaseRoute
 }
 
 /** Tab switch: one copy of each tab, state saved/restored, Back from any tab returns to the start tab (F0 step 3). */
@@ -103,29 +107,17 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
         }
     }
 
-    val showBar = Tabs.any { destination.isTab(it.route) }
-    Scaffold(
-        contentWindowInsets = WindowInsets(0),
-        bottomBar = {
-            if (showBar) NavigationBar {
-                for (tab in Tabs) {
-                    val active = tab.route == RecordRoute && recordingState is RecordingState.Recording
-                    val label = stringResource(tab.label)
-                    val a11y = if (active) stringResource(Res.string.nav_record_active_a11y) else label
-                    NavigationBarItem(
-                        selected = destination.isTab(tab.route),
-                        onClick = { nav.selectTab(tab.route) },
-                        icon = {
-                            BadgedBox(badge = { if (active) Badge() }) { Text(tab.glyph) }
-                        },
-                        label = { Text(label) },
-                        modifier = Modifier.semantics { contentDescription = a11y },
-                    )
-                }
-            }
-        },
-    ) { padding ->
-        NavHost(nav, startDestination = start, modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+    val showBar = BarRoutes.any { destination.isTab(it) }
+    val recording = recordingState is RecordingState.Recording
+    // Content stops at the bar's top edge (80dp + nav inset); the Record disc rises over it.
+    val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val barPadding = if (showBar) BtTheme.spacing.bottomBarHeight + navInset else 0.dp
+    Box(Modifier.fillMaxSize()) {
+        NavHost(
+            nav,
+            startDestination = start,
+            modifier = Modifier.fillMaxSize().padding(bottom = barPadding).consumeWindowInsets(PaddingValues(bottom = barPadding)),
+        ) {
             composable<MapRoute> { MapTab(graph, settings, launch?.camera) }
             composable<TrailsRoute> { TrailsScreen(graph, settings, onTrail = { nav.navigate(TrailDetailRoute(it)) }) }
             composable<RecordRoute> { RecordScreen(launch ?: SpikeLaunch(), Modifier.fillMaxSize()) }
@@ -164,6 +156,18 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                 )
             }
             composable<StyleSpikeRoute> { StyleSpikeScreen(launch ?: SpikeLaunch(), Modifier.fillMaxSize()) }
+            composable<ShowcaseRoute> { ShowcaseScreen(section = launch?.section) }
+        }
+        if (showBar) {
+            fun Tab.item(label: String) = BarItem(label, icon, selectedIcon, destination.isTab(route), { nav.selectTab(route) })
+            BtBottomBar(
+                start = StartTabs.map { it.item(stringResource(it.label)) },
+                end = EndTabs.map { it.item(stringResource(it.label)) },
+                recordLabel = stringResource(if (recording) Res.string.nav_recording else Res.string.nav_record),
+                recording = recording,
+                onRecord = { nav.selectTab(RecordRoute) },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
     }
 }
