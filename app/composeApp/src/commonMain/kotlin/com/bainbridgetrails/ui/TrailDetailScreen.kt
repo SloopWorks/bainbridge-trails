@@ -53,6 +53,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.data.AppSettings
 import com.bainbridgetrails.data.TrailData
+import com.bainbridgetrails.map.road
+import com.bainbridgetrails.map.RoadEnd
+import com.bainbridgetrails.map.StatusLayerSpec
+import androidx.compose.ui.unit.Dp
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.AttributionMode
 import com.bainbridgetrails.map.IslandCredit
@@ -177,9 +181,9 @@ private fun TrailDetailContent(
     val credit = remember(trailId, data) { data.dataset.islandCredit(trailId) }
     val lines = remember(trailId, data) { data.dataset.trailLines(trailId) }
     // Roads (docs/roads/ux.md §3): road blocks replace the trail facts, chosen by the row's data.
-    val road = facts?.road
-    val roadProfile = DatasetProfile.current == DatasetProfile.ROADS
-    val awaitingRoad = facts == null && roadProfile
+    val meta = remember(trailId, data) { data.dataset.trails.first { it.id == trailId } }
+    val road = meta.road(facts?.roadEnds.orEmpty())
+    val roadProfile = road != null
     val startWalk = rememberStartWalk(graph, onStartWalk)
     val linkError = { scope.launch { snackbar.showSnackbar(getString(Res.string.map_error_open_link)) } }
 
@@ -219,8 +223,8 @@ private fun TrailDetailContent(
             ) {
                 Spacer(Modifier.height(20.dp))
                 Text(name, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                if (road != null || awaitingRoad) {
-                    if (road != null) RoadDetailBody(
+                if (road != null) {
+                    RoadDetailBody(
                         data, trailId, road, fraction, status, settings.units,
                         community = community,
                         onRetryCommunity = { scope.launch { graph.trailStats.get(force = true) } },
@@ -314,7 +318,7 @@ private fun TrailDetailContent(
 
         // Sticky Start walk on a surface fade (none for an uncounted road: it isn't part of the goal).
         val surface = MaterialTheme.colorScheme.background
-        if (road?.counted != false && !awaitingRoad) Box(
+        if (road?.counted != false) Box(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .background(Brush.verticalGradient(0f to surface.copy(alpha = 0f), 0.35f to surface.copy(alpha = 0.94f), 1f to surface))
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))

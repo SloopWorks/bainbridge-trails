@@ -24,8 +24,8 @@ data class Trailhead(val name: String?, val lat: Double, val lon: Double)
 enum class IslandCredit { FULL, PARTIAL, NONE }
 
 /**
- * Trail facts the map and detail screens show beyond [com.bainbridgetrails.coverage.TrailMeta]. [road] is set for
- * rows of the roads dataset (roads.json carries category, ownership, surface, speed, maintainer and climb).
+ * Trail facts the map and detail screens show beyond [com.bainbridgetrails.coverage.TrailMeta]. [roadEnds] = the
+ * row's public road ends at the shore (roads dataset; road_ends.json), nearest the water first.
  */
 data class TrailFacts(
     val id: String,
@@ -36,7 +36,7 @@ data class TrailFacts(
     val officialLengthMi: Double?,
     val computedLengthMi: Double,
     val trailheads: List<Trailhead>,
-    val road: RoadFacts? = null,
+    val roadEnds: List<RoadEnd> = emptyList(),
 ) {
     /** Official length when the agency publishes one, else computed (product F4 step 3). */
     val lengthMi: Double get() = officialLengthMi ?: computedLengthMi
@@ -57,14 +57,6 @@ private data class FactsRow(
     @SerialName("official_length_mi") val officialLengthMi: Double? = null,
     @SerialName("computed_length_mi") val computedLengthMi: Double = 0.0,
     val trailheads: List<PointGeom> = emptyList(),
-    // Roads dataset only (docs/roads/data-spec.md); absent on trail rows.
-    val category: String? = null,
-    val counted: Boolean = true,
-    val ownership: String? = null,
-    val surface: String? = null,
-    @SerialName("speed_mph") val speedMph: Int? = null,
-    val maintainer: String? = null,
-    @SerialName("climb_total_m") val climbTotalM: Double? = null,
 )
 
 @Serializable
@@ -111,19 +103,7 @@ fun parseTrailFacts(
                 Trailhead(label, th.lat, th.lon)
             }
         } ?: r.trailheads.filter { it.coordinates.size >= 2 }.map { Trailhead(null, it.coordinates[1], it.coordinates[0]) }
-        val road = r.category?.let { cat ->
-            RoadFacts(
-                category = cat,
-                counted = r.counted,
-                ownership = r.ownership,
-                surface = r.surface,
-                speedMph = r.speedMph,
-                maintainer = r.maintainer,
-                climbTotalM = r.climbTotalM,
-                roadEnds = roadEnds[r.id].orEmpty(),
-            )
-        }
-        r.id to TrailFacts(r.id, r.park, r.manager, r.gainM, r.officialMapUrl, r.officialLengthMi, r.computedLengthMi, heads, road)
+        r.id to TrailFacts(r.id, r.park, r.manager, r.gainM, r.officialMapUrl, r.officialLengthMi, r.computedLengthMi, heads, roadEnds[r.id].orEmpty())
     }
 }
 

@@ -89,6 +89,7 @@ import com.bainbridgetrails.map.TapResult
 import com.bainbridgetrails.map.ROAD_END_LAYER
 import com.bainbridgetrails.map.StatusLayerSpec
 import com.bainbridgetrails.map.allRoadEnds
+import com.bainbridgetrails.map.road
 import com.bainbridgetrails.map.countedLengthMi
 import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.map.TrailFacts
@@ -227,7 +228,7 @@ fun MapTab(
         val meta = data?.dataset?.trails?.firstOrNull { it.id == id } ?: return null
         val p = snapshot?.trail(id)
         val f = facts[id]
-        val road = f?.road
+        val road = meta.road()
         if (road != null) {
             // Roads (docs/roads/ux.md §3.3): "Residential street · 0.7 mi" (counted length); uncounted say why.
             val length = formatTrailLength(data.dataset.countedLengthMi(id), settings.units)
@@ -396,7 +397,7 @@ fun MapTab(
     val lastSummary = remember { mutableStateOf<TrailSummary?>(null) }
 
     val completed = snapshot?.trailsCompleted ?: 0
-    val total = facts.takeIf { it.isNotEmpty() }?.values?.count { it.road?.counted ?: true } ?: data?.dataset?.trails?.size ?: 0
+    val total = snapshot?.trailCount ?: 0
     val mapA11y = stringResource(LocalGoal.current.s(Res.string.map_a11y), completed, total)
     val trailsLabel = stringResource(LocalGoal.current.s(Res.string.nav_trails))
     val animatedStack by animateDpAsState(stackHeight, tween(if (reduced) 0 else 200))

@@ -1,6 +1,7 @@
 package com.bainbridgetrails.map
 
 import com.bainbridgetrails.coverage.Dataset
+import com.bainbridgetrails.coverage.TrailMeta
 import com.bainbridgetrails.data.DatasetProfile
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -68,6 +69,11 @@ sealed interface RoadCaution {
     data class Fast(val mph: Int) : RoadCaution
 }
 
+/** The road view of a dataset row (null for trail rows, which carry no category). */
+fun TrailMeta.road(roadEnds: List<RoadEnd> = emptyList()): RoadFacts? = category?.let { cat ->
+    RoadFacts(cat, counted, ownership, surface, speedMph, maintainer, climbTotalM, roadEnds)
+}
+
 /** A public road end at the shoreline (road_ends.json). */
 data class RoadEnd(val roadId: String, val lat: Double, val lon: Double, val shoreDistanceM: Double, val cityConfirmed: Boolean)
 
@@ -116,5 +122,5 @@ fun Dataset.countedLengthMi(roadId: String): Double {
     return use.sumOf { it.lengthM } / METRES_PER_MILE
 }
 
-/** All road ends of the dataset as (road id, end), for the map's pin layer. */
-fun Map<String, TrailFacts>.allRoadEnds(): List<RoadEnd> = values.flatMap { it.road?.roadEnds.orEmpty() }
+/** All road ends of the dataset, for the map's pin layer. */
+fun Map<String, TrailFacts>.allRoadEnds(): List<RoadEnd> = values.flatMap { it.roadEnds }
