@@ -80,6 +80,22 @@ def test_changed_geometry_records_supersedes(tmp_path):
     assert r.entries[new]["supersedes"] == [old]
 
 
+def test_split_pieces_each_supersede_the_long_segment(tmp_path):
+    p = tmp_path / "s.json"
+    r = Registry.load(p)
+    long_ = LineString([(-122.500, 47.600), (-122.496, 47.600)])     # ~300 m
+    old = r.assign(long_)
+    r.finalize_run()
+    r.save()
+    r = Registry.load(p)
+    # four quarter pieces: each covers only 25% of the old line, but lies wholly on it
+    xs = [-122.500, -122.499, -122.498, -122.497, -122.496]
+    new = r.assign_many([LineString([(a, 47.600), (b, 47.600)]) for a, b in zip(xs, xs[1:])])
+    r.finalize_run()
+    assert old not in new and r.entries[old]["retired"] is True
+    assert [r.entries[n]["supersedes"] for n in new] == [[old]] * 4
+
+
 def test_save_is_deterministic(tmp_path):
     for name in ("x.json", "y.json"):
         r = Registry.load(tmp_path / name)
