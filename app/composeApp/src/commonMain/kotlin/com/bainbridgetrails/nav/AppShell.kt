@@ -1,5 +1,10 @@
 package com.bainbridgetrails.nav
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -12,6 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,7 +60,12 @@ import com.bainbridgetrails.ui.TrailsScreen
 import com.bainbridgetrails.ui.components.BarItem
 import com.bainbridgetrails.ui.components.BtBottomBar
 import com.bainbridgetrails.ui.components.BtIcons
+import com.bainbridgetrails.ui.components.RecordingPill
+import com.bainbridgetrails.ui.theme.BtDuration
+import com.bainbridgetrails.ui.theme.BtEasing
 import com.bainbridgetrails.ui.theme.BtTheme
+import kotlinx.coroutines.delay
+import kotlin.time.Clock
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -64,7 +77,10 @@ private val StartTabs = listOf(
     Tab(TrailsRoute, Res.string.nav_trails, BtIcons.Hiking, BtIcons.HikingFilled),
 )
 private val EndTabs = listOf(Tab(MeRoute, Res.string.nav_me, BtIcons.Person, BtIcons.PersonFilled))
-private val BarRoutes = listOf<Route>(MapRoute, TrailsRoute, RecordRoute, MeRoute)
+private val BarRoutes = listOf<Route>(MapRoute, TrailsRoute, MeRoute)
+
+/** The Record disc rises this far above the bar (ux.md §2.2); the pill keeps 12dp clear of it. */
+private val RecordDiscRise = 16.dp
 
 /** Debug launch options (spike scripts) pick the first screen; a normal launch starts on Map. */
 internal fun startRouteFor(launch: SpikeLaunch?): Route = when (launch?.screen) {
@@ -72,6 +88,17 @@ internal fun startRouteFor(launch: SpikeLaunch?): Route = when (launch?.screen) 
     SpikeLaunch.Screen.RECORD -> RecordRoute
     SpikeLaunch.Screen.STYLE -> StyleSpikeRoute
     SpikeLaunch.Screen.SHOWCASE -> ShowcaseRoute
+}
+
+/** Opens the Record flow as a full-screen layer over the current screen (ux.md §2.5); never a tab of its own. */
+fun NavController.openRecord() = navigate(RecordRoute) { launchSingleTop = true }
+
+/**
+ * Leaves the Record flow ("close" when idle, "minimize" while recording: the walk continues, the pill shows).
+ * Returns to whatever was under it; Map when Record was the first screen (debug `screen=record` launches).
+ */
+fun NavController.closeRecord() {
+    if (previousBackStackEntry == null) navigate(MapRoute) { popUpTo<RecordRoute> { inclusive = true } } else popBackStack()
 }
 
 /** Tab switch: one copy of each tab, state saved/restored, Back from any tab returns to the start tab (F0 step 3). */
@@ -100,14 +127,31 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
     LaunchedEffect(destination) {
         destination?.route?.let { AppGraph.analytics.track(AnalyticsEvents.SCREEN_VIEW, mapOf("route" to it.substringAfterLast('.').substringBefore('/').substringBefore('?'))) }
     }
-    // F6: a walk that completes trails (or a debug tool) opens the celebration once per key.
+    // F6: a walk that completes trails (or a debug tool) opens the celebration once per key. A finished walk's
+    // celebration sits over the Record flow, so Continue reveals its results underneath (ux.md §3.5f).
     LaunchedEffect(Unit) {
         AppGraph.celebrations.collect { c ->
-            if (AppGraph.celebrated.add(c.key)) nav.navigate(CelebrationRoute(c.key, c.trailIds))
+            if (!AppGraph.celebrated.add(c.key)) return@collect
+            val done = runCatching { graph.controller().await() }.getOrNull()?.state?.value as? RecordingState.Done
+            if (done?.summary?.sessionId == c.key && nav.currentDestination?.hasRoute(RecordRoute::class) != true) nav.openRecord()
+            nav.navigate(CelebrationRoute(c.key, c.trailIds))
         }
+    }
+    // F0 step 5 / TL-4: a recovered walk (Count it / Discard) or results finalised away from the Record flow
+    // (notification Stop, launch auto-finalise) open the Record flow.
+    val pendingKind = when (recordingState) {
+        is RecordingState.Recover -> "recover-" + recordingState.sessionId
+        is RecordingState.Done -> "done-" + recordingState.summary.sessionId
+        else -> null
+    }
+    LaunchedEffect(pendingKind, destination?.route) {
+        if (pendingKind == null || destination == null) return@LaunchedEffect
+        val blocked = destination.isTab(RecordRoute) || destination.isTab(OnboardingRoute) || destination.hasRoute(CelebrationRoute::class)
+        if (!blocked) nav.openRecord()
     }
 
     val showBar = BarRoutes.any { destination.isTab(it) }
+    val reduced = BtTheme.motion.reduced
     val recording = recordingState is RecordingState.Recording
     // Content stops at the bar's top edge (80dp + nav inset); the Record disc rises over it.
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -120,7 +164,21 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
         ) {
             composable<MapRoute> { MapTab(graph, settings, launch?.camera) }
             composable<TrailsRoute> { TrailsScreen(graph, settings, onTrail = { nav.navigate(TrailDetailRoute(it)) }) }
-            composable<RecordRoute> { RecordScreen(launch ?: SpikeLaunch(), Modifier.fillMaxSize()) }
+            composable<RecordRoute>(
+                // ux.md §2.5: slides up over the shell (medium4, emphasizedDecelerate); minimizing slides it down.
+                enterTransition = { if (reduced) fadeIn(tween(BtDuration.short3)) else slideInVertically(tween(BtDuration.medium4, easing = BtEasing.emphasizedDecelerate)) { it } },
+                popExitTransition = { if (reduced) fadeOut(tween(BtDuration.short3)) else slideOutVertically(tween(BtDuration.medium4, easing = BtEasing.emphasizedAccelerate)) { it } },
+                exitTransition = { fadeOut(tween(BtDuration.short3)) },
+                popEnterTransition = { fadeIn(tween(BtDuration.short3)) },
+            ) {
+                RecordScreen(
+                    settings,
+                    onClose = { nav.closeRecord() },
+                    onSignIn = { nav.navigate(ProfileRoute) },
+                    modifier = Modifier.fillMaxSize(),
+                    launch = launch ?: SpikeLaunch(),
+                )
+            }
             composable<MeRoute> {
                 MeScreen(
                     graph, settings,
@@ -131,7 +189,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                 )
             }
             composable<TrailDetailRoute> { entry ->
-                TrailDetailScreen(graph, settings, entry.toRoute<TrailDetailRoute>().trailId, onBack = { nav.popBackStack() }, onStartWalk = { nav.selectTab(RecordRoute) })
+                TrailDetailScreen(graph, settings, entry.toRoute<TrailDetailRoute>().trailId, onBack = { nav.popBackStack() }, onStartWalk = { nav.openRecord() })
             }
             composable<LeaderboardRoute> { LeaderboardScreen(onBack = { nav.popBackStack() }) }
             composable<ProfileRoute> { ProfileScreen(onBack = { nav.popBackStack() }) }
@@ -147,10 +205,13 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     }
                 })
             }
-            composable<CelebrationRoute> { entry ->
+            composable<CelebrationRoute>(
+                enterTransition = { fadeIn(tween(BtDuration.short3)) },
+                popExitTransition = { fadeOut(tween(BtDuration.short3)) },
+            ) { entry ->
                 val route = entry.toRoute<CelebrationRoute>()
                 CelebrationScreen(
-                    graph, route.trailIds,
+                    graph, route.sessionId, route.trailIds,
                     onContinue = { nav.popBackStack() },
                     onViewTrail = { id -> nav.navigate(TrailDetailRoute(id)) { popUpTo<CelebrationRoute> { inclusive = true } } },
                 )
@@ -165,11 +226,34 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                 end = EndTabs.map { it.item(stringResource(it.label)) },
                 recordLabel = stringResource(if (recording) Res.string.nav_recording else Res.string.nav_record),
                 recording = recording,
-                onRecord = { nav.selectTab(RecordRoute) },
+                onRecord = { nav.openRecord() },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
+        // ux.md §2.5: while a walk records and the Record flow is minimized, the pill floats above the bar.
+        val onRecordFlow = destination.isTab(RecordRoute) || destination?.hasRoute(CelebrationRoute::class) == true || destination.isTab(OnboardingRoute)
+        if (recordingState is RecordingState.Recording && destination != null && !onRecordFlow) {
+            LiveRecordingPill(
+                recordingState,
+                settings,
+                onClick = { nav.openRecord() },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = (if (showBar) barPadding + RecordDiscRise else navInset) + 12.dp),
+            )
+        }
     }
+}
+
+/** [RecordingPill] with its own 1 s clock (only the pill recomposes every second). */
+@Composable
+private fun LiveRecordingPill(r: RecordingState.Recording, settings: AppSettings, onClick: () -> Unit, modifier: Modifier) {
+    var now by remember { mutableLongStateOf(Clock.System.now().toEpochMilliseconds()) }
+    LaunchedEffect(r.startedMs) {
+        while (true) {
+            now = Clock.System.now().toEpochMilliseconds()
+            delay(1_000)
+        }
+    }
+    RecordingPill((now - r.startedMs).coerceAtLeast(0), r.distanceM, settings.units, onClick, modifier)
 }
 
 @Composable

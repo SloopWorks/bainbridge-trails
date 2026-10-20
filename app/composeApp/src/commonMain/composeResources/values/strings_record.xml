@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Record flow, results, permissions and celebration copy (docs/mvp/product.md §3; layout copy from ux.md §3.5–3.6).
+  Keys are the spec's where it has one. Compose resources substitute %1$s / %1$d only: a literal percent sign is a bare "%".
+-->
+<resources>
+    <!-- Record: idle -->
+    <string name="record_idle_title">Ready when you are</string>
+    <string name="record_start">Start</string>
+    <string name="record_idle_hint">Start before you set off. You can lock your phone; we’ll keep recording.</string>
+    <string name="record_idle_what">Your walk is matched to mapped trails. Only the trail sections you cover count.</string>
+    <string name="record_idle_private">Tracks stay on your phone</string>
+    <string name="record_settings">Settings</string>
+    <string name="record_close_a11y">Close</string>
+    <string name="record_minimize_a11y">Minimize, recording continues</string>
+    <string name="record_follow_a11y">Follow my location</string>
+    <string name="record_open_settings">Open settings</string>
+    <string name="record_not_now">Not now</string>
+
+    <!-- Record: recording -->
+    <string name="record_recording">Recording</string>
+    <string name="record_time">Time</string>
+    <string name="record_distance">Distance</string>
+    <string name="record_gps_waiting">Waiting for GPS</string>
+    <string name="record_gps_ok">GPS ok</string>
+    <string name="record_gps_approx">Approximate location</string>
+    <string name="record_gps_slow">Still looking for GPS. Open sky helps.</string>
+    <string name="record_unverified">Unverified</string>
+    <string name="record_unverified_title">Unverified walk</string>
+    <string name="record_unverified_body">Step or activity data isn’t available, so we can’t confirm this is a walk. It still counts.</string>
+    <string name="record_live_header">Trails on this walk</string>
+    <string name="record_live_header_count">Trails on this walk (%1$d)</string>
+    <string name="record_live_provisional">Estimate. Final numbers after you finish.</string>
+    <string name="record_live_empty">No trails yet. Head onto a trail and it’ll show up here.</string>
+    <string name="record_live_expand_a11y">Show all trails on this walk</string>
+    <string name="record_live_collapse_a11y">Show fewer trails</string>
+    <string name="record_finish">Finish walk</string>
+    <string name="record_finish_title">Finish this walk?</string>
+    <string name="record_finish_body">We’ll match it to trails and save it.</string>
+    <string name="record_finish_confirm">Finish</string>
+    <string name="record_keep_walking">Keep walking</string>
+    <string name="record_matching">Matching your walk to trails…</string>
+    <string name="record_needs_location">Location is needed to record a walk.</string>
+    <string name="record_stopped_reason">Recording stopped: %1$s</string>
+    <string name="record_loading_failed">Trail data didn’t load.</string>
+
+    <!-- Recovery -->
+    <string name="recovery_title">Unfinished walk found</string>
+    <string name="recovery_body">The app stopped while recording. Count what was recorded?</string>
+    <string name="recovery_finish">Count it</string>
+    <string name="recovery_discard">Discard</string>
+    <string name="recovery_banner">We recovered a walk that was interrupted.</string>
+
+    <!-- Results -->
+    <string name="results_title">Walk saved</string>
+    <string name="results_stats">%1$s · %2$s</string>
+    <string name="results_island_label">Island</string>
+    <string name="results_island">Island: %1$s → %2$s (%3$s)</string>
+    <string name="results_delta_pts">+%1$s pts</string>
+    <string name="results_trails_header">Trails</string>
+    <string name="results_newly_completed">Newly completed</string>
+    <string name="results_no_progress">No new trail progress this walk.</string>
+    <string name="results_no_progress_hint">Only mapped public trails count. Walks on roads or already-covered sections don’t add progress.</string>
+    <string name="results_verified">Verified walk</string>
+    <string name="results_unverified">Unverified walk: step or activity data wasn’t available. It still counts.</string>
+    <string name="results_approx_warning">Recorded with approximate location, so some trails may not have matched. Turn on precise location in Settings.</string>
+    <string name="results_details">Details</string>
+    <plurals name="results_dropped_vehicle">
+        <item quantity="one">%1$d point skipped (bike or vehicle)</item>
+        <item quantity="other">%1$d points skipped (bike or vehicle)</item>
+    </plurals>
+    <plurals name="results_dropped_steps">
+        <item quantity="one">%1$d point skipped (too few steps)</item>
+        <item quantity="other">%1$d points skipped (too few steps)</item>
+    </plurals>
+    <string name="results_sync_pending">Will sync when you’re online</string>
+    <string name="results_sync_running">Syncing your progress…</string>
+    <string name="results_sync_ok">Progress backed up</string>
+    <string name="results_sync_failed">Sync didn’t finish. We’ll try again.</string>
+    <string name="results_signin">Sign in to put this on the leaderboard.</string>
+    <string name="results_signin_action">Sign in</string>
+
+    <!-- Permissions (rationale before each OS prompt) -->
+    <string name="perm_step">Step %1$d of %2$d</string>
+    <string name="perm_optional">Optional. You can record without it.</string>
+    <string name="perm_location_title">Location while you record</string>
+    <string name="perm_location_body">Used only while you record a walk, to match your steps to trails. Your track stays on this phone.</string>
+    <string name="perm_location_allow">Allow location</string>
+    <string name="perm_precise_title">Precise location is off</string>
+    <string name="perm_precise_body">Trails here are close together, so we need precise location to tell them apart.</string>
+    <string name="perm_precise_allow">Use precise location</string>
+    <string name="perm_precise_settings">Turn on “Use precise location” for this app in Settings.</string>
+    <string name="perm_notif_title">Show the recording control</string>
+    <string name="perm_notif_body">A notification shows while you record, so you can see and stop the walk from your lock screen.</string>
+    <string name="perm_activity_title">Physical activity</string>
+    <string name="perm_activity_body">Optional. Helps keep bike and car rides from counting. Without it, walks are saved as Unverified.</string>
+    <string name="perm_activity_skip">Continue without</string>
+    <string name="perm_denied_body">Location is turned off for this app. You can turn it on in Settings.</string>
+    <string name="perm_off_body">This permission is turned off for this app. You can turn it on in Settings.</string>
+
+    <!-- Celebration (title/body/more/continue/view_trail live in strings.xml) -->
+    <string name="celebrate_eyebrow">Trail complete</string>
+    <plurals name="celebrate_eyebrow_multi">
+        <item quantity="one">%1$d trail complete</item>
+        <item quantity="other">%1$d trails complete</item>
+    </plurals>
+    <string name="celebrate_walked">You’ve walked %1$s of it</string>
+    <string name="celebrate_island_label">of the island</string>
+    <string name="celebrate_trails_count">%1$d of %2$d trails complete</string>
+    <plurals name="celebrate_community">
+        <item quantity="one">You’re the first person to finish it.</item>
+        <item quantity="other">You’re one of %1$d people to finish it.</item>
+    </plurals>
+    <string name="celebrate_a11y_announcement">Trail complete: %1$s. Island progress %2$s. %3$d of %4$d trails finished.</string>
+    <string name="celebrate_a11y_announcement_multi">%1$d trails complete: %2$s. Island progress %3$s.</string>
+    <string name="celebrate_island_title">You’ve walked the whole island</string>
+    <string name="celebrate_island_body">Every counted trail on Bainbridge, done. Take a bow.</string>
+</resources>
