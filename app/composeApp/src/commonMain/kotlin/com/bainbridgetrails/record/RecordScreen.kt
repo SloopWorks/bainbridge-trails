@@ -300,14 +300,14 @@ private fun RecordContent(
                 val auth = graph?.auth?.state?.collectAsStateWithLifecycle()?.value
                 val sync = graph?.sync?.state?.collectAsStateWithLifecycle()?.value
                 val data = AppGraph.datasets.state.collectAsStateWithLifecycle().value as? Loadable.Ready
-                val post = graph?.progress?.snapshot?.collectAsStateWithLifecycle()?.value
                 val isRoads = com.bainbridgetrails.data.LocalGoal.current.isRoads
-                // Roads milestones (product.md §5.3), derived from this walk's numbers; nothing stored.
-                val milestones = remember(s.summary, post, data, settings.units, isRoads) {
+                // Roads milestones (product.md §5.3), from this walk's own summary numbers; nothing stored.
+                val milestones = remember(s.summary, data, settings.units, isRoads) {
                     val d = data?.value
-                    if (!isRoads || d == null || post == null) emptyList()
+                    if (!isRoads || d == null) emptyList()
                     else com.bainbridgetrails.ui.walkMilestones(
-                        d, post, s.summary.islandBefore, s.summary.islandAfter, s.summary.newlyCompleted, settings.units,
+                        d, s.summary, settings.units,
+                        islandReached = AppGraph.Celebration.islandReached(s.summary.islandBefore, s.summary.islandAfter),
                     )
                 }
                 ResultsSheet(

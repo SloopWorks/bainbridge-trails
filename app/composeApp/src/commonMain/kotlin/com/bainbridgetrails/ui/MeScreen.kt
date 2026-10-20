@@ -167,7 +167,10 @@ fun MeScreen(
             val m = Modifier.padding(horizontal = BtTheme.spacing.screenH)
             val roadsNumbers = remember(s, data) { if (goal.isRoads && s != null) RoadsMeNumbers.of(data, s) else null }
             val roadsLadder = remember(roadsNumbers, settings.units) {
-                roadsNumbers?.let { Milestones.ladder(it.coveredM, settings.units, it.completed, it.counted, it.completedByCategory, it.countedByCategory) }
+                roadsNumbers?.let { Milestones.ladder(
+                    it.coveredM, settings.units, it.completed, it.counted, it.completedByCategory, it.countedByCategory,
+                    maxDistance = com.bainbridgetrails.data.GoalVocabulary.wholeUnitsDown(data.dataset.islandTotalM, settings.units),
+                ) }
             }
             if (milestonesOpen && roadsLadder != null) MilestonesSheet(roadsLadder, settings.units) { milestonesOpen = false }
 

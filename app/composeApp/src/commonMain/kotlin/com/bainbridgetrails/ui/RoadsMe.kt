@@ -1,5 +1,7 @@
 package com.bainbridgetrails.ui
 
+import com.bainbridgetrails.map.segmentsById
+import com.bainbridgetrails.tracking.SessionSummary
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,6 +97,7 @@ internal data class RoadsMeNumbers(
     companion object {
         fun of(data: TrailData, s: ProgressSnapshot): RoadsMeNumbers {
             val metas = data.dataset.trails.associateBy { it.id }
+            val segLen = data.dataset.segmentsById
             val done = HashMap<String, Int>()
             val total = HashMap<String, Int>()
             val walked = HashMap<String, Double>()
@@ -104,7 +107,10 @@ internal data class RoadsMeNumbers(
                 if (!m.counted) continue
                 total[cat] = (total[cat] ?: 0) + 1
                 if (p.status == TrailStatus.COMPLETE) done[cat] = (done[cat] ?: 0) + 1
-                walked[cat] = (walked[cat] ?: 0.0) + p.fraction * p.lengthMi
+                // Fraction is over the counted segments (RP-18), so weigh it by their length, not the display length.
+                val segs = m.segmentIds.distinct().mapNotNull { segLen[it] }
+                val countedM = segs.filter { it.included }.ifEmpty { segs }.sumOf { it.lengthM }
+                walked[cat] = (walked[cat] ?: 0.0) + p.fraction * countedM / METRES_PER_MILE
             }
             return RoadsMeNumbers(s.coveredM, s.islandFraction, s.trailsCompleted, s.trailCount, done, total, walked)
         }
@@ -112,36 +118,35 @@ internal data class RoadsMeNumbers(
 }
 
 /**
- * The milestones a finished walk crossed (product.md §5.3), highest first: distance from the walk's island before/after,
- * roads and type ladders from the post-walk snapshot. Empty for the trails goal.
+ * The milestones a finished walk crossed (product.md §5.3), highest first, from the walk's own [summary] numbers (read
+ * under the coverage lock by the finalizer), never from a later snapshot that sync may have moved. Empty for trails.
  */
 internal fun walkMilestones(
     data: TrailData,
-    snapshot: ProgressSnapshot,
-    islandBefore: Double,
-    islandAfter: Double,
-    newlyCompleted: List<String>,
+    summary: SessionSummary,
     units: Units,
     islandReached: Boolean = false,
 ): List<Milestone> {
-    val n = RoadsMeNumbers.of(data, snapshot)
     val metas = data.dataset.trails.associateBy { it.id }
-    val counted = newlyCompleted.filter { metas[it]?.counted == true }
+    val counted = summary.newlyCompleted.filter { metas[it]?.counted == true }
     return Milestones.crossed(
         WalkMilestoneInput(
-            islandBefore = islandBefore,
-            islandAfter = islandAfter,
+            islandBefore = summary.islandBefore,
+            islandAfter = summary.islandAfter,
             islandTotalM = data.dataset.islandTotalM,
             units = units,
             newlyCompleted = counted,
-            completedAfter = maxOf(n.completed, counted.size),
+            completedAfter = summary.completedAfter,
             categoryOf = { metas[it]?.category },
-            completedByCategory = n.completedByCategory,
-            countedByCategory = n.countedByCategory,
+            completedByCategory = summary.completedByCategory,
+            countedByCategory = summary.countedByCategory,
             islandReached = islandReached,
+            completedBefore = summary.completedBefore,
         ),
     )
 }
+
+private const val METRES_PER_MILE = 1609.344
 
 /**
  * Roads Me hero (RD-9, docs/roads/ux.md §5.1): the island plat drawn with the roads [ChartSpec], road miles covered as

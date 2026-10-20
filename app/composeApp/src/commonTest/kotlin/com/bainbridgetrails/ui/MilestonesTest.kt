@@ -93,4 +93,13 @@ class MilestonesTest {
         assertEquals(listOf(1, 10, 25), ladder.getValue(Milestones.LADDER_ROADS).map { (it.milestone as Milestone.Roads).count })
         assertNull(Milestones.nextRoads(25, 30))
     }
+
+    @Test fun distanceLadderStopsAtTheIslandTotal() {
+        // 162.5 mi island: the ladder ends at 160; nothing beyond the island total is offered as next.
+        val near = Milestones.ladder(158.0 * mile, Units.MILES, 0, 430, emptyMap(), emptyMap(), maxDistance = 162)
+        val d = near.getValue(Milestones.LADDER_DISTANCE).map { (it.milestone as Milestone.Distance).value }
+        assertEquals(160, d.last())
+        val all = Milestones.ladder(162.5 * mile, Units.MILES, 0, 430, emptyMap(), emptyMap(), maxDistance = 162)
+        assertTrue(all.getValue(Milestones.LADDER_DISTANCE).all { it.state == MilestoneState.EARNED })
+    }
 }

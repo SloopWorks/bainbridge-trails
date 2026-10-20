@@ -61,6 +61,15 @@ class GoalRulesTest {
     }
 
     @Test
+    fun roadsMapBucketsHoldOnlyCountedSegments() {
+        val st = index.cover(walkOf(0.0, 2000.0, 3000.0, 4000.0))
+        val roadsBucketed = pr.snapshot(st).segmentBuckets.values.flatten().toSet()
+        assertEquals(setOf("rseg-1"), roadsBucketed, "private stretches, private roads and trail competitors show no progress")
+        val trailBucketed = pt.snapshot(st).segmentBuckets.values.flatten().toSet()
+        assertTrue("rseg-3" in trailBucketed, "trail rules unchanged")
+    }
+
+    @Test
     fun roadFieldsSurviveTheBinary() {
         val rich = roads + TrailMeta(
             "road-c", "C", listOf("rseg-1"), 0.06, counted = true, category = "arterial", ownership = "public_city",

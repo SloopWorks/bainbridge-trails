@@ -3,6 +3,7 @@ package com.bainbridgetrails.coverage.eval
 import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.CoverageState
 import com.bainbridgetrails.coverage.Dataset
+import com.bainbridgetrails.coverage.GoalRules
 import com.bainbridgetrails.coverage.LocalProjection
 import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentGeom
@@ -22,7 +23,9 @@ import java.util.Locale
  * Both runs use the app's own matcher and parameters; "credit" is covered metres on scored segments ([isScored]) of
  * the **scored** dataset, which is what a user sees painted.
  */
-internal fun runCross(scored: Dataset, flags: Map<String, String>) {
+internal fun runCross(scoredData: Dataset, flags: Map<String, String>) {
+    // The roads dataset (rseg- ids) is scored by the app's roads rules (RP-18: counted roads/segments only).
+    val scored = if (scoredData.segments.any { it.id.startsWith("rseg-") }) scoredData.withRules(GoalRules.ROADS) else scoredData
     val walkDir = File(flags["walk-data"] ?: error("--walk-data is required"))
     val walked = readDataset(walkDir, flags["walk-meta"], flags["walk-segments"])
     val seeds = (flags["seeds"] ?: "3").toInt()
@@ -46,7 +49,7 @@ internal fun runCross(scored: Dataset, flags: Map<String, String>) {
     val competitors = walked.segments.filter { it.id !in present }.map { SegmentGeom(it.id, it.lengthM, included = false, trailIds = emptyList(), coords = it.coords, category = it.category) }
     val variants = listOf(
         "scored-only" to scored,
-        "with-competitors" to Dataset(scored.trails, scored.islandTotalM, scored.segments + competitors, scored.version),
+        "with-competitors" to Dataset(scored.trails, scored.islandTotalM, scored.segments + competitors, scored.version, scored.rules),
     )
 
     println()

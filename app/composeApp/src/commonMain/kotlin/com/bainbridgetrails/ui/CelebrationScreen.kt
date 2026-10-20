@@ -192,10 +192,11 @@ fun CelebrationScreen(
         val shown = if (preview) s.copy(islandFraction = 1.0, trailsCompleted = s.trailCount) else s
         val community = trails.singleOrNull()?.let { stats.forTrail(it.id)?.completedCount }?.takeIf { it >= COMMUNITY_MIN }
         // Roads (docs/roads/product.md §5.3): up to two milestone lines under the body, island > type > roads > miles.
-        val milestones = remember(s, summary, whole) {
-            if (!goal.isRoads || preview) emptyList()
-            else walkMilestones(data, s, islandBefore ?: s.islandFraction, s.islandFraction, trailIds, units, islandReached = whole)
-                .filter { it != Milestone.Island }.take(2)
+        // From the walk's own summary (no summary = a debug celebration: no milestone lines).
+        val milestones = remember(summary, whole) {
+            val sum = summary
+            if (!goal.isRoads || preview || sum == null) emptyList()
+            else walkMilestones(data, sum, units, islandReached = whole).filter { it != Milestone.Island }.take(2)
         }
         CelebrationContent(
             data, shown, trails.map { it.id to it.name }, if (preview) null else islandBefore, community, onContinue, onViewTrail,

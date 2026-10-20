@@ -102,7 +102,8 @@ class LiveCoverage<S>(
         fun forDataset(data: TrailData, preWalk: CoverageState, stickyCompleted: Set<String>): LiveCoverage<CoverageState> =
             LiveCoverage(
                 preWalk = preWalk,
-                trails = data.dataset.trails.map { it.id to it.name },
+                // Roads (RP-3): only counted roads are listed; the finalizer never rises an uncounted one either.
+                trails = data.dataset.trails.filter { data.progress.counts(it.id) }.map { it.id to it.name },
                 cover = { data.index.coverFixes(it) },
                 union = { a, b -> a.union(b) },
                 fraction = { s, id -> data.progress.trailFraction(s, id) },

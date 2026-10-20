@@ -50,6 +50,10 @@ ROAD_ASSETS=(
   "roads.json:roads.json"
   "coverage_segments.json:roads_coverage_segments.json"
   "roads.pmtiles:roads.pmtiles"
+)
+# Optional: without it the roads build simply shows no road-end pins/rows. A missing one never skips the set above;
+# it warns (auto) or fails (ROADS=1).
+ROAD_OPTIONAL=(
   "road_ends.json:roads_road_ends.json"
 )
 if [[ "$ROADS" == "0" ]]; then
@@ -68,6 +72,17 @@ else
     for pair in "${ROAD_ASSETS[@]}"; do
       cp "$ROADS_DIST/${pair%%:*}" "$DEST/${pair##*:}"
       echo "$(du -h "$DEST/${pair##*:}" | cut -f1)	${pair##*:}"
+    done
+    for pair in "${ROAD_OPTIONAL[@]}"; do
+      if [[ -f "$ROADS_DIST/${pair%%:*}" ]]; then
+        cp "$ROADS_DIST/${pair%%:*}" "$DEST/${pair##*:}"
+        echo "$(du -h "$DEST/${pair##*:}" | cut -f1)	${pair##*:}"
+      else
+        msg="roads: ${pair%%:*} not in $ROADS_DIST -- the roads build will show no road ends (scripts/bitroads dist)"
+        [[ "$ROADS" == "1" ]] && { echo "$msg" >&2; exit 1; }
+        echo "WARNING: $msg" >&2
+        rm -f "$DEST/${pair##*:}" # never ship a stale copy from an older roads build
+      fi
     done
     "$ROOT/app/gradlew" -p "$ROOT/app" -q :coverage-eval:run \
       --args="pack-dataset $DEST $DEST/roads_dataset.bin --meta roads.json --segments roads_coverage_segments.json"

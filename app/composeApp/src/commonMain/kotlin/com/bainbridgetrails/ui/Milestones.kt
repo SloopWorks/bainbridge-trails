@@ -52,6 +52,8 @@ data class WalkMilestoneInput(
     val completedByCategory: Map<String, Int>,
     val countedByCategory: Map<String, Int>,
     val islandReached: Boolean = false,
+    /** Counted roads complete before the walk (the walk summary's own number; defaults to after − newly). */
+    val completedBefore: Int = completedAfter - newlyCompleted.size,
 )
 
 object Milestones {
@@ -98,7 +100,7 @@ object Milestones {
                 out += Milestone.TypeComplete(cat)
             }
         }
-        val before = w.completedAfter - w.newlyCompleted.size
+        val before = w.completedBefore
         RoadsLadder.lastOrNull { it in (before + 1)..w.completedAfter }?.let { out += Milestone.Roads(it) }
         val dBefore = unitsOf(w.islandBefore * w.islandTotalM, w.units)
         val dAfter = unitsOf(w.islandAfter * w.islandTotalM, w.units)
@@ -119,6 +121,8 @@ object Milestones {
         completedByCategory: Map<String, Int>,
         countedByCategory: Map<String, Int>,
         lockedAhead: Int = 2,
+        /** Highest reachable distance step: the island total in whole units (GoalVocabulary.wholeUnitsDown). */
+        maxDistance: Int = Int.MAX_VALUE,
     ): Map<String, List<MilestoneProgress>> {
         val d = unitsOf(coveredM, units)
         val distances = buildList {
@@ -126,6 +130,7 @@ object Milestones {
             var nextSeen = 0
             while (true) {
                 val step = distanceStep(i++)
+                if (step > maxDistance) break
                 val state = when {
                     step <= d + EPS -> MilestoneState.EARNED
                     nextSeen++ == 0 -> MilestoneState.NEXT

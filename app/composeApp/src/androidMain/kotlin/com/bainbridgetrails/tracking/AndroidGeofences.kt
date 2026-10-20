@@ -130,13 +130,13 @@ object AndroidGeofences {
             return
         }
         val nm = context.getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Trailhead arrivals", NotificationManager.IMPORTANCE_DEFAULT))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, context.getString(com.bainbridgetrails.shared.R.string.notif_channel_trailheads), NotificationManager.IMPORTANCE_DEFAULT))
         val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
             PendingIntent.getActivity(context, trailheadId.hashCode(), it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
         val notification = Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_map)
-            .setContentTitle("Trailhead nearby")
+            .setContentTitle(context.getString(com.bainbridgetrails.shared.R.string.notif_trailhead_title))
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setContentIntent(open)

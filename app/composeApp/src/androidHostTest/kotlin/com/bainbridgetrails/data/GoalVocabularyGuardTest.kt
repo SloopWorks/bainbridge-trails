@@ -119,7 +119,7 @@ class GoalVocabularyGuardTest {
 
     /**
      * Android string resources (notifications, launcher label) have no `roads_` lookup: composeApp's androidMain
-     * res must not say "trail" at all, and androidApp's main res may only where the roads flavour overrides the key.
+     * res must not say "trail" outside [ANDROID_TRAIL_ONLY], and androidApp's main res may only where the roads flavour overrides the key.
      */
     @Test
     fun androidStringResourcesDoNotLeakTrails() {
@@ -128,7 +128,7 @@ class GoalVocabularyGuardTest {
         val appRoads = moduleFile("../androidApp/src/roads/res/values")
         val roadsKeys = androidStrings(appRoads).keys
         val problems = mutableListOf<String>()
-        androidStrings(composeAndroid).forEach { (k, v) -> if (trailWord.containsMatchIn(v)) problems += "composeApp androidMain $k says \"trail\": \"$v\"" }
+        androidStrings(composeAndroid).forEach { (k, v) -> if (trailWord.containsMatchIn(v) && k !in ANDROID_TRAIL_ONLY) problems += "composeApp androidMain $k says \"trail\": \"$v\"" }
         androidStrings(appMain).forEach { (k, v) ->
             if (trailWord.containsMatchIn(v) && k !in roadsKeys) problems += "androidApp main $k says \"trail\" and src/roads/res does not override it"
         }
@@ -185,6 +185,9 @@ class GoalVocabularyGuardTest {
             "record/PermissionFlow.kt:perm_precise_body",
             "ui/TrailsScreen.kt:trails_sort_length", // TrailSort.label -> LocalGoal.current.s(…label)
         )
+
+        /** Android strings of trail-only features (the trailhead geofence prototype: trails debug builds only). */
+        val ANDROID_TRAIL_ONLY = setOf("notif_channel_trailheads", "notif_trailhead_title")
 
         /** Overrides that add arguments (product.md §3.10 note: the trail text ignores them). */
         val EXTRA_ARGS = setOf("stat_island_info")

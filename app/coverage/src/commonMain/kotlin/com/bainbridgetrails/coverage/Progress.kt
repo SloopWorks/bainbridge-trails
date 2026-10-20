@@ -119,7 +119,8 @@ class Progress(
             val c = covered(s.id)
             if (s.included) islandCovered += c
             val len = index.segments[s.id]?.lengthM ?: s.lengthM
-            if (c > 0.0 && len > 0.0) buckets.getOrPut(status(c / len)) { ArrayList() } += s.id
+            // Roads (RP-3): uncounted stretches (private, unknown, lanes, trail competitors) are never drawn as progress.
+            if (c > 0.0 && len > 0.0 && (s.included || !rules.countedOnly)) buckets.getOrPut(status(c / len)) { ArrayList() } += s.id
         }
         val trails = dataset.trails.map { t ->
             var total = 0.0
