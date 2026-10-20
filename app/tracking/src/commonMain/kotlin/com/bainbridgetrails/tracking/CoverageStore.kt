@@ -1,6 +1,7 @@
 package com.bainbridgetrails.tracking
 
 import com.bainbridgetrails.coverage.CoverageState
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -67,6 +68,26 @@ class CoverageStore(dir: String) {
 
     /** Adds sticky completions without coverage (debug tools: test the celebration; sync: server's sticky set). */
     fun addCompleted(trailIds: Set<String>) = read().let { write(it.copy(completed = it.completed + trailIds)) }
+
+    /**
+     * Sync: unions the server's [state] and sticky [completed] ids in one write (union-only, never removes).
+     * Returns true when the stored file changed. Hold [writeLock] around it (the Finalizer writes concurrently).
+     */
+    fun mergeRemote(state: CoverageState, completed: Set<String>): Boolean {
+        val cur = read()
+        val next = cur.copy(state = cur.state.union(state), completed = cur.completed + completed)
+        if (next == cur) return false
+        write(next)
+        return true
+    }
+
+    companion object {
+        /**
+         * Process-wide guard for read-modify-write of `coverage.json` across store instances (Finalizer vs sync):
+         * without it a sync merge could overwrite a walk merged between its read and its write.
+         */
+        val writeLock: Mutex = Mutex()
+    }
 
     /** Unions [state] in without touching session bookkeeping (debug tools: inject coverage). */
     fun inject(state: CoverageState) = read().let { write(it.copy(state = it.state.union(state))) }

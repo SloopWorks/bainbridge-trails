@@ -30,6 +30,11 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        // Google OAuth *web* client id for Sign in with Google (Credential Manager `serverClientId`; the backend's
+        // GOOGLE_CLIENT_IDS must include it). `-PgoogleWebClientId=…` or gradle.properties; empty = the Google
+        // button shows "not configured" (debug builds still offer dev sign-in).
+        val googleWebClientId = providers.gradleProperty("googleWebClientId").orElse("").get()
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"" + googleWebClientId.replace("\"", "") + "\"")
     }
     buildFeatures {
         buildConfig = true // VERSION_NAME / BUILD_TYPE for the debug drawer's build info

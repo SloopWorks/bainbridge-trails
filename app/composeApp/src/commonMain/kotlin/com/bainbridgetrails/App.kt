@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.SpikeLaunch
@@ -27,6 +28,11 @@ fun App(launch: SpikeLaunch? = null) {
     val graph = remember(context) { AppGraph.install(context) }
     LaunchedEffect(Unit) {
         startGeofencesIfOptedIn(context) // re-arm trailhead geofences when opted in (no-op otherwise)
+    }
+    // F11 trigger: app foreground (sync runs only when due; see SyncRepository.onForeground).
+    LifecycleStartEffect(graph) {
+        graph.onForeground()
+        onStopOrDispose { }
     }
     val settings by graph.settings.settings.collectAsStateWithLifecycle()
     BtTheme {

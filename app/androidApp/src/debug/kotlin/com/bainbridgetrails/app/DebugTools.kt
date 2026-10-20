@@ -2,6 +2,7 @@ package com.bainbridgetrails.app
 
 import android.content.Context
 import com.bainbridgetrails.analytics.LogAnalytics
+import com.bainbridgetrails.auth.AuthConfig
 import com.bainbridgetrails.config.ApiConfig
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.log.AppLog
@@ -55,6 +56,7 @@ object DebugTools {
             }
         }
         AppGraph.analytics = LogAnalytics()
+        AuthConfig.devSignInEnabled = true // `signin_dev` → POST /v1/auth/dev (local wrangler dev only)
         AppLog.i("debug", "debug tools installed; backend ${ApiConfig.baseUrl}")
     }
 }
