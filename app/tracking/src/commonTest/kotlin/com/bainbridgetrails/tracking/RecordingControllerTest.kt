@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -87,11 +88,11 @@ class RecordingControllerTest {
 
     private class Rig(val controller: RecordingController, val recorder: FakeRecorder, val clock: FakeClock, val store: SessionStore, val dir: String)
 
-    private fun TestScope.rig(dir: String = tmpDir(), scope: CoroutineScope = backgroundScope): Rig {
+    private fun TestScope.rig(dir: String = tmpDir(), scope: CoroutineScope = backgroundScope, io: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.Default): Rig {
         val clock = FakeClock(t0)
         val store = SessionStore(dir)
         val recorder = FakeRecorder(store, clock)
-        val controller = RecordingController(store, Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir)), { clock.now }, recorder, scope)
+        val controller = RecordingController(store, Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir)), { clock.now }, recorder, scope, io = io)
         recorder.controller = controller
         return Rig(controller, recorder, clock, store, dir)
     }
@@ -532,7 +533,7 @@ class RecordingControllerTest {
         val dir = tmpDir()
         recordFinished(dir, "stopped", t0, 0.0, 60.0)
         SessionStore(dir).begin("crashed", t0 + 500_000)
-        val r = rig(dir)
+        val r = rig(dir, io = StandardTestDispatcher(testScheduler)) // file I/O on virtual time so runCurrent covers it
         r.controller.onLaunch()
         r.controller.state.first { it is RecordingState.Done }
         // The user starts a new walk straight from the results sheet (allowed from Done) instead of dismissing it.
@@ -542,7 +543,7 @@ class RecordingControllerTest {
         r.controller.stop()
         assertIs<RecordingState.Done>(r.controller.state.value)
         r.controller.dismiss()
-        advanceUntilIdle()
+        runCurrent() // dismiss() would launch the held-back onLaunch on backgroundScope (advanceUntilIdle skips it)
         assertIs<RecordingState.Idle>(r.controller.state.value, "the held-back recovery belonged to the earlier sheet")
     }
 }
