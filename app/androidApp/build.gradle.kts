@@ -27,7 +27,7 @@ if (providers.gradleProperty("shipyardDeployPluginRepository").isPresent) {
 val geofencePrototype = providers.gradleProperty("geofencePrototype").orNull == "true"
 
 // Release signing: keystore + passwords from Gradle properties or the environment (CI secrets), never from the repo.
-// All four present -> release is signed; otherwise assembleRelease produces androidApp-release-unsigned.apk.
+// All four present -> release is signed; otherwise assemble<Goal>Release produces androidApp-<goal>-release-unsigned.apk.
 // -PreleaseSignWithDebugKey=true signs release with the local debug key instead (on-device testing of an R8 build
 // only; such an APK must never be distributed).
 fun releaseSetting(name: String): String? =
