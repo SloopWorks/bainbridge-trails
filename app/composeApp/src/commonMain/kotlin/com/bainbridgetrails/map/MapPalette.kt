@@ -65,33 +65,3 @@ val MapStyle.palette: MapPalette
         MapStyle.DARK -> MapPalette.Dark
     }
 
-/**
- * Line encoding per status (styles.md "Status encoding"): width stops z11/13/15/17 in px (= dp in MapLibre) and the
- * dash pattern (× width). Shared by the map layers and the legend swatches.
- */
-object TrailLineSpec {
-    val widths: Map<TrailStatus, List<Pair<Int, Float>>> = mapOf(
-        TrailStatus.COMPLETE to listOf(11 to 1.8f, 13 to 3.2f, 15 to 5.6f, 17 to 9.0f),
-        TrailStatus.NEARLY_DONE to listOf(11 to 1.3f, 13 to 2.3f, 15 to 3.8f, 17 to 6.2f),
-        TrailStatus.PARTWAY to listOf(11 to 1.2f, 13 to 2.0f, 15 to 3.2f, 17 to 5.0f),
-        TrailStatus.NOT_STARTED to listOf(11 to 1.1f, 13 to 1.7f, 15 to 2.6f, 17 to 4.0f),
-    )
-
-    /** null = solid. Not started: round dots; Partway: long dash. */
-    fun dash(status: TrailStatus): List<Float>? = when (status) {
-        TrailStatus.NOT_STARTED -> listOf(0.01f, 1.9f)
-        TrailStatus.PARTWAY -> listOf(2.6f, 1.4f)
-        else -> null
-    }
-
-    /** Named trails outside the island total (TL-6): status color, short even dash, slightly thinner. */
-    val notCountedNamedDash: List<Float> = listOf(2.2f, 1.6f)
-    const val NOT_COUNTED_NAMED_SCALE = 0.85f
-
-    fun hasCasing(status: TrailStatus): Boolean = status == TrailStatus.NEARLY_DONE || status == TrailStatus.PARTWAY
-    const val CASING_EXTRA = 2.2f
-    const val HALO_EXTRA = 3.0f
-
-    /** Opacity of every other trail while one is selected (ux.md §6.2). */
-    const val DIM_OPACITY = 0.45f
-}

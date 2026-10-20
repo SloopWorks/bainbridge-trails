@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.coverage.TrailStatus
+import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.map_close
 import com.bainbridgetrails.resources.map_preview_multi_title
@@ -45,7 +46,15 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 /** What a map sheet shows about one trail. */
-data class TrailSummary(val id: String, val name: String, val subtitle: String, val fraction: Double, val status: TrailStatus)
+data class TrailSummary(
+    val id: String,
+    val name: String,
+    val subtitle: String,
+    val fraction: Double,
+    val status: TrailStatus,
+    /** Set for a road outside the island goal: why (docs/roads/product.md §6); no status, no Start walk. */
+    val notCountedReason: String? = null,
+)
 
 private val SheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
@@ -128,13 +137,23 @@ fun TrailPeekSheet(
                 if (trail.subtitle.isNotEmpty()) {
                     Text(trail.subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                StatusChip(trail.status, Modifier.padding(top = 6.dp))
+                if (trail.notCountedReason != null) {
+                    NotCountedChip(Modifier.padding(top = 6.dp))
+                    Text(trail.notCountedReason, Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    StatusChip(trail.status, Modifier.padding(top = 6.dp))
+                }
             }
-            ProgressRing(trail.fraction, trail.status, size = 56.dp)
+            if (trail.notCountedReason == null) ProgressRing(trail.fraction, trail.status, size = 56.dp)
         }
+        val openLabel = stringResource(LocalGoal.current.s(Res.string.map_preview_open))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(BtTheme.spacing.sm)) {
-            PrimaryButton(startLabel, onStart, Modifier.weight(1f), icon = BtIcons.DirectionsWalk)
-            SecondaryButton(stringResource(Res.string.map_preview_open), onDetails, Modifier.weight(1f))
+            if (trail.notCountedReason == null) {
+                PrimaryButton(startLabel, onStart, Modifier.weight(1f), icon = BtIcons.DirectionsWalk)
+                SecondaryButton(openLabel, onDetails, Modifier.weight(1f))
+            } else {
+                SecondaryButton(openLabel, onDetails, Modifier.weight(1f))
+            }
         }
     }
 }
@@ -149,7 +168,7 @@ fun TrailChooserSheet(
 ) {
     MapSheet(onDismiss, modifier, padContent = false) {
         Text(
-            stringResource(Res.string.map_preview_multi_title),
+            stringResource(LocalGoal.current.s(Res.string.map_preview_multi_title)),
             Modifier.semantics { heading() }.padding(horizontal = BtTheme.spacing.screenH).padding(bottom = 4.dp),
             style = MaterialTheme.typography.titleLarge,
         )

@@ -86,7 +86,11 @@ import com.bainbridgetrails.map.SelectedTrail
 import com.bainbridgetrails.map.StatusLayers
 import com.bainbridgetrails.map.TAP_HIT_SIZE_DP
 import com.bainbridgetrails.map.TapResult
-import com.bainbridgetrails.map.TappableTrailLayerIds
+import com.bainbridgetrails.map.ROAD_END_LAYER
+import com.bainbridgetrails.map.StatusLayerSpec
+import com.bainbridgetrails.map.allRoadEnds
+import com.bainbridgetrails.map.countedLengthMi
+import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.map.TrailFacts
 import com.bainbridgetrails.map.TrailFactsRepository
 import com.bainbridgetrails.map.TrailMap
@@ -135,6 +139,7 @@ import com.bainbridgetrails.ui.components.StatusLegend
 import com.bainbridgetrails.ui.components.TrailChooserSheet
 import com.bainbridgetrails.ui.components.TrailPeekSheet
 import com.bainbridgetrails.ui.components.TrailSummary
+import com.bainbridgetrails.ui.components.rememberRoadTexts
 import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PillShape
 import kotlinx.coroutines.Dispatchers
@@ -155,6 +160,7 @@ import org.maplibre.compose.map.MapState
 import org.maplibre.compose.util.DpPadding
 import org.maplibre.spatialk.geojson.LineString
 import org.maplibre.spatialk.geojson.MultiLineString
+import org.maplibre.spatialk.geojson.Point
 import org.maplibre.spatialk.geojson.Position
 
 /** "Off the island" = farther than this from the island bounds (ux.md §3.2). */
@@ -162,6 +168,9 @@ private const val OFF_ISLAND_M = 3_000.0
 
 /** How long Locate waits for a first fix before saying it can't find you. */
 private const val LOCATE_TIMEOUT_MS = 12_000L
+
+/** A road-end pin wins a tap within this distance (docs/roads/ux.md §2.6). */
+private const val ROAD_END_TAP_DP = 16.0
 
 /**
  * Map tab (ux.md §3.2, §6; product F2): full-bleed map with per-segment status layers, tap → peek / chooser sheet,
@@ -184,6 +193,7 @@ fun MapTab(
     val data = datasetState.valueOrNull
     val snapshot by graph.progress.snapshot.collectAsStateWithLifecycle()
     val facts by produceState<Map<String, TrailFacts>>(emptyMap()) { value = runCatching { TrailFactsRepository.all() }.getOrDefault(emptyMap()) }
+    val roadEnds = remember(facts) { facts.allRoadEnds() }
     val recordingController by produceState<RecordingController?>(null, graph) { value = runCatching { graph.controller().await() }.getOrNull() }
     // Only "is a walk recording" matters here (Start-walk label); a fix or a tick must not recompose the map screen.
     val recording = recordingController?.let { c ->
@@ -211,10 +221,23 @@ fun MapTab(
     val locationGranted = requester.status(Perm.LOCATION_WHILE_IN_USE) == PermStatus.GRANTED
     val locationState = rememberLocationState(enabled = locating && locationGranted)
 
+    val spec = StatusLayerSpec.current
+    val roadText = rememberRoadTexts()
     fun summary(id: String): TrailSummary? {
         val meta = data?.dataset?.trails?.firstOrNull { it.id == id } ?: return null
         val p = snapshot?.trail(id)
         val f = facts[id]
+        val road = f?.road
+        if (road != null) {
+            // Roads (docs/roads/ux.md §3.3): "Residential street · 0.7 mi" (counted length); uncounted say why.
+            val length = formatTrailLength(data.dataset.countedLengthMi(id), settings.units)
+            val reason = road.notCountedReason
+            return TrailSummary(
+                id, meta.name, listOf(roadText.category(road.category), length).joinToString(" · "),
+                p?.fraction ?: 0.0, p?.status ?: TrailStatus.NOT_STARTED,
+                notCountedReason = reason?.let(roadText::reason),
+            )
+        }
         val length = formatTrailLength(f?.lengthMi ?: meta.displayLengthMi, settings.units)
         return TrailSummary(id, meta.name, listOfNotNull(f?.park, length).joinToString(" · "), p?.fraction ?: 0.0, p?.status ?: TrailStatus.NOT_STARTED)
     }
@@ -237,6 +260,8 @@ fun MapTab(
                 bounds,
                 DpPadding(left = 48.dp, top = topInset + 72.dp, right = 48.dp, bottom = maxOf(stackHeight, 220.dp) + 24.dp),
                 animate = !reduced,
+                maxZoom = spec.fitZoomRange.endInclusive,
+                minZoom = spec.fitZoomRange.start,
             )
         }
     }
@@ -248,11 +273,23 @@ fun MapTab(
             val half = (TAP_HIT_SIZE_DP / 2).dp
             val o = e.screenOffset
             val rect = DpRect(o.x - half, o.y - half, o.x + half, o.y + half)
-            val features = runCatching { map.queryRenderedFeatures(rect, TappableTrailLayerIds) }.getOrDefault(emptyList())
+            val layers = if (spec.drawRoadEnds) spec.tappableLayerIds + ROAD_END_LAYER else spec.tappableLayerIds
+            val features = runCatching { map.queryRenderedFeatures(rect, layers) }.getOrDefault(emptyList())
             val segs = d.dataset.segmentsById
             val tapGeo = e.position ?: map.positionFromScreenLocation(o) ?: return@launch
             val zoom = map.cameraPosition.zoom
             val tap = ScreenPoint(0.0, 0.0)
+            // Road-end pins win within 16dp (docs/roads/ux.md §2.6): select the pin's road.
+            val pin = features.mapNotNull { f ->
+                val roadId = (f.properties?.get("road_id") as? JsonPrimitive)?.content ?: return@mapNotNull null
+                val pt = (f.geometry as? Point)?.coordinates ?: return@mapNotNull null
+                val off = mercatorOffsetDp(tapGeo.longitude, tapGeo.latitude, pt.longitude, pt.latitude, zoom)
+                roadId to kotlin.math.hypot(off.x, off.y)
+            }.filter { it.second <= ROAD_END_TAP_DP }.minByOrNull { it.second }
+            if (pin != null) {
+                select(pin.first, map)
+                return@launch
+            }
             // Pure math off Main: vertices are projected relative to the tap (north-up, no tilt).
             val hits = withContext(Dispatchers.Default) { features.mapNotNull { f ->
                 val segId = (f.properties?.get("id") as? JsonPrimitive)?.content ?: return@mapNotNull null
@@ -359,9 +396,9 @@ fun MapTab(
     val lastSummary = remember { mutableStateOf<TrailSummary?>(null) }
 
     val completed = snapshot?.trailsCompleted ?: 0
-    val total = data?.dataset?.trails?.size ?: 0
-    val mapA11y = stringResource(Res.string.map_a11y, completed, total)
-    val trailsLabel = stringResource(Res.string.nav_trails)
+    val total = facts.takeIf { it.isNotEmpty() }?.values?.count { it.road?.counted ?: true } ?: data?.dataset?.trails?.size ?: 0
+    val mapA11y = stringResource(LocalGoal.current.s(Res.string.map_a11y), completed, total)
+    val trailsLabel = stringResource(LocalGoal.current.s(Res.string.nav_trails))
     val animatedStack by animateDpAsState(stackHeight, tween(if (reduced) 0 else 200))
 
     Box(modifier.fillMaxSize().onSizeChanged { mapHeight = with(density) { it.height.toDp() } }) {
@@ -378,7 +415,7 @@ fun MapTab(
             attribution = AttributionMode.Timed,
             chromePadding = PaddingValues(bottom = animatedStack),
         ) {
-            StatusLayers(snapshot?.segmentBuckets.orEmpty(), style, selected, reduced)
+            StatusLayers(snapshot?.segmentBuckets.orEmpty(), style, selected, reduced, spec = spec, roadEnds = roadEnds)
             if (locating && locationGranted) {
                 LocationIndicatorLayer(
                     id = "app-user-location",
@@ -476,7 +513,7 @@ fun MapTab(
 /** "Find a trail" pill (ux.md §3.2 MapSearchChip): opens the Trails tab. Disabled until the dataset is ready. */
 @Composable
 private fun SearchChip(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val label = stringResource(Res.string.map_search_hint)
+    val label = stringResource(LocalGoal.current.s(Res.string.map_search_hint))
     Row(
         modifier
             .heightIn(min = 48.dp)
