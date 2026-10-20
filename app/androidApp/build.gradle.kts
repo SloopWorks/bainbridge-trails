@@ -117,8 +117,8 @@ android {
 
 // Bundled datasets per flavour (scripts/sync-app-assets.sh installs both into composeApp's resources). The roads APK
 // drops the trail dataset (its coverage_segments already carries the trail competitors it needs, RD-2b); trailsRelease
-// drops the roads dataset. trailsDebug keeps both for the debug drawer's dataset switch. Patterns match file names.
-val trailDatasetAssets = listOf("trails.json", "coverage_segments.json", "dataset.bin", "trails.pmtiles")
+// drops the roads dataset; the roads APK also drops trail-only trailheads.json and the trail credits. trailsDebug keeps both for the debug drawer's dataset switch. Patterns match file names.
+val trailDatasetAssets = listOf("trails.json", "coverage_segments.json", "dataset.bin", "trails.pmtiles", "trailheads.json", "ATTRIBUTION.md")
 val roadDatasetAssets = listOf("roads.json", "roads_coverage_segments.json", "roads_dataset.bin", "roads.pmtiles", "roads_road_ends.json", "roads_ATTRIBUTION.md")
 
 androidComponents {
