@@ -118,7 +118,8 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
         }
     }
 
-    val showBar = BarRoutes.any { destination.isTab(it) }
+    // ux.md §3.4: the bar stays visible under Trail detail (its Start walk sits above it).
+    val showBar = BarRoutes.any { destination.isTab(it) } || destination?.hasRoute(TrailDetailRoute::class) == true
     val recording = recordingState is RecordingState.Recording
     // Content stops at the bar's top edge (80dp + nav inset); the Record disc rises over it.
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -129,7 +130,15 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             startDestination = start,
             modifier = Modifier.fillMaxSize().padding(bottom = barPadding).consumeWindowInsets(PaddingValues(bottom = barPadding)),
         ) {
-            composable<MapRoute> { MapTab(graph, settings, launch?.camera) }
+            composable<MapRoute> {
+                MapTab(
+                    graph, settings, launch?.camera,
+                    onTrail = { nav.navigate(TrailDetailRoute(it)) },
+                    onLeaderboard = { nav.navigate(LeaderboardRoute) },
+                    onSearch = { nav.selectTab(TrailsRoute) },
+                    onRecord = { nav.selectTab(RecordRoute) },
+                )
+            }
             composable<TrailsRoute> { TrailsScreen(graph, settings, onTrail = { nav.navigate(TrailDetailRoute(it)) }, onLeaderboard = { nav.navigate(LeaderboardRoute) }) }
             composable<RecordRoute> { RecordScreen(launch ?: SpikeLaunch(), Modifier.fillMaxSize()) }
             composable<MeRoute> {
@@ -147,7 +156,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                 )
             }
             composable<TrailDetailRoute> { entry ->
-                TrailDetailScreen(graph, settings, entry.toRoute<TrailDetailRoute>().trailId, onBack = { nav.popBackStack() }, onStartWalk = { nav.selectTab(RecordRoute) })
+                TrailDetailScreen(graph, settings, entry.toRoute<TrailDetailRoute>().trailId, onBack = { nav.popBackStack() }, onStartWalk = { nav.selectTab(RecordRoute) }, onShowOnMap = { nav.selectTab(MapRoute) })
             }
             composable<LeaderboardRoute> { LeaderboardScreen(graph, onBack = { nav.popBackStack() }, onSignIn = { nav.navigate(ProfileRoute) }) }
             composable<ProfileRoute> { ProfileScreen(graph, onBack = { nav.popBackStack() }) }

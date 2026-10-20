@@ -50,11 +50,6 @@
     <string name="trails_search_hint">Search trails or parks</string>
     <string name="trails_count">%1$d of %2$d trails</string>
 
-    <!-- Trail detail -->
-    <string name="detail_length">Length</string>
-    <string name="detail_covered">Covered</string>
-    <string name="detail_start_walk">Start walk</string>
-
     <!-- Celebration -->
     <string name="celebrate_title">%1$s complete!</string>
     <plurals name="celebrate_title_multi">
