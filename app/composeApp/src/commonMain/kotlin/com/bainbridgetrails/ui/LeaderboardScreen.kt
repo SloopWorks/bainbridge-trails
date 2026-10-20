@@ -64,6 +64,7 @@ import com.bainbridgetrails.ui.components.EmptyKind
 import com.bainbridgetrails.ui.components.EmptyState
 import com.bainbridgetrails.ui.components.LeaderHeader
 import com.bainbridgetrails.ui.components.LeaderRow
+import com.bainbridgetrails.ui.components.HiddenYouRow
 import com.bainbridgetrails.ui.components.OfflineNote
 import com.bainbridgetrails.ui.components.SignInPrompt
 import com.bainbridgetrails.ui.components.SkeletonLeaderRow
@@ -87,6 +88,10 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
     val listState = rememberLazyListState()
     var reporting by remember { mutableStateOf<LeaderboardEntryDto?>(null) }
     LaunchedEffect(signedIn) { graph.leaderboard.refresh() }
+    // P1-8: the hide toggle lives on the profile (GET /v1/me); refresh it with the board so the hidden row is current.
+    val profile by graph.profile.profile.collectAsStateWithLifecycle()
+    LaunchedEffect(signedIn) { if (signedIn) graph.profile.refresh() }
+    val hiddenSelf = signedIn && profile?.me?.hiddenFromBoard == true
 
     val board = state.board
     val entries = board?.entries.orEmpty()
@@ -115,6 +120,12 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
             }
         },
         bottomBar = when {
+            hiddenSelf -> { {
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    HiddenYouRow(onChange = onSignIn)
+                }
+            } }
             !signedIn -> { { SignInPrompt(stringResource(Res.string.board_signed_out_prompt), stringResource(Res.string.board_signin), onSignIn, Modifier.padding(horizontal = BtTheme.spacing.screenH, vertical = BtTheme.spacing.sm)) } }
             you != null && !youVisible -> { {
                 Column {
@@ -145,7 +156,7 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
                 if (board != null && board.totalRanked > 0) {
                     Text(pluralStringResource(Res.plurals.board_total, board.totalRanked, board.totalRanked), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (signedIn && board != null && you == null && state.error == null) {
+                if (signedIn && !hiddenSelf && board != null && you == null && state.error == null) {
                     Text(stringResource(Res.string.board_not_ranked), Modifier.padding(top = BtTheme.spacing.xs), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 }
             }

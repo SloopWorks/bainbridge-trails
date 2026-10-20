@@ -77,6 +77,7 @@ import com.bainbridgetrails.resources.me_leaderboard_as_of
 import com.bainbridgetrails.resources.me_leaderboard_row
 import com.bainbridgetrails.resources.me_leaderboard_row_signed_out
 import com.bainbridgetrails.resources.me_leaderboard_row_unranked
+import com.bainbridgetrails.resources.me_leaderboard_row_hidden
 import com.bainbridgetrails.resources.me_leaderboard_see
 import com.bainbridgetrails.resources.me_profile_a11y
 import com.bainbridgetrails.resources.me_see_all
@@ -185,6 +186,7 @@ fun MeScreen(
                         val you = board.board?.you
                         val subtitle = when {
                             !signedIn -> stringResource(Res.string.me_leaderboard_see)
+                            profile?.me?.hiddenFromBoard == true -> stringResource(Res.string.me_leaderboard_row_hidden)
                             you != null -> stringResource(Res.string.me_leaderboard_row, you.rank, board.board?.totalRanked ?: you.rank) +
                                 (if (board.error != null && board.updatedAt != null) " · " + stringResource(Res.string.me_leaderboard_as_of, ageText(board.updatedAt!!)) else "")
                             board.board != null -> stringResource(Res.string.me_leaderboard_row_unranked)

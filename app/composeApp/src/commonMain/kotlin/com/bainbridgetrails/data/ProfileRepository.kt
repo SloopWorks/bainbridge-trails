@@ -141,6 +141,32 @@ class ProfileRepository(
         }
     }
 
+    /**
+     * P1-8 "Hide me from the leaderboard" (ux.md §3.9: the toggle saves at once, optimistic, reverted on failure).
+     * Online only: the server hides the row immediately, so there is no offline queue. Signed out / no profile yet
+     * → [ApiError.Unauthorized] without a request.
+     */
+    suspend fun setHiddenFromBoard(hidden: Boolean): ApiResult<MeDto> {
+        val before = mutex.withLock {
+            val cur = loadLocked()
+            val me = cur.me
+            if (me == null || !isSignedIn()) return ApiResult.Failure(ApiError.Unauthorized("signed out"))
+            _profile.value = cur.copy(me = me.copy(hiddenFromBoard = hidden))
+            me.hiddenFromBoard
+        }
+        val r = api.putMe(JsonObject(mapOf("hiddenFromBoard" to JsonPrimitive(hidden))))
+        when (r) {
+            is ApiResult.Ok -> applyServer(r.value, clearPending = null)
+            is ApiResult.Failure -> mutex.withLock {
+                val cur = _profile.value
+                val me = cur?.me
+                // Revert only our optimistic flip (a sign-out meanwhile cleared `me`: nothing to revert).
+                if (me != null && me.hiddenFromBoard == hidden) _profile.value = cur.copy(me = me.copy(hiddenFromBoard = before))
+            }
+        }
+        return r
+    }
+
     /** GET /v1/me (after flushing a pending change). */
     suspend fun refresh(): ApiResult<MeDto> {
         flushPending()

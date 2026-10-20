@@ -57,6 +57,7 @@
     <string name="stat_walks_info">Walks recorded and saved on this phone. Walks from other phones aren’t listed, but their progress is included above.</string>
     <string name="me_leaderboard_row">You’re #%1$d of %2$d</string>
     <string name="me_leaderboard_row_unranked">Not on the board yet. Walk a trail to get ranked.</string>
+    <string name="me_leaderboard_row_hidden">You’re hidden from the board</string>
     <string name="me_leaderboard_see">See how islanders are doing</string>
     <string name="me_leaderboard_as_of">as of %1$s</string>
     <string name="me_in_progress_count">In progress (%1$d)</string>
@@ -111,6 +112,10 @@
     <string name="board_report_name">Report name</string>
     <string name="board_more_a11y">More options for %1$s</string>
     <string name="board_refresh_a11y">Refresh</string>
+    <string name="board_you_hidden">You’re hidden</string>
+    <string name="board_you_hidden_body">Only you can see this.</string>
+    <string name="board_you_hidden_action">Change</string>
+    <string name="board_you_hidden_a11y">You’re hidden from the leaderboard. Only you can see this.</string>
     <string name="report_title">Report this name?</string>
     <string name="report_body">“%1$s” will be flagged for review and hidden from your board. Reports are anonymous.</string>
     <string name="report_send">Send report</string>
@@ -147,6 +152,11 @@
     <string name="name_err_rate">You’ve changed your name a lot today. Try again tomorrow.</string>
     <string name="name_err_generic">Couldn’t save your name. Try again.</string>
     <string name="name_reset_notice">Your name was reported and has been switched to %1$s. You can choose a new one here.</string>
+    <string name="profile_hide_title">Hide me from the leaderboard</string>
+    <string name="profile_hide_body">Your progress still syncs. Others won’t see your name, island % or rank.</string>
+    <string name="profile_hide_on">You’re hidden from the board</string>
+    <string name="profile_hide_off">You’re back on the board. Others will see you after the daily update.</string>
+    <string name="profile_hide_failed">Couldn’t change that. Try again.</string>
     <string name="profile_sync">Sync</string>
     <string name="account_signed_in_as">Signed in with %1$s</string>
     <string name="provider_apple">Apple</string>

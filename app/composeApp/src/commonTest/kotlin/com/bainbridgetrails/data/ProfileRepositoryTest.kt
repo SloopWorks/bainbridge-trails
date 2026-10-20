@@ -32,6 +32,29 @@ class ProfileRepositoryTest {
     }
 
     @Test
+    fun hideFromBoardSavesAndRevertsOnFailure() = runTest {
+        server.on("GET /v1/me", Reply.json(Fixtures.me()))
+        val p = repo()
+        p.refresh()
+        server.on("PUT /v1/me", Reply.json(Fixtures.me().replace("\"hiddenFromBoard\":false", "\"hiddenFromBoard\":true")))
+        assertIs<com.bainbridgetrails.net.ApiResult.Ok<*>>(p.setHiddenFromBoard(true))
+        assertEquals("""{"hiddenFromBoard":true}""", server.last("PUT /v1/me").body)
+        assertTrue(p.profile.value!!.me!!.hiddenFromBoard)
+
+        // Offline: the optimistic flip is undone (no offline queue for this toggle).
+        server.online = false
+        assertIs<com.bainbridgetrails.net.ApiResult.Failure>(p.setHiddenFromBoard(false))
+        assertTrue(p.profile.value!!.me!!.hiddenFromBoard)
+    }
+
+    @Test
+    fun hideFromBoardNeedsSignIn() = runTest {
+        signedIn = false
+        assertIs<com.bainbridgetrails.net.ApiResult.Failure>(repo().setHiddenFromBoard(true))
+        assertEquals(0, server.requests.size)
+    }
+
+    @Test
     fun invalidCustomNameIsNotSent() = runTest {
         assertEquals(NameSaveResult.Invalid(NameCheck.TooShort), repo().saveCustomName("ab"))
         assertEquals(0, server.requests.size)

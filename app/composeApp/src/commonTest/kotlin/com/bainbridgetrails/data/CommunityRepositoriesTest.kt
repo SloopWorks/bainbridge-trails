@@ -60,6 +60,14 @@ class CommunityRepositoriesTest {
         val restarted = boardRepo()
         restarted.refresh()
         assertEquals(listOf("b"), restarted.state.value.board!!.entries.map { it.userId })
+        // ...and offline from the cache.
+        server.online = false
+        val offline = boardRepo()
+        offline.refresh()
+        assertEquals(listOf("b"), offline.state.value.board!!.entries.map { it.userId })
+        // A failed report (offline) hides nothing.
+        assertIs<ReportResult.Failed>(offline.reportName("b"))
+        assertEquals(listOf("b"), offline.state.value.board!!.entries.map { it.userId })
     }
 
     @Test
