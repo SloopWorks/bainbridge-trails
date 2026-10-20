@@ -11,7 +11,8 @@ package com.bainbridgetrails.coverage
  * i32 MAGIC  i32 FORMAT  str version  i64 trailsJsonHash  f64 islandTotalM
  * i32 nStrings  str * nStrings                       // ids, names, categories (deduplicated)
  * i32 nTrails
- *   per trail:   i32 idRef  i32 nameRef  f64 computedLengthMi  u8 hasOfficial  [f64 officialLengthMi]
+ *   per trail:   i32 idRef  i32 nameRef  f64 computedLengthMi  u8 flags (1 = official, 2 = park)
+ *                [f64 officialLengthMi]  [i32 parkRef]
  *                i32 nSegmentIds  i32 segmentRef * nSegmentIds
  * i32 nSegments
  *   per segment: i32 idRef  f64 lengthM  u8 flags (1 = included, 2 = has category)  [i32 categoryRef]
@@ -24,7 +25,7 @@ package com.bainbridgetrails.coverage
  */
 object DatasetBinary {
     const val MAGIC: Int = 0x53445442 // "BTDS"
-    const val FORMAT: Int = 1
+    const val FORMAT: Int = 2
 
     fun encode(dataset: Dataset, trailsJsonHash: Long): ByteArray {
         val strings = LinkedHashMap<String, Int>()
@@ -32,6 +33,7 @@ object DatasetBinary {
         for (t in dataset.trails) {
             ref(t.id)
             ref(t.name)
+            t.park?.let(::ref)
             t.segmentIds.forEach(::ref)
         }
         for (s in dataset.segments) {
@@ -53,8 +55,10 @@ object DatasetBinary {
             w.i32(ref(t.name))
             w.f64(t.computedLengthMi)
             val official = t.officialLengthMi
-            w.u8(if (official != null) 1 else 0)
+            val park = t.park
+            w.u8((if (official != null) 1 else 0) or (if (park != null) 2 else 0))
             if (official != null) w.f64(official)
+            if (park != null) w.i32(ref(park))
             w.i32(t.segmentIds.size)
             for (s in t.segmentIds) w.i32(ref(s))
         }
@@ -97,8 +101,10 @@ object DatasetBinary {
             val id = strings[r.i32()]
             val name = strings[r.i32()]
             val computed = r.f64()
-            val official = if (r.u8() != 0) r.f64() else null
-            TrailMeta(id, name, List(r.i32()) { strings[r.i32()] }, computed, official)
+            val tf = r.u8()
+            val official = if (tf and 1 != 0) r.f64() else null
+            val park = if (tf and 2 != 0) strings[r.i32()] else null
+            TrailMeta(id, name, List(r.i32()) { strings[r.i32()] }, computed, official, park)
         }
         val n = r.i32()
         val ids = arrayOfNulls<String>(n)

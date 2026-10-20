@@ -15,6 +15,7 @@ ASSETS=(
   "trails.json:trails.json"
   "coverage_segments.json:coverage_segments.json"
   "trailheads.json:trailheads.json"
+  "ATTRIBUTION.md:ATTRIBUTION.md"
   "terrain/contours.pmtiles:contours.pmtiles"
   "terrain/hillshade.pmtiles:hillshade.pmtiles"
 )

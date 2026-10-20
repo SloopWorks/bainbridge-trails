@@ -14,6 +14,8 @@ sealed interface Route
 @Serializable data object LeaderboardRoute : Route
 @Serializable data object ProfileRoute : Route
 @Serializable data object SettingsRoute : Route
+@Serializable data object AttributionRoute : Route
+@Serializable data object PrivacyRoute : Route
 @Serializable data object OnboardingRoute : Route
 /** Full-screen celebration for a walk's newly completed trails (dataset order). */
 @Serializable data class CelebrationRoute(val sessionId: String, val trailIds: List<String>) : Route

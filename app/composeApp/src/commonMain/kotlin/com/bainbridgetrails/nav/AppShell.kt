@@ -28,6 +28,7 @@ import androidx.navigation.toRoute
 import com.bainbridgetrails.analytics.AnalyticsEvents
 import com.bainbridgetrails.data.AppSettings
 import com.bainbridgetrails.graph.AppGraph
+import com.bainbridgetrails.auth.isSignedIn
 import com.bainbridgetrails.map.SpikeLaunch
 import com.bainbridgetrails.map.StyleSpikeScreen
 import com.bainbridgetrails.record.RecordScreen
@@ -39,7 +40,12 @@ import com.bainbridgetrails.resources.nav_recording
 import com.bainbridgetrails.resources.nav_trails
 import com.bainbridgetrails.tracking.RecordingController
 import com.bainbridgetrails.tracking.RecordingState
+import com.bainbridgetrails.ui.AttributionScreen
 import com.bainbridgetrails.ui.CelebrationScreen
+import com.bainbridgetrails.ui.PrivacyScreen
+import com.bainbridgetrails.ui.TrailListQuery
+import com.bainbridgetrails.ui.TrailsListState
+import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.ui.LeaderboardScreen
 import com.bainbridgetrails.ui.MapTab
 import com.bainbridgetrails.ui.MeScreen
@@ -95,6 +101,11 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
 
     // F1: first run shows onboarding over Map (spike launches skip it).
     LaunchedEffect(Unit) {
+        val debugScreen = DebugLaunch.screen
+        if (debugScreen != null) {
+            openDebugScreen(nav, graph, debugScreen)
+            return@LaunchedEffect
+        }
         if (launch == null && !settings.onboardingDone) nav.navigate(OnboardingRoute)
     }
     LaunchedEffect(destination) {
@@ -119,7 +130,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             modifier = Modifier.fillMaxSize().padding(bottom = barPadding).consumeWindowInsets(PaddingValues(bottom = barPadding)),
         ) {
             composable<MapRoute> { MapTab(graph, settings, launch?.camera) }
-            composable<TrailsRoute> { TrailsScreen(graph, settings, onTrail = { nav.navigate(TrailDetailRoute(it)) }) }
+            composable<TrailsRoute> { TrailsScreen(graph, settings, onTrail = { nav.navigate(TrailDetailRoute(it)) }, onLeaderboard = { nav.navigate(LeaderboardRoute) }) }
             composable<RecordRoute> { RecordScreen(launch ?: SpikeLaunch(), Modifier.fillMaxSize()) }
             composable<MeRoute> {
                 MeScreen(
@@ -128,16 +139,30 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     onLeaderboard = { nav.navigate(LeaderboardRoute) },
                     onSettings = { nav.navigate(SettingsRoute) },
                     onProfile = { nav.navigate(ProfileRoute) },
+                    onMap = { nav.selectTab(MapRoute) },
+                    onSeeAllInProgress = {
+                        TrailsListState.query = TrailListQuery(statuses = setOf(TrailStatus.PARTWAY, TrailStatus.NEARLY_DONE))
+                        nav.selectTab(TrailsRoute)
+                    },
                 )
             }
             composable<TrailDetailRoute> { entry ->
                 TrailDetailScreen(graph, settings, entry.toRoute<TrailDetailRoute>().trailId, onBack = { nav.popBackStack() }, onStartWalk = { nav.selectTab(RecordRoute) })
             }
-            composable<LeaderboardRoute> { LeaderboardScreen(onBack = { nav.popBackStack() }) }
-            composable<ProfileRoute> { ProfileScreen(onBack = { nav.popBackStack() }) }
+            composable<LeaderboardRoute> { LeaderboardScreen(graph, onBack = { nav.popBackStack() }, onSignIn = { nav.navigate(ProfileRoute) }) }
+            composable<ProfileRoute> { ProfileScreen(graph, onBack = { nav.popBackStack() }) }
             composable<SettingsRoute> {
-                SettingsScreen(graph, settings, onBack = { nav.popBackStack() }, onShowIntro = { nav.navigate(OnboardingRoute) })
+                SettingsScreen(
+                    graph, settings,
+                    onBack = { nav.popBackStack() },
+                    onShowIntro = { nav.navigate(OnboardingRoute) },
+                    onAccount = { nav.navigate(ProfileRoute) },
+                    onAttribution = { nav.navigate(AttributionRoute) },
+                    onPrivacy = { nav.navigate(PrivacyRoute) },
+                )
             }
+            composable<AttributionRoute> { AttributionScreen(onBack = { nav.popBackStack() }) }
+            composable<PrivacyRoute> { PrivacyScreen(onBack = { nav.popBackStack() }) }
             composable<OnboardingRoute> {
                 OnboardingScreen(onDone = {
                     graph.settings.update { it.copy(onboardingDone = true) }
@@ -175,3 +200,19 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
 @Composable
 private fun rememberController(graph: AppGraph.Installed): State<RecordingController?> =
     produceState<RecordingController?>(null, graph) { value = runCatching { graph.controller().await() }.getOrNull() }
+
+/** Debug binaries: open the screen named by [DebugLaunch.screen] (simulator screenshots; no tap tooling there). */
+private suspend fun openDebugScreen(nav: NavController, graph: AppGraph.Installed, screen: String) {
+    if (screen != "onboarding") graph.settings.updateNow { it.copy(onboardingDone = true) }
+    if (DebugLaunch.devSignIn && !graph.auth.load().isSignedIn) graph.auth.signInWithDev()
+    when (screen) {
+        "trails" -> nav.selectTab(TrailsRoute)
+        "me" -> nav.selectTab(MeRoute)
+        "leaderboard" -> nav.navigate(LeaderboardRoute)
+        "profile" -> nav.navigate(ProfileRoute)
+        "settings" -> nav.navigate(SettingsRoute)
+        "attribution" -> nav.navigate(AttributionRoute)
+        "privacy" -> nav.navigate(PrivacyRoute)
+        "onboarding" -> nav.navigate(OnboardingRoute)
+    }
+}
