@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Roads flavour: the Bainbridge Roads launcher icon (docs/roads/ux.md §1.2). Merged into src/main's manifest. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" />
+</manifest>

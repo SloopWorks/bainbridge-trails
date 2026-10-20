@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bainbridge Roads launcher foreground (docs/roads/ux.md §1.2): the island (coastline.json simplified to 57 points)
+  in chart paper, two survey-slate water lines around it, and three roads in slate — SR 305 as the 4dp NW→SE diagonal,
+  two 2.5dp cross streets, one with a paper dashed centreline. No status colors. 108dp canvas, 66dp safe zone.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- water lines (outlines scaled out from the centre, ~3dp and ~6dp off the coast) -->
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="1.22" android:scaleY="1.11">
+        <path
+            android:strokeColor="#A8C8E0" android:strokeWidth="1.2" android:strokeAlpha="0.45" android:strokeLineJoin="round"
+            android:fillColor="#00000000"
+            android:pathData="@string/roads_icon_island" />
+    </group>
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="1.11" android:scaleY="1.055">
+        <path
+            android:strokeColor="#A8C8E0" android:strokeWidth="1.35" android:strokeAlpha="0.8" android:strokeLineJoin="round"
+            android:fillColor="#00000000"
+            android:pathData="@string/roads_icon_island" />
+    </group>
+    <!-- the island -->
+    <path android:fillColor="#F7F5EF" android:pathData="@string/roads_icon_island" />
+    <!-- roads, clipped to the land -->
+    <group>
+        <clip-path android:pathData="@string/roads_icon_island" />
+        <path
+            android:strokeColor="#2F5068" android:strokeWidth="4" android:strokeLineCap="round"
+            android:pathData="M42,27 L61,65" />
+        <path
+            android:strokeColor="#2F5068" android:strokeWidth="2.5" android:strokeLineCap="round"
+            android:pathData="M40,46 L66,46" />
+        <path
+            android:strokeColor="#2F5068" android:strokeWidth="2.5" android:strokeLineCap="round"
+            android:pathData="M40,56 L66,56" />
+        <path
+            android:strokeColor="#F7F5EF" android:strokeWidth="0.9"
+            android:pathData="M40,56 L42,56 M44,56 L46,56 M48,56 L50,56 M52,56 L54,56 M56,56 L58,56 M60,56 L62,56 M64,56 L66,56" />
+    </group>
+</vector>

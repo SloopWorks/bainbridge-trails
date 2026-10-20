@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Themed icon (API 33+): the island silhouette with the three roads cut out (docs/roads/ux.md §1.2). Monochrome layers
+  are alpha masks, so the cut is an even-odd hole: SR 305 and the two cross streets as thin polygons inside the island.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group>
+        <clip-path android:pathData="@string/roads_icon_island" />
+        <path
+            android:fillColor="#FF000000"
+            android:fillType="evenOdd"
+            android:pathData="M0,0 L108,0 L108,108 L0,108 Z M40.4,27.8 L59.4,65.8 L62.6,64.2 L43.6,26.2 Z M30,45 L49.4,45 L50.4,47 L30,47 Z M53.4,45 L80,45 L80,47 L54.4,47 Z M30,55 L54.4,55 L55.4,57 L30,57 Z M58.4,55 L80,55 L80,57 L59.4,57 Z" />
+    </group>
+</vector>
