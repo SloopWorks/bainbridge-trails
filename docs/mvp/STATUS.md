@@ -41,11 +41,11 @@ Legend: **done** · **partial** · **not done**.
 | 3 | Sync "other account" dialog | not done (P0 fallback: always union) |
 | 4 | Admin endpoint for blocklist terms without deploy | not done (blocklist is bundled JSON; admin can hide/reset names) |
 | 5 | Raw track retention 30 days | done |
-| 6 | Walk history detail view | not done |
-| 7 | Hide reported rows for the reporter immediately | not done (reports only flag for admin review) |
-| 8 | "Hide me from the leaderboard" toggle | not done (API exposes `hiddenFromBoard`; no UI) |
-| 9 | Island 100% celebration art | not done |
-| 10 | Debug drawer panels (dataset, coverage tools, recording) | done (Android only) |
+| 6 | Walk history detail view | done: read-only summary from Me history; route map only while the raw track is on the phone (30 days), else touched trails outlined; local only ([p2-walk-detail-*](screens/)) |
+| 7 | Hide reported rows for the reporter immediately | done (local hidden set persisted with the board cache); plus "Hide this person" (App Review 1.2 block) and a "Hidden people (N) — Show again" footer |
+| 8 | "Hide me from the leaderboard" toggle | done: Account switch → `PUT /v1/me {hiddenFromBoard}` (own `self_hidden` column, never undoes an admin hide); board pins "You're hidden" ([p2-profile-hide-*, p2-leaderboard-hidden-*](screens/)) |
+| 9 | Island 100% celebration art | done: coastline + water-line art, Fraunces headline, reduced-motion and screen-reader text; debug: Android Coverage plugin, iOS `-btScreen celebrate-island` ([p2-island-celebration-*](screens/)) |
+| 10 | Debug drawer panels (dataset, coverage tools, recording) | done (Android only; iOS drawer skipped, see Known issues) |
 
 P2 items (Google sign-in on iOS, release geofences, groups, photos, …) are not started. The trailhead geofence
 prototype exists but is compiled only with `-PgeofencePrototype=true` (Android) / `GEOFENCE_PROTOTYPE` (iOS).
@@ -60,7 +60,10 @@ prototype exists but is compiled only with `-PgeofencePrototype=true` (Android) 
 - **R8 / minify is off** for release (`isMinifyEnabled = false`); release is also unsigned (no signing config).
   Enable R8 with keep rules for Ktor/kotlinx-serialization/MapLibre and test before store upload.
 - **No debug drawer on iOS:** the drawer is Android-only; iOS uses launch arguments (`-apiBaseUrl`, `-btScreen`,
-  `-btDevSignIn`) instead.
+  `-btDevSignIn`) instead. A Debug-only iOS drawer would need the external drawer's source compiled into
+  `ComposeApp.framework` only for `linkDebug*` (a property-controlled iosMain source set), but Xcode links one
+  framework per configuration through `embedAndSignAppleFrameworkForXcode`, the drawer repo has no iOS target, and
+  the release framework must stay free of it; not done (phase 2 timebox).
 - **Real OAuth untested:** Google (Credential Manager) and Apple sign-in have only been exercised up to the
   "not configured" / simulator paths; dev sign-in covers the backend flow.
 - **Production API URL is a placeholder** (`ApiConfig.PROD_BASE_URL`); no backend is deployed.
@@ -78,8 +81,8 @@ prototype exists but is compiled only with `-PgeofencePrototype=true` (Android) 
    field-test plan in `docs/spikes/location/notes.md`).
 3. Release hardening: R8 with keep rules, release signing; submit the store forms drafted in `docs/store/`
    (Play FGS-location declaration + video, data safety, content rating; App Store privacy labels) and the
-   listing text in `metadata/`; add an iOS `PrivacyInfo.xcprivacy`.
-4. P1 gaps: walk history detail, hide-me toggle, reporter-side immediate hide, other-account sync dialog,
-   island 100% art, admin blocklist endpoint.
+   listing text in `metadata/`. `PrivacyInfo.xcprivacy` is in the iOS target; check it against Xcode's privacy
+   report on an archive.
+4. P1 gaps: other-account sync dialog, admin blocklist endpoint.
 5. Upstream debugdrawer fix (await the save before restart), then drop the AGENTS.md workaround.
 6. Decide on geofences for release (Play background-location declaration) or keep them as a debug prototype.
