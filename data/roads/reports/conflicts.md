@@ -1,0 +1,423 @@
+# Reconcile conflict report
+
+Canonical segments: 2261 (371.0 km; redistributable geometry 335.9 km)
+
+| kind | count |
+|---|---|
+| name_mismatch | 0 |
+| length_mismatch | 0 |
+| missing_in_osm | 258 |
+| missing_in_agency | 0 |
+| geometry_offset | 136 |
+
+## name_mismatch
+
+(none)
+
+## length_mismatch
+
+(none)
+
+## missing_in_osm
+
+- `rseg-000001` — cobi_rd_streets 'unnamed' 612 m not in osm_overpass_roads
+- `rseg-000004` — cobi_rd_streets 'unnamed' 156 m not in osm_overpass_roads
+- `rseg-000005` — wsdot_local_agency_public_road 'unnamed' 113 m not in osm_overpass_roads
+- `rseg-000006` — cobi_rd_streets 'unnamed' 165 m not in osm_overpass_roads
+- `rseg-000014` — wsdot_local_agency_public_road 'unnamed' 48 m not in osm_overpass_roads
+- `rseg-000023` — cobi_rd_streets 'unnamed' 490 m not in osm_overpass_roads
+- `rseg-000037` — wsdot_local_agency_public_road 'unnamed' 110 m not in osm_overpass_roads
+- `rseg-000060` — cobi_rd_streets 'unnamed' 108 m not in osm_overpass_roads
+- `rseg-000064` — wsdot_local_agency_public_road 'unnamed' 79 m not in osm_overpass_roads
+- `rseg-000105` — cobi_rd_streets 'unnamed' 99 m not in osm_overpass_roads
+- `rseg-000111` — wsdot_local_agency_public_road 'unnamed' 46 m not in osm_overpass_roads
+- `rseg-000116` — cobi_rd_streets 'unnamed' 117 m not in osm_overpass_roads
+- `rseg-000119` — cobi_rd_streets 'unnamed' 143 m not in osm_overpass_roads
+- `rseg-000133` — cobi_rd_streets 'unnamed' 174 m not in osm_overpass_roads
+- `rseg-000134` — wsdot_local_agency_public_road 'unnamed' 27 m not in osm_overpass_roads
+- `rseg-000149` — cobi_rd_streets 'unnamed' 351 m not in osm_overpass_roads
+- `rseg-000154` — wsdot_local_agency_public_road 'unnamed' 332 m not in osm_overpass_roads
+- `rseg-000158` — cobi_rd_streets 'unnamed' 327 m not in osm_overpass_roads
+- `rseg-000167` — wsdot_local_agency_public_road 'unnamed' 282 m not in osm_overpass_roads
+- `rseg-000169` — cobi_rd_streets 'unnamed' 108 m not in osm_overpass_roads
+- `rseg-000170` — cobi_rd_streets 'unnamed' 89 m not in osm_overpass_roads
+- `rseg-000171` — cobi_rd_streets 'unnamed' 274 m not in osm_overpass_roads
+- `rseg-000173` — cobi_rd_streets 'unnamed' 42 m not in osm_overpass_roads
+- `rseg-000174` — cobi_rd_streets 'unnamed' 84 m not in osm_overpass_roads
+- `rseg-000179` — cobi_rd_streets 'unnamed' 308 m not in osm_overpass_roads
+- `rseg-000183` — cobi_rd_streets 'unnamed' 79 m not in osm_overpass_roads
+- `rseg-000184` — cobi_rd_streets 'unnamed' 225 m not in osm_overpass_roads
+- `rseg-000188` — cobi_rd_streets 'unnamed' 30 m not in osm_overpass_roads
+- `rseg-000215` — cobi_rd_streets 'unnamed' 61 m not in osm_overpass_roads
+- `rseg-000221` — cobi_rd_streets 'unnamed' 192 m not in osm_overpass_roads
+- `rseg-000224` — cobi_rd_streets 'unnamed' 83 m not in osm_overpass_roads
+- `rseg-000226` — cobi_rd_streets 'unnamed' 21 m not in osm_overpass_roads
+- `rseg-000227` — cobi_rd_streets 'unnamed' 101 m not in osm_overpass_roads
+- `rseg-000229` — cobi_rd_streets 'unnamed' 68 m not in osm_overpass_roads
+- `rseg-000230` — cobi_rd_streets 'unnamed' 212 m not in osm_overpass_roads
+- `rseg-000233` — cobi_rd_streets 'unnamed' 35 m not in osm_overpass_roads
+- `rseg-000242` — cobi_rd_streets 'unnamed' 52 m not in osm_overpass_roads
+- `rseg-000244` — cobi_rd_streets 'unnamed' 84 m not in osm_overpass_roads
+- `rseg-000253` — cobi_rd_streets 'unnamed' 197 m not in osm_overpass_roads
+- `rseg-000264` — wsdot_local_agency_public_road 'unnamed' 96 m not in osm_overpass_roads
+- `rseg-000268` — cobi_rd_streets 'unnamed' 111 m not in osm_overpass_roads
+- `rseg-000269` — cobi_rd_streets 'unnamed' 153 m not in osm_overpass_roads
+- `rseg-000275` — wsdot_local_agency_public_road 'unnamed' 45 m not in osm_overpass_roads
+- `rseg-000285` — cobi_rd_streets 'unnamed' 45 m not in osm_overpass_roads
+- `rseg-000300` — cobi_rd_streets 'unnamed' 60 m not in osm_overpass_roads
+- `rseg-000313` — cobi_rd_streets 'unnamed' 76 m not in osm_overpass_roads
+- `rseg-000351` — cobi_rd_streets 'unnamed' 128 m not in osm_overpass_roads
+- `rseg-000381` — cobi_rd_streets 'unnamed' 157 m not in osm_overpass_roads
+- `rseg-000385` — cobi_rd_streets 'unnamed' 107 m not in osm_overpass_roads
+- `rseg-000386` — cobi_rd_streets 'unnamed' 125 m not in osm_overpass_roads
+- `rseg-000395` — cobi_rd_streets 'unnamed' 99 m not in osm_overpass_roads
+- `rseg-000427` — cobi_rd_streets 'unnamed' 29 m not in osm_overpass_roads
+- `rseg-000443` — cobi_rd_streets 'unnamed' 62 m not in osm_overpass_roads
+- `rseg-000463` — wsdot_local_agency_public_road 'unnamed' 79 m not in osm_overpass_roads
+- `rseg-000487` — cobi_rd_streets 'unnamed' 278 m not in osm_overpass_roads
+- `rseg-000511` — wsdot_local_agency_public_road 'unnamed' 22 m not in osm_overpass_roads
+- `rseg-000513` — cobi_rd_streets 'unnamed' 140 m not in osm_overpass_roads
+- `rseg-000518` — cobi_rd_streets 'unnamed' 94 m not in osm_overpass_roads
+- `rseg-000523` — cobi_rd_streets 'unnamed' 63 m not in osm_overpass_roads
+- `rseg-000525` — cobi_rd_streets 'unnamed' 60 m not in osm_overpass_roads
+- `rseg-000527` — cobi_rd_streets 'unnamed' 46 m not in osm_overpass_roads
+- `rseg-000529` — cobi_rd_streets 'unnamed' 50 m not in osm_overpass_roads
+- `rseg-000531` — wsdot_local_agency_public_road 'unnamed' 75 m not in osm_overpass_roads
+- `rseg-000536` — cobi_rd_streets 'unnamed' 64 m not in osm_overpass_roads
+- `rseg-000538` — wsdot_local_agency_public_road 'unnamed' 104 m not in osm_overpass_roads
+- `rseg-000543` — cobi_rd_streets 'unnamed' 147 m not in osm_overpass_roads
+- `rseg-000561` — wsdot_local_agency_public_road 'unnamed' 180 m not in osm_overpass_roads
+- `rseg-000592` — cobi_rd_streets 'unnamed' 48 m not in osm_overpass_roads
+- `rseg-000606` — wsdot_local_agency_public_road 'unnamed' 72 m not in osm_overpass_roads
+- `rseg-000608` — cobi_rd_streets 'unnamed' 62 m not in osm_overpass_roads
+- `rseg-000630` — cobi_rd_streets 'unnamed' 143 m not in osm_overpass_roads
+- `rseg-000644` — cobi_rd_streets 'unnamed' 38 m not in osm_overpass_roads
+- `rseg-000649` — cobi_rd_streets 'unnamed' 57 m not in osm_overpass_roads
+- `rseg-000650` — cobi_rd_streets 'unnamed' 24 m not in osm_overpass_roads
+- `rseg-000651` — cobi_rd_streets 'unnamed' 28 m not in osm_overpass_roads
+- `rseg-000652` — cobi_rd_streets 'unnamed' 123 m not in osm_overpass_roads
+- `rseg-000654` — wsdot_local_agency_public_road 'unnamed' 195 m not in osm_overpass_roads
+- `rseg-000655` — cobi_rd_streets 'unnamed' 140 m not in osm_overpass_roads
+- `rseg-000666` — cobi_rd_streets 'unnamed' 70 m not in osm_overpass_roads
+- `rseg-000667` — cobi_rd_streets 'unnamed' 221 m not in osm_overpass_roads
+- `rseg-000668` — cobi_rd_streets 'unnamed' 55 m not in osm_overpass_roads
+- `rseg-000669` — wsdot_local_agency_public_road 'unnamed' 208 m not in osm_overpass_roads
+- `rseg-000670` — wsdot_local_agency_public_road 'unnamed' 45 m not in osm_overpass_roads
+- `rseg-000684` — cobi_rd_streets 'unnamed' 175 m not in osm_overpass_roads
+- `rseg-000687` — cobi_rd_streets 'unnamed' 66 m not in osm_overpass_roads
+- `rseg-000688` — cobi_rd_streets 'unnamed' 128 m not in osm_overpass_roads
+- `rseg-000690` — wsdot_local_agency_public_road 'unnamed' 66 m not in osm_overpass_roads
+- `rseg-000714` — wsdot_local_agency_public_road 'unnamed' 143 m not in osm_overpass_roads
+- `rseg-000717` — cobi_rd_streets 'unnamed' 31 m not in osm_overpass_roads
+- `rseg-000721` — cobi_rd_streets 'unnamed' 53 m not in osm_overpass_roads
+- `rseg-000722` — cobi_rd_streets 'unnamed' 28 m not in osm_overpass_roads
+- `rseg-000725` — cobi_rd_streets 'unnamed' 66 m not in osm_overpass_roads
+- `rseg-000736` — wsdot_local_agency_public_road 'unnamed' 115 m not in osm_overpass_roads
+- `rseg-000737` — cobi_rd_streets 'unnamed' 151 m not in osm_overpass_roads
+- `rseg-000755` — cobi_rd_streets 'unnamed' 182 m not in osm_overpass_roads
+- `rseg-000761` — wsdot_local_agency_public_road 'unnamed' 92 m not in osm_overpass_roads
+- `rseg-000788` — wsdot_local_agency_public_road 'unnamed' 38 m not in osm_overpass_roads
+- `rseg-000807` — wsdot_local_agency_public_road 'unnamed' 69 m not in osm_overpass_roads
+- `rseg-000808` — cobi_rd_streets 'unnamed' 22 m not in osm_overpass_roads
+- `rseg-000814` — cobi_rd_streets 'unnamed' 161 m not in osm_overpass_roads
+- `rseg-000815` — wsdot_local_agency_public_road 'unnamed' 185 m not in osm_overpass_roads
+- `rseg-000831` — cobi_rd_streets 'unnamed' 197 m not in osm_overpass_roads
+- `rseg-000868` — cobi_rd_streets 'unnamed' 64 m not in osm_overpass_roads
+- `rseg-000869` — cobi_rd_streets 'unnamed' 60 m not in osm_overpass_roads
+- `rseg-000873` — cobi_rd_streets 'unnamed' 21 m not in osm_overpass_roads
+- `rseg-000885` — cobi_rd_streets 'unnamed' 128 m not in osm_overpass_roads
+- `rseg-000886` — wsdot_local_agency_public_road 'unnamed' 156 m not in osm_overpass_roads
+- `rseg-000903` — wsdot_local_agency_public_road 'unnamed' 144 m not in osm_overpass_roads
+- `rseg-000907` — wsdot_local_agency_public_road 'unnamed' 168 m not in osm_overpass_roads
+- `rseg-000921` — cobi_rd_streets 'unnamed' 133 m not in osm_overpass_roads
+- `rseg-000923` — cobi_rd_streets 'unnamed' 95 m not in osm_overpass_roads
+- `rseg-000957` — cobi_rd_streets 'unnamed' 44 m not in osm_overpass_roads
+- `rseg-000972` — cobi_rd_streets 'unnamed' 78 m not in osm_overpass_roads
+- `rseg-000978` — cobi_rd_streets 'unnamed' 225 m not in osm_overpass_roads
+- `rseg-000981` — cobi_rd_streets 'unnamed' 154 m not in osm_overpass_roads
+- `rseg-000984` — cobi_rd_streets 'unnamed' 167 m not in osm_overpass_roads
+- `rseg-000990` — cobi_rd_streets 'unnamed' 39 m not in osm_overpass_roads
+- `rseg-000993` — wsdot_local_agency_public_road 'unnamed' 41 m not in osm_overpass_roads
+- `rseg-000995` — cobi_rd_streets 'unnamed' 57 m not in osm_overpass_roads
+- `rseg-000996` — cobi_rd_streets 'unnamed' 27 m not in osm_overpass_roads
+- `rseg-001010` — cobi_rd_streets 'unnamed' 201 m not in osm_overpass_roads
+- `rseg-001013` — cobi_rd_streets 'unnamed' 26 m not in osm_overpass_roads
+- `rseg-001017` — cobi_rd_streets 'unnamed' 67 m not in osm_overpass_roads
+- `rseg-001018` — cobi_rd_streets 'unnamed' 59 m not in osm_overpass_roads
+- `rseg-001027` — wsdot_local_agency_public_road 'unnamed' 50 m not in osm_overpass_roads
+- `rseg-001028` — wsdot_local_agency_public_road 'unnamed' 132 m not in osm_overpass_roads
+- `rseg-001041` — wsdot_local_agency_public_road 'unnamed' 130 m not in osm_overpass_roads
+- `rseg-001058` — cobi_rd_streets 'unnamed' 78 m not in osm_overpass_roads
+- `rseg-001071` — cobi_rd_streets 'unnamed' 1052 m not in osm_overpass_roads
+- `rseg-001092` — cobi_rd_streets 'unnamed' 64 m not in osm_overpass_roads
+- `rseg-001097` — cobi_rd_streets 'unnamed' 129 m not in osm_overpass_roads
+- `rseg-001104` — wsdot_local_agency_public_road 'unnamed' 97 m not in osm_overpass_roads
+- `rseg-001128` — cobi_rd_streets 'unnamed' 369 m not in osm_overpass_roads
+- `rseg-001140` — cobi_rd_streets 'unnamed' 63 m not in osm_overpass_roads
+- `rseg-001144` — cobi_rd_streets 'unnamed' 125 m not in osm_overpass_roads
+- `rseg-001147` — cobi_rd_streets 'unnamed' 36 m not in osm_overpass_roads
+- `rseg-001162` — cobi_rd_streets 'unnamed' 91 m not in osm_overpass_roads
+- `rseg-001163` — cobi_rd_streets 'unnamed' 67 m not in osm_overpass_roads
+- `rseg-001179` — cobi_rd_streets 'unnamed' 56 m not in osm_overpass_roads
+- `rseg-001196` — cobi_rd_streets 'unnamed' 324 m not in osm_overpass_roads
+- `rseg-001207` — cobi_rd_streets 'unnamed' 78 m not in osm_overpass_roads
+- `rseg-001215` — wsdot_local_agency_public_road 'unnamed' 522 m not in osm_overpass_roads
+- `rseg-001220` — cobi_rd_streets 'unnamed' 51 m not in osm_overpass_roads
+- `rseg-001251` — wsdot_local_agency_public_road 'unnamed' 50 m not in osm_overpass_roads
+- `rseg-001278` — cobi_rd_streets 'unnamed' 29 m not in osm_overpass_roads
+- `rseg-001286` — cobi_rd_streets 'unnamed' 63 m not in osm_overpass_roads
+- `rseg-001318` — cobi_rd_streets 'unnamed' 59 m not in osm_overpass_roads
+- `rseg-001323` — cobi_rd_streets 'unnamed' 253 m not in osm_overpass_roads
+- `rseg-001339` — cobi_rd_streets 'unnamed' 47 m not in osm_overpass_roads
+- `rseg-001340` — cobi_rd_streets 'unnamed' 178 m not in osm_overpass_roads
+- `rseg-001341` — cobi_rd_streets 'unnamed' 66 m not in osm_overpass_roads
+- `rseg-001352` — cobi_rd_streets 'unnamed' 231 m not in osm_overpass_roads
+- `rseg-001357` — cobi_rd_streets 'unnamed' 229 m not in osm_overpass_roads
+- `rseg-001360` — cobi_rd_streets 'unnamed' 46 m not in osm_overpass_roads
+- `rseg-001367` — cobi_rd_streets 'unnamed' 120 m not in osm_overpass_roads
+- `rseg-001368` — cobi_rd_streets 'unnamed' 87 m not in osm_overpass_roads
+- `rseg-001373` — cobi_rd_streets 'unnamed' 116 m not in osm_overpass_roads
+- `rseg-001375` — cobi_rd_streets 'unnamed' 215 m not in osm_overpass_roads
+- `rseg-001376` — cobi_rd_streets 'unnamed' 121 m not in osm_overpass_roads
+- `rseg-001381` — wsdot_local_agency_public_road 'unnamed' 147 m not in osm_overpass_roads
+- `rseg-001383` — cobi_rd_streets 'unnamed' 107 m not in osm_overpass_roads
+- `rseg-001387` — cobi_rd_streets 'unnamed' 91 m not in osm_overpass_roads
+- `rseg-001396` — cobi_rd_streets 'unnamed' 131 m not in osm_overpass_roads
+- `rseg-001399` — cobi_rd_streets 'unnamed' 91 m not in osm_overpass_roads
+- `rseg-001405` — cobi_rd_streets 'unnamed' 368 m not in osm_overpass_roads
+- `rseg-001430` — wsdot_local_agency_public_road 'unnamed' 172 m not in osm_overpass_roads
+- `rseg-001434` — cobi_rd_streets 'unnamed' 187 m not in osm_overpass_roads
+- `rseg-001441` — wsdot_local_agency_public_road 'unnamed' 204 m not in osm_overpass_roads
+- `rseg-001464` — wsdot_local_agency_public_road 'unnamed' 151 m not in osm_overpass_roads
+- `rseg-001478` — wsdot_local_agency_public_road 'unnamed' 92 m not in osm_overpass_roads
+- `rseg-001479` — wsdot_local_agency_public_road 'unnamed' 47 m not in osm_overpass_roads
+- `rseg-001486` — cobi_rd_streets 'unnamed' 53 m not in osm_overpass_roads
+- `rseg-001489` — wsdot_local_agency_public_road 'unnamed' 45 m not in osm_overpass_roads
+- `rseg-001500` — wsdot_local_agency_public_road 'unnamed' 100 m not in osm_overpass_roads
+- `rseg-001502` — cobi_rd_streets 'unnamed' 206 m not in osm_overpass_roads
+- `rseg-001521` — cobi_rd_streets 'unnamed' 132 m not in osm_overpass_roads
+- `rseg-001526` — cobi_rd_streets 'unnamed' 98 m not in osm_overpass_roads
+- `rseg-001535` — wsdot_local_agency_public_road 'unnamed' 137 m not in osm_overpass_roads
+- `rseg-001544` — wsdot_local_agency_public_road 'unnamed' 131 m not in osm_overpass_roads
+- `rseg-001555` — cobi_rd_streets 'unnamed' 44 m not in osm_overpass_roads
+- `rseg-001566` — wsdot_local_agency_public_road 'unnamed' 231 m not in osm_overpass_roads
+- `rseg-001567` — cobi_rd_streets 'unnamed' 80 m not in osm_overpass_roads
+- `rseg-001584` — wsdot_local_agency_public_road 'unnamed' 92 m not in osm_overpass_roads
+- `rseg-001587` — cobi_rd_streets 'unnamed' 96 m not in osm_overpass_roads
+- `rseg-001588` — cobi_rd_streets 'unnamed' 127 m not in osm_overpass_roads
+- `rseg-001591` — cobi_rd_streets 'unnamed' 73 m not in osm_overpass_roads
+- `rseg-001592` — cobi_rd_streets 'unnamed' 507 m not in osm_overpass_roads
+- `rseg-001601` — cobi_rd_streets 'unnamed' 44 m not in osm_overpass_roads
+- `rseg-001609` — cobi_rd_streets 'unnamed' 174 m not in osm_overpass_roads
+- `rseg-001610` — cobi_rd_streets 'unnamed' 71 m not in osm_overpass_roads
+- `rseg-001614` — cobi_rd_streets 'unnamed' 139 m not in osm_overpass_roads
+- `rseg-001615` — wsdot_local_agency_public_road 'unnamed' 143 m not in osm_overpass_roads
+- `rseg-001616` — cobi_rd_streets 'unnamed' 142 m not in osm_overpass_roads
+- `rseg-001618` — wsdot_local_agency_public_road 'unnamed' 86 m not in osm_overpass_roads
+- `rseg-001628` — cobi_rd_streets 'unnamed' 34 m not in osm_overpass_roads
+- `rseg-001629` — cobi_rd_streets 'unnamed' 274 m not in osm_overpass_roads
+- `rseg-001639` — cobi_rd_streets 'unnamed' 153 m not in osm_overpass_roads
+- `rseg-001644` — cobi_rd_streets 'unnamed' 318 m not in osm_overpass_roads
+- `rseg-001653` — cobi_rd_streets 'unnamed' 234 m not in osm_overpass_roads
+- `rseg-001654` — cobi_rd_streets 'unnamed' 124 m not in osm_overpass_roads
+- `rseg-001659` — wsdot_local_agency_public_road 'unnamed' 52 m not in osm_overpass_roads
+- `rseg-001663` — cobi_rd_streets 'unnamed' 147 m not in osm_overpass_roads
+- `rseg-001679` — cobi_rd_streets 'unnamed' 127 m not in osm_overpass_roads
+- `rseg-001728` — wsdot_local_agency_public_road 'unnamed' 90 m not in osm_overpass_roads
+- `rseg-001729` — wsdot_local_agency_public_road 'unnamed' 543 m not in osm_overpass_roads
+- `rseg-001734` — cobi_rd_streets 'unnamed' 102 m not in osm_overpass_roads
+- `rseg-001735` — cobi_rd_streets 'unnamed' 196 m not in osm_overpass_roads
+- `rseg-001740` — cobi_rd_streets 'unnamed' 97 m not in osm_overpass_roads
+- `rseg-001741` — cobi_rd_streets 'unnamed' 225 m not in osm_overpass_roads
+- `rseg-001749` — cobi_rd_streets 'unnamed' 283 m not in osm_overpass_roads
+- `rseg-001772` — wsdot_local_agency_public_road 'unnamed' 497 m not in osm_overpass_roads
+- `rseg-001775` — cobi_rd_streets 'unnamed' 162 m not in osm_overpass_roads
+- `rseg-001782` — wsdot_local_agency_public_road 'unnamed' 29 m not in osm_overpass_roads
+- `rseg-001791` — cobi_rd_streets 'unnamed' 56 m not in osm_overpass_roads
+- `rseg-001831` — cobi_rd_streets 'unnamed' 56 m not in osm_overpass_roads
+- `rseg-001839` — cobi_rd_streets 'unnamed' 70 m not in osm_overpass_roads
+- `rseg-001844` — cobi_rd_streets 'unnamed' 852 m not in osm_overpass_roads
+- `rseg-001849` — cobi_rd_streets 'unnamed' 89 m not in osm_overpass_roads
+- `rseg-001851` — cobi_rd_streets 'unnamed' 200 m not in osm_overpass_roads
+- `rseg-001854` — cobi_rd_streets 'unnamed' 354 m not in osm_overpass_roads
+- `rseg-001873` — cobi_rd_streets 'unnamed' 94 m not in osm_overpass_roads
+- `rseg-001893` — cobi_rd_streets 'unnamed' 44 m not in osm_overpass_roads
+- `rseg-001896` — wsdot_local_agency_public_road 'unnamed' 29 m not in osm_overpass_roads
+- `rseg-001914` — wsdot_local_agency_public_road 'unnamed' 124 m not in osm_overpass_roads
+- `rseg-001963` — wsdot_local_agency_public_road 'unnamed' 295 m not in osm_overpass_roads
+- `rseg-001967` — wsdot_local_agency_public_road 'unnamed' 199 m not in osm_overpass_roads
+- `rseg-002003` — cobi_rd_streets 'unnamed' 129 m not in osm_overpass_roads
+- `rseg-002006` — wsdot_local_agency_public_road 'unnamed' 113 m not in osm_overpass_roads
+- `rseg-002016` — cobi_rd_streets 'unnamed' 146 m not in osm_overpass_roads
+- `rseg-002029` — wsdot_local_agency_public_road 'unnamed' 29 m not in osm_overpass_roads
+- `rseg-002034` — wsdot_local_agency_public_road 'unnamed' 40 m not in osm_overpass_roads
+- `rseg-002048` — cobi_rd_streets 'unnamed' 71 m not in osm_overpass_roads
+- `rseg-002058` — cobi_rd_streets 'unnamed' 243 m not in osm_overpass_roads
+- `rseg-002064` — cobi_rd_streets 'unnamed' 93 m not in osm_overpass_roads
+- `rseg-002066` — wsdot_local_agency_public_road 'unnamed' 97 m not in osm_overpass_roads
+- `rseg-002067` — cobi_rd_streets 'unnamed' 51 m not in osm_overpass_roads
+- `rseg-002068` — cobi_rd_streets 'unnamed' 24 m not in osm_overpass_roads
+- `rseg-002085` — cobi_rd_streets 'unnamed' 78 m not in osm_overpass_roads
+- `rseg-002088` — cobi_rd_streets 'unnamed' 204 m not in osm_overpass_roads
+- `rseg-002095` — cobi_rd_streets 'unnamed' 25 m not in osm_overpass_roads
+- `rseg-002098` — cobi_rd_streets 'unnamed' 271 m not in osm_overpass_roads
+- `rseg-002112` — cobi_rd_streets 'unnamed' 203 m not in osm_overpass_roads
+- `rseg-002144` — cobi_rd_streets 'unnamed' 66 m not in osm_overpass_roads
+- `rseg-002145` — cobi_rd_streets 'unnamed' 394 m not in osm_overpass_roads
+- `rseg-002154` — cobi_rd_streets 'unnamed' 309 m not in osm_overpass_roads
+- `rseg-002157` — cobi_rd_streets 'unnamed' 29 m not in osm_overpass_roads
+- `rseg-002180` — cobi_rd_streets 'unnamed' 138 m not in osm_overpass_roads
+- `rseg-002185` — cobi_rd_streets 'unnamed' 81 m not in osm_overpass_roads
+- `rseg-002186` — cobi_rd_streets 'unnamed' 24 m not in osm_overpass_roads
+- `rseg-002191` — cobi_rd_streets 'unnamed' 146 m not in osm_overpass_roads
+- `rseg-002193` — cobi_rd_streets 'unnamed' 65 m not in osm_overpass_roads
+- `rseg-002194` — cobi_rd_streets 'unnamed' 721 m not in osm_overpass_roads
+- `rseg-002208` — wsdot_local_agency_public_road 'unnamed' 33 m not in osm_overpass_roads
+- `rseg-002209` — wsdot_local_agency_public_road 'unnamed' 143 m not in osm_overpass_roads
+- `rseg-002210` — wsdot_local_agency_public_road 'unnamed' 91 m not in osm_overpass_roads
+- `rseg-002229` — wsdot_local_agency_public_road 'unnamed' 71 m not in osm_overpass_roads
+- `rseg-002232` — wsdot_local_agency_public_road 'unnamed' 141 m not in osm_overpass_roads
+- `rseg-002251` — cobi_rd_streets 'unnamed' 106 m not in osm_overpass_roads
+
+## missing_in_agency
+
+(none)
+
+## geometry_offset
+
+- `rseg-000016` — cobi_rd_streets:868 (unnamed) Hausdorff 27.3 m
+- `rseg-000021` — cobi_rd_streets:1491 (unnamed) Hausdorff 24.9 m
+- `rseg-000054` — cobi_rd_streets:1763 (unnamed) Hausdorff 16.0 m
+- `rseg-000057` — wsdot_local_agency_public_road:346 (unnamed) Hausdorff 27.4 m
+- `rseg-000067` — cobi_rd_streets:1352 (unnamed) Hausdorff 11.2 m
+- `rseg-000067` — wsdot_local_agency_public_road:334 (unnamed) Hausdorff 24.9 m
+- `rseg-000072` — cobi_rd_streets:432 (unnamed) Hausdorff 26.3 m
+- `rseg-000072` — wsdot_local_agency_public_road:1006 (unnamed) Hausdorff 21.1 m
+- `rseg-000073` — cobi_rd_streets:1735 (unnamed) Hausdorff 24.4 m
+- `rseg-000081` — cobi_rd_streets:868 (unnamed) Hausdorff 23.5 m
+- `rseg-000103` — wsdot_local_agency_public_road:348 (unnamed) Hausdorff 10.8 m
+- `rseg-000137` — wsdot_local_agency_public_road:1052 (unnamed) Hausdorff 22.5 m
+- `rseg-000144` — cobi_rd_streets:924 (unnamed) Hausdorff 11.1 m
+- `rseg-000173` — wsdot_local_agency_public_road:20 (unnamed) Hausdorff 13.6 m
+- `rseg-000186` — wsdot_local_agency_public_road:571 (unnamed) Hausdorff 11.4 m
+- `rseg-000189` — cobi_rd_streets:221 (unnamed) Hausdorff 16.5 m
+- `rseg-000194` — wsdot_local_agency_public_road:1270 (unnamed) Hausdorff 11.0 m
+- `rseg-000246` — wsdot_local_agency_public_road:1306 (unnamed) Hausdorff 13.0 m
+- `rseg-000388` — cobi_rd_streets:100 (unnamed) Hausdorff 18.9 m
+- `rseg-000409` — cobi_rd_streets:83 (unnamed) Hausdorff 20.7 m
+- `rseg-000419` — wsdot_local_agency_public_road:1185 (unnamed) Hausdorff 14.5 m
+- `rseg-000462` — cobi_rd_streets:1799 (unnamed) Hausdorff 11.1 m
+- `rseg-000475` — cobi_rd_streets:1410 (unnamed) Hausdorff 17.0 m
+- `rseg-000475` — wsdot_local_agency_public_road:1364 (unnamed) Hausdorff 16.2 m
+- `rseg-000485` — cobi_rd_streets:550 (unnamed) Hausdorff 10.4 m
+- `rseg-000492` — cobi_rd_streets:1783 (unnamed) Hausdorff 21.9 m
+- `rseg-000524` — cobi_rd_streets:550 (unnamed) Hausdorff 29.4 m
+- `rseg-000564` — wsdot_local_agency_public_road:613 (unnamed) Hausdorff 24.6 m
+- `rseg-000572` — cobi_rd_streets:934 (unnamed) Hausdorff 11.5 m
+- `rseg-000593` — cobi_rd_streets:1462 (unnamed) Hausdorff 10.8 m
+- `rseg-000604` — cobi_rd_streets:1477 (unnamed) Hausdorff 20.5 m
+- `rseg-000604` — wsdot_local_agency_public_road:1226 (unnamed) Hausdorff 16.9 m
+- `rseg-000618` — cobi_rd_streets:1477 (unnamed) Hausdorff 12.1 m
+- `rseg-000667` — wsdot_local_agency_public_road:711 (unnamed) Hausdorff 14.2 m
+- `rseg-000713` — cobi_rd_streets:902 (unnamed) Hausdorff 10.7 m
+- `rseg-000751` — wsdot_local_agency_public_road:1154 (unnamed) Hausdorff 10.3 m
+- `rseg-000765` — wsdot_local_agency_public_road:620 (unnamed) Hausdorff 25.8 m
+- `rseg-000786` — cobi_rd_streets:559 (unnamed) Hausdorff 10.3 m
+- `rseg-000813` — cobi_rd_streets:684 (unnamed) Hausdorff 10.5 m
+- `rseg-000872` — cobi_rd_streets:438 (unnamed) Hausdorff 10.6 m
+- `rseg-000876` — cobi_rd_streets:102 (unnamed) Hausdorff 15.0 m
+- `rseg-000879` — cobi_rd_streets:428 (unnamed) Hausdorff 10.6 m
+- `rseg-000879` — wsdot_local_agency_public_road:884 (unnamed) Hausdorff 14.1 m
+- `rseg-000884` — cobi_rd_streets:577 (unnamed) Hausdorff 28.3 m
+- `rseg-000950` — wsdot_local_agency_public_road:729 (unnamed) Hausdorff 15.2 m
+- `rseg-000971` — wsdot_state_route_lines:9 (unnamed) Hausdorff 14.5 m
+- `rseg-000976` — wsdot_state_route_lines:5 (unnamed) Hausdorff 14.5 m
+- `rseg-001098` — cobi_rd_streets:329 (unnamed) Hausdorff 11.2 m
+- `rseg-001143` — cobi_rd_streets:330 (unnamed) Hausdorff 11.4 m
+- `rseg-001184` — cobi_rd_streets:969 (unnamed) Hausdorff 13.7 m
+- `rseg-001184` — wsdot_local_agency_public_road:97 (unnamed) Hausdorff 10.2 m
+- `rseg-001201` — wsdot_local_agency_public_road:1331 (unnamed) Hausdorff 10.3 m
+- `rseg-001225` — cobi_rd_streets:93 (unnamed) Hausdorff 19.8 m
+- `rseg-001276` — cobi_rd_streets:1513 (unnamed) Hausdorff 20.2 m
+- `rseg-001290` — wsdot_local_agency_public_road:450 (unnamed) Hausdorff 27.0 m
+- `rseg-001320` — cobi_rd_streets:105 (unnamed) Hausdorff 15.9 m
+- `rseg-001331` — cobi_rd_streets:76 (unnamed) Hausdorff 22.9 m
+- `rseg-001338` — wsdot_local_agency_public_road:597 (unnamed) Hausdorff 27.2 m
+- `rseg-001370` — wsdot_local_agency_public_road:1196 (unnamed) Hausdorff 10.5 m
+- `rseg-001382` — cobi_rd_streets:107 (unnamed) Hausdorff 10.8 m
+- `rseg-001384` — cobi_rd_streets:328 (unnamed) Hausdorff 12.0 m
+- `rseg-001391` — wsdot_local_agency_public_road:763 (unnamed) Hausdorff 14.9 m
+- `rseg-001438` — cobi_rd_streets:142 (unnamed) Hausdorff 17.8 m
+- `rseg-001438` — wsdot_local_agency_public_road:1203 (unnamed) Hausdorff 17.5 m
+- `rseg-001446` — cobi_rd_streets:1233 (unnamed) Hausdorff 13.9 m
+- `rseg-001454` — cobi_rd_streets:1515 (unnamed) Hausdorff 19.8 m
+- `rseg-001460` — wsdot_local_agency_public_road:1265 (unnamed) Hausdorff 16.7 m
+- `rseg-001483` — wsdot_local_agency_public_road:739 (unnamed) Hausdorff 15.5 m
+- `rseg-001510` — wsdot_local_agency_public_road:1331 (unnamed) Hausdorff 10.9 m
+- `rseg-001519` — wsdot_local_agency_public_road:14 (unnamed) Hausdorff 21.6 m
+- `rseg-001551` — cobi_rd_streets:1209 (unnamed) Hausdorff 12.3 m
+- `rseg-001554` — wsdot_local_agency_public_road:91 (unnamed) Hausdorff 16.8 m
+- `rseg-001562` — cobi_rd_streets:177 (unnamed) Hausdorff 15.3 m
+- `rseg-001562` — wsdot_local_agency_public_road:163 (unnamed) Hausdorff 17.8 m
+- `rseg-001563` — wsdot_local_agency_public_road:89 (unnamed) Hausdorff 20.3 m
+- `rseg-001607` — cobi_rd_streets:1734 (unnamed) Hausdorff 20.0 m
+- `rseg-001613` — cobi_rd_streets:1651 (unnamed) Hausdorff 11.5 m
+- `rseg-001651` — wsdot_local_agency_public_road:1148 (unnamed) Hausdorff 19.4 m
+- `rseg-001695` — cobi_rd_streets:122 (unnamed) Hausdorff 19.3 m
+- `rseg-001705` — wsdot_local_agency_public_road:215 (unnamed) Hausdorff 11.8 m
+- `rseg-001754` — cobi_rd_streets:1263 (unnamed) Hausdorff 11.5 m
+- `rseg-001755` — cobi_rd_streets:166 (unnamed) Hausdorff 14.2 m
+- `rseg-001771` — wsdot_local_agency_public_road:921 (unnamed) Hausdorff 10.6 m
+- `rseg-001784` — wsdot_local_agency_public_road:1328 (unnamed) Hausdorff 22.0 m
+- `rseg-001823` — cobi_rd_streets:106 (unnamed) Hausdorff 11.4 m
+- `rseg-001824` — cobi_rd_streets:39 (unnamed) Hausdorff 10.0 m
+- `rseg-001843` — cobi_rd_streets:1584 (unnamed) Hausdorff 18.7 m
+- `rseg-001859` — wsdot_local_agency_public_road:1307 (unnamed) Hausdorff 11.3 m
+- `rseg-001862` — wsdot_local_agency_public_road:533 (unnamed) Hausdorff 26.3 m
+- `rseg-001865` — wsdot_local_agency_public_road:1327 (unnamed) Hausdorff 15.3 m
+- `rseg-001866` — wsdot_local_agency_public_road:276 (unnamed) Hausdorff 15.3 m
+- `rseg-001869` — wsdot_state_route_lines:10 (unnamed) Hausdorff 13.0 m
+- `rseg-001870` — wsdot_state_route_lines:10 (unnamed) Hausdorff 15.2 m
+- `rseg-001870` — wsdot_state_route_lines:12 (unnamed) Hausdorff 13.0 m
+- `rseg-001872` — wsdot_local_agency_public_road:369 (unnamed) Hausdorff 22.3 m
+- `rseg-001880` — wsdot_state_route_lines:12 (unnamed) Hausdorff 20.1 m
+- `rseg-001886` — wsdot_state_route_lines:10 (unnamed) Hausdorff 17.3 m
+- `rseg-001889` — wsdot_local_agency_public_road:1004 (unnamed) Hausdorff 12.1 m
+- `rseg-001897` — cobi_rd_streets:280 (unnamed) Hausdorff 13.9 m
+- `rseg-001897` — wsdot_local_agency_public_road:604 (unnamed) Hausdorff 11.9 m
+- `rseg-001912` — wsdot_state_route_lines:12 (unnamed) Hausdorff 16.4 m
+- `rseg-001920` — cobi_rd_streets:1582 (unnamed) Hausdorff 10.9 m
+- `rseg-001926` — cobi_rd_streets:1557 (unnamed) Hausdorff 17.0 m
+- `rseg-001938` — wsdot_state_route_lines:12 (unnamed) Hausdorff 18.6 m
+- `rseg-001941` — cobi_rd_streets:99 (unnamed) Hausdorff 26.2 m
+- `rseg-001950` — wsdot_state_route_lines:10 (unnamed) Hausdorff 11.2 m
+- `rseg-001960` — wsdot_local_agency_public_road:904 (unnamed) Hausdorff 10.5 m
+- `rseg-001961` — cobi_rd_streets:298 (unnamed) Hausdorff 27.7 m
+- `rseg-001962` — wsdot_state_route_lines:11 (unnamed) Hausdorff 18.8 m
+- `rseg-001965` — wsdot_local_agency_public_road:1386 (unnamed) Hausdorff 12.6 m
+- `rseg-002013` — cobi_rd_streets:91 (unnamed) Hausdorff 11.4 m
+- `rseg-002018` — cobi_rd_streets:1563 (unnamed) Hausdorff 14.1 m
+- `rseg-002047` — wsdot_local_agency_public_road:1041 (unnamed) Hausdorff 11.1 m
+- `rseg-002049` — cobi_rd_streets:1244 (unnamed) Hausdorff 20.9 m
+- `rseg-002051` — wsdot_local_agency_public_road:904 (unnamed) Hausdorff 11.4 m
+- `rseg-002064` — wsdot_local_agency_public_road:957 (unnamed) Hausdorff 20.9 m
+- `rseg-002083` — cobi_rd_streets:1192 (unnamed) Hausdorff 10.3 m
+- `rseg-002089` — wsdot_local_agency_public_road:1102 (unnamed) Hausdorff 11.3 m
+- `rseg-002134` — cobi_rd_streets:1328 (unnamed) Hausdorff 11.6 m
+- `rseg-002141` — cobi_rd_streets:1061 (unnamed) Hausdorff 12.3 m
+- `rseg-002159` — wsdot_local_agency_public_road:738 (unnamed) Hausdorff 12.2 m
+- `rseg-002168` — wsdot_local_agency_public_road:675 (unnamed) Hausdorff 22.9 m
+- `rseg-002171` — cobi_rd_streets:1617 (unnamed) Hausdorff 20.1 m
+- `rseg-002174` — cobi_rd_streets:1142 (unnamed) Hausdorff 26.1 m
+- `rseg-002177` — wsdot_local_agency_public_road:385 (unnamed) Hausdorff 13.5 m
+- `rseg-002184` — cobi_rd_streets:132 (unnamed) Hausdorff 13.8 m
+- `rseg-002199` — wsdot_local_agency_public_road:1312 (unnamed) Hausdorff 12.9 m
+- `rseg-002201` — cobi_rd_streets:1618 (unnamed) Hausdorff 14.1 m
+- `rseg-002213` — wsdot_local_agency_public_road:1338 (unnamed) Hausdorff 13.6 m
+- `rseg-002224` — cobi_rd_streets:1116 (unnamed) Hausdorff 10.4 m
+- `rseg-002224` — wsdot_local_agency_public_road:1021 (unnamed) Hausdorff 12.9 m
+- `rseg-002244` — cobi_rd_streets:1256 (unnamed) Hausdorff 11.3 m
+- `rseg-002244` — wsdot_local_agency_public_road:16 (unnamed) Hausdorff 12.4 m
+- `rseg-002245` — wsdot_local_agency_public_road:183 (unnamed) Hausdorff 12.8 m
+- `rseg-002249` — cobi_rd_streets:1112 (unnamed) Hausdorff 25.9 m
+- `rseg-002250` — cobi_rd_streets:1113 (unnamed) Hausdorff 21.2 m

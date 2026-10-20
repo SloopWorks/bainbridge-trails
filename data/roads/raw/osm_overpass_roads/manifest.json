@@ -1,0 +1,13 @@
+{
+  "id": "osm_overpass_roads",
+  "file": "latest.json",
+  "fetched_at": "2026-10-20T03:49:34Z",
+  "sha256": "06aa8bd597497009938c8d7a2621314fb1e55a3d449b130c6e94b6be4c139641",
+  "bytes": 1938000,
+  "history": [
+    {
+      "fetched_at": "2026-10-20T03:49:34Z",
+      "sha256": "06aa8bd597497009938c8d7a2621314fb1e55a3d449b130c6e94b6be4c139641"
+    }
+  ]
+}

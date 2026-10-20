@@ -1,0 +1,31 @@
+# Island-total inclusion rule for the ROADS goal: "walk, hike or bike every road on Bainbridge".
+# Evaluated at build/run time against the classification in bitrails/roads/classify.py; changing it
+# never requires re-fetching or re-classifying. Lengths are centerline metres, each segment once.
+#
+# A segment counts when:
+#   public_access not in exclude_public_access, AND category in categories, AND
+#   (ownership in ownerships OR (ownership == unknown AND count_unknown_ownership))
+#
+# Categories: state_route, arterial, collector, residential, lane, driveway, unknown
+# Ownerships: public_state, public_city, public_county, public_parks, public_school, private, unknown
+categories:
+  - state_route      # SR 305
+  - arterial         # primary/secondary arterials
+  - collector        # collectors
+  - residential      # residential and local-access streets
+ownerships:
+  - public_state
+  - public_city
+  - public_county
+  - public_parks
+  - public_school
+# `lane` (named service roads and alleys) and `driveway` are mapped and shipped but never counted:
+# a shared lane is usually private property, and nobody's goal is every driveway. Flip them on by
+# adding them above if the product decides otherwise - no rebuild of the data is required.
+#
+# Private roads are excluded from the goal: 34.3 mi of the island's centerlines are private
+# (WSDOT LAPR, 2026-10-19). They stay in the dataset with ownership=private so the app can draw
+# them greyed out and so "unknown" can be audited down over time.
+count_unknown_ownership: false
+exclude_public_access:
+  - "no"

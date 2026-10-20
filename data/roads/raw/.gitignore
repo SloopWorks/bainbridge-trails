@@ -1,0 +1,6 @@
+# Raw road cache: commit only sources with redistribution: yes (see ../sources.roads.yaml).
+*
+!.gitignore
+!osm_overpass_roads/
+!*/manifest.json
+!osm_overpass_roads/*

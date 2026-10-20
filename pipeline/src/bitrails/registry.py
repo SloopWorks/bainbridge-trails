@@ -53,8 +53,9 @@ def _canon_key(geom: LineString) -> tuple:
 
 class Registry:
     def __init__(self, path: Path, entries: dict[str, dict], next_id: int,
-                 private_geom: dict[str, str] | None = None):
+                 private_geom: dict[str, str] | None = None, prefix: str = "seg"):
         self.path = Path(path)
+        self.prefix = prefix          # id namespace: "seg" for trails, "rseg" for the road dataset
         self.entries = entries
         self.private_geom = dict(private_geom or {})  # id -> WKT for private entries
         self.next_id = next_id
@@ -65,7 +66,7 @@ class Registry:
         self._finalized = False
 
     @classmethod
-    def load(cls, path: Path | None = None) -> "Registry":
+    def load(cls, path: Path | None = None, prefix: str = "seg") -> "Registry":
         path = Path(path or DEFAULT_REGISTRY)
         entries: dict[str, dict] = {}
         next_id = 1
@@ -76,7 +77,7 @@ class Registry:
         side = cls.sidecar_path(path)
         private_geom = json.loads(side.read_text()) if side.exists() else {}
         issued = max((int(i.split("-")[1]) for i in entries), default=0)
-        return cls(path, entries, max(next_id, issued + 1), private_geom)
+        return cls(path, entries, max(next_id, issued + 1), private_geom, prefix)
 
     @staticmethod
     def sidecar_path(path: Path) -> Path:
@@ -175,7 +176,7 @@ class Registry:
 
         for k in order:
             if k not in result:
-                id_ = f"seg-{self.next_id:06d}"
+                id_ = f"{self.prefix}-{self.next_id:06d}"
                 self.next_id += 1
                 self.entries[id_] = {"id": id_, "fingerprint": "", "geometry": "", "supersedes": [], "retired": False}
                 self._new.add(id_)
