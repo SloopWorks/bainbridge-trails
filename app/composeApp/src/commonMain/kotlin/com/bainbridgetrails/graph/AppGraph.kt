@@ -6,6 +6,7 @@ import com.bainbridgetrails.analytics.NoOpAnalytics
 import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.data.DatasetRepository
 import com.bainbridgetrails.data.DatasetSources
+import com.bainbridgetrails.data.GoalVocabulary
 import com.bainbridgetrails.data.ProgressRepository
 import com.bainbridgetrails.data.SettingsRepository
 import com.bainbridgetrails.data.StoredCoverage
@@ -90,6 +91,9 @@ object AppGraph {
             ),
         )
     }
+
+    /** The running goal's words (RD-4); composables read `LocalGoal.current` instead. Fixes the profile like [datasets]. */
+    val goal: GoalVocabulary get() = GoalVocabulary.of(DatasetProfile.current)
 
     /**
      * Starts the dataset load before any UI exists (platform entry points call it first thing), so parsing overlaps

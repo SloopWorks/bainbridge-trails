@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.data.Loadable
+import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.nav.DebugLaunch
 import com.bainbridgetrails.resources.Res
@@ -92,6 +93,10 @@ fun OnboardingScreen(onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
     val completePct = (CoverageParams().completionThreshold * 100).roundToInt()
     val last = pager.currentPage == PAGES - 1
+    val goal = LocalGoal.current
+    // RD-4/RP-20: the "over N miles" number comes from the dataset (blank for the moment before it has loaded).
+    val datasetState by AppGraph.datasets.state.collectAsStateWithLifecycle()
+    val islandTotalM = (datasetState as? Loadable.Ready)?.value?.dataset?.islandTotalM
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).windowInsetsPadding(WindowInsets.safeDrawing), contentAlignment = Alignment.TopCenter) {
         Column(Modifier.fillMaxSize().widthIn(max = BtTheme.spacing.contentMaxWidth)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = BtTheme.spacing.xs), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
@@ -112,9 +117,9 @@ fun OnboardingScreen(onDone: () -> Unit) {
                     }
                     Spacer(Modifier.height(BtTheme.spacing.xl))
                     val (title, body) = when (page) {
-                        0 -> stringResource(Res.string.onboarding_1_title) to stringResource(Res.string.onboarding_1_body)
-                        1 -> stringResource(Res.string.onboarding_2_title) to stringResource(Res.string.onboarding_2_body, completePct)
-                        else -> stringResource(Res.string.onboarding_3_title) to stringResource(Res.string.onboarding_privacy_body)
+                        0 -> goal.string(Res.string.onboarding_1_title) to (islandTotalM?.let { goal.string(Res.string.onboarding_1_body, goal.islandTotalOver(it)) } ?: "")
+                        1 -> stringResource(Res.string.onboarding_2_title) to goal.string(Res.string.onboarding_2_body, completePct)
+                        else -> stringResource(Res.string.onboarding_3_title) to goal.string(Res.string.onboarding_privacy_body)
                     }
                     Text(title, Modifier.fillMaxWidth().semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
                     Text(body, Modifier.fillMaxWidth().padding(top = BtTheme.spacing.md), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
