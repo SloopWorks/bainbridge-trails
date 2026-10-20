@@ -11,6 +11,8 @@ data class TrailMeta(
     @SerialName("segment_ids") val segmentIds: List<String>,
     @SerialName("computed_length_mi") val computedLengthMi: Double,
     @SerialName("official_length_mi") val officialLengthMi: Double? = null,
+    /** Park or preserve the trail is in; null = not in a park (Trails list "Not in a park" filter). */
+    val park: String? = null,
 ) {
     val displayLengthMi: Double get() = officialLengthMi ?: computedLengthMi
 }
