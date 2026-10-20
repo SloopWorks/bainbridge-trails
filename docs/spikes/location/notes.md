@@ -55,6 +55,30 @@ Branch `spike4/location-activity`. Dev build published to channel `dev-spike4-lo
 - iOS needs a device: CoreMotion history, pedometer, geofence banner, the blue background indicator, taps through the opt-in UI.
 - Android geofence latency on a real device; fences do not alert if already inside at opt-in.
 
+## Field test results (owner, Pixel 10 Pro)
+
+**Walk 1 (2026-10-19):** recorded with the screen off and the app in the background throughout.
+
+- **Session:** 21.2 min, 1,098 GPS fixes (~1 Hz), mean accuracy 3.3 m.
+- **Activity:** 93% ON_FOOT, 6% STILL, no vehicle or bicycle.
+- **Steps and verification:** 2,287 steps; both sources available, so the walk is marked **Verified**.
+- **Battery:** 75% → 74% over 15 min, about 4 %/h. That is a single 1% step, so it is coarse; the 60-min walk gives a firmer number.
+- **Coverage:** Schel Chelb Trail **97.4% COMPLETE**; island +0.31%. The phone's saved result matched the offline re-score exactly (326 m).
+- **Where the walked distance fell:**
+  - 424 m on the trail and 109 m on its connector, which are scored.
+  - 691 m on road/connector segments and 432 m on informal paths. These are not scored and were correctly not credited.
+  - 501 m more than 30 m from any mapped path, likely an unmapped path. This is a candidate data gap.
+- **Finding: step-counter stall.**
+  - About 8 min in, TYPE_STEP_COUNTER registered 2 steps over 65 s while GPS showed 71 m of walking.
+  - Activity Recognition independently reported STILL (HIGH), then UNKNOWN, for the same span. The phone sensed no stepping motion, so this was not a background restriction: the standby bucket was ACTIVE, the sensor stayed registered, and GPS kept arriving at 1 Hz.
+  - The old 60 s step check dropped 55 genuine fixes. It happened to cost no credit, because that stretch was already covered.
+  - **Fixed** (`fix/step-gating-stall`):
+    - Each 60 s window is now judged over a ±60 s evidence span, and is dropped only if the span moved > 180 m with steps × 2.5 m < moved.
+    - Distance across fixes the activity gate dropped, or across GPS gaps over 60 s, counts as 0.
+    - Android flushes the step sensor before each heartbeat. Per-flush tokens are used, and they resync if a completion is lost.
+  - Re-gating the raw session (`:coverage-eval:run --args="session --data ../data/dist <file>"`) gives droppedSteps 0, with the same 97.4%.
+  - Trade-off: a vehicle hop under about a minute inside a walk is no longer caught by steps. It is left to the activity gate and the speed filter.
+
 ## Owner field test (Pixel, dev build `com.bainbridgetrails.app.dev`)
 Install the dev-channel build before 2026-10-21T13:05Z (it expires after 48 h); otherwise republish from the branch: `scripts/sync-app-assets.sh`, `cd app && ./gradlew -PshipyardDeployPluginRepository=file://$HOME/.m2/repository :androidApp:assembleDebug`, then `shipyard-deploy publish androidApp/build/outputs/apk/debug/androidApp-debug.apk` (with `SHIPYARD_DEPLOY_SERVER` and `SHIPYARD_DEPLOY_TOKEN` set). Grant all prompts. Record each as its own session.
 1. **60 min walk, screen off**, Gazzam or Grand Forest. Start, lock phone, pocket, Finish at the end.
