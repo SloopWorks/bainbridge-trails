@@ -99,12 +99,18 @@ export async function deleteUser(env: Env, deps: Deps, user: UserRow): Promise<v
     env.DB.prepare("DELETE FROM coverage WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM user_trails WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM user_completed WHERE user_id = ?").bind(id),
-    env.DB.prepare("DELETE FROM walks WHERE user_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM walks_v2 WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM user_metrics WHERE user_id = ?").bind(id), // every dataset
     env.DB.prepare("DELETE FROM name_reports WHERE reporter_id = ?1 OR target_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id),
     ...snapshotRemove(env, id),
-    env.DB.prepare("DELETE FROM rate_limits WHERE key IN (?1, ?2, ?3, ?4)").bind(`cov:${id}`, `name:${id}`, `report:${id}`, `hide:${id}`),
+    env.DB.prepare("DELETE FROM rate_limits WHERE key IN (?1, ?2, ?3, ?4, ?5)").bind(
+      `cov:trails:${id}`,
+      `cov:roads:${id}`,
+      `name:${id}`,
+      `report:${id}`,
+      `hide:${id}`,
+    ),
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id),
   ]);
 }
