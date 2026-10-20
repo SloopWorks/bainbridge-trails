@@ -46,9 +46,21 @@ final class AppleSignIn: NSObject, AppleSignInBridge, ASAuthorizationControllerD
                                   error: cancelled ? nil : error.localizedDescription))
     }
 
+    func cancel() {
+        DispatchQueue.main.async {
+            self.completion = nil
+            self.hashedNonce = nil
+        }
+    }
+
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        return scenes.flatMap { $0.windows }.first { $0.isKeyWindow } ?? ASPresentationAnchor()
+        let windows = scenes.flatMap { $0.windows }
+        if let key = windows.first(where: { $0.isKeyWindow }) ?? windows.first { return key }
+        // No window yet: anchor to a window in the first (foreground-first) scene, never a detached one.
+        let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+        if let scene { return UIWindow(windowScene: scene) }
+        return ASPresentationAnchor()
     }
 
     private func finish(_ outcome: AppleSignInOutcome) {

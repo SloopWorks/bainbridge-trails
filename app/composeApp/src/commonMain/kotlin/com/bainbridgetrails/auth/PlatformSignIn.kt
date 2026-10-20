@@ -51,6 +51,9 @@ object AuthConfig {
 interface AppleSignInBridge {
     /** Shows the Apple sheet; calls [onResult] exactly once on the main thread. */
     fun signIn(onResult: (AppleSignInOutcome) -> Unit)
+
+    /** The caller stopped waiting: forget the pending [signIn] callback (it is never called). */
+    fun cancel()
 }
 
 /** [cancelled] = user dismissed; otherwise [idToken] set on success or [error] on failure. [nonce] = SHA-256 hex sent to Apple. */
