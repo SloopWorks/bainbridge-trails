@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "types": "wrangler types --strict-vars=false",
     "build:segments": "node scripts/build-segment-meta.mjs",
+    "build:segments:roads": "node scripts/build-segment-meta.mjs --dataset roads",
     "build:legal": "node scripts/build-legal-pages.mjs",
     "migrate:local": "wrangler d1 migrations apply DB --local",
     "migrate:remote": "wrangler d1 migrations apply DB --remote",
