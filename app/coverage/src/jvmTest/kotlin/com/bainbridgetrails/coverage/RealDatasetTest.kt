@@ -11,10 +11,7 @@ class RealDatasetTest {
     fun realDatasetParses() {
         val segs = File("../../data/dist/coverage_segments.json")
         val trails = File("../../data/dist/trails.json")
-        if (!segs.exists() || !trails.exists()) {
-            println("realDatasetParses: SKIPPED, ../../data/dist files missing")
-            return
-        }
+        assumeDataFiles("realDatasetParses", segs, trails)
         val ds = Dataset.parse(trails.readText(), segs.readText())
         val sum = ds.segments.filter { it.included }.sumOf { it.lengthM }
         println("realDatasetParses: trails=${ds.trails.size} segments=${ds.segments.size} includedSum=$sum islandTotalM=${ds.islandTotalM}")

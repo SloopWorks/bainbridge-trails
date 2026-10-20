@@ -11,10 +11,7 @@ class HmmPerfTest {
     fun sixtyMinuteWalkUnderTwoSeconds() {
         val segsFile = File("../../data/dist/coverage_segments.json")
         val trailsFile = File("../../data/dist/trails.json")
-        if (!segsFile.exists() || !trailsFile.exists()) {
-            println("HmmPerfTest: SKIPPED, ../../data/dist files missing")
-            return
-        }
+        assumeDataFiles("HmmPerfTest", segsFile, trailsFile)
         val ds = Dataset.parse(trailsFile.readText(), segsFile.readText())
         val params = CoverageParams(matcher = Matcher.HMM)
         val proj = LocalProjection()
