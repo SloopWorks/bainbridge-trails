@@ -7,14 +7,17 @@ import { adminMethod, adminRoute } from "./routes/admin";
 import { leaderboard, reportName, trailStats } from "./routes/board";
 import { getCoverage, putCoverage } from "./routes/coverage";
 import { deleteUser, meBody, putMe } from "./routes/me";
-import { deleteAccountPage } from "./routes/pages";
+import { deleteAccountPage, legalPage } from "./routes/pages";
 import { META } from "./segments";
 import { rebuildSnapshots } from "./snapshot";
 import { USER_COLS, type UserRow, recomputeMetrics } from "./users";
 
 /** Allowed methods per path. Checked before auth so a wrong method is always 405 (P2-14). */
 const ROUTES: Record<string, string[]> = {
-  "/delete-account": ["GET"],
+  "/delete-account": ["GET", "HEAD"],
+  "/privacy": ["GET", "HEAD"],
+  "/terms": ["GET", "HEAD"],
+  "/support": ["GET", "HEAD"],
   "/v1/health": ["GET"],
   "/v1/auth/google": ["POST"],
   "/v1/auth/apple": ["POST"],
@@ -51,7 +54,11 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
 
   switch (path) {
     case "/delete-account":
-      return deleteAccountPage(env);
+      return deleteAccountPage(env, method);
+    case "/privacy":
+    case "/terms":
+    case "/support":
+      return legalPage(path.slice(1) as "privacy" | "terms" | "support", method);
     case "/v1/health":
       return json({ ok: true, datasetVersion: META.version, tickM: META.tickM });
     case "/v1/auth/google":

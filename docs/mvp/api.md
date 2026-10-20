@@ -5,7 +5,8 @@ Follows `docs/mvp/decisions.md` (TL-*) over `product.md`.
 
 - Base URL: local `http://10.0.2.2:8787` (Android emulator) / `http://localhost:8787` (iOS simulator);
   prod `https://bainbridge-trails-api.<account>.workers.dev` (owner deploys).
-- All API paths are under `/v1`. JSON in, JSON out (`content-type: application/json`).
+- All API paths are under `/v1`. JSON in, JSON out (`content-type: application/json`). The public HTML pages
+  (`/privacy`, `/terms`, `/support`, `/delete-account`) are listed at the end.
 - Auth: `Authorization: Bearer <token>` with the session token from an `/v1/auth/*` call.
   Tokens are opaque, valid 90 days. On `401` drop the token and sign in again.
 - Errors: always `{"error": {"code": "...", "message": "..."}}`, sometimes with extra fields
@@ -264,3 +265,17 @@ review only (auto-hide was cut). Duplicate reports by the same user are no-ops. 
 ## Other
 
 `GET /v1/health` → `{"ok": true, "datasetVersion": "…", "tickM": 5}`.
+
+## Public web pages (not JSON, no `/v1`)
+
+Static HTML for store listings and the in-app Settings links (`GET` and `HEAD`; other methods `405`). No auth,
+no scripts, `cache-control: public, max-age=3600`.
+
+| path | content | used by |
+|---|---|---|
+| `/privacy` | privacy policy (`docs/legal/privacy-policy.md`) | Settings > Privacy policy; Play + App Store privacy policy URL |
+| `/terms` | terms of use (`docs/legal/terms.md`) | store listings, footer links |
+| `/support` | contact + FAQ (`docs/legal/support.md`) | App Store support URL |
+| `/delete-account` | how to delete the account; email fallback (`SUPPORT_EMAIL`) | Play account-deletion URL (TL-10) |
+
+The Markdown is rendered into the Worker at build time (`npm run build:legal`, see `backend/README.md`).

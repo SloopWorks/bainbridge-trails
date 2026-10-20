@@ -1,0 +1,30 @@
+Bainbridge Trails maps the public trails of Bainbridge Island, Washington, and keeps track of the ones you have walked. Record a walk and the app fills in the trail sections you covered. Finish a trail, then keep going until you have walked the whole island.
+
+WHAT YOU CAN DO
+• Browse more than 100 named island trails on an offline map (Topo, Light or Dark style), with length, elevation gain, park and trailheads.
+• Search and filter the trail list by status: not started, partway, nearly done, complete.
+• Record a walk. A notification shows while recording and lets you stop from the lock screen.
+• See which sections you covered, your progress on each trail, and your share of the whole island.
+• Celebrate each trail you complete.
+• Optional: sign in to back up your progress and join the island leaderboard under a display name or a generated anonymous name.
+• See community stats per trail, such as how many people have walked it.
+
+PRIVATE BY DESIGN
+• Your GPS track stays on your phone. Raw tracks are deleted from the phone 30 days after a walk; your progress is kept.
+• If you sign in, we sync only which trail sections you have covered, never your GPS track or walk times.
+• The leaderboard shows a name, island percentage and trails completed. It never shows where or when you walked.
+• No ads. No analytics or tracking SDKs.
+• Delete your account in the app at any time.
+
+WORKS OFFLINE
+The map and trail data are built into the app, so you can browse and record without a signal. Syncing and the leaderboard need a connection.
+
+GOOD TO KNOW
+• Location is used only during a walk you start (it keeps recording with the screen off until you stop) or while the map shows your position. There is no location access at other times.
+• Precise location is needed because island trails run close together.
+• Optional physical-activity access helps keep bike and car rides from counting as walks.
+• Trail conditions change. Follow posted signs, closures and park rules.
+• Bainbridge Trails is an independent app by SloopWorks LLC. It is not affiliated with or endorsed by the Bainbridge Island Metro Park & Recreation District or the City of Bainbridge Island.
+
+MAP DATA
+Map and trail data © OpenStreetMap contributors, available under the Open Database License (ODbL 1.0). Basemap tiles from Protomaps (OpenStreetMap data). Elevation data from the U.S. Geological Survey, National Geospatial Program. Trail names and attributes also draw on Bainbridge Island Metro Park & Recreation District and Kitsap County planning data. Full credits are in the app under Settings > Map and data credits.
