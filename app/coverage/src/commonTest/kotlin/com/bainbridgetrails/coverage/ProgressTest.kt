@@ -93,4 +93,29 @@ class ProgressTest {
         val e = assertFailsWith<IllegalArgumentException> { Dataset.parse(t, s) }
         assertTrue(e.message!!.contains("s2"), e.message)
     }
+
+    @Test
+    fun snapshotMatchesPerCallQueries() {
+        val st = index.cover(walkOf(1000.0) + walkOf(0.0) + walkOf(3000.0))
+        val snap = progress.snapshot(st)
+        assertEquals(progress.islandFraction(st), snap.islandFraction, 1e-12)
+        assertEquals(progress.trailsCompleted(st), snap.trailsCompleted)
+        assertEquals(listOf("T1", "T2", "T3"), snap.trails.map { it.trailId })
+        for (t in snap.trails) {
+            assertEquals(progress.trailFraction(st, t.trailId), t.fraction, 1e-12)
+            assertEquals(progress.status(t.fraction), t.status)
+        }
+        assertEquals(snap.islandFraction * 300.0, snap.coveredM, 1e-9) // included segments only
+        assertEquals(TrailStatus.COMPLETE, snap.trail("T1")?.status)
+        assertEquals(3, snap.trailCount)
+    }
+
+    @Test
+    fun emptySnapshot() {
+        val snap = progress.snapshot(CoverageState.EMPTY)
+        assertEquals(0.0, snap.islandFraction)
+        assertEquals(0, snap.trailsCompleted)
+        assertTrue(snap.trails.all { it.status == TrailStatus.NOT_STARTED })
+    }
 }
+

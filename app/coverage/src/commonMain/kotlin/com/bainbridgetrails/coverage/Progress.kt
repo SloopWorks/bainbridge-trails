@@ -2,6 +2,32 @@ package com.bainbridgetrails.coverage
 
 enum class TrailStatus { NOT_STARTED, PARTWAY, NEARLY_DONE, COMPLETE }
 
+/** One trail's progress inside a [ProgressSnapshot]. */
+data class TrailProgress(val trailId: String, val name: String, val fraction: Double, val status: TrailStatus, val lengthMi: Double)
+
+/**
+ * Everything the UI shows about a [CoverageState], computed in one pass by [Progress.snapshot]. Cache it per state
+ * instead of calling [Progress.islandFraction] / [Progress.trailsCompleted] (each walks every segment) per frame.
+ */
+data class ProgressSnapshot(
+    /** Dataset trail order. */
+    val trails: List<TrailProgress>,
+    val islandFraction: Double,
+    val trailsCompleted: Int,
+    /** Covered metres on included (island-total) segments; shared segments count once. */
+    val coveredM: Double,
+) {
+    private val byId: Map<String, TrailProgress> by lazy { trails.associateBy { it.trailId } }
+
+    val trailCount: Int get() = trails.size
+
+    fun trail(id: String): TrailProgress? = byId[id]
+
+    companion object {
+        val EMPTY = ProgressSnapshot(emptyList(), 0.0, 0, 0.0)
+    }
+}
+
 class Progress(
     private val dataset: Dataset,
     private val index: SegmentIndex,
@@ -51,4 +77,25 @@ class Progress(
     /** Every trail using [segmentId] when that segment has any covered tick; else empty. */
     fun trailsOn(state: CoverageState, segmentId: String): List<String> =
         if (state.covered(segmentId).isEmpty()) emptyList() else trailsBySegment[segmentId].orEmpty()
+
+    /** One pass over segments and trails: per-trail fraction + status, island fraction, completed count, covered metres. */
+    fun snapshot(state: CoverageState): ProgressSnapshot {
+        val coveredBySegment = HashMap<String, Double>()
+        fun covered(id: String) = coveredBySegment.getOrPut(id) { coveredClamped(state, id) }
+        var islandCovered = 0.0
+        for (s in dataset.segments) if (s.included) islandCovered += covered(s.id)
+        val trails = dataset.trails.map { t ->
+            var total = 0.0
+            var cov = 0.0
+            for (s in t.segmentIds.distinct()) {
+                total += index.segments[s]?.lengthM ?: continue
+                cov += covered(s)
+            }
+            val f = if (total <= 0.0) 0.0 else (cov / total).coerceIn(0.0, 1.0)
+            TrailProgress(t.id, t.name, f, status(f), t.displayLengthMi)
+        }
+        val island = if (dataset.islandTotalM <= 0.0) 0.0 else (islandCovered / dataset.islandTotalM).coerceIn(0.0, 1.0)
+        return ProgressSnapshot(trails, island, trails.count { it.status == TrailStatus.COMPLETE }, islandCovered)
+    }
 }
+

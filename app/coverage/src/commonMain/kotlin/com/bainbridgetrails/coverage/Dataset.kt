@@ -26,7 +26,13 @@ private data class TrailsFile(
 private data class SegmentsFile(val version: String, val segments: List<SegmentGeom>)
 
 /** Parsed trails.json + coverage_segments.json. [islandTotalM] is the shippable total. */
-class Dataset(val trails: List<TrailMeta>, val islandTotalM: Double, val segments: List<SegmentGeom>) {
+class Dataset(
+    val trails: List<TrailMeta>,
+    val islandTotalM: Double,
+    val segments: List<SegmentGeom>,
+    /** Dataset build version (trails.json "version"); empty for hand-built test datasets. */
+    val version: String = "",
+) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
 
@@ -39,7 +45,7 @@ class Dataset(val trails: List<TrailMeta>, val islandTotalM: Double, val segment
                 val missing = tr.segmentIds.firstOrNull { it !in segIds }
                 require(missing == null) { "trail ${tr.id} segment $missing missing from coverage segments" }
             }
-            return Dataset(t.trails, t.islandTotalShippableM, s.segments)
+            return Dataset(t.trails, t.islandTotalShippableM, s.segments, t.version)
         }
     }
 }
