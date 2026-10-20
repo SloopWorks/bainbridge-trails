@@ -73,6 +73,19 @@ Capture **all available trails and paths** from every source — do not pre-filt
 ### "Island total"
 Island % denominator = total length of unique public trail segments in the dataset. Changes to the dataset or to the inclusion rule must not silently drop users' completion. Because segment IDs are stable and add-only, and the server stores per-segment coverage, progress survives phone switches, reinstalls and dataset updates without needing raw tracks.
 
+### Data review decisions (owner, 2026-10-18)
+- **Data stays as built.** Inclusion rule, Gazzam merges, short (<80 m) trails, near-duplicate names and
+  road-following Winslow lines are accepted as-is; filtering/combining later remains an option and needs
+  no re-collection (the rule is config, segments are stable).
+- **The app lists only named trails.** Trail list, trail detail, "trails completed" and per-trail % cover
+  trails with a name. Unnamed segments keep their current treatment (drawn on the map; counted toward the
+  island total only if the inclusion rule already counts them).
+- **Displayed trail length = official mileage when available, else computed.** For each named trail, try
+  to find a published length (agency trail pages/maps, e.g. Metro Parks). Store it as a fact with its
+  source (`official_length_mi`, `official_length_source`) next to the computed length; show official
+  when present, computed otherwise. Island % and per-trail % stay computed from segment geometry so the
+  math is consistent; a large official-vs-computed gap goes into the conflict report.
+
 ## 4. Maps & visual design
 - Vector map rendering with **MapLibre** (native SDKs on both platforms; free, no API key fees).
 - Stylish, polished, distinctive look; multiple map styles explored by the design agent (e.g. topo/contour, minimal light, dark, satellite-free). Trail status colors work across all styles and for color-blind users.
