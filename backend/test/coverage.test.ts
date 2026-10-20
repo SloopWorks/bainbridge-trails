@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { computeMetrics, decodeBits, encodeBits, fitsTicks, maskTicks, or, popcount } from "../src/coverage";
-import { META, bitsOf, devLogin, fullBits, harness, trailFull, upload, walkFor } from "./helpers";
+import { computeMetrics, decodeBits, encodeBits, fitsTicks, maskTicks, or, popcount, toJsonObject } from "../src/coverage";
+import { META, bitsOf, devLogin, fullBits, harness, syncWalk, trailFull, upload, walkFor } from "./helpers";
 
 type CovRes = {
   datasetVersion: string;
@@ -33,6 +33,22 @@ function includedUpTo(metres: number, skip = new Set<string>()): Record<string, 
 }
 
 describe("bit encoding (CoverageState contract)", () => {
+  it("matches fixtures asserted by the Kotlin CoverageState tests", () => {
+    // app/coverage/src/commonTest/.../CoverTest.kt encodeBitOrderLittleEndian: ticks {0, 9} <-> {"seg-000001":"AQI="}
+    expect(bitsOf([0, 9])).toBe("AQI=");
+    expect([...decodeBits("AQI=")!]).toEqual([0x01, 0x02]);
+    // CoverTest.encodeDecodeRoundTrip: EMPTY.encode() == "{}"
+    expect(JSON.stringify(toJsonObject(new Map()))).toBe("{}");
+    // hand-crafted from the algorithm (not Kotlin-emitted): sorted keys, empty segment omitted, 64+ ticks
+    const m = new Map([
+      ["seg-000010", decodeBits(bitsOf([63, 64, 65]))!],
+      ["seg-000002", decodeBits(bitsOf([7]))!],
+      ["seg-000005", new Uint8Array(0)],
+    ]);
+    // tick 7 -> byte0 0x80; ticks 63,64,65 -> byte7 0x80, byte8 0x03 (9 bytes, no trailing zero bytes)
+    expect(JSON.stringify(toJsonObject(m))).toBe('{"seg-000002":"gA==","seg-000010":"AAAAAAAAAIAD"}');
+  });
+
   it("little-endian ticks, trailing zero bytes dropped, OR union", () => {
     expect(bitsOf([0])).toBe("AQ==");
     expect(encodeBits(decodeBits("AQAA")!)).toBe("AQ==");
@@ -84,24 +100,25 @@ describe("metrics mirror Kotlin Progress", () => {
 });
 
 describe("PUT/GET /v1/coverage", () => {
-  it("requires auth", async () => {
-    expect((await harness().call("GET", "/v1/coverage")).status).toBe(401);
+  it("requires auth; wrong method is 405 before auth", async () => {
+    const h = harness();
+    expect((await h.call("GET", "/v1/coverage")).status).toBe(401);
+    expect((await h.call("DELETE", "/v1/coverage")).status).toBe(405);
+    expect((await h.call("POST", "/v1/me")).status).toBe(405);
   });
 
   it("unions with stored bits (OR) and returns merged state for new devices", async () => {
     const h = harness();
     const { token } = await devLogin(h);
-    const r1 = await h.call("PUT", "/v1/coverage", { token, body: upload({ [ROTARY_SEG]: bitsOf([0, 1]) }) });
-    expect(r1.status).toBe(200);
-    const r2 = await h.call("PUT", "/v1/coverage", { token, body: upload({ [ROTARY_SEG]: bitsOf([1, 2, 6]) }) });
-    const j2 = (await r2.json()) as CovRes;
+    expect((await syncWalk(h, token, { [ROTARY_SEG]: bitsOf([0, 1]) })).status).toBe(200);
+    const j2 = (await (await syncWalk(h, token, { [ROTARY_SEG]: bitsOf([1, 2, 6]) })).json()) as CovRes;
     expect(j2.segments[ROTARY_SEG]).toBe(bitsOf([0, 1, 2, 6]));
     const g = (await (await h.call("GET", "/v1/coverage", { token })).json()) as CovRes;
     expect(g.segments).toEqual({ [ROTARY_SEG]: bitsOf([0, 1, 2, 6]) });
     expect(g.datasetVersion).toBe(META.version);
     expect(g.tickM).toBe(5);
-    // a smaller upload never removes bits
-    const r3 = (await (await h.call("PUT", "/v1/coverage", { token, body: upload({}) })).json()) as CovRes;
+    // a smaller upload never removes bits; already-known bits need no walk
+    const r3 = (await (await h.call("PUT", "/v1/coverage", { token, body: upload({ [ROTARY_SEG]: bitsOf([0]) }) })).json()) as CovRes;
     expect(r3.segments[ROTARY_SEG]).toBe(bitsOf([0, 1, 2, 6]));
     expect(r3.newlyCoveredM).toBe(0);
   });
@@ -109,7 +126,7 @@ describe("PUT/GET /v1/coverage", () => {
   it("recomputes metrics server-side and stores per-trail fractions", async () => {
     const h = harness();
     const { token, userId } = await devLogin(h);
-    const res = (await (await h.call("PUT", "/v1/coverage", { token, body: upload({ ...trailFull(ROTARY), ...trailFull(WHARF) }) })).json()) as CovRes;
+    const res = (await (await syncWalk(h, token, { ...trailFull(ROTARY), ...trailFull(WHARF) })).json()) as CovRes;
     expect(res.metrics.trailsCompleted).toBe(2);
     expect(res.metrics.trailsTotal).toBe(Object.keys(META.trails).length);
     expect(res.metrics.islandCoveredM).toBeCloseTo(30.8, 0);
@@ -124,9 +141,10 @@ describe("PUT/GET /v1/coverage", () => {
     const h = harness();
     const { token } = await devLogin(h);
     const segs = Object.keys(includedUpTo(200));
+    h.clock.advanceHours(2);
     const [r1, r2] = await Promise.all([
-      h.call("PUT", "/v1/coverage", { token, body: upload({ [segs[0]!]: "AQ==" }) }),
-      h.call("PUT", "/v1/coverage", { token, body: upload({ [segs[1]!]: "AQ==" }) }),
+      h.call("PUT", "/v1/coverage", { token, body: upload({ [segs[0]!]: "AQ==" }, [walkFor(100)]) }),
+      h.call("PUT", "/v1/coverage", { token, body: upload({ [segs[1]!]: "AQ==" }, [walkFor(100)]) }),
     ]);
     expect([r1.status, r2.status]).toEqual([200, 200]);
     const g = (await (await h.call("GET", "/v1/coverage", { token })).json()) as CovRes;
@@ -139,7 +157,7 @@ describe("PUT/GET /v1/coverage", () => {
     const stale = env.DB.prepare(
       "UPDATE users SET coverage_rev = CASE WHEN coverage_rev = ?2 THEN coverage_rev + 1 ELSE NULL END, island_m = 5 WHERE id = ?1",
     ).bind(userId, 99);
-    const write = env.DB.prepare("INSERT INTO coverage (user_id, segment_id, bits, updated_at) VALUES (?, 'seg-x', 'AQ==', 0)").bind(userId);
+    const write = env.DB.prepare("INSERT INTO coverage (user_id, segment_id, bits) VALUES (?, 'seg-x', 'AQ==')").bind(userId);
     await expect(env.DB.batch([stale, write])).rejects.toThrow(/NOT NULL constraint failed/);
     const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM coverage WHERE user_id = ?").bind(userId).first<{ n: number }>();
     expect(n!.n).toBe(0);
@@ -153,7 +171,7 @@ describe("PUT/GET /v1/coverage", () => {
       return { status: r.status, body: (await r.json()) as ErrRes & CovRes };
     };
     // other dataset versions are accepted and computed with the bundled dataset; out-of-range ticks dropped
-    const other = await put({ ...upload({ [ROTARY_SEG]: bitsOf([0, 9]) }), datasetVersion: "2026-01-01+old" });
+    const other = await put({ ...upload({ [ROTARY_SEG]: bitsOf([0, 9]) }, [walkFor(10)]), datasetVersion: "2026-01-01+old" });
     expect(other.status).toBe(200);
     expect(other.body.datasetVersion).toBe(META.version);
     expect(other.body.segments[ROTARY_SEG]).toBe(bitsOf([0]));
@@ -165,7 +183,6 @@ describe("PUT/GET /v1/coverage", () => {
     expect((await put(upload({ [ROTARY_SEG]: bitsOf([7]) }))).body.error.code).toBe("invalid_coverage");
     expect((await put(upload({ [ROTARY_SEG]: "%%%" }))).status).toBe(400);
     expect((await put(upload({ [ROTARY_SEG]: 5 as unknown as string }))).status).toBe(400);
-    // well-formed id that does not count (not included, not on a trail): accepted but ignored
     const ignored = await put(upload({ "seg-000001": "AQ==" }));
     expect(ignored.status).toBe(200);
     expect(ignored.body.ignoredSegments).toEqual(["seg-000001"]);
@@ -175,33 +192,38 @@ describe("PUT/GET /v1/coverage", () => {
   it("rejects oversized bodies", async () => {
     const h = harness();
     const { token } = await devLogin(h);
-    const res = await h.call("PUT", "/v1/coverage", { token, body: "x".repeat(600 * 1024) });
-    expect(res.status).toBe(413);
+    expect((await h.call("PUT", "/v1/coverage", { token, body: "x".repeat(600 * 1024) })).status).toBe(413);
+  });
+
+  it("stores no walk times/durations and no coverage timestamps (P0-1)", async () => {
+    const cols = async (t: string) =>
+      ((await env.DB.prepare(`SELECT name FROM pragma_table_info('${t}')`).all<{ name: string }>()).results.map((r) => r.name));
+    expect(await cols("walks")).toEqual(["user_id", "walk_id"]);
+    expect(await cols("coverage")).toEqual(["user_id", "segment_id", "bits"]);
   });
 });
 
-describe("plausibility limits (TL-2)", () => {
-  it("allows 500 m of slack without walks; more needs new walk durations at <= 4 m/s", async () => {
+describe("plausibility limits (TL-2 + review P1-3)", () => {
+  it("new coverage needs new walks: 4 m/s x duration + 500 m; no slack without walks", async () => {
     const h = harness();
     const { token } = await devLogin(h);
+    const tiny = { [ROTARY_SEG]: bitsOf([0]) };
+    const noWalk = await h.call("PUT", "/v1/coverage", { token, body: upload(tiny) });
+    expect(noWalk.status).toBe(422);
+    expect(((await noWalk.json()) as ErrRes).error.allowedM).toBe(0);
     const small = includedUpTo(400);
-    expect((await h.call("PUT", "/v1/coverage", { token, body: upload(small) })).status).toBe(200);
+    expect((await h.call("PUT", "/v1/coverage", { token, body: upload(small, [{ id: crypto.randomUUID(), durationS: 0 }]) })).status).toBe(200);
+    h.clock.advanceHours(1);
     const big = includedUpTo(3000, new Set(Object.keys(small)));
-    const r = await h.call("PUT", "/v1/coverage", { token, body: upload(big) });
+    const r = await h.call("PUT", "/v1/coverage", { token, body: upload(big, [{ id: crypto.randomUUID(), durationS: 600 }]) });
     expect(r.status).toBe(422);
     const e = (await r.json()) as ErrRes;
     expect(e.error.code).toBe("implausible");
-    expect(e.error.allowedM).toBe(500);
-    expect(e.error.newlyCoveredM).toBeGreaterThan(3000);
+    expect(e.error.allowedM).toBe(4 * 600 + 500);
     // nothing stored on rejection
     const g = (await (await h.call("GET", "/v1/coverage", { token })).json()) as CovRes;
     expect(Object.keys(g.segments).sort()).toEqual(Object.keys(small).sort());
-    // a walk of ~12.5 min (750 s x 4 m/s = 3000 m) + 500 m slack is not enough for > 3.5 km...
-    const tooShort = { id: crypto.randomUUID(), durationS: 600 };
-    expect((await h.call("PUT", "/v1/coverage", { token, body: upload(big, [tooShort]) })).status).toBe(422);
-    // ...a long enough walk is
-    const walk = walkFor(4000);
-    expect((await h.call("PUT", "/v1/coverage", { token, body: upload(big, [walk]) })).status).toBe(200);
+    expect((await h.call("PUT", "/v1/coverage", { token, body: upload(big, [walkFor(4000)]) })).status).toBe(200);
   });
 
   it("credits each walk id once (dedup per user)", async () => {
@@ -210,21 +232,49 @@ describe("plausibility limits (TL-2)", () => {
     const walk = walkFor(5000);
     const a = includedUpTo(4000);
     expect((await h.call("PUT", "/v1/coverage", { token, body: upload(a, [walk]) })).status).toBe(200);
+    h.clock.advanceHours(3);
     const b = includedUpTo(4000, new Set(Object.keys(a)));
-    // same walk again: already credited -> only the 500 m slack
     expect((await h.call("PUT", "/v1/coverage", { token, body: upload(b, [walk, walk]) })).status).toBe(422);
     expect((await h.call("PUT", "/v1/coverage", { token, body: upload(b, [walk, walkFor(4000)]) })).status).toBe(200);
   });
 
-  it("first-sign-in backfill with all local walks", async () => {
+  it("caps each walk at 6 h and new walk time at the time since the last walk upload", async () => {
+    const h = harness();
+    const { token } = await devLogin(h);
+    const first = includedUpTo(90_000);
+    // one 100 h walk counts as 6 h = 86.4 km + 0.5 km < 90 km
+    expect((await h.call("PUT", "/v1/coverage", { token, body: upload(first, [{ id: crypto.randomUUID(), durationS: 360_000 }]) })).status).toBe(422);
+    const ok = includedUpTo(1000);
+    expect((await h.call("PUT", "/v1/coverage", { token, body: upload(ok, [walkFor(1000)]) })).status).toBe(200);
+    // 30 min later, a "2 h" walk does not fit (tolerance 15 min)
+    h.clock.advanceHours(0.5);
+    const more = includedUpTo(500, new Set(Object.keys(ok)));
+    const r = await h.call("PUT", "/v1/coverage", { token, body: upload(more, [{ id: crypto.randomUUID(), durationS: 7200 }]) });
+    expect(r.status).toBe(422);
+    expect((await h.call("PUT", "/v1/coverage", { token, body: upload(more, [{ id: crypto.randomUUID(), durationS: 2400 }]) })).status).toBe(200);
+  });
+
+  it("first-sign-in backfill may carry up to 2000 walks; later uploads 200 (P0-2)", async () => {
     const h = harness();
     const { token } = await devLogin(h);
     const all = includedUpTo(Infinity);
-    const walks = Array.from({ length: 40 }, () => ({ id: crypto.randomUUID(), durationS: 3600 })); // 40 h x 4 m/s = 576 km
+    const walks = Array.from({ length: 300 }, () => ({ id: crypto.randomUUID(), durationS: 1800 })); // 150 h -> 2160 km
     const r = await h.call("PUT", "/v1/coverage", { token, body: upload(all, walks) });
     expect(r.status).toBe(200);
-    const j = (await r.json()) as CovRes;
-    expect(j.metrics.islandPct).toBe(99.9); // 105290.8 / 105396 = 99.900...% floored
+    expect(((await r.json()) as CovRes).metrics.islandPct).toBe(99.9); // 105290.8 / 105396 = 99.900...% floored
+    const again = await h.call("PUT", "/v1/coverage", { token, body: upload({}, walks.slice(0, 201)) });
+    expect(again.status).toBe(400);
+    expect(((await again.json()) as ErrRes).error.code).toBe("too_many_walks");
+    expect((await h.call("PUT", "/v1/coverage", { token, body: upload({}, walks.slice(0, 200)) })).status).toBe(200);
+  });
+
+  it("caps stored walk ids per account", async () => {
+    const h = harness();
+    const { token, userId } = await devLogin(h);
+    await env.DB.prepare("UPDATE users SET walk_count = 9999 WHERE id = ?").bind(userId).run();
+    const r = await h.call("PUT", "/v1/coverage", { token, body: upload({}, [walkFor(1), walkFor(1)]) });
+    expect(r.status).toBe(422);
+    expect(((await r.json()) as ErrRes).error.code).toBe("walk_limit");
   });
 
   it("rate limits uploads per user", async () => {
@@ -240,15 +290,28 @@ describe("sticky completions (TL-7)", () => {
   it("returns completedTrailIds and counts them", async () => {
     const h = harness();
     const { token, userId } = await devLogin(h);
-    const r = (await (await h.call("PUT", "/v1/coverage", { token, body: upload(trailFull(ROTARY)) })).json()) as CovRes;
+    const r = (await (await syncWalk(h, token, trailFull(ROTARY))).json()) as CovRes;
     expect(r.completedTrailIds).toContain(ROTARY);
     expect(r.metrics.trailsCompleted).toBe(r.completedTrailIds.length);
-    // a completion recorded earlier (e.g. under an older dataset) stays counted
     await env.DB.prepare("INSERT INTO user_completed (user_id, trail_id) VALUES (?, 'trail-retired-in-new-dataset')").bind(userId).run();
-    const r2 = (await (await h.call("PUT", "/v1/coverage", { token, body: upload(trailFull(WHARF)) })).json()) as CovRes;
+    const r2 = (await (await syncWalk(h, token, trailFull(WHARF))).json()) as CovRes;
     expect(r2.completedTrailIds).toEqual([ROTARY, "trail-retired-in-new-dataset", WHARF].sort());
     expect(r2.metrics.trailsCompleted).toBe(3);
     const g = (await (await h.call("GET", "/v1/coverage", { token })).json()) as CovRes;
     expect(g.completedTrailIds).toEqual(r2.completedTrailIds);
+  });
+});
+
+describe("dataset updates (P1-7)", () => {
+  it("recomputes stale metrics lazily on the user's own read", async () => {
+    const h = harness();
+    const { token, userId } = await devLogin(h);
+    await syncWalk(h, token, trailFull(ROTARY));
+    await env.DB.prepare("UPDATE users SET metrics_version = 'old', island_m = 0, island_rank = 0, trails_completed = 0 WHERE id = ?").bind(userId).run();
+    const me = (await (await h.call("GET", "/v1/me", { token })).json()) as { metrics: CovRes["metrics"] };
+    expect(me.metrics.islandCoveredM).toBeCloseTo(30.8, 0);
+    expect(me.metrics.trailsCompleted).toBe(1);
+    const row = await env.DB.prepare("SELECT metrics_version FROM users WHERE id = ?").bind(userId).first<{ metrics_version: string }>();
+    expect(row!.metrics_version).toBe(META.version);
   });
 });

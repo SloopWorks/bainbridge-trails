@@ -1,100 +1,83 @@
 import type { UserRow } from "../auth";
+import { COMPLETION_THRESHOLD } from "../coverage";
 import type { Deps } from "../deps";
 import { ApiError, KB, badRequest, isObject, json, readJson } from "../http";
+import { publicName } from "../moderation/public-name";
 import { LIMITS, rateLimit } from "../ratelimit";
 import { META } from "../segments";
-import { ensureSnapshots } from "../snapshot";
-import { COMPLETION_THRESHOLD } from "../coverage";
+import { type BoardSnapRow, getSnapshot } from "../snapshot";
 import { floorTo } from "../util";
-import { islandPct } from "./coverage";
-import { publicName } from "./me";
 
 /** Community counts below this are hidden (TL-4 / TL-11). */
 export const MIN_COMMUNITY_COUNT = 5;
 
-interface SnapRow {
-  user_id: string;
-  island_m: number;
-  trails_completed: number;
-  display_name: string | null;
-  anon_name: string;
+/** Counts >= 5 are rounded to the nearest 5 so day-to-day snapshot diffs reveal less (review P2-16). */
+export function communityCount(n: number): number | null {
+  if (n < MIN_COMMUNITY_COUNT) return null;
+  return Math.max(MIN_COMMUNITY_COUNT, Math.round(n / 5) * 5);
+}
+
+/** a ranks ahead of b: island % (0.1 % floor) desc, trails desc, reached_at asc, id asc (P1-4). */
+function ahead(a: { island_rank: number; trails_completed: number; reached_at: number; id: string }, b: typeof a): boolean {
+  if (a.island_rank !== b.island_rank) return a.island_rank > b.island_rank;
+  if (a.trails_completed !== b.trails_completed) return a.trails_completed > b.trails_completed;
+  if (a.reached_at !== b.reached_at) return a.reached_at < b.reached_at;
+  return a.id < b.id;
 }
 
 export async function leaderboard(url: URL, env: Env, deps: Deps, me: UserRow | null): Promise<Response> {
   const limitParam = url.searchParams.get("limit");
   const limit = limitParam === null ? 100 : Number(limitParam);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw badRequest("limit must be an integer 1-100");
-  await ensureSnapshots(env, deps.now());
-
-  const visible = "FROM leaderboard_snapshot s JOIN users u ON u.id = s.user_id WHERE u.hidden = 0";
-  const [topRes, totalRes] = await env.DB.batch<SnapRow | { n: number }>([
-    env.DB.prepare(
-      `SELECT s.user_id, s.island_m, s.trails_completed, u.display_name, u.anon_name ${visible} ORDER BY s.ord LIMIT ?`,
-    ).bind(limit),
-    env.DB.prepare(`SELECT COUNT(*) AS n ${visible}`),
-  ]);
-  const rows = (topRes?.results ?? []) as SnapRow[];
-  let totalRanked = ((totalRes?.results?.[0] as { n: number } | undefined)?.n) ?? 0;
+  const snap = await getSnapshot(env, deps.now());
 
   // entries are snapshot values (also the caller's own entry); `you` below is live
-  const entries = rows.map((r, i) => ({
+  const entries = snap.board.slice(0, limit).map((r, i) => ({
     rank: i + 1,
     userId: r.user_id,
-    displayName: publicName(r),
-    islandPct: islandPct(r.island_m),
+    displayName: r.display_name,
+    islandPct: r.island_rank / 10,
     trailsCompleted: r.trails_completed,
     isYou: me !== null && r.user_id === me.id,
   }));
 
+  let totalRanked = snap.total_ranked;
   let you: (typeof entries)[number] | null = null;
   if (me && me.hidden === 0 && me.island_m > 0) {
-    // live rank of the caller against everyone else's snapshot rows
-    const ahead = await env.DB.prepare(
-      `SELECT COUNT(*) AS n ${visible} AND s.user_id != ?4 AND (
-         s.island_m > ?1 OR (s.island_m = ?1 AND (s.trails_completed > ?2 OR (s.trails_completed = ?2 AND (
-           s.reached_at < ?3 OR (s.reached_at = ?3 AND s.user_id < ?4))))))`,
-    )
-      .bind(me.island_m, me.trails_completed, me.reached_at ?? 0, me.id)
-      .first<{ n: number }>();
-    const inSnapshot = rows.some((r) => r.user_id === me.id) ||
-      (await env.DB.prepare("SELECT 1 AS x FROM leaderboard_snapshot WHERE user_id = ?").bind(me.id).first()) !== null;
+    const mine = { island_rank: me.island_rank, trails_completed: me.trails_completed, reached_at: me.reached_at ?? 0, id: me.id };
+    let rank = 1;
+    let inSnapshot = false;
+    for (const r of snap.board as BoardSnapRow[]) {
+      if (r.user_id === me.id) {
+        inSnapshot = true;
+        continue;
+      }
+      if (ahead({ ...r, id: r.user_id }, mine)) rank++;
+    }
     if (!inSnapshot) totalRanked += 1;
-    you = {
-      rank: (ahead?.n ?? 0) + 1,
-      userId: me.id,
-      displayName: publicName(me),
-      islandPct: islandPct(me.island_m),
-      trailsCompleted: me.trails_completed,
-      isYou: true,
-    };
+    you = { rank, userId: me.id, displayName: publicName(me), islandPct: me.island_rank / 10, trailsCompleted: me.trails_completed, isYou: true };
   }
   return json({ entries, you, totalRanked });
 }
 
-/** GET /v1/trails/stats — from the daily snapshot; counts below 5 are null. */
+/** GET /v1/trails/stats — from the daily snapshot; counts below 5 are null, larger ones rounded to 5. */
 export async function trailStats(env: Env, deps: Deps): Promise<Response> {
-  await ensureSnapshots(env, deps.now());
-  const { results } = await env.DB.prepare("SELECT trail_id, walkers, completed, median_fraction FROM trail_stats_snapshot").run<{
-    trail_id: string;
-    walkers: number;
-    completed: number;
-    median_fraction: number | null;
-  }>();
-  const byId = new Map(results.map((r) => [r.trail_id, r]));
+  const snap = await getSnapshot(env, deps.now());
   const trails: Record<string, { walkers: number | null; completedCount: number | null; medianPct: number | null }> = {};
   for (const trailId of Object.keys(META.trails)) {
-    const r = byId.get(trailId);
-    const walkers = r?.walkers ?? 0;
-    const completed = r?.completed ?? 0;
+    const r = snap.stats.get(trailId);
+    const walkers = communityCount(r?.walkers ?? 0);
     trails[trailId] = {
-      walkers: walkers >= MIN_COMMUNITY_COUNT ? walkers : null,
-      completedCount: completed >= MIN_COMMUNITY_COUNT ? completed : null,
-      medianPct: walkers >= MIN_COMMUNITY_COUNT && r?.median_fraction != null ? floorTo(r.median_fraction * 100, 1) : null,
+      walkers,
+      completedCount: communityCount(r?.completed ?? 0),
+      medianPct: walkers !== null && r?.median_fraction != null ? floorTo(r.median_fraction * 100, 1) : null,
     };
   }
-  return json({ datasetVersion: META.version, completionThreshold: COMPLETION_THRESHOLD, minCount: MIN_COMMUNITY_COUNT, trails }, 200, {
-    "cache-control": "public, max-age=300",
-  });
+  return json(
+    { datasetVersion: META.version, completionThreshold: COMPLETION_THRESHOLD, minCount: MIN_COMMUNITY_COUNT, trails },
+    200,
+    { "cache-control": "public, max-age=300" },
+  );
 }
 
 /** Reports only flag the name for admin review (auto-hide cut in TL decisions). */

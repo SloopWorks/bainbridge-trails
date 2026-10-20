@@ -1,5 +1,6 @@
 import { createExecutionContext, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { cachedJwks, clearJwksCache } from "../src/deps";
 import { handle } from "../src/index";
 import { devLogin, harness, idToken, rsaKey } from "./helpers";
 
@@ -25,14 +26,13 @@ describe("dev auth", () => {
   it("stores only the SHA-256 of the token, with 90-day expiry", async () => {
     const h = harness();
     const { token, userId } = await devLogin(h);
-    const row = await env.DB.prepare("SELECT token_hash, created_at, expires_at FROM sessions WHERE user_id = ?").bind(userId).first<{
+    const row = await env.DB.prepare("SELECT token_hash, expires_at FROM sessions WHERE user_id = ?").bind(userId).first<{
       token_hash: string;
-      created_at: number;
       expires_at: number;
     }>();
     expect(row!.token_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(row!.token_hash).not.toContain(token);
-    expect(row!.expires_at - row!.created_at).toBe(90 * 24 * 3600 * 1000);
+    expect(row!.expires_at - h.clock.t).toBe(90 * 24 * 3600 * 1000);
     h.clock.advanceHours(90 * 24 + 1);
     expect((await h.call("GET", "/v1/me", { token })).status).toBe(401);
   });
@@ -48,13 +48,23 @@ describe("dev auth", () => {
   it("is 404 unless ALLOW_DEV_AUTH=true", async () => {
     const h = harness();
     const res = await handle(
-      new Request("https://api.test/v1/auth/dev", { method: "POST", body: JSON.stringify({ deviceId: "x" }) }),
+      new Request("http://localhost:8787/v1/auth/dev", { method: "POST", body: JSON.stringify({ deviceId: "x" }) }),
       { ...env, ALLOW_DEV_AUTH: undefined } as Env,
       createExecutionContext(),
       h.deps,
     );
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: { code: "not_found", message: "no such endpoint" } });
+  });
+
+  it("is 404 on a non-local host even with ALLOW_DEV_AUTH=true", async () => {
+    const res = await handle(
+      new Request("https://bainbridge-trails-api.example.workers.dev/v1/auth/dev", { method: "POST", body: JSON.stringify({ deviceId: "x" }) }),
+      env,
+      createExecutionContext(),
+      harness().deps,
+    );
+    expect(res.status).toBe(404);
   });
 
   it("rejects bad deviceId", async () => {
@@ -127,5 +137,42 @@ describe("Google / Apple ID tokens (JWKS)", () => {
     expect((await h.call("POST", "/v1/auth/google", { body: { idToken: "not-a-jwt-at-all" } })).status).toBe(401);
     expect((await h.call("POST", "/v1/auth/google", { body: "{" })).status).toBe(400);
     expect((await h.call("POST", "/v1/auth/google", { body: {} })).status).toBe(400);
+  });
+});
+
+describe("JWKS cache (P2-12)", () => {
+  it("refetches an unknown kid at most every 5 minutes and serves stale keys when the provider fails", async () => {
+    clearJwksCache();
+    const url = "https://jwks.test/certs";
+    let calls = 0;
+    const ok = async () => {
+      calls++;
+      return { keys: [] };
+    };
+    const t0 = 1_000_000;
+    await cachedJwks(url, false, t0, ok);
+    await cachedJwks(url, true, t0 + 60_000, ok); // unknown kid 1 min later: no refetch
+    expect(calls).toBe(1);
+    await cachedJwks(url, true, t0 + 6 * 60_000, ok); // after 5 min: refetch
+    expect(calls).toBe(2);
+    const failing = async () => {
+      throw new Error("down");
+    };
+    await expect(cachedJwks(url, false, t0 + 2 * 3600_000, failing)).resolves.toEqual({ keys: [] });
+    clearJwksCache();
+    await expect(cachedJwks(url, false, t0, failing)).rejects.toThrow("down");
+  });
+});
+
+describe("auth rate limit keys (P1-5)", () => {
+  it("never store the raw IP", async () => {
+    const h = harness();
+    await h.call("POST", "/v1/auth/google", { body: { idToken: "garbage-token-xx" }, headers: { "cf-connecting-ip": "203.0.113.77" } });
+    const { results } = await env.DB.prepare("SELECT key FROM rate_limits WHERE key LIKE 'auth:%'").run<{ key: string }>();
+    expect(results.length).toBeGreaterThan(0);
+    for (const r of results) {
+      expect(r.key).not.toContain("203.0.113.77");
+      expect(r.key).toMatch(/^auth:[0-9a-f]{32}$/);
+    }
   });
 });
