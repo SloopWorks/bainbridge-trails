@@ -119,7 +119,7 @@ android {
 // drops the trail dataset (its coverage_segments already carries the trail competitors it needs, RD-2b); trailsRelease
 // drops the roads dataset. trailsDebug keeps both for the debug drawer's dataset switch. Patterns match file names.
 val trailDatasetAssets = listOf("trails.json", "coverage_segments.json", "dataset.bin", "trails.pmtiles")
-val roadDatasetAssets = listOf("roads.json", "roads_coverage_segments.json", "roads_dataset.bin", "roads.pmtiles")
+val roadDatasetAssets = listOf("roads.json", "roads_coverage_segments.json", "roads_dataset.bin", "roads.pmtiles", "roads_road_ends.json")
 
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->

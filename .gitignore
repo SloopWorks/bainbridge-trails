@@ -25,6 +25,7 @@ app/composeApp/src/commonMain/composeResources/files/ATTRIBUTION.md
 app/composeApp/src/commonMain/composeResources/files/roads.json
 app/composeApp/src/commonMain/composeResources/files/roads_coverage_segments.json
 app/composeApp/src/commonMain/composeResources/files/roads_dataset.bin
+app/composeApp/src/commonMain/composeResources/files/roads_road_ends.json
 
 # real GPS tracks: never committed
 data/tracks/private/
