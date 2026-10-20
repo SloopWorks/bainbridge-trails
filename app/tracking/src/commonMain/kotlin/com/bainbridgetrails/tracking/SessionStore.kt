@@ -19,6 +19,10 @@ data class RecordedSession(
     val finished: Boolean,
     /** A "precise" SourceState reported reduced accuracy (iOS approximate location). */
     val approximateLocation: Boolean = false,
+    /** Wall-clock time of the Start event (null if missing). */
+    val startMs: Long? = null,
+    /** Wall-clock time of the Stop event (null while unfinished). */
+    val stopMs: Long? = null,
 )
 
 /**
@@ -179,15 +183,20 @@ class SessionStore(dir: String) {
             val steps = mutableListOf<StepSample>()
             val lastAvailable = mutableMapOf<String, Boolean>()
             var finished = false
+            var startMs: Long? = null
+            var stopMs: Long? = null
             for (e in events) {
                 when (e) {
-                    is SessionEvent.Start -> Unit
+                    is SessionEvent.Start -> if (startMs == null) startMs = e.timeMs
                     is SessionEvent.FixEvent -> fixes += Fix(e.timeMs, e.lon, e.lat, e.accuracyM, e.isMock)
                     is SessionEvent.Act -> acts += e.sample
                     is SessionEvent.Steps -> steps += e.sample
                     is SessionEvent.SourceState -> lastAvailable[e.source] = e.available
                     is SessionEvent.Diag -> Unit
-                    is SessionEvent.Stop -> finished = true
+                    is SessionEvent.Stop -> {
+                        finished = true
+                        stopMs = e.timeMs
+                    }
                 }
             }
             return RecordedSession(
@@ -199,6 +208,8 @@ class SessionStore(dir: String) {
                 stepsAvailable = lastAvailable["steps"] == true,
                 finished = finished,
                 approximateLocation = lastAvailable["precise"] == false,
+                startMs = startMs,
+                stopMs = stopMs,
             )
         }
     }

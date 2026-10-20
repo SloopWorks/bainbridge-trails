@@ -1,7 +1,6 @@
 package com.bainbridgetrails.tracking
 
 import com.bainbridgetrails.coverage.CoverageParams
-import com.bainbridgetrails.coverage.CoverageState
 import com.bainbridgetrails.coverage.Dataset
 import com.bainbridgetrails.coverage.Fix
 import com.bainbridgetrails.coverage.LocalProjection
@@ -92,7 +91,7 @@ class RecordingControllerTest {
         val clock = FakeClock(t0)
         val store = SessionStore(dir)
         val recorder = FakeRecorder(store, clock)
-        val controller = RecordingController(store, Finalizer(ds, index, store, CoverageStore(dir)), { clock.now }, recorder, scope)
+        val controller = RecordingController(store, Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir)), { clock.now }, recorder, scope)
         recorder.controller = controller
         return Rig(controller, recorder, clock, store, dir)
     }
@@ -508,7 +507,9 @@ class RecordingControllerTest {
         assertIs<RecordingState.Idle>(r.controller.state.value)
         assertNull(r.controller.notice.value)
         assertEquals(setOf(id), CoverageStore(dir).finalizedIds())
-        assertEquals(listOf(id), WalkIndex(dir).all().map { it.sessionId }, "one history entry, updated in place")
+        val walk = WalkIndex(dir).all().single()
+        assertEquals(id, walk.sessionId, "one history entry, updated in place")
+        assertTrue(walk.summaryShown)
     }
 
     @Test
@@ -516,7 +517,7 @@ class RecordingControllerTest {
         val dir = tmpDir()
         // "early" was shown after a stop timeout; "later" was stopped from the notification and never shown.
         recordFinished(dir, "s1700000000000-early", t0, 0.0, 90.0)
-        CoverageStore(dir).merge("s1700000000000-early", CoverageState.EMPTY, verified = true, finalized = false, summaryShown = true)
+        WalkIndex(dir).upsert(WalkRecord("s1700000000000-early", t0, t0, 0.0, 0.0, verified = true, summaryShown = true))
         recordFinished(dir, "s1700000100000-later", t0 + 100_000, 90.0, 200.0)
         val r = rig(dir)
         r.controller.onLaunch()

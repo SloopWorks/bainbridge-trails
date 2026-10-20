@@ -23,6 +23,14 @@ data class SessionSummary(
     val newlyCompleted: List<String>,
     /** The walk was recorded with approximate (reduced-accuracy) location: trails may not match. */
     val approximateLocation: Boolean = false,
+    /** Start event wall clock (epoch ms). */
+    val startedAt: Long = 0,
+    /** Stop event wall clock (or last fix when merged before the Stop). */
+    val endedAt: Long = 0,
+    /** Gated, filtered GPS path length. */
+    val distanceM: Double = 0.0,
+    /** Distinct matched ticks of this walk on any mapped segment × tick length. */
+    val matchedM: Double = 0.0,
 )
 
 /**
@@ -46,17 +54,22 @@ class Finalizer(
     /** Ids already finalised after their Stop. Blocking file read: call off the main thread. */
     fun finalizedIds(): Set<String> = coverage.finalizedIds()
 
-    /** Early-merged sessions whose summary was already shown. Blocking file read: call off the main thread. */
-    fun shownIds(): Set<String> = coverage.shownIds()
+    /** Sessions whose results sheet was already shown (walk index). Blocking file read: call off the main thread. */
+    fun shownIds(): Set<String> = walks?.shownIds().orEmpty()
+
+    /** Records that [sessionId]'s results sheet was shown. Blocking file write: call off the main thread. */
+    fun markShown(sessionId: String) {
+        walks?.markShown(sessionId)
+    }
 
     suspend fun finalize(sessionId: String): SessionSummary = withContext(Dispatchers.Default) { mutex.withLock {
         onWork()
         val session = store.load(sessionId)
         val gate = Gating.gate(session, index.projection)
         val before = coverage.load()
-        val after = before.union(index.coverFixes(gate.fixes))
-        // A session without its Stop is merged early (stop timeout); its summary is shown now, so remember that.
-        coverage.merge(sessionId, after, gate.verified, finalized = session.finished, summaryShown = !session.finished)
+        val walked = index.coverFixes(gate.fixes)
+        val after = before.union(walked)
+        coverage.merge(sessionId, after, gate.verified, finalized = session.finished)
 
         val rose = mutableListOf<TrailResult>()
         val completed = mutableListOf<String>()
@@ -70,26 +83,41 @@ class Finalizer(
             }
         }
         val sorted = rose.sortedByDescending { it.after }
+        val startedAt = session.startMs ?: session.fixes.minOfOrNull { it.timeMs } ?: startOf(sessionId)
+        val endedAt = session.stopMs ?: session.fixes.maxOfOrNull { it.timeMs } ?: startedAt
+        val distanceM = WalkIndex.distanceM(gate.fixes.filterNot { it.isMock }.sortedBy { it.timeMs }, index.projection)
+        val matchedM = walked.totalCoveredM(index)
+        val islandBefore = progress.islandFraction(before)
+        val islandAfter = progress.islandFraction(after)
         walks?.upsert(
             WalkRecord(
                 sessionId = sessionId,
-                startMs = session.fixes.minOfOrNull { it.timeMs } ?: startOf(sessionId),
-                endMs = session.fixes.maxOfOrNull { it.timeMs } ?: startOf(sessionId),
-                distanceM = WalkIndex.distanceM(gate.fixes.filterNot { it.isMock }.sortedBy { it.timeMs }, index.projection),
-                trailIds = sorted.map { it.trailId },
+                startedAt = startedAt,
+                endedAt = endedAt,
+                distanceM = distanceM,
+                matchedM = matchedM,
                 verified = gate.verified,
+                approximateLocation = session.approximateLocation,
+                islandBefore = islandBefore,
+                islandAfter = islandAfter,
+                trails = sorted.map { WalkTrail(it.trailId, it.before, it.after) },
+                newlyCompleted = completed,
             ),
         )
         SessionSummary(
             sessionId = sessionId,
-            islandBefore = progress.islandFraction(before),
-            islandAfter = progress.islandFraction(after),
+            islandBefore = islandBefore,
+            islandAfter = islandAfter,
             trails = sorted,
             verified = gate.verified,
             droppedVehicle = gate.droppedVehicle,
             droppedSteps = gate.droppedSteps,
             newlyCompleted = completed,
             approximateLocation = session.approximateLocation,
+            startedAt = startedAt,
+            endedAt = endedAt,
+            distanceM = distanceM,
+            matchedM = matchedM,
         )
     } }
 }

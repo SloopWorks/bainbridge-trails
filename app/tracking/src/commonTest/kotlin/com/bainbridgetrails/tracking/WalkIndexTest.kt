@@ -63,10 +63,13 @@ class WalkIndexTest {
 
         val w = walks.all().single()
         assertEquals("s1", w.sessionId)
-        assertEquals(t0, w.startMs)
-        assertEquals(t0 + 50 * 2_000L, w.endMs) // 51 fixes, 2 s apart
+        assertEquals(t0, w.startedAt)
+        assertEquals(t0 + 51 * 2_000L, w.endedAt) // Stop written 2 s after the 51st fix
         assertEquals(150.0, w.distanceM, 1.0)
-        assertEquals(listOf("A"), w.trailIds)
+        assertTrue(w.matchedM in 130.0..160.0, "matched ${w.matchedM}")
+        assertEquals(listOf("A"), w.trails.map { it.trailId })
+        assertTrue(w.islandAfter > w.islandBefore)
+        assertFalse(w.summaryShown)
         val text = SystemFileSystem.source(Path(dir, "walks.json")).buffered().use { it.readString() }
         assertFalse("lat" in text || "lon" in text, "no coordinates in the walk index: $text")
     }
@@ -80,7 +83,30 @@ class WalkIndexTest {
         f(record(dir, "s2", t0 + 1_000_000, 1000.0, 90.0)).finalize("s2")
         f(SessionStore(dir)).finalize("s1")
         assertEquals(listOf("s2", "s1"), walks.all().map { it.sessionId })
-        assertEquals(listOf("B"), walks.all().first().trailIds)
+        assertEquals(listOf("B"), walks.all().first().trails.map { it.trailId })
+    }
+
+    @Test
+    fun summaryShownSurvivesRefinalize() = runTest {
+        val dir = tmpDir()
+        val walks = WalkIndex(dir)
+        val store = record(dir, "s1", t0, 0.0, 60.0)
+        val f = Finalizer(ds, index, store, CoverageStore(dir), walks = walks)
+        f.finalize("s1")
+        f.markShown("s1")
+        f.finalize("s1")
+        assertEquals(setOf("s1"), f.shownIds())
+    }
+
+    @Test
+    fun summaryCarriesTimesAndDistances() = runTest {
+        val dir = tmpDir()
+        val store = record(dir, "s1", t0, 0.0, 150.0)
+        val s = Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir)).finalize("s1")
+        assertEquals(t0, s.startedAt)
+        assertEquals(t0 + 51 * 2_000L, s.endedAt)
+        assertEquals(150.0, s.distanceM, 1.0)
+        assertEquals(WalkIndex(dir).totalMatchedM(), s.matchedM, 1e-9)
     }
 
     @Test

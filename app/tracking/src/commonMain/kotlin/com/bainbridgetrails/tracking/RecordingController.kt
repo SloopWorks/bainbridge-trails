@@ -121,7 +121,7 @@ class RecordingController(
             for (id in pending) {
                 try {
                     val summary = finalizer.finalize(id)
-                    // Merged early after a stop timeout and its summary already shown: complete it silently.
+                    // Its results sheet was already shown (merged early after a stop timeout): complete it silently.
                     if (id in shown) continue
                     last = summary
                     saved++
@@ -133,7 +133,7 @@ class RecordingController(
             recoverAfterDismiss = unfinished != null
             if (last != null) {
                 if (saved > 1) _notice.value = "$saved walks saved"
-                _state.value = RecordingState.Done(last)
+                showDone(last)
                 return
             }
             recoverAfterDismiss = false
@@ -266,13 +266,24 @@ class RecordingController(
     }
 
     private suspend fun finalizeTo(sessionId: String) {
-        _state.value = try {
-            RecordingState.Done(finalizer.finalize(sessionId))
+        val summary = try {
+            finalizer.finalize(sessionId)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             _notice.value = "Could not finish the walk: ${e.message}"
-            RecordingState.Idle
+            _state.value = RecordingState.Idle
+            return
         }
+        showDone(summary)
+    }
+
+    /**
+     * Shows the results sheet and persists "summary shown" for the walk, so a later re-merge of the same session
+     * (stop-timeout path: merged before its Stop, merged again on the next launch) never shows it a second time.
+     */
+    private suspend fun showDone(summary: SessionSummary) {
+        _state.value = RecordingState.Done(summary)
+        withContext(io) { runCatching { finalizer.markShown(summary.sessionId) } }
     }
 
     /**

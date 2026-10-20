@@ -11,19 +11,35 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.math.hypot
 
-/** One finished walk for the history list. Deliberately holds no coordinates (raw tracks stay in session files). */
+@Serializable
+data class WalkTrail(val trailId: String, val before: Double, val after: Double)
+
+/**
+ * One finalised walk for the history list (docs/mvp/product.md §6). Deliberately holds no coordinates
+ * (raw tracks stay in session files) and is never synced (times are private).
+ */
 @Serializable
 data class WalkRecord(
     val sessionId: String,
-    val startMs: Long,
-    val endMs: Long,
-    /** Gated walking distance; GPS gaps over [Gating.MAX_GAP_MS] add nothing. */
+    /** Start event wall clock (epoch ms). */
+    val startedAt: Long,
+    /** Stop event wall clock; the last fix (or start) when the walk was merged before its Stop. */
+    val endedAt: Long,
+    /** Gated, filtered GPS path length; GPS gaps over [Gating.MAX_GAP_MS] add nothing. */
     val distanceM: Double,
-    /** Trails whose coverage rose on this walk, highest resulting fraction first. */
-    val trailIds: List<String>,
+    /** This walk's own matched length: distinct ticks on any mapped segment × tick length (feeds trail miles). */
+    val matchedM: Double,
     val verified: Boolean,
+    val approximateLocation: Boolean = false,
+    val islandBefore: Double = 0.0,
+    val islandAfter: Double = 0.0,
+    /** Trails whose coverage rose on this walk, highest resulting fraction first. */
+    val trails: List<WalkTrail> = emptyList(),
+    val newlyCompleted: List<String> = emptyList(),
+    /** The results sheet for this walk was shown; it is never shown again (F0-3 / F6-5). */
+    val summaryShown: Boolean = false,
 ) {
-    val durationMs: Long get() = (endMs - startMs).coerceAtLeast(0)
+    val durationMs: Long get() = (endedAt - startedAt).coerceAtLeast(0)
 }
 
 @Serializable
@@ -49,8 +65,28 @@ class WalkIndex(dir: String) {
         }.getOrElse { emptyList() }
     }
 
+    /** Ids of walks whose results sheet was already shown. */
+    fun shownIds(): Set<String> = all().filter { it.summaryShown }.mapTo(HashSet()) { it.sessionId }
+
+    /** Replaces [record]'s entry; a previously shown walk stays shown. */
     fun upsert(record: WalkRecord) {
-        val next = (all().filterNot { it.sessionId == record.sessionId } + record).sortedByDescending { it.startMs }
+        val cur = all()
+        val wasShown = cur.any { it.sessionId == record.sessionId && it.summaryShown }
+        val merged = if (wasShown) record.copy(summaryShown = true) else record
+        write((cur.filterNot { it.sessionId == record.sessionId } + merged).sortedByDescending { it.startedAt })
+    }
+
+    /** Marks [sessionId]'s results sheet as shown (no-op if the walk is not indexed). */
+    fun markShown(sessionId: String) {
+        val cur = all()
+        if (cur.none { it.sessionId == sessionId && !it.summaryShown }) return
+        write(cur.map { if (it.sessionId == sessionId) it.copy(summaryShown = true) else it })
+    }
+
+    /** Σ [WalkRecord.matchedM] over all walks: "trail miles walked" (repeats count). */
+    fun totalMatchedM(): Double = all().sumOf { it.matchedM }
+
+    private fun write(next: List<WalkRecord>) {
         SystemFileSystem.sink(tmp).buffered().use {
             it.writeString(json.encodeToString(WalksFile.serializer(), WalksFile(walks = next)))
             it.flush()
