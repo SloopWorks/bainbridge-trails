@@ -87,6 +87,35 @@ Gradle properties (`-P…` or `gradle.properties`):
 | `geofencePrototype=true` | off | Debug builds only: merges `androidApp/src/geofencePrototype/AndroidManifest.xml` (ACCESS_BACKGROUND_LOCATION, RECEIVE_BOOT_COMPLETED, geofence + boot receivers) and sets `BuildConfig.GEOFENCE_PROTOTYPE`. Off by default because a debug APK declaring background location was blocked by Play Protect (`INSTALL_FAILED_VERIFICATION_FAILURE`) on the owner's phone. Without it the Record > Settings geofence opt-in is hidden. Release never has it. |
 | `googleWebClientId=<id>` | empty | Google OAuth **web** client id for Credential Manager (`BuildConfig.GOOGLE_WEB_CLIENT_ID`); the backend's `GOOGLE_CLIENT_IDS` must include it. Empty = the Google button says "not configured" (debug still offers dev sign-in). |
 | `shipyardDeployPluginRepository=<maven repo>` | unset | Applies the Shipyard Deploy plugin (see above). |
+| `btVersionCode=<int>` / `btVersionName=<str>` | `1` / `1.0` | `versionCode` / `versionName` of both variants (set by CI/release tooling). |
+| `BT_RELEASE_STORE_FILE`, `BT_RELEASE_STORE_PASSWORD`, `BT_RELEASE_KEY_ALIAS`, `BT_RELEASE_KEY_PASSWORD` | unset | Release signing; each read from `-P…` first, then the environment variable of the same name. All four set → `androidApp-release.apk` signed with that key; any missing → `androidApp-release-unsigned.apk`. Never commit a keystore or put passwords in `gradle.properties` in the repo (use `~/.gradle/gradle.properties` or CI secrets). |
+| `releaseSignWithDebugKey=true` | off | Signs release with the local debug key so an R8 build can be installed for testing. Local only; never distribute such an APK. |
+
+## Release builds (R8)
+
+Release runs R8 (`isMinifyEnabled` + `isShrinkResources`) with `androidApp/proguard-rules.pro` (kotlinx-serialization
+plumbing, type-safe nav routes, MapLibre JNI, Ktor/OkHttp, coroutines, Credential Manager / googleid, Compose
+resources). The mapping file is `androidApp/build/outputs/mapping/release/mapping.txt` — keep it with every shipped
+build. After touching keep rules, dependencies, or anything `@Serializable`, smoke-test a minified build on the
+emulator (the release package `com.bainbridgetrails.app` installs alongside the `.dev` debug app):
+
+```sh
+./gradlew :androidApp:assembleRelease -PreleaseSignWithDebugKey=true
+adb -s emulator-5554 install -r androidApp/build/outputs/apk/release/androidApp-release.apk
+adb -s emulator-5554 logcat -b crash -c
+adb -s emulator-5554 shell am start -W -n com.bainbridgetrails.app/.MainActivity   # not `monkey -p`: it can surface .dev
+# walk Map (trails render), Trails, a trail detail, Me, Settings (change units, relaunch: persisted), Record idle
+adb -s emulator-5554 logcat -b crash -d   # must be empty
+```
+
+## CI
+
+`.github/workflows/ci.yml` runs on pushes to `main` and on PRs: `android` (unit tests + `assembleDebug` with
+`-PdebugDrawer=off`), `backend` (`npm ci`, `npm test`, `tsc --noEmit`), `ios` (simulator framework link +
+unsigned `xcodebuild` simulator build). CI has no map data: `data/dist/` and the synced Compose resources are
+gitignored and the pipeline (uv + tippecanoe) is too heavy to run there, so the app builds without them and the
+real-dataset tests in `:coverage` (`assumeDataFiles`) report as skipped. Reproduce that locally with a data-free
+worktree: `git worktree add --detach /tmp/bt-ci HEAD && cd /tmp/bt-ci/app && ./gradlew --no-build-cache -PdebugDrawer=off …`.
 
 Check the merged permissions of an APK:
 `$ANDROID_HOME/build-tools/<ver>/aapt2 dump permissions androidApp/build/outputs/apk/debug/androidApp-debug.apk`.
