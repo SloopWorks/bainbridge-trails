@@ -85,7 +85,9 @@ class Finalizer(
                 if (status == TrailStatus.COMPLETE && progress.status(b) != TrailStatus.COMPLETE && t.id !in sticky) completed += t.id
             }
         }
-        coverage.merge(sessionId, after, gate.verified, finalized = session.finished, completed = nowComplete)
+        CoverageStore.writeLock.withLock {
+            coverage.merge(sessionId, after, gate.verified, finalized = session.finished, completed = nowComplete)
+        }
         val sorted = rose.sortedByDescending { it.after }
         val startedAt = session.startMs ?: session.fixes.minOfOrNull { it.timeMs } ?: startOf(sessionId)
         val endedAt = session.stopMs ?: session.fixes.maxOfOrNull { it.timeMs } ?: startedAt
