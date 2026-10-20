@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.bainbridgetrails.App
 import com.bainbridgetrails.map.SpikeLaunch
+import com.sloopworks.debugdrawer.DebugDrawerHost
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,6 +20,7 @@ class MainActivity : ComponentActivity() {
         val options = extras?.keySet()?.associateWith { extras.getString(it).orEmpty() }.orEmpty()
         // No options = normal launch (tab shell). Any option = spike launch (scripts): screen/style/camera.
         val launch = if (options.isEmpty()) null else SpikeLaunch.parse(options)
-        setContent { App(launch) }
+        DebugTools.install(this) // debug: drawer + log/analytics/backend wiring; release: nothing
+        setContent { DebugDrawerHost { App(launch) } }
     }
 }

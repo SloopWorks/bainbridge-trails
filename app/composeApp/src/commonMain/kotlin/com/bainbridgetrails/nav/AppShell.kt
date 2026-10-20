@@ -96,12 +96,10 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
     LaunchedEffect(destination) {
         destination?.route?.let { AppGraph.analytics.track(AnalyticsEvents.SCREEN_VIEW, mapOf("route" to it.substringAfterLast('.').substringBefore('/').substringBefore('?'))) }
     }
-    // F6: a walk that completes trails opens the celebration once per session (results stay underneath on Record).
-    LaunchedEffect(controller) {
-        controller?.state?.collect { s ->
-            if (s is RecordingState.Done && s.summary.newlyCompleted.isNotEmpty() && AppGraph.celebrated.add(s.summary.sessionId)) {
-                nav.navigate(CelebrationRoute(s.summary.sessionId, s.summary.newlyCompleted))
-            }
+    // F6: a walk that completes trails (or a debug tool) opens the celebration once per key.
+    LaunchedEffect(Unit) {
+        AppGraph.celebrations.collect { c ->
+            if (AppGraph.celebrated.add(c.key)) nav.navigate(CelebrationRoute(c.key, c.trailIds))
         }
     }
 

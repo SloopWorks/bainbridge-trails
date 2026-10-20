@@ -22,6 +22,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -52,8 +55,19 @@ object AppGraph {
 
     private var installed: Installed? = null
 
-    /** Sessions whose celebration was already opened in this process (rotation/recomposition must not repeat it). */
+    /** A request to show the celebration for [trailIds]; [key] dedupes (session id, or a debug-tool key). */
+    data class Celebration(val key: String, val trailIds: List<String>)
+
+    private val _celebrations = MutableSharedFlow<Celebration>(replay = 1, extraBufferCapacity = 4)
+    /** Celebrations to show (finished walks, debug tools). Replay 1 so one emitted before the shell exists still shows. */
+    val celebrations: SharedFlow<Celebration> = _celebrations.asSharedFlow()
+
+    /** Keys whose celebration was already opened in this process (rotation/recomposition must not repeat it). */
     val celebrated: MutableSet<String> = mutableSetOf()
+
+    fun requestCelebration(c: Celebration) {
+        if (c.trailIds.isNotEmpty()) _celebrations.tryEmit(c)
+    }
 
     class Installed internal constructor(val context: PlatformContext) {
         val trackingDir: String by lazy { trackingDir(context) }
@@ -90,6 +104,7 @@ object AppGraph {
                         analytics.track(AnalyticsEvents.WALK_FINISHED, mapOf("verified" to s.summary.verified.toString(), "trails" to s.summary.trails.size.toString()))
                         s.summary.newlyCompleted.forEach { analytics.track(AnalyticsEvents.TRAIL_COMPLETED, mapOf("trail" to it)) }
                         graph.coverageChanged()
+                        requestCelebration(Celebration(s.summary.sessionId, s.summary.newlyCompleted))
                     }
                     else -> Unit
                 }

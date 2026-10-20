@@ -31,6 +31,9 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+    buildFeatures {
+        buildConfig = true // VERSION_NAME / BUILD_TYPE for the debug drawer's build info
+    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -50,7 +53,22 @@ android {
     }
 }
 
+// Debug drawer: real drawer (debug) / its noop twin (release), compiled from a checkout's sources when
+// settings.gradle.kts found one; otherwise the in-repo no-op :debugdrawer-shim for both. Never a published
+// artifact (those are minSdk 33).
+val debugDrawerShim = rootProject.findProject(":debugdrawer-shim")
+
 dependencies {
-    implementation(projects.composeApp)
+    implementation(project(":composeApp"))
+    implementation(project(":tracking")) // debug tools read/write the coverage store
     implementation(libs.androidx.activity.compose)
+    implementation(compose.material3)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.kotlinx.coroutines.core)
+    if (debugDrawerShim != null) {
+        implementation(debugDrawerShim)
+    } else {
+        debugImplementation(project(":debugdrawer"))
+        releaseImplementation(project(":debugdrawer-noop"))
+    }
 }
