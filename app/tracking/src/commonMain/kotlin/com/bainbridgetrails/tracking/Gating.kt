@@ -1,5 +1,6 @@
 package com.bainbridgetrails.tracking
 
+import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.Fix
 import com.bainbridgetrails.coverage.LocalProjection
 import kotlin.math.hypot
@@ -22,10 +23,14 @@ data class GateResult(val fixes: List<Fix>, val droppedVehicle: Int, val dropped
  *     sensor still registered, GPS at 1 Hz throughout), whereas a bike
  *     or car ride lasts minutes. Rides shorter than the span are still caught by the activity gate (1.) and by
  *     the speed filter in coverage.
+ *     Moved distance is the path length over the span's fixes, except that a step between consecutive fixes adds
+ *     0 when the activity gate removed any fix between them, or when they are more than [MAX_GAP_MS] apart (the
+ *     coverage piece-break gap): a dropped ride or a GPS gap is not walking that steps must explain.
  *     Cumulative steps at the span edges are interpolated between the nearest samples; after the last sample
  *     the count is held (no new steps: Android reports only on change, and the recorder writes a heartbeat
  *     sample every [STEP_HEARTBEAT_MS]). Skipped when step data is unavailable, when no sample exists at or
- *     before the span start, or when the counter reset (decreased) inside the span.
+ *     before the span start, or when the counter reset (decreased) inside the span. Because spans overlap, a
+ *     reset also suspends the step check for the neighbouring windows whose span reaches it (up to ±1 window).
  * A session is verified only when both sources were available; missing sources never drop fixes.
  */
 object Gating {
@@ -38,6 +43,9 @@ object Gating {
     /** Distance an evidence span must exceed before missing steps can drop its window. */
     private const val SPAN_MIN_MOVE_M = 3 * STEP_MIN_MOVE_M
 
+    /** Fix gap beyond which no distance is counted between two fixes; matches the coverage piece break. */
+    val MAX_GAP_MS: Long = (CoverageParams().maxGapS * 1000).toLong()
+
     fun gate(session: RecordedSession, proj: LocalProjection = LocalProjection()): GateResult {
         val sorted = session.fixes.sortedBy { it.timeMs }
         val acts = session.activities.sortedBy { it.timeMs }
@@ -45,11 +53,20 @@ object Gating {
         // 1. activity
         var droppedVehicle = 0
         val afterActivity = ArrayList<Fix>(sorted.size)
+        // breakBefore[i]: the activity gate dropped a fix between kept fix i-1 and kept fix i
+        val breakBefore = ArrayList<Boolean>(sorted.size)
+        var droppedSinceKept = false
         for (f in sorted) {
             val a = acts.lastOrNull { it.timeMs <= f.timeMs }
             val governs = a != null && f.timeMs - a.timeMs <= ACTIVITY_GOVERNS_MS
-            if (governs && (a.kind == ActivityKind.VEHICLE || a.kind == ActivityKind.BICYCLE) && a.confidence >= Confidence.MEDIUM) droppedVehicle++
-            else afterActivity += f
+            if (governs && (a.kind == ActivityKind.VEHICLE || a.kind == ActivityKind.BICYCLE) && a.confidence >= Confidence.MEDIUM) {
+                droppedVehicle++
+                droppedSinceKept = true
+            } else {
+                afterActivity += f
+                breakBefore += droppedSinceKept
+                droppedSinceKept = false
+            }
         }
 
         // 2. steps
@@ -59,12 +76,13 @@ object Gating {
             val start = afterActivity.first().timeMs
             val end = afterActivity.last().timeMs
             val times = LongArray(afterActivity.size) { afterActivity[it].timeMs }
-            // path length from the first fix to fix i
+            // path length from the first fix to fix i; no distance across activity-dropped fixes or GPS gaps
             val path = DoubleArray(afterActivity.size)
             for (i in 1 until afterActivity.size) {
+                val counts = !breakBefore[i] && times[i] - times[i - 1] <= MAX_GAP_MS
                 val a = proj.toXy(afterActivity[i - 1].lon, afterActivity[i - 1].lat)
                 val b = proj.toXy(afterActivity[i].lon, afterActivity[i].lat)
-                path[i] = path[i - 1] + hypot(b.x - a.x, b.y - a.y)
+                path[i] = path[i - 1] + if (counts) hypot(b.x - a.x, b.y - a.y) else 0.0
             }
             val kept = ArrayList<Fix>(afterActivity.size)
             val windows: List<List<Fix>> = afterActivity.groupBy { (it.timeMs - start) / STEP_WINDOW_MS }.entries.sortedBy { it.key }.map { it.value }

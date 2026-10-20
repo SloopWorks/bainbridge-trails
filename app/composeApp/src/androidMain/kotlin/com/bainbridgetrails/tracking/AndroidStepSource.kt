@@ -67,7 +67,9 @@ class AndroidStepSource(context: Context) : StepSource {
                 g.refused(ticket)
                 return false
             }
-            return withTimeoutOrNull(timeoutMs) { done.await() } != null
+            val completed = withTimeoutOrNull(timeoutMs) { done.await() } != null
+            if (!completed) g.timedOut(ticket)
+            return completed
         } finally {
             g.abandon(ticket)
         }

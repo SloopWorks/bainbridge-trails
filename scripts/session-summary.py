@@ -13,7 +13,8 @@ and dropped counts. Dropped counts follow Gating.kt:
     span edges are interpolated between the nearest samples and held after the last sample;
     the window is skipped when no sample is at or before the span start, or the counter
     decreased (reset) inside the span. Its fixes are dropped when the span moved > 180 m
-    (3 x 60 m) and span steps * 2.5 m cannot cover it.
+    (3 x 60 m) and span steps * 2.5 m cannot cover it. Moved distance adds nothing between two
+    kept fixes > 60 s apart (coverage maxGapS) or with an activity-dropped fix between them.
 Remaining differences from Gating.kt (labelled in the output):
   - mock fixes are counted separately and excluded before gating (Gating.kt gates them too;
     coverage drops them later), so vehicle/steps counts can differ when mock fixes exist;
@@ -25,7 +26,7 @@ import sys
 from collections import Counter
 
 ACT_GOVERNS_MS, WINDOW_MS, MIN_MOVE_M, STRIDE_M = 600_000, 60_000, 60.0, 2.5
-PAD_MS, SPAN_MIN_MOVE_M = 60_000, 3 * MIN_MOVE_M
+PAD_MS, SPAN_MIN_MOVE_M, MAX_GAP_MS = 60_000, 3 * MIN_MOVE_M, 60_000
 CONF = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
 
 
@@ -112,6 +113,8 @@ def main(path):
     mock = sum(1 for f in fixes if f["isMock"])
     veh = 0
     live = []
+    brk = []  # brk[i]: an activity-dropped fix lies between live[i-1] and live[i]
+    dropped_since = False
     for f in fixes:
         if f["isMock"]:
             continue
@@ -123,15 +126,19 @@ def main(path):
                 break
         if a and f["timeMs"] - a["timeMs"] <= ACT_GOVERNS_MS and a["kind"] in ("VEHICLE", "BICYCLE") and CONF[a["confidence"]] >= 1:
             veh += 1
+            dropped_since = True
         else:
             live.append(f)
+            brk.append(dropped_since)
+            dropped_since = False
     stp = 0
     if steps_available and steps and live:
         t0 = live[0]["timeMs"]
         t_end = live[-1]["timeMs"]
-        path = [0.0]
+        cum = [0.0]  # path length to live[i], skipping activity drops and GPS gaps
         for i in range(1, len(live)):
-            path.append(path[-1] + dist(live[i - 1], live[i]))
+            counts = not brk[i] and live[i]["timeMs"] - live[i - 1]["timeMs"] <= MAX_GAP_MS
+            cum.append(cum[-1] + (dist(live[i - 1], live[i]) if counts else 0.0))
         wins = {}
         for f in live:
             wins.setdefault((f["timeMs"] - t0) // WINDOW_MS, []).append(f)
@@ -145,7 +152,7 @@ def main(path):
                    for a, b in zip(steps, steps[1:])):
                 continue  # counter reset: no usable step data
             idx = [i for i, f in enumerate(live) if ss <= f["timeMs"] <= se]
-            moved = path[idx[-1]] - path[idx[0]] if idx else 0.0
+            moved = cum[idx[-1]] - cum[idx[0]] if idx else 0.0
             n = cumulative_at(steps, se) - cumulative_at(steps, ss)
             if n >= 0 and moved > SPAN_MIN_MOVE_M and n * STRIDE_M < moved:
                 stp += len(w)

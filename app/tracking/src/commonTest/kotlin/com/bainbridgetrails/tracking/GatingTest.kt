@@ -218,4 +218,66 @@ class GatingTest {
         assertEquals(0, r.droppedSteps)
         assertEquals(fixes.size, r.fixes.size)
     }
+
+    /** 1 Hz fixes along a continuous eastward track; each leg is (startS, endS exclusive, m/s). */
+    private fun track(vararg legs: Triple<Int, Int, Double>): List<Fix> {
+        var x = 0.0
+        val out = ArrayList<Fix>()
+        for ((a, b, mps) in legs) for (s in a until b) {
+            val (lon, lat) = proj.toLonLat(com.bainbridgetrails.coverage.Xy(x, 0.0))
+            out += Fix(t0 + s * 1000L, lon, lat)
+            x += mps
+        }
+        return out
+    }
+
+    /** Step samples every 10 s from 0 to [endS]; [perS](second) steps counted during each second. */
+    private fun stepsPerSecond(endS: Int, perS: (Int) -> Double): List<StepSample> {
+        var total = 0.0
+        var s = 0
+        return (0..endS step 10).map { at ->
+            while (s < at) total += perS(s++)
+            StepSample(t0 + at * 1000L, total.toLong())
+        }
+    }
+
+    @Test
+    fun walkVehicleWalkKeepsWalking() {
+        // 3 min walk, 5 km drive (5 min, VEHICLE HIGH, dropped by activity), 3 min walk.
+        val fixes = track(Triple(0, 180, 1.3), Triple(180, 480, 5000.0 / 300), Triple(480, 660, 1.3))
+        val acts = listOf(act(0, ActivityKind.ON_FOOT, Confidence.HIGH), act(180, ActivityKind.VEHICLE, Confidence.HIGH), act(480, ActivityKind.ON_FOOT, Confidence.HIGH))
+        val steps = stepsPerSecond(660) { s -> if (s in 180 until 480) 0.0 else 110 / 60.0 }
+        val r = Gating.gate(session(fixes, acts, steps))
+        assertEquals(300, r.droppedVehicle)
+        assertEquals(0, r.droppedSteps)
+    }
+
+    @Test
+    fun shortVehicleHopDoesNotPutItsJumpIntoNeighbourWalk() {
+        // 750 m in 50 s under VEHICLE HIGH: dropped by activity, so its distance must not count against the walk.
+        val fixes = track(Triple(0, 150, 1.3), Triple(150, 200, 15.0), Triple(200, 380, 1.3))
+        val acts = listOf(act(0, ActivityKind.ON_FOOT, Confidence.HIGH), act(150, ActivityKind.VEHICLE, Confidence.HIGH), act(200, ActivityKind.ON_FOOT, Confidence.HIGH))
+        val steps = stepsPerSecond(380) { s -> if (s in 150 until 200) 0.0 else 110 / 60.0 }
+        val r = Gating.gate(session(fixes, acts, steps))
+        assertEquals(50, r.droppedVehicle)
+        assertEquals(0, r.droppedSteps)
+    }
+
+    @Test
+    fun gpsGapJumpNotCounted() {
+        // No fixes for 90 s (> maxGapS) across a 600 m displacement (carried, no steps); walking either side.
+        val fixes = track(Triple(0, 150, 1.3), Triple(150, 240, 600.0 / 90), Triple(240, 420, 1.3)).filterNot { it.timeMs in t0 + 150_000 until t0 + 240_000 }
+        val steps = stepsPerSecond(420) { s -> if (s in 150 until 240) 0.0 else 110 / 60.0 }
+        val r = Gating.gate(session(fixes, steps = steps))
+        assertEquals(0, r.droppedSteps)
+    }
+
+    @Test
+    fun stallAtSessionEndKept() {
+        val fixes = walk(0, 239, 1.3, stepS = 1)
+        val steps = stepsPerMinute(240) { m -> if (m == 3) 0 else 110 }
+        val r = Gating.gate(session(fixes, steps = steps))
+        assertEquals(0, r.droppedSteps)
+        assertEquals(fixes.size, r.fixes.size)
+    }
 }

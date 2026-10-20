@@ -52,4 +52,32 @@ class FlushGateTest {
         gate.onCompleted()
         assertEquals(emptyList(), fired)
     }
+
+    @Test
+    fun twoConsecutiveTimeoutsResync() {
+        // Completions for both flushes were lost: without a resync every later completion would be misattributed.
+        gate.timedOut(gate.begin { fired += "lost1" })
+        gate.timedOut(gate.begin { fired += "lost2" })
+        gate.begin { fired += "fresh" }
+        gate.onCompleted()
+        assertEquals(listOf("fresh"), fired)
+    }
+
+    @Test
+    fun oneTimeoutThenLateCompletionStillConsumed() {
+        gate.timedOut(gate.begin { fired += "slow" })
+        gate.begin { fired += "next" }
+        gate.onCompleted() // slow's late completion
+        assertEquals(emptyList(), fired)
+        gate.onCompleted()
+        assertEquals(listOf("next"), fired)
+    }
+
+    @Test
+    fun moreThanFourOutstandingResync() {
+        repeat(5) { gate.abandon(gate.begin { fired += "abandoned" }) }
+        gate.begin { fired += "fresh" }
+        gate.onCompleted()
+        assertEquals(listOf("fresh"), fired)
+    }
 }
