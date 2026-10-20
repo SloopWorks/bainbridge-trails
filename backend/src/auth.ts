@@ -2,8 +2,7 @@ import { createLocalJWKSet, errors as joseErrors, jwtVerify } from "jose";
 import type { Deps } from "./deps";
 import { ApiError, badRequest, bearer } from "./http";
 import { anonName, isAnonName } from "./moderation/names";
-import { META } from "./segments";
-import { USER_COLS, USER_COLS_U, type UserRow, freshUser } from "./users";
+import { USER_COLS, USER_COLS_U, type UserRow, metricsFor } from "./users";
 import { base64UrlRandom, csv, sha256Hex } from "./util";
 
 export type { UserRow } from "./users";
@@ -71,21 +70,22 @@ export async function verifyIdToken(
 export async function signIn(env: Env, deps: Deps, provider: Provider, sub: string, clientAnonName?: unknown) {
   const now = deps.now();
   const inserted = await env.DB.prepare(
-    `INSERT INTO users (id, provider, sub, anon_name, metrics_version) VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO users (id, provider, sub, anon_name) VALUES (?, ?, ?, ?)
      ON CONFLICT (provider, sub) DO NOTHING`,
   )
-    .bind(crypto.randomUUID(), provider, sub, isAnonName(clientAnonName) ? clientAnonName : anonName(), META.version)
+    .bind(crypto.randomUUID(), provider, sub, isAnonName(clientAnonName) ? clientAnonName : anonName())
     .run();
-  const found = await env.DB.prepare(`SELECT ${USER_COLS} FROM users WHERE provider = ? AND sub = ?`).bind(provider, sub).first<UserRow>();
-  if (!found) throw new ApiError(500, "internal", "user upsert failed");
-  const user = await freshUser(env, found, now);
+  const user = await env.DB.prepare(`SELECT ${USER_COLS} FROM users WHERE provider = ? AND sub = ?`).bind(provider, sub).first<UserRow>();
+  if (!user) throw new ApiError(500, "internal", "user upsert failed");
+  // the sign-in response's `user` carries the trails metrics (unchanged contract; RD-7)
+  const metrics = await metricsFor(env, user.id, "trails", now);
   const token = base64UrlRandom(32);
   const expiresAt = now + SESSION_TTL_MS;
   await env.DB.batch([
     env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").bind(await sha256Hex(token), user.id, expiresAt),
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ? AND expires_at < ?").bind(user.id, now),
   ]);
-  return { token, expiresAt, user, isNewUser: inserted.meta.changes === 1 };
+  return { token, expiresAt, user, metrics, isNewUser: inserted.meta.changes === 1 };
 }
 
 /** Returns the session user, null when no Authorization header; throws 401 for a bad/expired token. */
@@ -98,7 +98,7 @@ export async function optionalUser(request: Request, env: Env, deps: Deps): Prom
     .bind(await sha256Hex(token), deps.now())
     .first<UserRow>();
   if (!row) throw new ApiError(401, "unauthorized", "invalid or expired session");
-  return freshUser(env, row, deps.now());
+  return row;
 }
 
 export async function requireUser(request: Request, env: Env, deps: Deps): Promise<UserRow> {

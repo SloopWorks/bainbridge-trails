@@ -3,14 +3,19 @@ import { handle } from "../src/index";
 import { describe, expect, it } from "vitest";
 import { communityCount } from "../src/routes/board";
 import { resetPublicRateLimit } from "../src/ratelimit";
+import { type Dataset, METAS } from "../src/segments";
 import { islandRank } from "../src/users";
 import { ADMIN, META, bitsOf, devLogin, harness, idToken, rsaKey, syncWalk, trailFull, upload } from "./helpers";
 type Entry = { rank: number; userId: string; displayName: string; islandPct: number; trailsCompleted: number; isYou: boolean };
 type Board = { entries: Entry[]; you: Entry | null; totalRanked: number };
 
-async function setMetrics(userId: string, islandM: number, trails: number, reachedAt: number) {
-  await env.DB.prepare("UPDATE users SET island_m = ?, island_rank = ?, trails_completed = ?, reached_at = ? WHERE id = ?")
-    .bind(islandM, islandRank(islandM), trails, reachedAt, userId)
+async function setMetrics(userId: string, islandM: number, trails: number, reachedAt: number, dataset: Dataset = "trails") {
+  await env.DB.prepare(
+    `INSERT INTO user_metrics (user_id, dataset, island_m, island_rank, trails_completed, reached_at, metrics_version)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+     ON CONFLICT (user_id, dataset) DO UPDATE SET island_m = ?3, island_rank = ?4, trails_completed = ?5, reached_at = ?6`,
+  )
+    .bind(userId, dataset, islandM, islandRank(METAS[dataset], islandM), trails, reachedAt, METAS[dataset].version)
     .run();
 }
 
@@ -140,7 +145,8 @@ describe("leaderboard", () => {
     const { token, userId } = await devLogin(h, "lb-reach");
     const seg = META.trails["trail-rotary-park-trails"]![0]!;
     const reached = async () =>
-      (await env.DB.prepare("SELECT reached_at FROM users WHERE id = ?").bind(userId).first<{ reached_at: number }>())!.reached_at;
+      (await env.DB.prepare("SELECT reached_at FROM user_metrics WHERE user_id = ? AND dataset = 'trails'").bind(userId).first<{ reached_at: number }>())!
+        .reached_at;
     await syncWalk(h, token, { [seg]: bitsOf([0]) });
     const r1 = await reached();
     expect(r1).toBe(h.clock.t);
@@ -269,6 +275,7 @@ describe("profile, moderation, deletion", () => {
       ["name_reports", "target_id"],
       ["user_completed", "user_id"],
       ["walks", "user_id"],
+      ["user_metrics", "user_id"],
       ["leaderboard_snapshot", "user_id"],
     ] as const) {
       const r = await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${col} = ?`).bind(u.userId).first<{ n: number }>();
@@ -344,7 +351,7 @@ describe("cron trigger", () => {
     const h = harness();
     const { token, userId } = await devLogin(h, "cron-user");
     await syncWalk(h, token, trailFull("trail-rotary-park-trails"));
-    await env.DB.prepare("UPDATE users SET metrics_version = 'old', island_m = 0 WHERE id = ?").bind(userId).run();
+    await env.DB.prepare("UPDATE user_metrics SET metrics_version = 'old', island_m = 0 WHERE user_id = ?").bind(userId).run();
     await env.DB.prepare("INSERT INTO rate_limits (key, window_start, count) VALUES ('auth:old', 1, 1)").run();
     const t = Date.UTC(2026, 9, 20, 9, 17);
     // P0-1: anything whose (<= 24 h) window has ended goes, so no row outlives the policy's "within 2 days".
@@ -361,10 +368,15 @@ describe("cron trigger", () => {
     expect(await one("SELECT COUNT(*) AS n FROM rate_limits WHERE key = 'name:live'")).toBe(1);
     expect(await one("SELECT COUNT(*) AS n FROM daily_salt WHERE day = '2000-01-01'")).toBe(0);
     expect(await one("SELECT COUNT(*) AS n FROM sessions WHERE token_hash = 'dead'")).toBe(0);
-    const u = await env.DB.prepare("SELECT metrics_version, island_m FROM users WHERE id = ?").bind(userId).first<{ metrics_version: string; island_m: number }>();
+    const u = await env.DB.prepare("SELECT metrics_version, island_m FROM user_metrics WHERE user_id = ? AND dataset = 'trails'")
+      .bind(userId)
+      .first<{ metrics_version: string; island_m: number }>();
     expect(u!.metrics_version).toBe(META.version);
     expect(u!.island_m).toBeGreaterThan(30);
-    const meta = await env.DB.prepare("SELECT generated_at, dataset_version FROM snapshot_meta WHERE id = 1").first<{ generated_at: number; dataset_version: string }>();
-    expect(meta).toEqual({ generated_at: t, dataset_version: META.version });
+    const metas = await env.DB.prepare("SELECT dataset, generated_at, dataset_version FROM snapshot_meta ORDER BY dataset").all();
+    expect(metas.results).toEqual([
+      { dataset: "roads", generated_at: t, dataset_version: METAS.roads.version },
+      { dataset: "trails", generated_at: t, dataset_version: META.version },
+    ]);
   });
 });

@@ -6,11 +6,11 @@ import { LIMITS, clientIp, hashedIp, publicRateLimit, purgeHousekeeping, rateLim
 import { adminMethod, adminRoute } from "./routes/admin";
 import { leaderboard, reportName, trailStats } from "./routes/board";
 import { getCoverage, putCoverage } from "./routes/coverage";
-import { deleteUser, meBody, putMe } from "./routes/me";
+import { deleteUser, getMe, meBody, putMe } from "./routes/me";
 import { deleteAccountPage, legalPage } from "./routes/pages";
-import { META } from "./segments";
+import { DATASETS, type Dataset, META, METAS, parseDataset } from "./segments";
 import { rebuildSnapshots } from "./snapshot";
-import { USER_COLS, type UserRow, recomputeMetrics } from "./users";
+import { METRICS_COLS, type MetricsRow, recomputeMetrics } from "./users";
 
 /** Allowed methods per path. Checked before auth so a wrong method is always 405 (P2-14). */
 const ROUTES: Record<string, string[]> = {
@@ -27,6 +27,7 @@ const ROUTES: Record<string, string[]> = {
   "/v1/coverage": ["GET", "PUT"],
   "/v1/leaderboard": ["GET"],
   "/v1/trails/stats": ["GET"],
+  "/v1/stats": ["GET"],
   "/v1/report-name": ["POST"],
 };
 
@@ -39,7 +40,7 @@ async function authRateLimit(request: Request, env: Env, deps: Deps): Promise<vo
 }
 
 function sessionBody(s: Awaited<ReturnType<typeof signIn>>) {
-  return { token: s.token, expiresAt: s.expiresAt, isNewUser: s.isNewUser, user: meBody(s.user) };
+  return { token: s.token, expiresAt: s.expiresAt, isNewUser: s.isNewUser, user: meBody(s.user, s.metrics) };
 }
 
 async function route(request: Request, env: Env, deps: Deps): Promise<Response> {
@@ -60,7 +61,12 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
     case "/support":
       return legalPage(path.slice(1) as "privacy" | "terms" | "support", method);
     case "/v1/health":
-      return json({ ok: true, datasetVersion: META.version, tickM: META.tickM });
+      return json({
+        ok: true,
+        datasetVersion: META.version,
+        tickM: META.tickM,
+        datasets: Object.fromEntries(DATASETS.map((d) => [d, { datasetVersion: METAS[d].version, tickM: METAS[d].tickM }])),
+      });
     case "/v1/auth/google":
     case "/v1/auth/apple": {
       const provider = path.endsWith("google") ? "google" : "apple";
@@ -92,21 +98,24 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
       return new Response(null, { status: 204 });
     case "/v1/me": {
       const user = await requireUser(request, env, deps);
-      if (method === "GET") return json(meBody(user));
+      if (method === "GET") return getMe(env, deps, user);
       if (method === "PUT") return putMe(request, env, deps, user);
       await deleteUser(env, deps, user);
       return new Response(null, { status: 204 });
     }
     case "/v1/coverage": {
       const user = await requireUser(request, env, deps);
-      return method === "GET" ? getCoverage(env, user) : putCoverage(request, env, deps, user);
+      return method === "GET" ? getCoverage(url, env, deps, user) : putCoverage(request, url, env, deps, user);
     }
     case "/v1/leaderboard":
       publicRateLimit(clientIp(request), deps.now());
       return leaderboard(url, env, deps, await optionalUser(request, env, deps));
     case "/v1/trails/stats":
       publicRateLimit(clientIp(request), deps.now());
-      return trailStats(env, deps);
+      return trailStats(env, deps, "trails");
+    case "/v1/stats":
+      publicRateLimit(clientIp(request), deps.now());
+      return trailStats(env, deps, parseDataset(url.searchParams.get("dataset") ?? undefined));
     case "/v1/report-name":
       return reportName(request, env, deps, await requireUser(request, env, deps));
     default:
@@ -125,18 +134,20 @@ export async function handle(request: Request, env: Env, _ctx: ExecutionContext,
 }
 
 /** Daily cron: housekeeping, metrics for a dataset update (P1-7), then the snapshots (TL-11). */
-export async function daily(env: Env, now: number): Promise<{ recomputed: number; ranked: number }> {
+export async function daily(env: Env, now: number): Promise<{ recomputed: number; ranked: Record<Dataset, number> }> {
   await purgeHousekeeping(env, now);
   let recomputed = 0;
-  for (let round = 0; round < 10; round++) {
-    const { results } = await env.DB.prepare(`SELECT ${USER_COLS} FROM users WHERE metrics_version IS NOT ? LIMIT 100`)
-      .bind(META.version)
-      .run<UserRow>();
-    if (results.length === 0) break;
-    for (const u of results) if (await recomputeMetrics(env, u, now)) recomputed++;
+  for (const dataset of DATASETS) {
+    for (let round = 0; round < 10; round++) {
+      const { results } = await env.DB.prepare(`SELECT ${METRICS_COLS} FROM user_metrics WHERE dataset = ? AND metrics_version IS NOT ? LIMIT 100`)
+        .bind(dataset, METAS[dataset].version)
+        .run<MetricsRow>();
+      if (results.length === 0) break;
+      for (const m of results) if (await recomputeMetrics(env, m, now)) recomputed++;
+    }
   }
-  const { ranked } = await rebuildSnapshots(env, now);
-  return { recomputed, ranked };
+  const built = await rebuildSnapshots(env, now);
+  return { recomputed, ranked: { trails: built.trails.ranked, roads: built.roads.ranked } };
 }
 
 export default {
