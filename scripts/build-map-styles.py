@@ -55,6 +55,26 @@ def road_bed_width(stops: dict[float, float]) -> list:
     return expr
 
 
+# Bed opacity per class (docs/roads/ux.md §2.3): at island zoom state routes and arterials read as the skeleton,
+# collectors as the secondary web, residential streets as faint fill. Same per-stop shape as road_bed_width.
+ROAD_BED_OPACITY = {
+    "collector": {10: 0.75, 12: 0.85, 13: 0.95, 15: 1.0, 18: 1.0},
+    "residential": {10: 0.55, 12: 0.7, 13: 0.85, 15: 1.0, 18: 1.0},
+}
+
+
+def road_bed_opacity(scale: float = 1.0) -> list:
+    expr: list = ["interpolate", ["linear"], ["zoom"]]
+    for z in (10, 12, 13, 15, 18):
+        expr += [z, [
+            "match", ["get", "category"],
+            "collector", round(ROAD_BED_OPACITY["collector"][z] * scale, 3),
+            "residential", round(ROAD_BED_OPACITY["residential"][z] * scale, 3),
+            round(scale, 3),
+        ]]
+    return expr
+
+
 # --- status encoding (shared by all styles; colors per style) --------------------------------------
 # Width stops (zoom -> px). Encoding never relies on color alone:
 #   complete     solid, thickest
@@ -236,21 +256,21 @@ def build(p: dict) -> dict:
         "line-color": ["match", ["get", "category"],
                        "state_route", rd["state_route"], "arterial", rd["arterial"],
                        "collector", rd["collector"], rd["residential"]],
-        "line-width": road_bed_width({10: 1.0, 13: 2.8, 15: 5.5, 18: 11.0}),
-        "line-opacity": rd.get("bed_opacity", 1.0),
+        "line-width": road_bed_width({10: 0.6, 12: 1.2, 13: 2.0, 15: 5.5, 18: 11.0}),
+        "line-opacity": road_bed_opacity(rd.get("bed_opacity", 1.0)),
     }, ["all", COUNTED, IS_ROAD], minzoom=10))
     L.append(line("roads-ds-private", "trails", "segments", {
         "line-color": rd["private"],
         "line-opacity": rd["muted_opacity"],
         "line-width": interp({10: 0.6, 14: 1.6, 18: 3.4}),
         "line-dasharray": [2.2, 1.8],
-    }, ["all", NOT_COUNTED, IS_ROAD, PRIVATE], minzoom=10))
+    }, ["all", NOT_COUNTED, IS_ROAD, PRIVATE], minzoom=12))
     L.append(line("roads-ds-holdout", "trails", "segments", {
         "line-color": rd["holdout"],
         "line-opacity": rd["muted_opacity"] * 0.75,
         "line-width": interp({10: 0.5, 14: 1.3, 18: 2.6}),
         "line-dasharray": [0.01, 2.4],
-    }, ["all", NOT_COUNTED, IS_ROAD, ["!", PRIVATE]], minzoom=10))
+    }, ["all", NOT_COUNTED, IS_ROAD, ["!", PRIVATE]], minzoom=13))
 
     # ---- trails -----------------------------------------------------------------------------------
     # decisions.md TL-1: status, not-counted, selected-halo and dim layers are NOT in the style. The app

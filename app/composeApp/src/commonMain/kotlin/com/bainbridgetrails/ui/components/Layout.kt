@@ -65,6 +65,12 @@ fun StatTile(
     modifier: Modifier = Modifier,
     icon: DrawableResource? = null,
     emphasis: Boolean = false,
+    /** Value in titleLarge (2 lines) instead of statLarge, for words rather than numbers (docs/roads/ux.md §3.2). */
+    compactValue: Boolean = false,
+    /** Drawn in the icon slot instead of [icon] (e.g. the speed-sign glyph). */
+    leading: (@Composable () -> Unit)? = null,
+    /** Screen-reader text; default "value label". */
+    a11y: String? = null,
 ) {
     val bg = if (emphasis) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
     val fg = if (emphasis) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
@@ -74,13 +80,17 @@ fun StatTile(
             .heightIn(min = 96.dp)
             .fillMaxHeight()
             .background(bg, MaterialTheme.shapes.medium)
-            .clearAndSetSemantics { contentDescription = "$value $label" }
+            .clearAndSetSemantics { contentDescription = a11y ?: "$value $label" }
             .padding(BtTheme.spacing.lg),
         verticalArrangement = Arrangement.spacedBy(BtTheme.spacing.xs, Alignment.Bottom),
     ) {
-        if (icon != null) BtIcon(icon, null, size = 20.dp, tint = sub)
+        if (leading != null) leading() else if (icon != null) BtIcon(icon, null, size = 20.dp, tint = sub)
         Spacer(Modifier.weight(1f, fill = true))
-        Text(value, style = BtTheme.type.statLarge, color = fg, maxLines = 1)
+        if (compactValue) {
+            Text(value, style = MaterialTheme.typography.titleLarge, color = fg, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        } else {
+            Text(value, style = BtTheme.type.statLarge, color = fg, maxLines = 1)
+        }
         Text(label, style = MaterialTheme.typography.bodySmall, color = sub, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }

@@ -58,6 +58,7 @@ import com.bainbridgetrails.auth.AuthState
 import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.data.AppSettings
 import com.bainbridgetrails.data.Units
+import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.me_edit_name
@@ -133,6 +134,8 @@ fun MeScreen(
     onMap: () -> Unit,
     onSeeAllInProgress: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Roads "By road type" row → the Roads list filtered to that group. */
+    onRoadType: (RoadGroup) -> Unit = {},
 ) {
     val snapshot by graph.progress.snapshot.collectAsStateWithLifecycle()
     val history by graph.walks.history.collectAsStateWithLifecycle()
@@ -143,6 +146,8 @@ fun MeScreen(
     val signedIn = auth is AuthState.SignedIn
     LaunchedEffect(signedIn) { if (signedIn) graph.leaderboard.refresh() }
     var info by remember { mutableStateOf<StatInfo?>(null) }
+    var milestonesOpen by remember { mutableStateOf(false) }
+    val goal = LocalGoal.current
 
     Column(modifier.fillMaxSize()) {
         BtTopBar(stringResource(Res.string.me_title)) {
@@ -160,6 +165,11 @@ fun MeScreen(
             val zone = remember { TimeZone.currentSystemDefault() }
             val now = remember(walks) { nowMs() }
             val m = Modifier.padding(horizontal = BtTheme.spacing.screenH)
+            val roadsNumbers = remember(s, data) { if (goal.isRoads && s != null) RoadsMeNumbers.of(data, s) else null }
+            val roadsLadder = remember(roadsNumbers, settings.units) {
+                roadsNumbers?.let { Milestones.ladder(it.coveredM, settings.units, it.completed, it.counted, it.completedByCategory, it.countedByCategory) }
+            }
+            if (milestonesOpen && roadsLadder != null) MilestonesSheet(roadsLadder, settings.units) { milestonesOpen = false }
 
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 val listState = rememberLazyListState()
@@ -176,6 +186,8 @@ fun MeScreen(
                         val g = geometry
                         if (s == null || g == null) {
                             SkeletonBlock(0.dp, 280.dp, m.fillMaxWidth(), shape = MaterialTheme.shapes.large)
+                        } else if (roadsNumbers != null) {
+                            RoadsHero(g, segStatus, roadsNumbers, settings.units, onMap, m)
                         } else {
                             IslandHero(g, segStatus, stats, onMap, m)
                         }
@@ -183,6 +195,12 @@ fun MeScreen(
                     item(key = "tiles") {
                         Spacer(Modifier.height(BtTheme.spacing.sm))
                         StatTiles(stats, settings.units, onInfo = { info = it }, modifier = m)
+                    }
+                    if (roadsNumbers != null) {
+                        // Roads retention (docs/roads/product.md §5.2, ux.md §5.3): next milestone, strip, by type.
+                        item(key = "next-milestone") { NextMilestoneLine(roadsNumbers, settings.units, m.padding(top = BtTheme.spacing.md)) }
+                        item(key = "milestones") { MilestoneStrip(Milestones.strip(roadsLadder!!), settings.units, onAll = { milestonesOpen = true }, Modifier.padding(top = BtTheme.spacing.sm)) }
+                        item(key = "by-type") { ByTypeRows(roadsNumbers, settings.units, onRoadType, m.padding(top = BtTheme.spacing.sm)) }
                     }
                     item(key = "board") {
                         Spacer(Modifier.height(BtTheme.spacing.sm))
@@ -206,7 +224,7 @@ fun MeScreen(
                         )
                     }
                     if (inProgress.isEmpty()) {
-                        item(key = "progress-empty") { EmptyState(stringResource(Res.string.me_in_progress_empty), compact = true) }
+                        item(key = "progress-empty") { EmptyState(stringResource(goal.s(Res.string.me_in_progress_empty)), compact = true) }
                     }
                     items(inProgress.take(5), key = { "p-" + it.trailId }) { t ->
                         TrailRow(t.name, trailLengthText(t.lengthMi, settings.units), t.fraction, t.status, onClick = { onTrail(t.trailId) })
@@ -328,10 +346,10 @@ private fun IslandHero(geometry: IslandGeometry, segStatus: Map<String, com.bain
 @Composable
 private fun StatTiles(stats: MeStats, units: Units, onInfo: (StatInfo) -> Unit, modifier: Modifier = Modifier) {
     val miles = Format.distance(stats.trailMetresWalked, units).substringBefore(' ')
-    val milesLabel = stringResource(if (units == Units.MILES) Res.string.me_stat_miles_phone else Res.string.me_stat_km_phone)
+    val milesLabel = stringResource(LocalGoal.current.s(if (units == Units.MILES) Res.string.me_stat_miles_phone else Res.string.me_stat_km_phone))
     val trailsValue = stringResource(Res.string.me_stat_trails_value, stats.trailsCompleted, stats.trailsTotal)
     val tiles = listOf(
-        Triple(trailsValue, stringResource(Res.string.me_stat_trails), StatInfo.TRAILS),
+        Triple(trailsValue, stringResource(LocalGoal.current.s(Res.string.me_stat_trails)), StatInfo.TRAILS),
         Triple(miles, milesLabel, StatInfo.MILES),
         Triple("${stats.walkCount}", stringResource(Res.string.me_stat_walks), StatInfo.WALKS),
     )
@@ -387,8 +405,8 @@ private fun StatInfoSheet(info: StatInfo, onDismiss: () -> Unit) {
     val completePct = (CoverageParams().completionThreshold * 100).roundToInt()
     val (title, body) = when (info) {
         StatInfo.ISLAND -> stringResource(Res.string.me_stat_island) to stringResource(Res.string.stat_island_info)
-        StatInfo.TRAILS -> stringResource(Res.string.me_stat_trails) to stringResource(Res.string.stat_trails_info, completePct)
-        StatInfo.MILES -> stringResource(Res.string.me_stat_miles_phone) to stringResource(Res.string.stat_miles_info)
+        StatInfo.TRAILS -> stringResource(LocalGoal.current.s(Res.string.me_stat_trails)) to stringResource(LocalGoal.current.s(Res.string.stat_trails_info), completePct)
+        StatInfo.MILES -> stringResource(LocalGoal.current.s(Res.string.me_stat_miles_phone)) to stringResource(LocalGoal.current.s(Res.string.stat_miles_info))
         StatInfo.WALKS -> stringResource(Res.string.me_stat_walks) to stringResource(Res.string.stat_walks_info)
     }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {

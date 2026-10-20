@@ -1,11 +1,13 @@
 package com.bainbridgetrails.map
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.coverage.TrailStatus
 import org.maplibre.compose.expressions.ast.Expression
+import org.maplibre.compose.expressions.dsl.all
 import org.maplibre.compose.expressions.dsl.asBoolean
 import org.maplibre.compose.expressions.dsl.asString
 import org.maplibre.compose.expressions.dsl.case
@@ -17,7 +19,6 @@ import org.maplibre.compose.expressions.dsl.interpolate
 import org.maplibre.compose.expressions.dsl.linear
 import org.maplibre.compose.expressions.dsl.neq
 import org.maplibre.compose.expressions.dsl.not
-import org.maplibre.compose.expressions.dsl.all
 import org.maplibre.compose.expressions.dsl.switch
 import org.maplibre.compose.expressions.dsl.zoom
 import org.maplibre.compose.expressions.value.BooleanValue
@@ -26,6 +27,7 @@ import org.maplibre.compose.expressions.value.FloatValue
 import org.maplibre.compose.expressions.value.LineCap
 import org.maplibre.compose.expressions.value.LineJoin
 import org.maplibre.compose.layers.Anchor
+import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.VectorSource
@@ -36,12 +38,14 @@ import org.maplibre.compose.util.MaplibreComposable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-/** Layer ids a tap may hit (ux.md §6.1): counted status lines + named not-counted lines (TL-6), never hairlines/labels. */
-val TappableTrailLayerIds: Set<String> =
-    TrailStatus.entries.flatMap { listOf(statusLayerId(it), namedNotCountedLayerId(it)) }.toSet()
+/** Layer ids a tap may hit on the active dataset (ux.md §6.1; roads: docs/roads/ux.md §2.5). */
+val TappableTrailLayerIds: Set<String> get() = StatusLayerSpec.current.tappableLayerIds
 
 internal fun statusLayerId(s: TrailStatus) = "app-trail-${s.name.lowercase()}"
 internal fun namedNotCountedLayerId(s: TrailStatus) = "app-trail-nc-${s.name.lowercase()}"
+
+/** Road-end pin layer id (docs/roads/ux.md §2.6). */
+const val ROAD_END_LAYER = "app-road-ends"
 
 /** The style layer the app's trail layers sit under, so trail names stay readable on top. */
 private const val LABEL_LAYER = "trail-label"
@@ -62,10 +66,12 @@ data class SelectedTrail(val id: String, val lines: List<List<List<Double>>>, va
  * ux.md §6.4).
  *
  * Encoding (styles.md, never color alone): not started = dots, partway = long dash + casing, nearly done = solid +
- * casing, complete = thick solid (+ glow on Dark). Named trails outside the island total (TL-6) use the same colors
- * with a short even dash; unnamed not-counted paths are faint hairlines. With a [selected] trail every other trail
- * dims to 45% and the selected one gets an outline + gap + its trail-level status line on top. [highlight] lines
- * (e.g. the trails a walk added to, P1-6) get the selection outline + gap under their own status lines, no dimming.
+ * casing, complete = thick solid (+ glow on Dark). Widths, gates and which extras draw come from [spec] (one code
+ * path for trails and roads, docs/roads/ux.md §2.2): on roads the style's category bed *is* "not started" below z15,
+ * only progress gets a halo, and uncounted roads are the style's. With a [selected] trail every other line dims and
+ * the selected one gets an outline + gap + its trail-level status line on top. [highlight] lines (e.g. the trails a
+ * walk added to, P1-6) get the selection outline + gap under their own status lines, no dimming. [roadEnds] draw as
+ * pins (roads).
  */
 @Composable
 @MaplibreComposable
@@ -75,11 +81,14 @@ fun StatusLayers(
     selected: SelectedTrail? = null,
     reducedMotion: Boolean = false,
     highlight: List<List<List<Double>>> = emptyList(),
+    spec: StatusLayerSpec = StatusLayerSpec.current,
+    roadEnds: List<RoadEnd> = emptyList(),
 ) {
     val trails = getBaseSource<VectorSource>("trails") ?: return // style still loading
     val p = style.palette
     val fade = TransitionOptions(duration = if (reducedMotion) Duration.ZERO else 200.milliseconds)
-    val dim = const(if (selected != null) TrailLineSpec.DIM_OPACITY else 1f)
+    val dimF = if (selected != null) spec.dimOpacity else 1f
+    val dim = const(dimF)
 
     val id = feature["id"].asString()
     val counted = feature["included"].asBoolean(const(false))
@@ -95,84 +104,91 @@ fun StatusLayers(
         }
     }
     fun present(s: TrailStatus) = s == TrailStatus.NOT_STARTED || buckets[s].orEmpty().isNotEmpty()
+    fun minZoom(s: TrailStatus) = if (s == TrailStatus.NOT_STARTED) spec.notStartedMinZoom else 0f
     // Layer filters carry every covered segment id as a literal: build them once per coverage change, not per recomposition.
     val countedFilters = remember(filters) { filters.mapValues { (_, f) -> all(counted, f) } }
     val namedNcFilters = remember(filters) { filters.mapValues { (_, f) -> all(!counted, named, f) } }
 
     Anchor.Below(LABEL_LAYER) {
-        // Unnamed paths outside the island total: faint hairlines, by category (styles.md). Uncounted *roads*
-        // (the roads dataset carries road_ids, so they all land here) are drawn by the style's own muted
-        // roads-ds-private / roads-ds-holdout layers instead, which say why they are out of the goal.
-        val hair = all(!counted, !named, !(const(RoadCategories).contains(feature["category"].asString(const("")))))
-        val hairWidth = interpolate(linear(), zoom(), 12 to const(0.4.dp), 15 to const(1.0.dp), 18 to const(1.8.dp))
-        LineLayer(
-            id = "app-nc-hairline",
-            source = trails, sourceLayer = "segments", minZoom = 12f,
-            filter = all(hair, feature["category"].asString(const("")) neq const("seasonal_closed"), feature["category"].asString(const("")) neq const("easement")),
-            color = switch(feature["category"].asString(const("")), case("beach_access", const(p.notCountedBeach)), fallback = const(p.notCounted)),
-            opacity = const(p.notCountedOpacity), width = hairWidth, cap = const(LineCap.Round), join = const(LineJoin.Round),
-        )
-        LineLayer(
-            id = "app-nc-closed",
-            source = trails, sourceLayer = "segments", minZoom = 12f,
-            filter = all(hair, feature["category"].asString(const("")) eq const("seasonal_closed")),
-            color = const(p.notCountedClosed), opacity = const(p.notCountedOpacity), width = hairWidth,
-            dasharray = const(listOf(2, 1.5)),
-        )
-        LineLayer(
-            id = "app-nc-easement",
-            source = trails, sourceLayer = "segments", minZoom = 12f,
-            filter = all(hair, feature["category"].asString(const("")) eq const("easement")),
-            color = const(p.notCounted), opacity = const(p.notCountedOpacity), width = hairWidth,
-            dasharray = const(listOf(5, 2.5)),
-        )
+        if (spec.drawUnnamedHairlines) {
+            // Unnamed paths outside the island total: faint hairlines, by category (styles.md). Uncounted *roads*
+            // are drawn by the style's own muted roads-ds-private / roads-ds-holdout layers instead.
+            val hair = all(!counted, !named, !(const(RoadCategories).contains(feature["category"].asString(const("")))))
+            val hairWidth = interpolate(linear(), zoom(), 12 to const(0.4.dp), 15 to const(1.0.dp), 18 to const(1.8.dp))
+            LineLayer(
+                id = "app-nc-hairline",
+                source = trails, sourceLayer = "segments", minZoom = 12f,
+                filter = all(hair, feature["category"].asString(const("")) neq const("seasonal_closed"), feature["category"].asString(const("")) neq const("easement")),
+                color = switch(feature["category"].asString(const("")), case("beach_access", const(p.notCountedBeach)), fallback = const(p.notCounted)),
+                opacity = const(p.notCountedOpacity), width = hairWidth, cap = const(LineCap.Round), join = const(LineJoin.Round),
+            )
+            LineLayer(
+                id = "app-nc-closed",
+                source = trails, sourceLayer = "segments", minZoom = 12f,
+                filter = all(hair, feature["category"].asString(const("")) eq const("seasonal_closed")),
+                color = const(p.notCountedClosed), opacity = const(p.notCountedOpacity), width = hairWidth,
+                dasharray = const(listOf(2, 1.5)),
+            )
+            LineLayer(
+                id = "app-nc-easement",
+                source = trails, sourceLayer = "segments", minZoom = 12f,
+                filter = all(hair, feature["category"].asString(const("")) eq const("easement")),
+                color = const(p.notCounted), opacity = const(p.notCountedOpacity), width = hairWidth,
+                dasharray = const(listOf(5, 2.5)),
+            )
+        }
 
         val order = TrailStatus.entries // not started (bottom) → complete (top)
-        // Land-colored halo under every counted line.
-        for (s in order) if (present(s)) LineLayer(
+        // Land-colored halo under counted lines (roads: under progress only; the halo gap is what separates a
+        // complete line from the steel bed under CVD, docs/roads/ux.md §8.2).
+        for (s in order) if (present(s) && s in spec.haloStatuses) LineLayer(
             id = "app-trail-halo-${s.name.lowercase()}",
-            source = trails, sourceLayer = "segments",
+            source = trails, sourceLayer = "segments", minZoom = minZoom(s),
             filter = countedFilters.getValue(s),
-            color = const(p.halo), opacity = const(p.haloOpacity * if (selected != null) TrailLineSpec.DIM_OPACITY else 1f),
+            color = const(p.halo), opacity = const(p.haloOpacity * dimF),
             opacityTransition = fade,
-            width = width(s, extra = TrailLineSpec.HALO_EXTRA),
+            width = width(spec, s, extra = spec.haloExtra),
             cap = const(LineCap.Round), join = const(LineJoin.Round),
         )
-        if (highlight.isNotEmpty()) HighlightLayers(highlight, p)
+        if (highlight.isNotEmpty()) HighlightLayers(highlight, p, spec)
         // Dark casing under Partway and Nearly done.
-        for (s in order) if (present(s) && TrailLineSpec.hasCasing(s)) LineLayer(
+        for (s in order) if (present(s) && spec.hasCasing(s)) LineLayer(
             id = "app-trail-casing-${s.name.lowercase()}",
             source = trails, sourceLayer = "segments",
             filter = countedFilters.getValue(s),
             color = const(p.casing), opacity = dim, opacityTransition = fade,
-            width = width(s, extra = TrailLineSpec.CASING_EXTRA),
+            width = width(spec, s, extra = spec.casingExtra),
             cap = const(LineCap.Butt), join = const(LineJoin.Round),
         )
         if (p.completeGlow > 0f && present(TrailStatus.COMPLETE)) LineLayer(
             id = "app-trail-glow",
             source = trails, sourceLayer = "segments",
             filter = countedFilters.getValue(TrailStatus.COMPLETE),
-            color = const(p.complete), opacity = const(p.completeGlow * if (selected != null) TrailLineSpec.DIM_OPACITY else 1f),
+            color = const(p.complete), opacity = const(p.completeGlow * dimF),
             opacityTransition = fade,
-            width = width(TrailStatus.COMPLETE, extra = 4f), blur = const(3.dp),
+            width = width(spec, TrailStatus.COMPLETE, extra = spec.glowExtra), blur = const(3.dp),
             cap = const(LineCap.Round), join = const(LineJoin.Round),
         )
         for (s in order) if (present(s)) StatusLine(
             id = statusLayerId(s), source = trails, filter = countedFilters.getValue(s),
-            status = s, color = p.of(s), opacity = dim, fade = fade,
+            status = s, color = p.of(s),
+            opacity = const(dimF * if (s == TrailStatus.NOT_STARTED) spec.notStartedOpacity else 1f),
+            fade = fade, spec = spec, minZoom = minZoom(s),
         )
         // TL-6: named trails that don't count toward the island: status colors, short even dash.
-        for (s in order) if (present(s)) LineLayer(
+        if (spec.drawNamedNotCounted) for (s in order) if (present(s)) LineLayer(
             id = namedNotCountedLayerId(s),
             source = trails, sourceLayer = "segments",
             filter = namedNcFilters.getValue(s),
             color = const(p.of(s)), opacity = dim, opacityTransition = fade,
-            width = width(s, scale = TrailLineSpec.NOT_COUNTED_NAMED_SCALE),
-            dasharray = const(TrailLineSpec.notCountedNamedDash),
+            width = width(spec, s, scale = StatusLayerSpec.NOT_COUNTED_NAMED_SCALE),
+            dasharray = const(StatusLayerSpec.notCountedNamedDash),
             cap = const(LineCap.Butt), join = const(LineJoin.Round),
         )
 
-        if (selected != null) SelectionLayers(selected, p)
+        if (selected != null) SelectionLayers(selected, p, spec)
+        // Pins on top of the selection: a road end sits on its road's last metres.
+        if (spec.drawRoadEnds && roadEnds.isNotEmpty()) RoadEndPins(roadEnds, style)
     }
 }
 
@@ -192,42 +208,50 @@ private fun StatusLine(
     color: Color,
     opacity: Expression<FloatValue>,
     fade: TransitionOptions,
+    spec: StatusLayerSpec,
+    minZoom: Float,
 ) {
-    val dash = TrailLineSpec.dash(status)
+    val dash = spec.dash(status)
     LineLayer(
         id = id,
-        source = source, sourceLayer = "segments",
+        source = source, sourceLayer = "segments", minZoom = minZoom,
         filter = filter,
         color = const(color), opacity = opacity, opacityTransition = fade,
-        width = width(status),
+        width = width(spec, status),
         dasharray = dash?.let { const(it) },
         cap = const(if (status == TrailStatus.PARTWAY) LineCap.Butt else LineCap.Round),
         join = const(LineJoin.Round),
     )
 }
 
-/** Outline (selection color, +6), gap line (+2), then the trail-level status line, from a GeoJSON of the trail. */
+/**
+ * Outline (selection color, +6), gap line (+2), then the trail-level status line, from a GeoJSON of the trail.
+ * Widths follow [StatusLayerSpec.selectionWidths]; a not-started road (no status line below z15) gets a solid
+ * not-started line at that width instead of dots, so the selection always has a body (docs/roads/ux.md §2.5).
+ */
 @Composable
 @MaplibreComposable
-private fun SelectionLayers(selected: SelectedTrail, p: MapPalette) {
+private fun SelectionLayers(selected: SelectedTrail, p: MapPalette, spec: StatusLayerSpec) {
     val json = remember(selected.id, selected.lines) { multiLineGeoJson(selected.lines) }
     val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))
     val s = selected.status
+    val stops = spec.selectionWidths(s)
+    val solidNotStarted = s == TrailStatus.NOT_STARTED && spec.selectionMinStatus != null
     LineLayer(
         id = "app-selected-outline", source = source,
-        color = const(p.selection), opacity = const(0.9f), width = width(s, extra = 6f),
+        color = const(p.selection), opacity = const(0.9f), width = width(stops, extra = 6f),
         cap = const(LineCap.Round), join = const(LineJoin.Round),
     )
     LineLayer(
         id = "app-selected-gap", source = source,
-        color = const(p.selectionGap), width = width(s, extra = 2f),
+        color = const(p.selectionGap), width = width(stops, extra = 2f),
         cap = const(LineCap.Round), join = const(LineJoin.Round),
     )
     LineLayer(
         id = "app-selected-line", source = source,
         color = const(p.of(s)),
-        width = width(s),
-        dasharray = TrailLineSpec.dash(s)?.let { const(it) },
+        width = width(stops),
+        dasharray = if (solidNotStarted) null else spec.dash(s)?.let { const(it) },
         cap = const(if (s == TrailStatus.PARTWAY) LineCap.Butt else LineCap.Round),
         join = const(LineJoin.Round),
     )
@@ -236,24 +260,59 @@ private fun SelectionLayers(selected: SelectedTrail, p: MapPalette) {
 /** Selection outline (+6) and gap (+2) along [lines], drawn under the status lines (walk detail). */
 @Composable
 @MaplibreComposable
-private fun HighlightLayers(lines: List<List<List<Double>>>, p: MapPalette) {
+private fun HighlightLayers(lines: List<List<List<Double>>>, p: MapPalette, spec: StatusLayerSpec) {
     val json = remember(lines) { multiLineGeoJson(lines) }
     val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))
+    val stops = spec.widths.getValue(TrailStatus.NEARLY_DONE)
     LineLayer(
         id = "app-highlight-outline", source = source,
-        color = const(p.selection), opacity = const(0.9f), width = width(TrailStatus.NEARLY_DONE, extra = 6f),
+        color = const(p.selection), opacity = const(0.9f), width = width(stops, extra = 6f),
         cap = const(LineCap.Round), join = const(LineJoin.Round),
     )
     LineLayer(
         id = "app-highlight-gap", source = source,
-        color = const(p.selectionGap), width = width(TrailStatus.NEARLY_DONE, extra = 2f),
+        color = const(p.selectionGap), width = width(stops, extra = 2f),
         cap = const(LineCap.Round), join = const(LineJoin.Round),
     )
 }
 
-private fun width(status: TrailStatus, extra: Float = 0f, scale: Float = 1f): Expression<DpValue> {
-    val stops = TrailLineSpec.widths.getValue(status).map { (z, w) -> z to const((w * scale + extra).dp) }
-    return interpolate(linear(), zoom(), *stops.toTypedArray())
+/**
+ * Public road ends at the shore (docs/roads/ux.md §2.6): contour-brown pins ringed in the map's paper color, from z12,
+ * 4dp → 7dp. Tapping one selects its road (the map tap prefers a pin within 16dp).
+ */
+@Composable
+@MaplibreComposable
+private fun RoadEndPins(ends: List<RoadEnd>, style: MapStyle) {
+    val json = remember(ends) { pointsGeoJson(ends) }
+    val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))
+    val ring = if (style.isDark) Color(0xFF0B1410) else Color(0xFFFBFAF6)
+    CircleLayer(
+        id = ROAD_END_LAYER, source = source, minZoom = 12f,
+        color = const(MaterialTheme.colorScheme.tertiary),
+        radius = interpolate(linear(), zoom(), 12 to const(4.dp), 16 to const(7.dp)),
+        strokeColor = const(ring),
+        strokeWidth = const(2.dp),
+    )
+}
+
+private fun width(spec: StatusLayerSpec, status: TrailStatus, extra: Float = 0f, scale: Float = 1f): Expression<DpValue> =
+    width(spec.widths.getValue(status), extra, scale)
+
+private fun width(stops: List<Pair<Int, Float>>, extra: Float = 0f, scale: Float = 1f): Expression<DpValue> {
+    val s = stops.map { (z, w) -> z to const((w * scale + extra).dp) }
+    // A single stop is a constant: interpolate needs two.
+    return if (s.size == 1) s[0].second else interpolate(linear(), zoom(), *s.toTypedArray())
+}
+
+/** GeoJSON FeatureCollection of road-end points, each with its `road_id`. */
+internal fun pointsGeoJson(ends: List<RoadEnd>): String = buildString {
+    append("""{"type":"FeatureCollection","features":[""")
+    ends.forEachIndexed { i, e ->
+        if (i > 0) append(',')
+        append("""{"type":"Feature","properties":{"road_id":"""").append(e.roadId).append('"').append("},")
+        append(""""geometry":{"type":"Point","coordinates":[""").append(e.lon).append(',').append(e.lat).append("]}}")
+    }
+    append("]}")
 }
 
 /** GeoJSON FeatureCollection with one MultiLineString of [lines] (each a list of [lon, lat]). */

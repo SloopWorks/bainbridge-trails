@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.common_loading_trails
 import com.bainbridgetrails.ui.theme.BtTheme
+import com.bainbridgetrails.ui.theme.EmptyMotif
 import com.bainbridgetrails.ui.theme.PillShape
 import org.jetbrains.compose.resources.stringResource
 
@@ -70,7 +71,7 @@ fun EmptyState(
         Column(Modifier.widthIn(max = 320.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             if (!compact) {
                 when (kind) {
-                    EmptyKind.Empty -> WaterLines(Modifier.size(96.dp))
+                    EmptyKind.Empty -> if (BtTheme.brand.emptyMotif == EmptyMotif.RoadGrid) RoadGridGlyph(Modifier.size(96.dp)) else WaterLines(Modifier.size(96.dp))
                     EmptyKind.Offline -> IconBadge { BtIcon(BtIcons.CloudOff, null, size = 32.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                     EmptyKind.Error -> IconBadge(MaterialTheme.colorScheme.errorContainer) {
                         BtIcon(BtIcons.Error, null, size = 32.dp, tint = MaterialTheme.colorScheme.onErrorContainer)
