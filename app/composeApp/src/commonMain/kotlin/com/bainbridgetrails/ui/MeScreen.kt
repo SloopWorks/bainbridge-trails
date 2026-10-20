@@ -210,7 +210,7 @@ fun MeScreen(
                             profile?.me?.hiddenFromBoard == true -> stringResource(Res.string.me_leaderboard_row_hidden)
                             you != null -> stringResource(Res.string.me_leaderboard_row, you.rank, board.board?.totalRanked ?: you.rank) +
                                 (if (board.error != null && board.updatedAt != null) " · " + stringResource(Res.string.me_leaderboard_as_of, ageText(board.updatedAt!!)) else "")
-                            board.board != null -> stringResource(Res.string.me_leaderboard_row_unranked)
+                            board.board != null -> stringResource(LocalGoal.current.s(Res.string.me_leaderboard_row_unranked))
                             else -> null
                         }
                         CardRow(BtIcons.Trophy, stringResource(Res.string.me_leaderboard_row_signed_out), subtitle, onLeaderboard, m)
@@ -316,7 +316,7 @@ private fun IslandHero(geometry: IslandGeometry, segStatus: Map<String, com.bain
     val water = androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.secondaryContainer, if (dark) 0.3f else 0.55f)
     val land = if (dark) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surface
     val pct = Format.percent(stats.islandFraction)
-    val a11y = stringResource(Res.string.me_hero_a11y, pct, stats.trailsCompleted, stats.trailsTotal)
+    val a11y = stringResource(LocalGoal.current.s(Res.string.me_hero_a11y), pct, stats.trailsCompleted, stats.trailsTotal)
     // statHero is 64sp; cap growth at 1.3× so the number never truncates (ux.md §5.3).
     val scale = LocalDensity.current.fontScale
     val heroStyle = BtTheme.type.statHero.let { if (scale > 1.3f) it.copy(fontSize = (64 * 1.3f / scale).sp, lineHeight = (68 * 1.3f / scale).sp) else it }
@@ -335,7 +335,7 @@ private fun IslandHero(geometry: IslandGeometry, segStatus: Map<String, com.bain
             Text(stringResource(Res.string.me_stat_island).uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(pct, style = heroStyle, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, softWrap = false)
             Text(
-                stringResource(if (stats.isNew) Res.string.me_hero_caption_new else Res.string.me_hero_caption),
+                stringResource(if (stats.isNew) Res.string.me_hero_caption_new else LocalGoal.current.s(Res.string.me_hero_caption)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -346,7 +346,7 @@ private fun IslandHero(geometry: IslandGeometry, segStatus: Map<String, com.bain
 @Composable
 private fun StatTiles(stats: MeStats, units: Units, onInfo: (StatInfo) -> Unit, modifier: Modifier = Modifier) {
     val miles = Format.distance(stats.trailMetresWalked, units).substringBefore(' ')
-    val milesLabel = stringResource(LocalGoal.current.s(if (units == Units.MILES) Res.string.me_stat_miles_phone else Res.string.me_stat_km_phone))
+    val milesLabel = stringResource(LocalGoal.current.s(if (units == Units.MILES) LocalGoal.current.s(Res.string.me_stat_miles_phone) else LocalGoal.current.s(Res.string.me_stat_km_phone)))
     val trailsValue = stringResource(Res.string.me_stat_trails_value, stats.trailsCompleted, stats.trailsTotal)
     val tiles = listOf(
         Triple(trailsValue, stringResource(LocalGoal.current.s(Res.string.me_stat_trails)), StatInfo.TRAILS),
@@ -404,7 +404,7 @@ private fun InfoTile(value: String, label: String, info: StatInfo, onInfo: (Stat
 private fun StatInfoSheet(info: StatInfo, onDismiss: () -> Unit) {
     val completePct = (CoverageParams().completionThreshold * 100).roundToInt()
     val (title, body) = when (info) {
-        StatInfo.ISLAND -> stringResource(Res.string.me_stat_island) to stringResource(Res.string.stat_island_info)
+        StatInfo.ISLAND -> stringResource(Res.string.me_stat_island) to stringResource(LocalGoal.current.s(Res.string.stat_island_info))
         StatInfo.TRAILS -> stringResource(LocalGoal.current.s(Res.string.me_stat_trails)) to stringResource(LocalGoal.current.s(Res.string.stat_trails_info), completePct)
         StatInfo.MILES -> stringResource(LocalGoal.current.s(Res.string.me_stat_miles_phone)) to stringResource(LocalGoal.current.s(Res.string.stat_miles_info))
         StatInfo.WALKS -> stringResource(Res.string.me_stat_walks) to stringResource(Res.string.stat_walks_info)
@@ -448,7 +448,7 @@ private fun CardRow(icon: org.jetbrains.compose.resources.DrawableResource, titl
 /** Walk history row: "Sat, Oct 18" · duration · distance, then trails touched; Unverified tag when so. */
 @Composable
 private fun WalkRow(w: WalkRowData, date: String, units: Units, onOpen: () -> Unit) {
-    val trails = pluralStringResource(Res.plurals.me_history_trails, w.trailCount, w.trailCount) +
+    val trails = pluralStringResource(LocalGoal.current.p(Res.plurals.me_history_trails), w.trailCount, w.trailCount) +
         (if (w.trailNames.isEmpty()) "" else " · " + w.trailNames.joinToString(", ") + if (w.trailCount > w.trailNames.size) "…" else "")
     val duration = ListFormat.walkDuration(w.durationMs)
     val distance = Format.distance(w.distanceM, units)

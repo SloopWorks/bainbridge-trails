@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui.components
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,7 +75,7 @@ fun LeaderHeader(modifier: Modifier = Modifier) {
         Text(stringResource(Res.string.board_col_rank), Modifier.width(RankW), style = style, color = c, textAlign = TextAlign.End)
         Text(stringResource(Res.string.board_col_name), Modifier.weight(1f).padding(start = 4.dp), style = style, color = c)
         Text(stringResource(Res.string.board_col_island), Modifier.width(PctW), style = style, color = c, textAlign = TextAlign.End)
-        Text(stringResource(Res.string.board_col_trails), Modifier.width(TrailsW), style = style, color = c, textAlign = TextAlign.End)
+        Text(stringResource(LocalGoal.current.s(Res.string.board_col_trails)), Modifier.width(TrailsW), style = style, color = c, textAlign = TextAlign.End)
         Box(Modifier.width(MenuW))
     }
 }
@@ -96,8 +97,8 @@ fun LeaderRow(
     onHide: (() -> Unit)? = null,
 ) {
     val pct = boardPct(islandPct)
-    val a11y = if (isYou) pluralStringResource(Res.plurals.board_row_you_a11y, trailsCompleted, rank, pct, trailsCompleted)
-    else pluralStringResource(Res.plurals.board_row_a11y, trailsCompleted, rank, name, pct, trailsCompleted)
+    val a11y = if (isYou) pluralStringResource(LocalGoal.current.p(Res.plurals.board_row_you_a11y), trailsCompleted, rank, pct, trailsCompleted)
+    else pluralStringResource(LocalGoal.current.p(Res.plurals.board_row_a11y), trailsCompleted, rank, name, pct, trailsCompleted)
     val bg = if (isYou) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
     val fg = if (isYou) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
     val sub = if (isYou) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant

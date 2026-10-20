@@ -1,5 +1,6 @@
 package com.bainbridgetrails.nav
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -287,8 +288,8 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
         if (showBar) {
             fun Tab.item(label: String) = BarItem(label, icon, selectedIcon, destination.isTab(route), { nav.selectTab(route) })
             BtBottomBar(
-                start = StartTabs.map { it.item(stringResource(it.label)) },
-                end = EndTabs.map { it.item(stringResource(it.label)) },
+                start = StartTabs.map { it.item(stringResource(LocalGoal.current.s(it.label))) },
+                end = EndTabs.map { it.item(stringResource(LocalGoal.current.s(it.label))) },
                 recordLabel = stringResource(if (recording) Res.string.nav_recording else Res.string.nav_record),
                 recording = recording,
                 onRecord = { nav.openRecord() },

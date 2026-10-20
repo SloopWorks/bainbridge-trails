@@ -313,9 +313,9 @@ private fun CelebrationContent(
                 )
                 if (wholeIsland) {
                     // P1-9: Fraunces headline (upright), the body line under it.
-                    Text(stringResource(Res.string.celebrate_island_title), style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
+                    Text(stringResource(LocalGoal.current.s(Res.string.celebrate_island_title)), style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
                     Text(
-                        stringResource(Res.string.celebrate_island_body),
+                        stringResource(LocalGoal.current.s(Res.string.celebrate_island_body)),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,

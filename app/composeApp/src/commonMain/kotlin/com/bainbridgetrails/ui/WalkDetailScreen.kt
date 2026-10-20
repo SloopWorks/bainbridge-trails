@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -143,7 +144,7 @@ private fun WalkDetailContent(
             WalkMap(settings, pieces, touched, snapshot?.segmentBuckets.orEmpty(), m)
         }
         Text(
-            stringResource(if (pieces.isNullOrEmpty()) Res.string.walk_no_track_note else Res.string.walk_track_note),
+            stringResource(if (pieces.isNullOrEmpty()) LocalGoal.current.s(Res.string.walk_no_track_note) else Res.string.walk_track_note),
             m.padding(top = BtTheme.spacing.sm),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -152,11 +153,11 @@ private fun WalkDetailContent(
         Column(m.padding(top = BtTheme.spacing.lg), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             IslandTile(walk.islandBefore, walk.islandAfter)
             if (!walk.verified) Banner(stringResource(Res.string.results_unverified), Res.drawable.ic_warning, MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
-            if (walk.approximateLocation) Banner(stringResource(Res.string.results_approx_warning), Res.drawable.ic_warning, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
+            if (walk.approximateLocation) Banner(stringResource(LocalGoal.current.s(Res.string.results_approx_warning)), Res.drawable.ic_warning, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
             if (sections.isEmpty) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(Res.string.results_no_progress), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(Res.string.results_no_progress_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(LocalGoal.current.s(Res.string.results_no_progress)), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(LocalGoal.current.s(Res.string.results_no_progress_hint)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             val status = { f: Double -> data.progress.status(f) }
@@ -165,7 +166,7 @@ private fun WalkDetailContent(
                 for (t in sections.completed) TrailResultLink(t, status, onTrail)
             }
             if (sections.rest.isNotEmpty()) {
-                SectionHeader(stringResource(Res.string.results_trails_header))
+                SectionHeader(stringResource(LocalGoal.current.s(Res.string.results_trails_header)))
                 for (t in sections.rest) TrailResultLink(t, status, onTrail)
             }
             if (walk.verified) {

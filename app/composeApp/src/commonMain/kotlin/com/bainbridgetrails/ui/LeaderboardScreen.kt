@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.SnackbarDuration
@@ -135,7 +136,7 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
                     HiddenYouRow(onChange = onSignIn)
                 }
             } }
-            !signedIn -> { { SignInPrompt(stringResource(Res.string.board_signed_out_prompt), stringResource(Res.string.board_signin), onSignIn, Modifier.padding(horizontal = BtTheme.spacing.screenH, vertical = BtTheme.spacing.sm)) } }
+            !signedIn -> { { SignInPrompt(stringResource(LocalGoal.current.s(Res.string.board_signed_out_prompt)), stringResource(Res.string.board_signin), onSignIn, Modifier.padding(horizontal = BtTheme.spacing.screenH, vertical = BtTheme.spacing.sm)) } }
             you != null && !youVisible -> { {
                 Column {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -147,7 +148,7 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
     ) {
         item(key = "intro") {
             Column(Modifier.padding(horizontal = BtTheme.spacing.screenH).padding(bottom = BtTheme.spacing.md), verticalArrangement = Arrangement.spacedBy(BtTheme.spacing.xs)) {
-                Text(stringResource(Res.string.board_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(LocalGoal.current.s(Res.string.board_subtitle)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val updated = state.updatedAt
                 if (updated != null && board != null) {
                     if (state.error != null) {
@@ -166,7 +167,7 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
                     Text(pluralStringResource(Res.plurals.board_total, board.totalRanked, board.totalRanked), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (signedIn && !hiddenSelf && board != null && you == null && state.error == null) {
-                    Text(stringResource(Res.string.board_not_ranked), Modifier.padding(top = BtTheme.spacing.xs), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(LocalGoal.current.s(Res.string.board_not_ranked)), Modifier.padding(top = BtTheme.spacing.xs), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -182,7 +183,7 @@ fun LeaderboardScreen(graph: AppGraph.Installed, onBack: () -> Unit, onSignIn: (
                 )
             }
             rows.isEmpty() -> item(key = "empty") {
-                EmptyState(stringResource(Res.string.board_empty_title), body = stringResource(Res.string.board_empty_body))
+                EmptyState(stringResource(Res.string.board_empty_title), body = stringResource(LocalGoal.current.s(Res.string.board_empty_body)))
             }
             else -> {
                 stickyHeader(key = "header") { LeaderHeader() }

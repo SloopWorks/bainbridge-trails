@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -413,7 +414,7 @@ private fun CreditNote(credit: IslandCredit, modifier: Modifier = Modifier) {
     val text = stringResource(
         when (credit) {
             IslandCredit.NONE -> Res.string.detail_not_counted
-            IslandCredit.PARTIAL -> Res.string.detail_partly_counted
+            IslandCredit.PARTIAL -> LocalGoal.current.s(Res.string.detail_partly_counted)
             IslandCredit.FULL -> Res.string.detail_counts
         },
     )

@@ -90,6 +90,69 @@ class GoalVocabularyGuardTest {
         assertEquals(emptyList(), leaks.map { it.key })
     }
 
+    /**
+     * Every Kotlin reference to an overridden trail key goes through the vocabulary on the same line
+     * (`LocalGoal.current.s(Res.string.x)`, `goal.text(Res.string.x)`, …), so a call site cannot forget the roads
+     * twin. [INDIRECT] lists the few that hand the key to a holder which is looked up where it is rendered.
+     */
+    @Test
+    fun everyOverriddenKeyIsLookedUpThroughTheVocabulary() {
+        val keys = GoalVocabulary.Roads.stringOverrides.keys.map { "Res.string.${it.key}" } +
+            GoalVocabulary.Roads.pluralOverrides.keys.map { "Res.plurals.${it.key}" }
+        val wrapped = Regex("""\.(s|p|string|plural|text|pluralText)\(\s*$""")
+        val problems = mutableListOf<String>()
+        kotlinSources().forEach { (path, text) ->
+            text.lines().forEachIndexed { i, line ->
+                if (line.trimStart().startsWith("import ")) return@forEachIndexed
+                keys.forEach { ref ->
+                    Regex(Regex.escape(ref) + """\b""").findAll(line).forEach { m ->
+                        val key = ref.substringAfterLast('.')
+                        if (!wrapped.containsMatchIn(line.substring(0, m.range.first)) && "$path:$key" !in INDIRECT) {
+                            problems += "$path:${i + 1} uses $ref without LocalGoal / AppGraph.goal"
+                        }
+                    }
+                }
+            }
+        }
+        if (problems.isNotEmpty()) fail(problems.joinToString("\n"))
+    }
+
+    /**
+     * Android string resources (notifications, launcher label) have no `roads_` lookup: composeApp's androidMain
+     * res must not say "trail" at all, and androidApp's main res may only where the roads flavour overrides the key.
+     */
+    @Test
+    fun androidStringResourcesDoNotLeakTrails() {
+        val composeAndroid = moduleFile("src/androidMain/res/values")
+        val appMain = moduleFile("../androidApp/src/main/res/values")
+        val appRoads = moduleFile("../androidApp/src/roads/res/values")
+        val roadsKeys = androidStrings(appRoads).keys
+        val problems = mutableListOf<String>()
+        androidStrings(composeAndroid).forEach { (k, v) -> if (trailWord.containsMatchIn(v)) problems += "composeApp androidMain $k says \"trail\": \"$v\"" }
+        androidStrings(appMain).forEach { (k, v) ->
+            if (trailWord.containsMatchIn(v) && k !in roadsKeys) problems += "androidApp main $k says \"trail\" and src/roads/res does not override it"
+        }
+        androidStrings(appRoads).forEach { (k, v) -> if (trailWord.containsMatchIn(v)) problems += "androidApp roads $k says \"trail\": \"$v\"" }
+        assertTrue(androidStrings(appMain).isNotEmpty(), "parsed no androidApp strings")
+        if (problems.isNotEmpty()) fail(problems.joinToString("\n"))
+    }
+
+    private fun moduleFile(path: String): File =
+        listOf(File(path), File("composeApp", path)).firstOrNull { it.exists() } ?: error("$path not found from ${File(".").absolutePath}")
+
+    private fun androidStrings(dir: File): Map<String, String> =
+        dir.listFiles { f -> f.name.endsWith(".xml") }.orEmpty().flatMap { f ->
+            val xml = f.readText().replace(Regex("<!--.*?-->", RegexOption.DOT_MATCHES_ALL), "")
+            Regex("""<string name="([^"]+)"[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL).findAll(xml).map { it.groupValues[1] to it.groupValues[2] }.toList()
+        }.toMap()
+
+    private fun kotlinSources(): List<Pair<String, String>> {
+        val root = moduleFile("src/commonMain/kotlin")
+        return root.walkTopDown().filter { it.isFile && it.extension == "kt" && it.name != "GoalVocabulary.kt" }
+            .map { it.relativeTo(root).invariantSeparatorsPath.substringAfter("com/bainbridgetrails/") to it.readText() }.toList()
+            .also { assertTrue(it.size > 50, "found only ${it.size} sources") }
+    }
+
     @Test
     fun trailsVocabularyIsIdentity() {
         assertTrue(GoalVocabulary.Trails.stringOverrides.isEmpty())
@@ -113,6 +176,14 @@ class GoalVocabularyGuardTest {
         val TRAIL_ONLY = setOf(
             "detail_trailheads", "detail_trailhead_row", "detail_official_map", "detail_official_map_host",
             "trails_filter_park", "trails_filter_park_all", "trails_filter_park_none", "trails_park_sheet_title",
+        )
+
+        /** Overridden keys stored in a holder and looked up through the vocabulary where they are rendered ("file:key"). */
+        val INDIRECT = setOf(
+            "nav/AppShell.kt:nav_trails", // Tab.label -> stringResource(LocalGoal.current.s(it.label))
+            "record/PermissionFlow.kt:perm_location_body", // Rationale.body / body -> LocalGoal.current.s(body)
+            "record/PermissionFlow.kt:perm_precise_body",
+            "ui/TrailsScreen.kt:trails_sort_length", // TrailSort.label -> LocalGoal.current.s(…label)
         )
 
         /** Overrides that add arguments (product.md §3.10 note: the trail text ignores them). */

@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui.components
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -179,7 +180,7 @@ fun milestoneTitle(m: Milestone): String = when (m) {
             else -> Res.string.roads_milestone_cat_residential
         },
     )
-    Milestone.Island -> stringResource(Res.string.celebrate_island_eyebrow)
+    Milestone.Island -> stringResource(LocalGoal.current.s(Res.string.celebrate_island_eyebrow))
 }
 
 /** The short medallion text: "5", "10", a category initial, or a check for the island. */

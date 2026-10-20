@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -235,7 +236,7 @@ fun AttributionScreen(onBack: () -> Unit) {
                 if (t != null) MarkdownLite(t)
                 (dataset as? Loadable.Ready)?.let {
                     Text(
-                        stringResource(Res.string.settings_attribution_dataset, it.value.dataset.version),
+                        stringResource(LocalGoal.current.s(Res.string.settings_attribution_dataset), it.value.dataset.version),
                         Modifier.padding(top = BtTheme.spacing.sm),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -294,11 +295,11 @@ fun PrivacyScreen(onBack: () -> Unit) {
     ListScreen(stringResource(Res.string.privacy_title), onBack = onBack) {
         item {
             Column(Modifier.padding(horizontal = BtTheme.spacing.screenH), verticalArrangement = Arrangement.spacedBy(BtTheme.spacing.sm)) {
-                Text(stringResource(Res.string.privacy_lead), style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(LocalGoal.current.s(Res.string.privacy_lead)), style = MaterialTheme.typography.headlineSmall)
                 for ((t, b) in listOf(
                     Res.string.privacy_phone_title to Res.string.privacy_phone_body,
-                    Res.string.privacy_account_title to Res.string.privacy_account_body,
-                    Res.string.privacy_board_title to Res.string.privacy_board_body,
+                    Res.string.privacy_account_title to LocalGoal.current.s(Res.string.privacy_account_body),
+                    Res.string.privacy_board_title to LocalGoal.current.s(Res.string.privacy_board_body),
                     Res.string.privacy_delete_title to Res.string.privacy_delete_body,
                 )) {
                     Text(stringResource(t), Modifier.padding(top = BtTheme.spacing.lg).semantics { heading() }, style = MaterialTheme.typography.titleMedium)

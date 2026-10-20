@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui.components
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -108,7 +109,7 @@ private fun IconBadge(color: Color = MaterialTheme.colorScheme.surfaceContainerH
  * Reduced motion: no moving indicator.
  */
 @Composable
-fun LoadingState(modifier: Modifier = Modifier, text: String = stringResource(Res.string.common_loading_trails)) {
+fun LoadingState(modifier: Modifier = Modifier, text: String = stringResource(LocalGoal.current.s(Res.string.common_loading_trails))) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(BtTheme.spacing.lg)) {
             WaterLines(Modifier.size(120.dp))

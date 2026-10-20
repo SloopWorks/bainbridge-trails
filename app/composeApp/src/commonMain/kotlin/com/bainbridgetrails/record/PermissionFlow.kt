@@ -1,5 +1,6 @@
 package com.bainbridgetrails.record
 
+import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -223,7 +224,7 @@ internal fun PermissionFlow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(stringResource(title), Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
-            Text(stringResource(body), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(LocalGoal.current.s(body)), style = MaterialTheme.typography.bodyLarge)
             if (!r.required && perm != Perm.ACTIVITY) {
                 // The activity body already says it is optional.
                 Text(stringResource(Res.string.perm_optional), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

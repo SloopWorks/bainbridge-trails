@@ -543,6 +543,6 @@ private fun LoadingChip() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-        Text(stringResource(Res.string.map_loading_trails), style = MaterialTheme.typography.labelLarge, color = BtTheme.colors.onMapChrome)
+        Text(stringResource(LocalGoal.current.s(Res.string.map_loading_trails)), style = MaterialTheme.typography.labelLarge, color = BtTheme.colors.onMapChrome)
     }
 }
