@@ -7,11 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E1D0C9B8A7F6E5D4C3B2A1 /* AppleSignIn.swift */; };
 		307C2654CD5972A25FB7FD87 /* iOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 668CECA83ACC03A83C85A623 /* iOSApp.swift */; };
 		56B0305B5D3847FC6B326502 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8509E5A49E4A5CAAEB3ADB /* ContentView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F2E1D0C9B8A7F6E5D4C3B2A1 /* AppleSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
 		668CECA83ACC03A83C85A623 /* iOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSApp.swift; sourceTree = "<group>"; };
 		86038AE1032E284E79B32AD6 /* iosApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C117AD187833E2513BD2F553 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -25,6 +27,7 @@
 				CE8509E5A49E4A5CAAEB3ADB /* ContentView.swift */,
 				C117AD187833E2513BD2F553 /* Info.plist */,
 				668CECA83ACC03A83C85A623 /* iOSApp.swift */,
+				F2E1D0C9B8A7F6E5D4C3B2A1 /* AppleSignIn.swift */,
 			);
 			path = iosApp;
 			sourceTree = "<group>";
@@ -125,6 +128,7 @@
 			files = (
 				56B0305B5D3847FC6B326502 /* ContentView.swift in Sources */,
 				307C2654CD5972A25FB7FD87 /* iOSApp.swift in Sources */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* AppleSignIn.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -291,6 +295,7 @@
 					"-framework",
 					QuartzCore,
 				);
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bainbridgetrails.app;
 				PRODUCT_NAME = BainbridgeTrails;
 				SDKROOT = iphoneos;
@@ -338,6 +343,7 @@
 					"-framework",
 					QuartzCore,
 				);
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bainbridgetrails.app;
 				PRODUCT_NAME = BainbridgeTrails;
 				SDKROOT = iphoneos;
