@@ -26,7 +26,7 @@ shipyard-deploy publish <apk>                 # publish; the channel is created 
 That is the whole list. `login`, `logout`, `rollback`, `enroll-code`,
 `devices`, `channels create` and `resume` belong to a human.
 
-Build the APK first with `./gradlew :app:assembleDebug`.
+Build the APK first with `./gradlew :androidApp:assembleDebug` (from `app/`).
 Every command takes `--json` and returns a single object; exit code 0 means it worked.
 
 ### Do not
@@ -55,3 +55,67 @@ Every command takes `--json` and returns a single object; exit code 0 means it w
   and `publish` refuses it.
 - Publishing needs a publisher token scoped to project `bainbridge-trails`, passed as
   `SHIPYARD_DEPLOY_TOKEN`. A token for another project gets `404 E_NOT_FOUND`, not `403`.
+
+## Building and testing (Gradle root is `app/`)
+
+Modules: `:composeApp` (shared KMP UI + platform glue), `:androidApp` (Android shell; the module is
+`:androidApp`, there is no `:app`), `:coverage` and `:tracking` (pure KMP logic), `iosApp/` (hand-maintained
+Xcode project), plus `:debugdrawer-shim` (in-repo no-op drawer).
+
+Before the first build, copy the map data and dataset (built by `pipeline/` into `data/dist/`, gitignored):
+
+```sh
+scripts/sync-app-assets.sh          # from the repo root
+```
+
+Full verification set (run all before handing back work):
+
+```sh
+cd app
+./gradlew :coverage:jvmTest :tracking:jvmTest :composeApp:testAndroidHostTest \
+  :androidApp:assembleDebug :androidApp:assembleRelease :composeApp:linkDebugFrameworkIosSimulatorArm64
+cd .. && xcodebuild -project app/iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/bt-dd build
+```
+
+Gradle properties (`-P…` or `gradle.properties`):
+
+| Property | Default | Effect |
+|---|---|---|
+| `debugDrawerPath=<dir>` | `../../debugdrawer` (relative to `app/`) | Build the SloopWorks debug drawer from that source checkout (debug: real drawer, release: its noop twin). Never edit that repo from here. |
+| `debugDrawer=off` | on when a checkout exists | Force the in-repo no-op `:debugdrawer-shim` even when a checkout exists (a plain clone always uses the shim). |
+| `geofencePrototype=true` | off | Debug builds only: merges `androidApp/src/geofencePrototype/AndroidManifest.xml` (ACCESS_BACKGROUND_LOCATION, RECEIVE_BOOT_COMPLETED, geofence + boot receivers) and sets `BuildConfig.GEOFENCE_PROTOTYPE`. Off by default because a debug APK declaring background location was blocked by Play Protect (`INSTALL_FAILED_VERIFICATION_FAILURE`) on the owner's phone. Without it the Record > Settings geofence opt-in is hidden. Release never has it. |
+| `googleWebClientId=<id>` | empty | Google OAuth **web** client id for Credential Manager (`BuildConfig.GOOGLE_WEB_CLIENT_ID`); the backend's `GOOGLE_CLIENT_IDS` must include it. Empty = the Google button says "not configured" (debug still offers dev sign-in). |
+| `shipyardDeployPluginRepository=<maven repo>` | unset | Applies the Shipyard Deploy plugin (see above). |
+
+Check the merged permissions of an APK:
+`$ANDROID_HOME/build-tools/<ver>/aapt2 dump permissions androidApp/build/outputs/apk/debug/androidApp-debug.apk`.
+
+iOS: the geofence prototype's Always request is compiled only with the Swift condition `GEOFENCE_PROTOTYPE`
+(`xcodebuild … SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG GEOFENCE_PROTOTYPE"`); default Debug has no request
+path. Simulator screenshots: launch arguments `-btScreen trails|me|leaderboard|profile|settings|privacy|onboarding|trail:<id>`,
+`-btDevSignIn 1`, `-apiBaseUrl http://localhost:8787` (debug binaries only; `xcrun simctl launch <udid>
+com.bainbridgetrails.app -btScreen me`).
+
+## Local backend
+
+```sh
+cd backend && npm install && cp .dev.vars.example .dev.vars && npm run dev   # wrangler dev on 0.0.0.0:8787
+```
+
+- Android emulator: open the debug drawer (blue bubble, lower right) > Backend > "Local wrangler dev"
+  (`http://10.0.2.2:8787`) > Apply & Restart. The drawer's Apply & Restart currently restarts before its async
+  save lands (bug in the external debugdrawer repo), so the choice may not stick; reliable fallback:
+  `adb shell run-as com.bainbridgetrails.app.dev rm shared_prefs/com.sloopworks.debugdrawer.xml` resets to Prod.
+  Check the active backend in logcat (`debug tools installed; backend …`).
+- Android 17 (API 37) blocks connections to private addresses such as 10.0.2.2 unless the app holds the runtime
+  permission `ACCESS_LOCAL_NETWORK` (declared in the debug manifest only). `DebugTools` asks for it at launch when
+  the backend is Local; without the grant requests just time out.
+- iOS simulator: launch with `-apiBaseUrl http://localhost:8787` (no drawer on iOS; Debug Info.plist allows local
+  networking only).
+- Debug builds offer dev sign-in (`POST /v1/auth/dev`, needs `ALLOW_DEV_AUTH` from `.dev.vars`; never in prod).
+
+## Devices
+
+Two Android targets may be attached (emulator + the owner's USB phone). Always set `ANDROID_SERIAL` or pass
+`-s`; `installDebug` installs on every attached device.
