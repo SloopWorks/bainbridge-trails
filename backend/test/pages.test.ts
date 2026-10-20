@@ -44,7 +44,8 @@ describe("public pages", () => {
     expect(html).toContain('<a href="mailto:privacy@sloopworks.com">');
     expect(html).toContain("30 days after the walk");
     expect(html).toContain("90 days");
-    expect(html).toContain("deleted after 2 days");
+    expect(html).toContain("deleted within 2 days");
+    expect(html).toContain("Hide yourself from the leaderboard");
     expect(html).toContain('<th scope="col">Data</th>');
     expect(html).toContain('<a href="/delete-account">');
   });

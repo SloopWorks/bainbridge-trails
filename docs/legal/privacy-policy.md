@@ -59,6 +59,7 @@ Signing in is optional. You can sign in with Google (Android) or Apple (iOS). Wh
 | A random id for each walk you sync (no start time, end time or duration) | So a walk is credited only once. |
 | When you last synced a walk, and when your island percentage last went up (server clock, not walk times) | To check that coverage does not grow faster than walking allows, and to break ties on the leaderboard. That time is never shown to anyone. |
 | A hashed sign-in session token and its expiry date (90 days) | To keep you signed in. |
+| Whether you chose to hide yourself from the leaderboard, and whether we hid you from it | To leave you off the leaderboard. |
 | Name reports: who reported whose name, and when | So we can review names reported as offensive. |
 | If you sign in with Apple, and our server is configured for it: an Apple refresh token | Only so that deleting your account also revokes the app's access to your Apple ID, as Apple requires. |
 
@@ -80,7 +81,7 @@ does not store the rest.
 Like any internet service, our server receives your IP address with each request. We do not store it in our
 database. For rate limiting (to stop abuse), we store a one-way hash of your IP address combined with a random
 value that changes every day. The daily random value is deleted after the day ends, so the hashes can no
-longer be linked to an IP address, and the rate-limit records themselves are deleted after 2 days.
+longer be linked to an IP address, and the rate-limit records themselves are deleted within 2 days.
 
 Our hosting provider, Cloudflare, processes requests on our behalf and keeps short-lived request logs (which
 can include IP address, request path and approximate network location) that we use only for debugging and
@@ -90,9 +91,11 @@ security. These logs are kept for no more than 7 days.
 
 - **Everyone using the app** can see the leaderboard: your display name (or anonymous name), rank, island
   percentage and number of trails completed. Nobody can see where or when you walked. The leaderboard is
-  refreshed once a day, except your own row, which only you see live.
+  refreshed once a day, except your own row, which only you see live. If you hide yourself from the leaderboard
+  (Me > Account), nobody else sees your row.
 - **Community trail stats** (for example "25 walkers, 10 completed") are aggregates. Numbers below 5 are hidden
-  and larger ones are rounded to the nearest 5, so they do not reveal individual walkers.
+  and larger ones are rounded to the nearest 5, so they do not reveal individual walkers. They still count you
+  if you hide yourself from the leaderboard.
 - **We** can see the server data described above, to run the service and review reported names. We may hide a
   user from the leaderboard or reset an offensive name.
 - **Service providers** that run parts of the service for us:
@@ -112,7 +115,7 @@ required by law, and only what is required.
 - On your phone: raw walk recordings for 30 days after each walk; everything else until you delete it or
   uninstall the app.
 - On our server: account data until you delete your account. Sign-in sessions expire after 90 days and are then
-  deleted. Rate-limit records are deleted after 2 days; daily hashing values after one day. Hosting logs are kept
+  deleted. Rate-limit records are deleted within 2 days; daily hashing values after one day. Hosting logs are kept
   for no more than 7 days.
 - After you delete your account, your row disappears from the leaderboard immediately; community trail stats
   stop counting you at their next daily refresh.
@@ -128,6 +131,8 @@ required by law, and only what is required.
 - **Sign out** at any time; your progress stays on the phone but stops syncing.
 - **Use the app without an account**: recording, progress and the map all work offline without one.
 - **Change or remove your display name** in Me > Account; without one, your anonymous name is shown.
+- **Hide yourself from the leaderboard** in Me > Account (Hide me from the leaderboard). Turn it off to appear
+  again. Your progress still syncs and still counts in community trail stats.
 - **Permissions**: you can turn off location, physical activity and notifications in your phone's settings.
   Without location you cannot record walks; without physical activity, walks are saved as "Unverified".
 

@@ -62,7 +62,8 @@ type is **Optional**.
    to the name claim in the token: if the form asks, mark **Name** also as ephemeral for the Google token (the
    stored Name above is the display name). Apple sign-in is iOS-only and requests no scopes.
 4. **IP addresses.** Not a Play data type. Stored only as `SHA-256(daily salt + IP)` rate-limit keys, salt
-   deleted daily, rows after 2 days. Explained in the privacy policy.
+   deleted daily, rows within 2 days (daily cron deletes rows whose window, at most 24 h, has ended). Explained in
+   the privacy policy.
 5. **Third parties that receive data.** Cloudflare (hosting, processor on our behalf: not "sharing" under Play's
    service-provider exemption), Google (sign-in, initiated by the user). No SDKs that send data: MapLibre
    (no telemetry), Ktor, kotlinx, AndroidX, Play services location / activity recognition / Credential Manager
