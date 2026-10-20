@@ -28,6 +28,7 @@ export const LIMITS = {
   coveragePerUser: { limit: 30, windowMs: 60 * 60_000 },
   nameChangesPerUser: { limit: 5, windowMs: 24 * 60 * 60_000 },
   reportsPerUser: { limit: 20, windowMs: 24 * 60 * 60_000 },
+  hideTogglesPerUser: { limit: 10, windowMs: 24 * 60 * 60_000 },
   publicPerIp: { limit: 120, windowMs: 10 * 60_000 },
 } as const;
 
@@ -68,10 +69,16 @@ export function resetPublicRateLimit(): void {
   publicHits.clear();
 }
 
-/** Cron housekeeping: old counters, expired sessions, old salts. */
+/** Longest D1-backed window. A row whose window has ended is dead weight (the next call resets it). */
+export const MAX_WINDOW_MS = Math.max(...Object.values(LIMITS).map((l) => l.windowMs));
+
+/**
+ * Cron housekeeping (daily): ended counters, expired sessions, old salts. Cutoff = longest window, so with a daily
+ * cron no rate-limit row lives more than ~2 days after its window started (privacy policy: "within 2 days").
+ */
 export async function purgeHousekeeping(env: Env, now: number): Promise<void> {
   await env.DB.batch([
-    env.DB.prepare("DELETE FROM rate_limits WHERE window_start < ?").bind(now - 2 * 24 * 60 * 60_000),
+    env.DB.prepare("DELETE FROM rate_limits WHERE window_start < ?").bind(now - MAX_WINDOW_MS),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now),
     env.DB.prepare("DELETE FROM daily_salt WHERE day < ?").bind(utcDay(now)),
   ]);

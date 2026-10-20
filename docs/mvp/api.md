@@ -94,6 +94,7 @@ Bearer required. Revokes that token. `204`, no body. Local progress stays (D11).
   "isAnonymous": false,
   "nameStatus": "ok",
   "hiddenFromBoard": false,
+  "hiddenByModeration": false,
   "metrics": {
     "islandPct": 12.3,
     "islandCoveredM": 13011.4,
@@ -120,13 +121,16 @@ Any subset of:
 { "anonName": "Sleepy Newt 31" }    // after Shuffle / after sign-in; must use the shared word lists
 { "hiddenFromBoard": true }         // P1-8 "Hide me from the leaderboard" (boolean)
 ```
-`200` → same body as `GET /v1/me`. Errors: `name_invalid`, `name_rejected`, `name_rate_limited`, `bad_request`.
+`200` → same body as `GET /v1/me`. Errors: `name_invalid`, `name_rejected`, `name_rate_limited`, `bad_request`,
+`rate_limited` (429 with `retry-after`: more than 10 `hiddenFromBoard` changes per 24 h; re-sending the current
+value doesn't count).
 
 `hiddenFromBoard` is the user's own choice (column `self_hidden`), separate from an admin hide (`hidden`), so
-turning it off never undoes moderation; an admin hide is not reported in this field. Hiding removes the row from
+turning it off never undoes moderation; an admin hide is reported only as `hiddenByModeration` (P2-10: the app
+shows a neutral note so the user knows why the toggle doesn't bring the row back). Hiding removes the row from
 the leaderboard snapshot at once (`you` becomes null). Un-hiding brings back the caller's live `you` row at once;
-others see the row again at the next daily snapshot (TL-11). Hidden users still count in the anonymous community
-trail stats (counts < 5 hidden, rounded to 5).
+others see the row again at the next daily snapshot (TL-11). Self-hidden users still count in the anonymous
+community trail stats (counts < 5 hidden, rounded to 5); admin-hidden users don't.
 
 Name rules (server authoritative, TL-9): NFC, trim, collapse spaces; 3–24 characters; only
 `[A-Za-z0-9 À-ÖØ-öø-ÿ'._-]`; ≥ 2 letters; no `@`, `www`, `http`, `.tld`; allowlist first, then severe
