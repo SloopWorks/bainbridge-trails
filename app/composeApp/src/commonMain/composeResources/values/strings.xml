@@ -35,7 +35,10 @@
 
     <!-- Onboarding -->
     <string name="onboarding_1_title">Walk every trail on the island</string>
-    <string name="onboarding_1_body">Bainbridge has over 60 miles of public trails. See them all, pick one, and watch your map fill in.</string>
+    <!-- %1$s = goal_distance_mi/km of floor(island total) (RP-20, RD-4: never a hard-coded number) -->
+    <string name="onboarding_1_body">Bainbridge has over %1$s of public trails. See them all, pick one, and watch your map fill in.</string>
+    <string name="goal_distance_mi">%1$d miles</string>
+    <string name="goal_distance_km">%1$d km</string>
     <string name="onboarding_2_title">Every step adds up</string>
     <string name="onboarding_2_body">Record a walk and the trails you cover light up. Finish a trail across as many walks as you like, in any direction. A trail counts as complete at %1$d%.</string>
     <string name="onboarding_3_title">Your walks stay on your phone</string>

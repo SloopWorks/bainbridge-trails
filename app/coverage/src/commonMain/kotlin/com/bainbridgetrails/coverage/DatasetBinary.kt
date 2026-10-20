@@ -11,8 +11,10 @@ package com.bainbridgetrails.coverage
  * i32 MAGIC  i32 FORMAT  str version  i64 trailsJsonHash  f64 islandTotalM
  * i32 nStrings  str * nStrings                       // ids, names, categories (deduplicated)
  * i32 nTrails
- *   per trail:   i32 idRef  i32 nameRef  f64 computedLengthMi  u8 flags (1 = official, 2 = park)
+ *   per trail:   i32 idRef  i32 nameRef  f64 computedLengthMi  u8 flags (1 = official, 2 = park, 4 = road fields)
  *                [f64 officialLengthMi]  [i32 parkRef]
+ *                [u8 counted  i32 categoryRef  i32 ownershipRef  i32 surfaceRef  i32 maintainerRef  i32 speedMph
+ *                 f64 climbTotalM]                   // road fields: ref -1 / speed Int.MIN_VALUE / climb NaN = null
  *                i32 nSegmentIds  i32 segmentRef * nSegmentIds
  * i32 nSegments
  *   per segment: i32 idRef  f64 lengthM  u8 flags (1 = included, 2 = has category)  [i32 categoryRef]
@@ -25,7 +27,7 @@ package com.bainbridgetrails.coverage
  */
 object DatasetBinary {
     const val MAGIC: Int = 0x53445442 // "BTDS"
-    const val FORMAT: Int = 2
+    const val FORMAT: Int = 3
 
     fun encode(dataset: Dataset, trailsJsonHash: Long): ByteArray {
         val strings = LinkedHashMap<String, Int>()
@@ -34,6 +36,7 @@ object DatasetBinary {
             ref(t.id)
             ref(t.name)
             t.park?.let(::ref)
+            listOfNotNull(t.category, t.ownership, t.surface, t.maintainer).forEach(::ref)
             t.segmentIds.forEach(::ref)
         }
         for (s in dataset.segments) {
@@ -56,9 +59,16 @@ object DatasetBinary {
             w.f64(t.computedLengthMi)
             val official = t.officialLengthMi
             val park = t.park
-            w.u8((if (official != null) 1 else 0) or (if (park != null) 2 else 0))
+            val road = t.hasRoadFields
+            w.u8((if (official != null) 1 else 0) or (if (park != null) 2 else 0) or (if (road) 4 else 0))
             if (official != null) w.f64(official)
             if (park != null) w.i32(ref(park))
+            if (road) {
+                w.u8(if (t.counted) 1 else 0)
+                for (s in listOf(t.category, t.ownership, t.surface, t.maintainer)) w.i32(s?.let(::ref) ?: -1)
+                w.i32(t.speedMph ?: Int.MIN_VALUE)
+                w.f64(t.climbTotalM ?: Double.NaN)
+            }
             w.i32(t.segmentIds.size)
             for (s in t.segmentIds) w.i32(ref(s))
         }
@@ -104,7 +114,19 @@ object DatasetBinary {
             val tf = r.u8()
             val official = if (tf and 1 != 0) r.f64() else null
             val park = if (tf and 2 != 0) strings[r.i32()] else null
-            TrailMeta(id, name, List(r.i32()) { strings[r.i32()] }, computed, official, park)
+            if (tf and 4 == 0) {
+                TrailMeta(id, name, List(r.i32()) { strings[r.i32()] }, computed, official, park)
+            } else {
+                val counted = r.u8() != 0
+                val refs = List(4) { r.i32().let { i -> if (i < 0) null else strings[i] } }
+                val speed = r.i32().takeIf { it != Int.MIN_VALUE }
+                val climb = r.f64().takeIf { !it.isNaN() }
+                TrailMeta(
+                    id, name, List(r.i32()) { strings[r.i32()] }, computed, official, park,
+                    counted = counted, category = refs[0], ownership = refs[1], surface = refs[2], maintainer = refs[3],
+                    speedMph = speed, climbTotalM = climb,
+                )
+            }
         }
         val n = r.i32()
         val ids = arrayOfNulls<String>(n)

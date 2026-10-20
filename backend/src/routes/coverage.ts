@@ -148,7 +148,7 @@ function parseWalks(raw: unknown, maxWalks: number): Walk[] {
 async function newWalks(env: Env, userId: string, dataset: Dataset, walks: Walk[]): Promise<Walk[]> {
   if (walks.length === 0) return [];
   const { results } = await env.DB.prepare(
-    "SELECT j.value AS id FROM json_each(?3) j JOIN walks w ON w.user_id = ?1 AND w.dataset = ?2 AND w.walk_id = j.value",
+    "SELECT j.value AS id FROM json_each(?3) j JOIN walks_v2 w ON w.user_id = ?1 AND w.dataset = ?2 AND w.walk_id = j.value",
   )
     .bind(userId, dataset, JSON.stringify(walks.map((w) => w.id)))
     .run<{ id: string }>();
@@ -159,9 +159,11 @@ async function newWalks(env: Env, userId: string, dataset: Dataset, walks: Walk[
 const CAS_FAILED = /NOT NULL constraint failed/i;
 
 export async function putCoverage(request: Request, url: URL, env: Env, deps: Deps, user: UserRow): Promise<Response> {
-  await rateLimit(env, deps.now(), `cov:${user.id}`, LIMITS.coveragePerUser.limit, LIMITS.coveragePerUser.windowMs);
-  const parsed = parseUpload(await readJson(request, MAX_COVERAGE_BODY), url);
-  const { dataset } = parsed;
+  const body = await readJson(request, MAX_COVERAGE_BODY);
+  // P2-7: one budget per dataset (each app syncs on its own); counted before the costly validation
+  const dataset = isObject(body) ? uploadDataset(body, url) : "trails";
+  await rateLimit(env, deps.now(), `cov:${dataset}:${user.id}`, LIMITS.coveragePerUser.limit, LIMITS.coveragePerUser.windowMs);
+  const parsed = parseUpload(body, url);
   const meta = METAS[dataset];
   let m: MetricsRow = await metricsFor(env, user.id, dataset, deps.now());
   const upload: ParsedUpload = { ...parsed, walks: parseWalks(parsed.rawWalks, m.backfilled ? MAX_WALKS_PER_UPLOAD : MAX_WALKS_BACKFILL) };
@@ -264,7 +266,7 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
     }
     const insCompleted = env.DB.prepare("INSERT INTO user_completed (user_id, trail_id, dataset) VALUES (?, ?, ?) ON CONFLICT DO NOTHING");
     for (const t of newlyCompleted) stmts.push(insCompleted.bind(user.id, t, dataset));
-    const insWalk = env.DB.prepare("INSERT INTO walks (user_id, dataset, walk_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING");
+    const insWalk = env.DB.prepare("INSERT INTO walks_v2 (user_id, dataset, walk_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING");
     for (const w of fresh) stmts.push(insWalk.bind(user.id, dataset, w.id));
     try {
       await env.DB.batch(stmts);

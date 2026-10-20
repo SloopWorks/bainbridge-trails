@@ -1,0 +1,4 @@
+<resources>
+    <!-- Debug label: short so it never truncates next to "Trails dev" (ux.md 1.2). Variant res beats src/debug and src/roads. -->
+    <string name="app_name">Roads dev</string>
+</resources>

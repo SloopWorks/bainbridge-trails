@@ -98,7 +98,7 @@ class RecordingService : Service() {
         events = channel
         this.sessionId = sessionId
         stopping = false
-        val dir = File(noBackupFilesDir, "tracking").path
+        val dir = com.bainbridgetrails.record.trackingDir(this)
         val startMs = System.currentTimeMillis()
 
         scope.launch {

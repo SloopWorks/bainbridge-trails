@@ -103,7 +103,9 @@ actual fun startRecordingService(context: PlatformContext, sessionId: String, re
 
 actual fun stopRecordingService(context: PlatformContext) = RecordingService.stop(context)
 
-actual fun trackingDir(context: PlatformContext): String = File(context.noBackupFilesDir, "tracking").path
+/** Per goal ([DatasetProfile.storeName]): coverage, walks and raw tracks of the two goals never mix. */
+actual fun trackingDir(context: PlatformContext): String =
+    File(context.noBackupFilesDir, com.bainbridgetrails.data.DatasetProfile.current.storeName("tracking")).path
 
 actual fun openAppSettings(context: PlatformContext) {
     context.startActivity(

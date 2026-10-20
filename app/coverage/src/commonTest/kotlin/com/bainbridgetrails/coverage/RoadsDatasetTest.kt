@@ -34,6 +34,14 @@ class RoadsDatasetTest {
         assertEquals(listOf("road-aaron-avenue-northeast"), d.segments.single().trailIds)
         assertEquals(487.5, d.segments.single().lengthM)
         assertEquals("residential", d.segments.single().category)
+        // product.md §4 road fields (defaults keep trails.json rows unchanged)
+        val r = d.trails.single()
+        assertEquals(true, r.counted)
+        assertEquals("residential", r.category)
+        assertEquals("public_city", r.ownership)
+        assertEquals(null, r.surface)
+        assertEquals(20, r.speedMph)
+        assertEquals(10.0, r.climbTotalM)
     }
 
     /** RD-2b: the roads coverage_segments.json carries the trail dataset's segments as matching-only competitors. */

@@ -152,7 +152,7 @@ fun MeScreen(
             val geometry by produceState<IslandGeometry?>(null, data) { value = IslandGeometry.forDataset(data.dataset) }
             val s = snapshot
             val walks = history?.walks.orEmpty()
-            val stats = MeLogic.stats(s?.islandFraction ?: 0.0, s?.trailsCompleted ?: 0, data.dataset.trails.size, walks)
+            val stats = MeLogic.stats(s?.islandFraction ?: 0.0, s?.trailsCompleted ?: 0, data.progress.countedTrailCount, walks)
             val inProgress = remember(s) { MeLogic.inProgress(s?.trails.orEmpty()) }
             val rows = remember(walks, s) { MeLogic.walkRows(walks) { id -> s?.trail(id)?.name } }
             val segStatus = remember(s) { s?.segmentBuckets.orEmpty().bySegment() }

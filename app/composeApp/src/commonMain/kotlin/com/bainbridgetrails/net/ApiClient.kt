@@ -38,6 +38,11 @@ class ApiClient(
     private val onUnauthorized: suspend (bearer: String) -> Unit = {},
     /** Off in tests: HttpTimeout's timers run on the caller's (virtual-time) dispatcher under runTest. */
     timeouts: Boolean = true,
+    /**
+     * RD-7 (api.md "Datasets"): the goal's dataset key. Anything but "trails" is sent on every progress call (coverage
+     * PUT body / GET query, leaderboard, stats); trails requests stay exactly the v1 ones (server default).
+     */
+    private val dataset: () -> String = { TRAILS },
 ) {
     private val http = HttpClient(engine) {
         expectSuccess = false
@@ -73,15 +78,21 @@ class ApiClient(
 
     // --- coverage
     suspend fun putCoverage(upload: CoverageUpload): ApiResult<CoverageResponse> =
-        call(HttpMethod.Put, "/v1/coverage", CoverageResponse.serializer(), body(CoverageUpload.serializer(), upload))
+        call(HttpMethod.Put, "/v1/coverage", CoverageResponse.serializer(), body(CoverageUpload.serializer(), upload.copy(dataset = scoped())))
 
-    suspend fun getCoverage(): ApiResult<CoverageResponse> = call(HttpMethod.Get, "/v1/coverage", CoverageResponse.serializer())
+    suspend fun getCoverage(): ApiResult<CoverageResponse> =
+        call(HttpMethod.Get, "/v1/coverage" + (scoped()?.let { "?dataset=$it" } ?: ""), CoverageResponse.serializer())
 
     // --- community
     suspend fun leaderboard(limit: Int = 100): ApiResult<LeaderboardDto> =
-        call(HttpMethod.Get, "/v1/leaderboard?limit=$limit", LeaderboardDto.serializer())
+        call(HttpMethod.Get, "/v1/leaderboard?limit=$limit" + (scoped()?.let { "&dataset=$it" } ?: ""), LeaderboardDto.serializer())
 
-    suspend fun trailStats(): ApiResult<TrailStatsDto> = call(HttpMethod.Get, "/v1/trails/stats", TrailStatsDto.serializer(), auth = false)
+    /** Community stats per trail/road (`/v1/trails/stats` for trails, `/v1/stats?dataset=` otherwise). */
+    suspend fun trailStats(): ApiResult<TrailStatsDto> =
+        call(HttpMethod.Get, scoped()?.let { "/v1/stats?dataset=$it" } ?: "/v1/trails/stats", TrailStatsDto.serializer(), auth = false)
+
+    /** The dataset to send, or null for trails (the server default: requests unchanged). */
+    private fun scoped(): String? = dataset().takeIf { it != TRAILS }
 
     suspend fun reportName(userId: String): ApiResult<Unit> =
         call(HttpMethod.Post, "/v1/report-name", null, body(ReportNameRequest.serializer(), ReportNameRequest(userId)))
@@ -149,6 +160,9 @@ class ApiClient(
 
     companion object {
         private const val TAG = "api"
+
+        /** The server's default dataset (api.md "Datasets"). */
+        const val TRAILS = "trails"
 
         /** Shared wire format: tolerant reads, nulls omitted on write (PUT /v1/me builds its JsonObject by hand). */
         val json = Json {
