@@ -131,7 +131,6 @@ import com.bainbridgetrails.ui.components.BtIcons
 import com.bainbridgetrails.ui.components.LocateButton
 import com.bainbridgetrails.ui.components.LocateMode
 import com.bainbridgetrails.ui.components.MapIconButton
-import com.bainbridgetrails.ui.components.RecordingPill
 import com.bainbridgetrails.ui.components.StatusLegend
 import com.bainbridgetrails.ui.components.TrailChooserSheet
 import com.bainbridgetrails.ui.components.TrailPeekSheet
@@ -140,6 +139,8 @@ import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PillShape
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
@@ -164,7 +165,7 @@ private const val LOCATE_TIMEOUT_MS = 12_000L
 
 /**
  * Map tab (ux.md §3.2, §6; product F2): full-bleed map with per-segment status layers, tap → peek / chooser sheet,
- * selected-trail halo with the rest dimmed, legend, locate-me, leaderboard shortcut and the recording pill. The map
+ * selected-trail halo with the rest dimmed, legend, locate-me and leaderboard shortcut (the recording pill is the shell's). The map
  * shows at once (bundled tiles); statuses arrive when the dataset and coverage have loaded.
  */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -184,7 +185,10 @@ fun MapTab(
     val snapshot by graph.progress.snapshot.collectAsStateWithLifecycle()
     val facts by produceState<Map<String, TrailFacts>>(emptyMap()) { value = runCatching { TrailFactsRepository.all() }.getOrDefault(emptyMap()) }
     val recordingController by produceState<RecordingController?>(null, graph) { value = runCatching { graph.controller().await() }.getOrNull() }
-    val recordingState = recordingController?.state?.collectAsStateWithLifecycle()?.value
+    // Only "is a walk recording" matters here (Start-walk label); a fix or a tick must not recompose the map screen.
+    val recording = recordingController?.let { c ->
+        remember(c) { c.state.map { it is RecordingState.Recording }.distinctUntilChanged() }.collectAsStateWithLifecycle(c.state.value is RecordingState.Recording).value
+    } ?: false
     val style = settings.effectiveMapStyle(isSystemInDarkTheme())
     val reduced = BtTheme.motion.reduced
     val density = LocalDensity.current
@@ -337,14 +341,6 @@ fun MapTab(
     }
 
     val startWalk = rememberStartWalk(graph, onRecord)
-    val recording = recordingState as? RecordingState.Recording
-    // Recording pill ticks once a second while visible.
-    val now by produceState(0L, recording != null) {
-        while (recording != null) {
-            value = kotlin.time.Clock.System.now().toEpochMilliseconds()
-            delay(1_000)
-        }
-    }
 
     val sheetOpen = selectedId != null || choices != null
     NavigationBackHandler(
@@ -409,7 +405,7 @@ fun MapTab(
             }
         }
 
-        // Bottom: legend + locate row, then the sheet, then the recording pill.
+        // Bottom: legend + locate row, then the sheet.
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = BtTheme.spacing.screenH).padding(bottom = 64.dp),
@@ -434,7 +430,7 @@ fun MapTab(
                             onStart = startWalk,
                             onDetails = { onTrail(s.id) },
                             onDismiss = ::clearSelection,
-                            startLabel = stringResource(if (recording != null) Res.string.detail_go_to_recording else Res.string.detail_start_walk),
+                            startLabel = stringResource(if (recording) Res.string.detail_go_to_recording else Res.string.detail_start_walk),
                         )
                     }
                 }
@@ -445,11 +441,6 @@ fun MapTab(
                     exit = slideOutVertically(tween(if (reduced) 0 else 200)) { it } + fadeOut(),
                 ) {
                     TrailChooserSheet(choiceSummaries.orEmpty(), onPick = { select(it, controller.mapState) }, onDismiss = ::clearSelection)
-                }
-                if (recording != null) {
-                    Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
-                        RecordingPill((now - recording.startedMs).coerceAtLeast(0), recording.distanceM, settings.units, onRecord)
-                    }
                 }
             }
         }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
@@ -71,6 +72,8 @@ import com.bainbridgetrails.ui.theme.BtDuration
 import com.bainbridgetrails.ui.theme.BtEasing
 import com.bainbridgetrails.ui.theme.BtTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.StringResource
@@ -108,10 +111,19 @@ fun NavController.closeRecord() {
 }
 
 /** Tab switch: one copy of each tab, state saved/restored, Back from any tab returns to the start tab (F0 step 3). */
-fun NavController.selectTab(route: Route) = navigate(route) {
-    popUpTo(graph.findStartDestination().id) { saveState = true }
-    launchSingleTop = true
-    restoreState = true
+fun NavController.selectTab(route: Route) {
+    // Re-tapping the selected tab returns to its root (e.g. Trails → detail → tap Trails = the list), instead of
+    // restoreState re-pushing the saved detail.
+    val tabEntry = currentBackStack.value.lastOrNull { e -> BarRoutes.any { e.destination.isTab(it) } }
+    if (tabEntry != null && tabEntry.destination.isTab(route) && currentDestination?.isTab(route) != true) {
+        popBackStack(tabEntry.destination.id, inclusive = false)
+        return
+    }
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
 }
 
 private fun NavDestination?.isTab(tab: Route) = this?.hasRoute(tab::class) == true
@@ -124,7 +136,11 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
     val backStack by nav.currentBackStackEntryAsState()
     val destination = backStack?.destination
     val controller by rememberController(graph)
-    val recordingState = controller?.state?.let { produceState<RecordingState>(it.value, it) { it.collect { s -> value = s } }.value }
+    // Only what the shell decides on (bar label, pill shown, pending Record flow): a walk's every fix must not
+    // recompose the whole shell. The pill collects the live state itself.
+    val shell = controller?.let { c ->
+        remember(c) { c.state.map(::shellRecording).distinctUntilChanged() }.collectAsState(shellRecording(c.state.value)).value
+    } ?: ShellRecording()
 
     // F1: first run shows onboarding over Map (spike launches skip it).
     LaunchedEffect(Unit) {
@@ -150,11 +166,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
     }
     // F0 step 5 / TL-4: a recovered walk (Count it / Discard) or results finalised away from the Record flow
     // (notification Stop, launch auto-finalise) open the Record flow.
-    val pendingKind = when (recordingState) {
-        is RecordingState.Recover -> "recover-" + recordingState.sessionId
-        is RecordingState.Done -> "done-" + recordingState.summary.sessionId
-        else -> null
-    }
+    val pendingKind = shell.pendingKind
     LaunchedEffect(pendingKind, destination?.route) {
         if (pendingKind == null || destination == null) return@LaunchedEffect
         val blocked = destination.isTab(RecordRoute) || destination.isTab(OnboardingRoute) || destination.hasRoute(CelebrationRoute::class)
@@ -164,7 +176,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
     // ux.md §3.4: the bar stays visible under Trail detail (its Start walk sits above it).
     val showBar = BarRoutes.any { destination.isTab(it) } || destination?.hasRoute(TrailDetailRoute::class) == true
     val reduced = BtTheme.motion.reduced
-    val recording = recordingState is RecordingState.Recording
+    val recording = shell.recording
     // Content stops at the bar's top edge (80dp + nav inset); the Record disc rises over it.
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val barPadding = if (showBar) BtTheme.spacing.bottomBarHeight + navInset else 0.dp
@@ -266,9 +278,10 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
         }
         // ux.md §2.5: while a walk records and the Record flow is minimized, the pill floats above the bar.
         val onRecordFlow = destination.isTab(RecordRoute) || destination?.hasRoute(CelebrationRoute::class) == true || destination.isTab(OnboardingRoute)
-        if (recordingState is RecordingState.Recording && destination != null && !onRecordFlow) {
+        val c = controller
+        if (recording && c != null && destination != null && !onRecordFlow) {
             LiveRecordingPill(
-                recordingState,
+                c,
                 settings,
                 onClick = { nav.openRecord() },
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = (if (showBar) barPadding + RecordDiscRise else navInset) + 12.dp),
@@ -277,9 +290,22 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
     }
 }
 
-/** [RecordingPill] with its own 1 s clock (only the pill recomposes every second). */
+/** What [AppShell] reads from the recording state; equal values skip recomposition. */
+private data class ShellRecording(val recording: Boolean = false, val pendingKind: String? = null)
+
+private fun shellRecording(s: RecordingState) = ShellRecording(
+    recording = s is RecordingState.Recording,
+    pendingKind = when (s) {
+        is RecordingState.Recover -> "recover-" + s.sessionId
+        is RecordingState.Done -> "done-" + s.summary.sessionId
+        else -> null
+    },
+)
+
+/** [RecordingPill] with its own 1 s clock and its own state collection (only the pill recomposes per second / fix). */
 @Composable
-private fun LiveRecordingPill(r: RecordingState.Recording, settings: AppSettings, onClick: () -> Unit, modifier: Modifier) {
+private fun LiveRecordingPill(controller: RecordingController, settings: AppSettings, onClick: () -> Unit, modifier: Modifier) {
+    val r = controller.state.collectAsState().value as? RecordingState.Recording ?: return
     var now by remember { mutableLongStateOf(Clock.System.now().toEpochMilliseconds()) }
     LaunchedEffect(r.startedMs) {
         while (true) {
