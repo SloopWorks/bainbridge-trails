@@ -1,20 +1,28 @@
 package com.bainbridgetrails.coverage
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 
-/** One segment as in coverage_segments.json; coords are [lon, lat]. */
+/**
+ * One segment as in coverage_segments.json; coords are [lon, lat].
+ *
+ * The roads dataset (data/roads/dist) writes the same contract with `road_ids` in place of `trail_ids`, so one
+ * model reads either (@JsonNames alias; [trailIds] then holds road ids).
+ */
 @Serializable
 data class SegmentGeom(
     val id: String,
     @SerialName("length_m") val lengthM: Double,
     val included: Boolean,
-    @SerialName("trail_ids") val trailIds: List<String>,
+    @OptIn(ExperimentalSerializationApi::class)
+    @SerialName("trail_ids") @JsonNames("road_ids") val trailIds: List<String>,
     val coords: List<List<Double>>,
     val category: String? = null,
 )

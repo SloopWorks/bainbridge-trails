@@ -21,6 +21,10 @@ app/composeApp/src/commonMain/composeResources/files/coverage_segments.json
 app/composeApp/src/commonMain/composeResources/files/dataset.bin
 app/composeApp/src/commonMain/composeResources/files/trailheads.json
 app/composeApp/src/commonMain/composeResources/files/ATTRIBUTION.md
+# the roads dataset's second profile (debug builds; docs/roads/plan.md)
+app/composeApp/src/commonMain/composeResources/files/roads.json
+app/composeApp/src/commonMain/composeResources/files/roads_coverage_segments.json
+app/composeApp/src/commonMain/composeResources/files/roads_dataset.bin
 
 # real GPS tracks: never committed
 data/tracks/private/

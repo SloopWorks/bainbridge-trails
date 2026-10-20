@@ -21,15 +21,16 @@ private const val USAGE = """usage:
         [--matchers competitive,hmm] [--hmm-sigmas 10] [--hmm-betas 5] [--off-network 25]  (HMM rows only)
   gpx --data DIR FILE.gpx...
   session --data DIR FILE.jsonl   (re-gate a recorded session; prints counts and per-trail %, no coordinates)
-  pack-dataset DIR OUT.bin        (DIR/trails.json + coverage_segments.json -> the app's dataset.bin, verified by re-reading)"""
+  cross --data DIR --walk-data DIR [--seeds 3] [--sigmas 5,10] [--intervals 1,5] [--buffers 30] [--limit 0]
+        (walk every trail of --walk-data, score against --data; prints false credit with and without the walked
+         dataset injected as `included: false` competitors)
+  pack-dataset DIR OUT.bin        (DIR's metadata + coverage segments -> the app's dataset.bin, verified by re-reading)
+
+any command: --meta trails.json --segments coverage_segments.json name the documents inside --data
+             (the roads dataset uses roads.json / coverage_segments.json; --walk-meta / --walk-segments for --walk-data)"""
 
 fun main(args: Array<String>) {
     if (args.isEmpty()) usage()
-    if (args[0] == "pack-dataset") {
-        if (args.size != 3) usage("pack-dataset takes DIR OUT.bin")
-        packDataset(File(args[1]), File(args[2]))
-        return
-    }
     val flags = HashMap<String, String>()
     val positional = ArrayList<String>()
     var i = 1
@@ -44,24 +45,45 @@ fun main(args: Array<String>) {
             i++
         }
     }
-    val allowed = when (args[0]) {
+    // The roads dataset (data/roads/dist) ships the same contract under different file names, so every command takes
+    // --meta / --segments instead of assuming the trail dataset's (docs/roads/data-spec.md).
+    val names = setOf("meta", "segments")
+    val allowed = names + when (args[0]) {
         "sweep" -> setOf("data", "out", "buffers", "headings", "margins", "smooth", "sigmas", "intervals", "seeds", "threshold",
             "matchers", "hmm-sigmas", "hmm-betas", "off-network")
         "gpx" -> setOf("data")
         "session" -> setOf("data")
+        "cross" -> setOf("data", "walk-data", "walk-meta", "walk-segments", "seeds", "sigmas", "intervals", "buffers", "limit")
+        "pack-dataset" -> emptySet()
         else -> usage("unknown command ${args[0]}")
     }
     (flags.keys - allowed).firstOrNull()?.let { usage("unknown flag --$it for ${args[0]}") }
-    if (args[0] == "sweep" && positional.isNotEmpty()) usage("unexpected argument ${positional.first()}")
+    if (args[0] == "pack-dataset") {
+        if (positional.size != 2) usage("pack-dataset takes DIR OUT.bin")
+        packDataset(File(positional[0]), File(positional[1]), flags["meta"], flags["segments"])
+        return
+    }
+    if (args[0] in setOf("sweep", "cross") && positional.isNotEmpty()) usage("unexpected argument ${positional.first()}")
     val dataDir = File(flags["data"] ?: usage("--data is required"))
-    val dataset = Dataset.parse(File(dataDir, "trails.json").readText(), File(dataDir, "coverage_segments.json").readText())
+    val dataset = readDataset(dataDir, flags["meta"], flags["segments"])
     when (args[0]) {
         "sweep" -> runSweep(dataset, flags)
         "gpx" -> runGpx(dataset, positional)
         "session" -> runSession(dataset, positional)
+        "cross" -> runCross(dataset, flags)
         else -> usage("unknown command ${args[0]}")
     }
 }
+
+/** Metadata document in [dir]: [meta] if given, else trails.json, else the roads dataset's roads.json. */
+internal fun metaFile(dir: File, meta: String?): File {
+    meta?.let { return File(dir, it) }
+    val trails = File(dir, "trails.json")
+    return if (trails.isFile) trails else File(dir, "roads.json")
+}
+
+internal fun readDataset(dir: File, meta: String?, segments: String?): Dataset =
+    Dataset.parse(metaFile(dir, meta).readText(), File(dir, segments ?: "coverage_segments.json").readText())
 
 private fun usage(msg: String? = null): Nothing {
     msg?.let { System.err.println(it) }
@@ -69,10 +91,10 @@ private fun usage(msg: String? = null): Nothing {
     exitProcess(2)
 }
 
-/** Writes [out] (atomically) from [dir]'s trails.json + coverage_segments.json; fails unless it decodes back equal. */
-internal fun packDataset(dir: File, out: File) {
-    val trails = File(dir, "trails.json").readBytes()
-    val dataset = Dataset.parse(trails.decodeToString(), File(dir, "coverage_segments.json").readText())
+/** Writes [out] (atomically) from [dir]'s metadata + coverage segments; fails unless it decodes back equal. */
+internal fun packDataset(dir: File, out: File, meta: String? = null, segments: String? = null) {
+    val trails = metaFile(dir, meta).readBytes()
+    val dataset = Dataset.parse(trails.decodeToString(), File(dir, segments ?: "coverage_segments.json").readText())
     val bytes = DatasetBinary.encode(dataset, DatasetBinary.hash(trails))
     val back = Dataset.fromBinary(bytes)
     check(

@@ -91,6 +91,130 @@ both datasets already use one id space with distinct prefixes.
   "pleasant / careful / avoid" rating per road, which is the thing a trail app cannot offer and the
   reason a road-walker would open this app twice.
 
+## What the roads mode actually feels like (prototype, 2026-10-20)
+
+Branch `roads/app-prototype`: the v1 app runs on `data/roads/dist` behind a debug-only switch
+([`DatasetProfile`](../../app/composeApp/src/commonMain/kotlin/com/bainbridgetrails/data/DatasetProfile.kt)),
+no flavour, no second model, no engine change. Screenshots: [`screens/`](screens/).
+
+**It works, and it works on the first try.** `@JsonNames("roads")` / `@JsonNames("road_ids")` were the whole
+app/coverage change; `Dataset`, `SegmentIndex`, `HmmMatcher` and `Progress` read the roads dataset unmodified, and
+`dataset.bin` packs it too (468 KB, parsed in 237–387 ms on an emulator against the trail dataset's 980 KB). The
+second dataset adds ~2.2 MB to the APK, so both ship and the switch needs no rebuild. On the device the engine
+matched a replayed road walk to the right road with no bleed onto the parallel road 100 m away
+([`walk-in-progress.png`](screens/walk-in-progress.png)).
+
+**What it feels like is *flat*.** A 0.5 mi walk took the island from 0 % to **0.1 %** (0.4 km of 261.5 km). The same
+walk on the trail goal is 0.5 %. 2.5× the denominator means the first month shows almost nothing, which is the
+multi-year-map argument from the other side: it is a real risk to first-run retention, not just a longer game.
+
+**It reads as a different kind of map.** The trail dataset draws sparse ribbons inside parks; the roads dataset covers
+the whole island, so at island zoom "not started" is 2003 dotted segments edge to edge
+([`map-island.png`](screens/map-island.png)). The category bed added here (state route → arterial → collector →
+residential, muted dashes for private, dots for the ownership holdouts) is what keeps it legible
+([`map-street.png`](screens/map-street.png)); without it every road is one weight and the island is a lace.
+
+### The three questions this was built to answer
+
+**1. Does per-segment painting read well on a 165 m-average road network? No — the segments are too long.**
+
+| counted segments | n | median | mean | p90 | max | share of length in segments > 200 m | > 400 m |
+|---|---|---|---|---|---|---|---|
+| trails | 1589 | 29 m | 66 m | 165 m | 1314 m | 41 % | 17 % |
+| roads | 1462 | **122 m** | **179 m** | **398 m** | 1674 m | **64 %** | **33 %** |
+
+The buckets themselves are fine; the unit they paint is not. Island Center Road NE is 0.77 mi in **two** segments,
+137 m and **1108 m**. A replayed 494 m walk finished the 137 m segment (violet) and covered 32 % of the 1108 m one —
+which paints the **whole 1108 m** gold "Partway", including the long westward leg the walker never entered
+([`walk-paints-whole-segment.png`](screens/walk-paints-whole-segment.png)). **751 m of unwalked road reads as
+progress.** On trails the same error is a 29 m segment, i.e. invisible.
+
+This is a pipeline fix, not an app fix: split road segments at a target length (~100–150 m) in
+`pipeline/src/bitrails/roads/` after junction splitting. Ids are issued per segment, so doing it **before** a roads
+release is much cheaper than after — `rseg-*` ids are never reused and the backend keys coverage by them.
+
+**2. Does `bufferM = 30` over-credit parallel streets or the other side of a two-sided road? No.**
+
+Sweeping the app's own matcher over the roads dataset (1328 simulated walks per row, HMM, `smoothWindowS = 10`,
+threshold 0.85), false credit = covered metres on roads *other than the walked one* ÷ walked metres:
+
+| buffer | σ = 5 m: false credit | complete rate | σ = 10 m: false credit | complete rate |
+|---|---|---|---|---|
+| 10 m | 0.80 % | 87.7 % | 2.22 % | 11.9 % |
+| 20 m | 0.64 % | 96.4 % | 2.23 % | 82.0 % |
+| **30 m** | **0.64 %** | **96.3 %** | **1.80 %** | **89.3 %** |
+
+False credit is flat-to-falling in buffer while the completion rate climbs, because a wider buffer gives the HMM more
+of the right road to lock onto. For comparison the trail dataset at the same settings is **0.90 %** — the road network
+is slightly *better* behaved than the trail network, which makes sense: `oneway=yes` covers only 6.9 km of the island
+and the dataset carries no sidewalks at all (they are footways in the trail dataset, see `data-spec.md`), so there are
+very few parallel carriageways to confuse. One walk in 1328 falsely completed another road.
+
+So `bufferM = 30` is not the problem *inside* the roads dataset. It is the problem *across* datasets:
+
+**3. Does a walk on a trail falsely paint a nearby road? Yes — badly. This is the one blocker.**
+
+New tool for this: `coverage-eval cross --data <roads dist> --meta roads.json --walk-data <trail dist>` walks every
+trail chain with the app's matcher and scores it against the roads dataset.
+
+| scenario (114 trails, 669 chain walks, 200.4 km walked, 3 seeds) | road metres credited | ÷ walked |
+|---|---|---|
+| roads dataset as it ships today | **19.4 km** | **9.7 %** |
+| same, with trail segments injected as `included: false` competitors | 0.6–2.3 km | 0.3–1.2 % |
+
+And the buffer ladder shows exactly where it comes from (1 seed, σ = 5 m):
+
+| buffer | 10 m | 15 m | 20 m | 25 m | 30 m |
+|---|---|---|---|---|---|
+| roads only | 0.05 % | 0.68 % | 3.4 % | 6.4 % | **9.6 %** |
+| with trail competitors | 0.20 % | 0.36 % | 0.36 % | 0.36 % | **0.36 %** |
+
+Worst offenders are the roads the trails run beside: Battle Point Drive NE (2.35 km over three seeds), SR 305
+(1.54 + 1.02 + 0.30 km), NE Tani Creek Road (1.07 km), NE Oddfellows Road, Old Mill Road NE. `CoverageParams` already
+documents the mechanism — at `offNetworkM = bufferM = 30`, *every* walk within the buffer of a lone feature is
+credited to it, and in the roads dataset the trail is not there to compete.
+
+**Recommendation: ship the trail segments into the roads dataset as competitors** — a change in
+`pipeline/src/bitrails/roads/dist.py`'s `coverage_segments_doc`, appending the trail dataset's shippable segments with
+`included: false` and `road_ids: []`. No app change, no licensing change (the trail dataset already ships only
+redistributable geometry), no id collision (`seg-*` vs `rseg-*`), and `SegmentGeom.isScored` already makes such a
+segment matching-only, so it can never be credited or drawn as progress. Cost: `coverage_segments.json` grows from
+788 KB to roughly 2.5 MB and `dataset.bin` likewise. Caveat on the 0.3–1.2 %: a simulated walk follows the trail
+centreline exactly, so the injected competitor is a perfect match; expect a real walk to do somewhat worse.
+
+### Other things the prototype exposed
+
+1. **"Walk, hike or bike" does not work today.** `CoverageParams.maxSpeedMps = 4.0` drops any fix faster than
+   ~14.4 km/h over a 30 s window (`filterFixes` rule 4) and `Gating` drops vehicle-classified activity, so a bike
+   ride credits nothing. The roads goal names cycling; the trail app's anti-driving defence is the same mechanism.
+   Resolving this (a mode switch? a per-dataset speed ceiling? accepting that only walking counts?) is a product
+   decision, not tuning, and it belongs in P1, not P4.
+2. **Strings are the loudest tell.** "Find a trail", the Trails tab, "664 of 664 trails", "of the island's trails
+   walked", "Trail miles on this phone", "Your walk is matched to mapped trails". None of it is wrong-looking enough
+   to break the prototype and all of it has to change.
+3. **The island denominator is hardcoded in copy**, not read from the dataset: onboarding says "over 60 miles of
+   public trails" and no screen ever prints the total. Only the debug drawer shows it (261.5 km = 162.5 mi,
+   [`debug-dataset.png`](screens/debug-dataset.png)). A flavour or a tab needs this data-driven.
+4. **Road detail drops the road-specific data.** `roads.json` carries `climb_total_m`, `surface`, `speed_mph` and
+   `maintainer`, but `TrailMeta` has no fields for them, so the detail screen shows "Elevation gain —" and nothing
+   else road-shaped ([`road-detail.png`](screens/road-detail.png)). Road ends (`road_ends.json`) are not wired at all.
+5. **The uncounted-feature treatment had to change.** Roads tiles carry `road_ids`, not `trail_ids`, so every
+   uncounted road falls into `StatusLayers`' unnamed-hairline branch. That is the muted read we want, but the trail
+   hairlines now explicitly skip road categories so the style's own private/holdout layers show through.
+6. **MapLibre gotcha, recorded so nobody repeats it:** a zoom `interpolate` nested inside `["*", …]` is not a valid
+   paint property and the native renderer silently drops the layer. The category bed applies its class factor per
+   interpolation stop instead (`scripts/build-map-styles.py`).
+7. Leaderboard and aggregate totals still blend the two goals — unchanged, still P2.
+
+### What this says about the decision
+
+The engine and the data contract are a non-issue: one enum and two `@JsonNames` aliases. What separates "second app"
+from "second tab" is everything *around* the dataset — strings, the goal number, the detail screen, the bike
+question, and a backend that can hold two island totals. Option 1 (second app, shared code) still looks right, and
+nothing here argues for merging the goals. The two things that should happen **before** any roads release, because
+they are expensive afterwards, are the segment split (P0, ids are permanent) and the trail competitors (P0, it is a
+correctness bug a user would see as their map painting itself).
+
 ## Decisions the owner has to make
 
 1. **Private roads in or out of the goal?** Out today (58.7 mi). They are drawn but uncounted, and

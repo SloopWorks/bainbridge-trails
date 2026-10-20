@@ -812,6 +812,277 @@
    }
   },
   {
+   "id": "roads-ds-bed",
+   "type": "line",
+   "source": "trails",
+   "source-layer": "segments",
+   "minzoom": 10,
+   "filter": [
+    "all",
+    [
+     "==",
+     [
+      "get",
+      "included"
+     ],
+     true
+    ],
+    [
+     "in",
+     [
+      "get",
+      "category"
+     ],
+     [
+      "literal",
+      [
+       "state_route",
+       "arterial",
+       "collector",
+       "residential",
+       "lane",
+       "driveway"
+      ]
+     ]
+    ]
+   ],
+   "layout": {
+    "line-cap": "round",
+    "line-join": "round"
+   },
+   "paint": {
+    "line-color": [
+     "match",
+     [
+      "get",
+      "category"
+     ],
+     "state_route",
+     "#5F86A6",
+     "arterial",
+     "#85A6BE",
+     "collector",
+     "#A6BFCB",
+     "#C2D1D1"
+    ],
+    "line-width": [
+     "interpolate",
+     [
+      "linear"
+     ],
+     [
+      "zoom"
+     ],
+     10,
+     [
+      "match",
+      [
+       "get",
+       "category"
+      ],
+      "state_route",
+      2.1,
+      "arterial",
+      1.7,
+      "collector",
+      1.35,
+      1.0
+     ],
+     13,
+     [
+      "match",
+      [
+       "get",
+       "category"
+      ],
+      "state_route",
+      5.88,
+      "arterial",
+      4.76,
+      "collector",
+      3.78,
+      2.8
+     ],
+     15,
+     [
+      "match",
+      [
+       "get",
+       "category"
+      ],
+      "state_route",
+      11.55,
+      "arterial",
+      9.35,
+      "collector",
+      7.43,
+      5.5
+     ],
+     18,
+     [
+      "match",
+      [
+       "get",
+       "category"
+      ],
+      "state_route",
+      23.1,
+      "arterial",
+      18.7,
+      "collector",
+      14.85,
+      11.0
+     ]
+    ],
+    "line-opacity": 1.0
+   }
+  },
+  {
+   "id": "roads-ds-private",
+   "type": "line",
+   "source": "trails",
+   "source-layer": "segments",
+   "minzoom": 10,
+   "filter": [
+    "all",
+    [
+     "!=",
+     [
+      "get",
+      "included"
+     ],
+     true
+    ],
+    [
+     "in",
+     [
+      "get",
+      "category"
+     ],
+     [
+      "literal",
+      [
+       "state_route",
+       "arterial",
+       "collector",
+       "residential",
+       "lane",
+       "driveway"
+      ]
+     ]
+    ],
+    [
+     "==",
+     [
+      "get",
+      "ownership"
+     ],
+     "private"
+    ]
+   ],
+   "layout": {
+    "line-cap": "round",
+    "line-join": "round"
+   },
+   "paint": {
+    "line-color": "#8E9890",
+    "line-opacity": 0.85,
+    "line-width": [
+     "interpolate",
+     [
+      "linear"
+     ],
+     [
+      "zoom"
+     ],
+     10,
+     0.6,
+     14,
+     1.6,
+     18,
+     3.4
+    ],
+    "line-dasharray": [
+     2.2,
+     1.8
+    ]
+   }
+  },
+  {
+   "id": "roads-ds-holdout",
+   "type": "line",
+   "source": "trails",
+   "source-layer": "segments",
+   "minzoom": 10,
+   "filter": [
+    "all",
+    [
+     "!=",
+     [
+      "get",
+      "included"
+     ],
+     true
+    ],
+    [
+     "in",
+     [
+      "get",
+      "category"
+     ],
+     [
+      "literal",
+      [
+       "state_route",
+       "arterial",
+       "collector",
+       "residential",
+       "lane",
+       "driveway"
+      ]
+     ]
+    ],
+    [
+     "!",
+     [
+      "==",
+      [
+       "get",
+       "ownership"
+      ],
+      "private"
+     ]
+    ]
+   ],
+   "layout": {
+    "line-cap": "round",
+    "line-join": "round"
+   },
+   "paint": {
+    "line-color": "#A2998A",
+    "line-opacity": 0.6375,
+    "line-width": [
+     "interpolate",
+     [
+      "linear"
+     ],
+     [
+      "zoom"
+     ],
+     10,
+     0.5,
+     14,
+     1.3,
+     18,
+     2.6
+    ],
+    "line-dasharray": [
+     0.01,
+     2.4
+    ]
+   }
+  },
+  {
    "id": "trails-mup-bed",
    "type": "line",
    "source": "trails",

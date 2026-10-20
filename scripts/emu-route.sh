@@ -4,6 +4,7 @@
 #
 #   scripts/emu-route.sh <trail-id> <interval-s> [max-seconds]
 #   e.g. scripts/emu-route.sh trail-gazzam-lake-main-trail 2 300
+#   e.g. DIST=data/roads/dist scripts/emu-route.sh road-battle-point-drive-northeast 2 600  (the roads dataset)
 #
 # Segments are chained greedily (nearest unused endpoint next, reversed as needed), so a branching
 # trail is walked as one continuous line with short straight hops between branches. Positions are
@@ -16,12 +17,17 @@ DIST="${DIST:-$ROOT/data/dist}"
 ADB="${ADB:-adb}"
 
 python3 -I - "$DIST" "$1" "$2" "${3:-0}" "$ADB" <<'PY'
-import json, math, subprocess, sys, time
+import json, math, os, subprocess, sys, time
 
 dist, trail_id, interval, max_s, adb = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4]), sys.argv[5]
 SPEED = 1.3  # m/s
 
-trails = {t["id"]: t for t in json.load(open(f"{dist}/trails.json"))["trails"]}
+# The roads dataset (data/roads/dist) is the same contract under other names: DIST=data/roads/dist works.
+meta = next((f"{dist}/{n}" for n in ("trails.json", "roads.json") if os.path.isfile(f"{dist}/{n}")), None)
+if meta is None:
+    sys.exit(f"no trails.json or roads.json in {dist}")
+doc = json.load(open(meta))
+trails = {t["id"]: t for t in (doc.get("trails") or doc["roads"])}
 if trail_id not in trails:
     close = [t for t in trails if trail_id.split("-")[1] in t] if "-" in trail_id else []
     sys.exit(f"unknown trail {trail_id!r}; similar: {close[:8]}")

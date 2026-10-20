@@ -3,6 +3,7 @@ package com.bainbridgetrails.graph
 import com.bainbridgetrails.analytics.Analytics
 import com.bainbridgetrails.analytics.AnalyticsEvents
 import com.bainbridgetrails.analytics.NoOpAnalytics
+import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.data.DatasetRepository
 import com.bainbridgetrails.data.DatasetSources
 import com.bainbridgetrails.data.ProgressRepository
@@ -62,21 +63,27 @@ object AppGraph {
     /** Main: UI-facing coordination; heavy work moves itself to Default/IO. Shared with [RecordingGraph]. */
     val scope: CoroutineScope get() = RecordingGraph.scope
 
-    /** Ruling R1: the bundled dataset, parsed once per process off Main. */
+    /**
+     * Ruling R1: the bundled dataset, parsed once per process off Main. Which dataset comes from [DatasetProfile]
+     * (trails in release; debug builds may select roads) — reading it here fixes the profile for the process.
+     */
     val datasets: DatasetRepository by lazy {
+        val profile = DatasetProfile.current
         // Res.readBytes reads on the calling thread: keep every read on IO.
         DatasetRepository(
             scope,
             DatasetSources(
-                trailsJson = { withContext(Dispatchers.IO) { Res.readBytes("files/trails.json") } },
-                segmentsJson = { withContext(Dispatchers.IO) { Res.readBytes("files/coverage_segments.json").decodeToString() } },
+                trailsJson = { withContext(Dispatchers.IO) { Res.readBytes("files/${profile.metadataFile}") } },
+                segmentsJson = { withContext(Dispatchers.IO) { Res.readBytes("files/${profile.coverageFile}").decodeToString() } },
                 datasetBin = {
-                    withContext(Dispatchers.IO) {
-                        try {
-                            Res.readBytes("files/dataset.bin")
-                        } catch (e: Exception) { // not synced (scripts/sync-app-assets.sh): fall back to the JSON
-                            if (e is CancellationException) throw e
-                            null
+                    profile.datasetBinFile?.let { name ->
+                        withContext(Dispatchers.IO) {
+                            try {
+                                Res.readBytes("files/$name")
+                            } catch (e: Exception) { // not synced (scripts/sync-app-assets.sh): fall back to the JSON
+                                if (e is CancellationException) throw e
+                                null
+                            }
                         }
                     }
                 },
