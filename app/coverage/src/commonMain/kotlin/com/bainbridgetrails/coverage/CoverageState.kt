@@ -40,6 +40,9 @@ class CoverageState internal constructor(bits: Map<String, LongArray>) {
     fun coveredM(index: SegmentIndex, segmentId: String): Double =
         bits[segmentId]?.sumOf { it.countOneBits() }?.times(index.tickLengthM(segmentId)) ?: 0.0
 
+    /** Covered metres summed over every segment with a covered tick (included or not; ticks × tick length). */
+    fun totalCoveredM(index: SegmentIndex): Double = bits.keys.sumOf { coveredM(index, it) }
+
     fun union(other: CoverageState): CoverageState {
         val out = HashMap<String, LongArray>()
         for ((k, v) in bits) out[k] = v.copyOf()

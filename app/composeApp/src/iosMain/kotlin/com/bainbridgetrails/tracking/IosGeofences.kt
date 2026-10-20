@@ -47,6 +47,15 @@ import platform.darwin.NSObject
 import kotlin.coroutines.resume
 
 /**
+ * Asks CoreLocation for Always authorization. Implemented in Swift under `#if DEBUG` (iOSApp.swift) and installed
+ * into [IosGeofences.alwaysRequester] at startup, so the release binary (Kotlin framework and app) contains no
+ * `requestAlwaysAuthorization` call at all (TL-10).
+ */
+interface AlwaysAuthorizationRequester {
+    fun requestAlways(manager: CLLocationManager)
+}
+
+/**
  * Opt-in trailhead geofences on iOS (Task 7 prototype): `CLCircularRegion` monitoring for the [Geofences.IOS_MAX]
  * nearest trailheads (the system limit is 20 per app), re-selected on significant-location-change, with a local
  * notification on region entry. Always authorization is requested only from the opt-in toggle, through this
@@ -70,13 +79,16 @@ object IosGeofences {
     private val notificationDelegate = NotificationDelegate()
     private var authWaiter: CompletableDeferred<Unit>? = null
 
+    /** Debug app builds with the GEOFENCE_PROTOTYPE condition only (Swift `#if DEBUG && GEOFENCE_PROTOTYPE`); null otherwise, so geofences are unsupported there. */
+    var alwaysRequester: AlwaysAuthorizationRequester? = null
+
     /**
      * Ruling R11 (mirrors Android R2): geofences are a debug-build prototype. Release builds show no toggle and never
      * request Always or monitor regions, until the owner decides to ship the feature.
      */
     @OptIn(kotlin.experimental.ExperimentalNativeApi::class)
     val supported: Boolean
-        get() = kotlin.native.Platform.isDebugBinary &&
+        get() = kotlin.native.Platform.isDebugBinary && alwaysRequester != null &&
             CLCircularRegion.`class`()?.let { CLLocationManager.isMonitoringAvailableForClass(it) } == true
 
     fun optedIn(): Boolean = NSUserDefaults.standardUserDefaults.boolForKey(KEY_OPTED_IN)
@@ -92,6 +104,7 @@ object IosGeofences {
      */
     suspend fun requestAlways(): Boolean {
         if (!supported) return false // R11: never ask for Always in release builds
+        val requester = alwaysRequester ?: return false
         val s = manager.authorizationStatus
         if (s != kCLAuthorizationStatusAuthorizedAlways &&
             (s == kCLAuthorizationStatusNotDetermined || s == kCLAuthorizationStatusAuthorizedWhenInUse)
@@ -108,7 +121,7 @@ object IosGeofences {
             val answered = CompletableDeferred<Unit>().also { authWaiter = it }
             try {
                 manager.delegate = delegate
-                manager.requestAlwaysAuthorization()
+                requester.requestAlways(manager)
                 if (withTimeoutOrNull(1_500) { prompted.await() } != null) {
                     // A system prompt is up: wait for the answer (or the app coming back without one).
                     withTimeoutOrNull(120_000) {

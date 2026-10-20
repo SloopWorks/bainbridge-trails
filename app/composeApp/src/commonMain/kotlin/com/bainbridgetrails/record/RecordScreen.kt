@@ -1,21 +1,36 @@
 package com.bainbridgetrails.record
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,25 +41,115 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.bainbridgetrails.auth.isSignedIn
+import com.bainbridgetrails.coverage.TrailStatus
+import com.bainbridgetrails.data.AppSettings
+import com.bainbridgetrails.data.Loadable
+import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.MapStyle
 import com.bainbridgetrails.map.SpikeLaunch
+import com.bainbridgetrails.map.StatusLayers
 import com.bainbridgetrails.map.TrailMap
+import com.bainbridgetrails.resources.Res
+import com.bainbridgetrails.resources.common_done
+import com.bainbridgetrails.resources.common_loading_trails
+import com.bainbridgetrails.resources.common_retry
+import com.bainbridgetrails.resources.ic_play_arrow
+import com.bainbridgetrails.resources.ic_warning
+import com.bainbridgetrails.resources.perm_location_allow
+import com.bainbridgetrails.resources.perm_precise_allow
+import com.bainbridgetrails.resources.perm_precise_body
+import com.bainbridgetrails.resources.record_close_a11y
+import com.bainbridgetrails.resources.record_distance
+import com.bainbridgetrails.resources.record_finish
+import com.bainbridgetrails.resources.record_finish_body
+import com.bainbridgetrails.resources.record_finish_confirm
+import com.bainbridgetrails.resources.record_finish_title
+import com.bainbridgetrails.resources.record_follow_a11y
+import com.bainbridgetrails.resources.record_gps_approx
+import com.bainbridgetrails.resources.record_gps_ok
+import com.bainbridgetrails.resources.record_gps_slow
+import com.bainbridgetrails.resources.record_gps_waiting
+import com.bainbridgetrails.resources.record_idle_hint
+import com.bainbridgetrails.resources.record_idle_private
+import com.bainbridgetrails.resources.record_idle_title
+import com.bainbridgetrails.resources.record_idle_what
+import com.bainbridgetrails.resources.record_keep_walking
+import com.bainbridgetrails.resources.record_live_collapse_a11y
+import com.bainbridgetrails.resources.record_live_empty
+import com.bainbridgetrails.resources.record_live_expand_a11y
+import com.bainbridgetrails.resources.record_live_header
+import com.bainbridgetrails.resources.record_live_header_count
+import com.bainbridgetrails.resources.record_live_provisional
+import com.bainbridgetrails.resources.record_loading_failed
+import com.bainbridgetrails.resources.record_matching
+import com.bainbridgetrails.resources.record_minimize_a11y
+import com.bainbridgetrails.resources.record_needs_location
+import com.bainbridgetrails.resources.record_not_now
+import com.bainbridgetrails.resources.record_open_settings
+import com.bainbridgetrails.resources.record_recording
+import com.bainbridgetrails.resources.record_settings
+import com.bainbridgetrails.resources.record_start
+import com.bainbridgetrails.resources.record_stopped_reason
+import com.bainbridgetrails.resources.record_time
+import com.bainbridgetrails.resources.record_unverified
+import com.bainbridgetrails.resources.record_unverified_body
+import com.bainbridgetrails.resources.record_unverified_title
+import com.bainbridgetrails.resources.recovery_body
+import com.bainbridgetrails.resources.recovery_discard
+import com.bainbridgetrails.resources.recovery_finish
+import com.bainbridgetrails.resources.recovery_title
+import com.bainbridgetrails.sync.SyncState
 import com.bainbridgetrails.tracking.Perm
 import com.bainbridgetrails.tracking.RecordingController
 import com.bainbridgetrails.tracking.RecordingState
+import com.bainbridgetrails.ui.Format
+import com.bainbridgetrails.ui.components.BtIcon
+import com.bainbridgetrails.ui.components.BtIcons
+import com.bainbridgetrails.ui.components.LiveTrailRow
+import com.bainbridgetrails.ui.components.LocateButton
+import com.bainbridgetrails.ui.components.LocateMode
+import com.bainbridgetrails.ui.components.MapIconButton
+import com.bainbridgetrails.ui.components.PrimaryButton
+import com.bainbridgetrails.ui.components.RecordingDot
+import com.bainbridgetrails.ui.components.StateChip
+import com.bainbridgetrails.ui.theme.BtExtraDark
+import com.bainbridgetrails.ui.theme.BtExtraLight
+import com.bainbridgetrails.ui.theme.BtTheme
+import com.bainbridgetrails.ui.theme.PillShape
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import org.maplibre.spatialk.geojson.Position
 import kotlin.time.Clock
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import com.bainbridgetrails.map.boundsOf
+import com.bainbridgetrails.map.fitTo
+import com.bainbridgetrails.map.rememberTrailMapController
+import org.maplibre.compose.util.DpPadding
 
 private sealed interface Load {
     data object Loading : Load
@@ -52,9 +157,22 @@ private sealed interface Load {
     data class Failed(val message: String) : Load
 }
 
-/** Record a walk over the Topo map: Start/Stop, elapsed, distance, GPS chip, live track, results. */
+/** GPS "waiting" longer than this shows `record_gps_slow` (product.md F5 States). */
+private const val GPS_SLOW_MS = 60_000L
+
+/**
+ * The Record flow (F5/F6, ux.md §3.5): a full-screen overlay over the shell. Idle → permissions → recording (live
+ * provisional trails, TL-8) → Finish confirm → finalizing → results; crash recovery as a dialog.
+ * [onClose] leaves the overlay: "close" when idle, "minimize" while recording (recording continues).
+ */
 @Composable
-fun RecordScreen(launch: SpikeLaunch = SpikeLaunch(), modifier: Modifier = Modifier) {
+fun RecordScreen(
+    settings: AppSettings,
+    onClose: () -> Unit,
+    onSignIn: () -> Unit,
+    modifier: Modifier = Modifier,
+    launch: SpikeLaunch = SpikeLaunch(),
+) {
     val context = rememberPlatformContext()
     var attempt by remember { mutableStateOf(0) }
     val load by produceState<Load>(Load.Loading, context, attempt) {
@@ -64,37 +182,60 @@ fun RecordScreen(launch: SpikeLaunch = SpikeLaunch(), modifier: Modifier = Modif
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Load.Failed("Trail data failed to load: ${e.message}")
+            Load.Failed(e.message ?: "")
         }
     }
+    val style = settings.effectiveMapStyle(isSystemInDarkTheme())
     when (val l = load) {
-        is Load.Ready -> RecordContent(l.controller, launch, context, modifier)
+        is Load.Ready -> RecordContent(l.controller, settings, style, launch, context, onClose, onSignIn, modifier)
         else -> Box(modifier.fillMaxSize()) {
-            TrailMap(MapStyle.TOPO, Modifier.fillMaxSize(), initialCamera = launch.camera)
-            BottomPanel(Modifier.align(Alignment.BottomCenter)) {
-                Text(if (l is Load.Failed) l.message else "Loading trails…", fontSize = 16.sp, color = Color(0xFF1E2A24))
-                if (l is Load.Failed) Button(onClick = { attempt++ }) { Text("Retry") }
+            TrailMap(style, Modifier.fillMaxSize(), initialCamera = launch.camera)
+            TopControls(recording = false, onClose = onClose, chips = {}, locate = null)
+            BottomCard(Modifier.align(Alignment.BottomCenter)) {
+                if (l is Load.Failed) {
+                    Text(stringResource(Res.string.record_loading_failed), style = MaterialTheme.typography.titleMedium)
+                    PrimaryButton(stringResource(Res.string.common_retry), onClick = { attempt++ }, modifier = Modifier.fillMaxWidth())
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        BusyIndicator(24.dp)
+                        Text(stringResource(Res.string.common_loading_trails), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, context: PlatformContext, modifier: Modifier) {
+private fun RecordContent(
+    controller: RecordingController,
+    settings: AppSettings,
+    style: MapStyle,
+    launch: SpikeLaunch,
+    context: PlatformContext,
+    onClose: () -> Unit,
+    onSignIn: () -> Unit,
+    modifier: Modifier,
+) {
     val state by controller.state.collectAsState()
     val notice by controller.notice.collectAsState()
     val requester = rememberPermissionRequester()
     var permissionQueue by remember { mutableStateOf<List<Perm>>(emptyList()) }
     val geofences = rememberGeofencePlatform()
     var showSettings by remember { mutableStateOf(false) }
+    var confirmFinish by remember { mutableStateOf(false) }
+    var follow by rememberSaveable { mutableStateOf(true) }
+    var resultsSheetH by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
 
-    val recording = state is RecordingState.Recording
-    LaunchedEffect(recording) {
-        while (recording) {
+    val recording = state as? RecordingState.Recording
+    LaunchedEffect(recording != null) {
+        while (recording != null) {
             controller.tick()
             delay(1_000)
         }
     }
+    if (recording == null) confirmFinish = false
     // Back from Settings (or another app): a location grant clears the NeedsPermission panel.
     LifecycleResumeEffect(requester) {
         if (requester.status(Perm.LOCATION_WHILE_IN_USE) == PermStatus.GRANTED) {
@@ -112,6 +253,7 @@ private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, 
     fun startWithPermissions(granted: Set<Perm>) {
         controller.onPermissions(granted)
         controller.start()
+        follow = true
     }
 
     fun onStartTapped() {
@@ -120,75 +262,123 @@ private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, 
         else permissionQueue = ask
     }
 
-    Box(modifier.fillMaxSize()) {
-        RecordMap(controller, launch)
+    fun done() {
+        controller.dismiss()
+        onClose()
+    }
 
-        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(8.dp)) {
-            Column(Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                (state as? RecordingState.Recording)?.let { r ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (r.waitingForGps) Chip("Waiting for GPS", Color(0xFFFFE9B0), Color(0xFF6B4A00))
-                        else Chip("GPS ok", Color(0xFFD7F0DC), Color(0xFF1B5E20))
-                        if (!r.activityAvailable || !r.stepsAvailable) Chip("Unverified", Color(0xFFEDE7DA), Color(0xFF5A4A2A))
-                        if (!r.preciseLocation) Chip("Approximate location", Color(0xFFFFE0DC), Color(0xFF8C1D18))
-                    }
-                }
-                notice?.let { Chip(it, Color(0xEE26302B), Color.White) }
-            }
+    // ux.md §2.3: finalizing → back disabled; results → same as Done; otherwise close / minimize.
+    FlowBackHandler(enabled = permissionQueue.isEmpty()) {
+        when (state) {
+            is RecordingState.Finalizing, is RecordingState.Stopped -> Unit
+            is RecordingState.Done -> done()
+            else -> onClose()
         }
+    }
 
+    Box(modifier.fillMaxSize()) {
+        RecordMap(controller, style, launch, follow = follow && state !is RecordingState.Done, fitWalkAbove = if (state is RecordingState.Done) resultsSheetH else null)
+
+        val busy = state is RecordingState.Finalizing || state is RecordingState.Stopped
+        TopControls(
+            recording = recording != null,
+            onClose = if (busy) null else if (state is RecordingState.Done) ::done else onClose,
+            chips = {
+                recording?.let { r -> RecordingChips(r) }
+                notice?.let { StateChip(it) }
+            },
+            locate = if (recording != null || state == RecordingState.Idle) ({
+                LocateButton(if (follow) LocateMode.Following else LocateMode.Idle, onClick = { follow = !follow })
+            }) else null,
+        )
+
+        val bottom = Modifier.align(Alignment.BottomCenter)
         when (val s = state) {
-            is RecordingState.Done -> ResultsSheet(s.summary, onClose = { controller.dismiss() }, modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.safeDrawing))
-            is RecordingState.Recover -> BottomPanel(Modifier.align(Alignment.BottomCenter)) {
-                Text("Unfinished walk found", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1E2A24))
-                Text("The app stopped while recording. Count what was recorded?", fontSize = 15.sp, color = Color(0xFF2E3A33))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = { RecordingGraph.scope.launch { controller.finishRecovered(s.sessionId) } }) { Text("Finish walk") }
-                    TextButton(onClick = { controller.discardRecovered(s.sessionId) }) { Text("Discard") }
-                }
+            is RecordingState.Done -> BottomSheetSurface(bottom.onSizeChanged { resultsSheetH = with(density) { it.height.toDp() } }, maxFraction = 0.78f) {
+                val graph = AppGraph.installedOrNull()
+                val auth = graph?.auth?.state?.collectAsStateWithLifecycle()?.value
+                val sync = graph?.sync?.state?.collectAsStateWithLifecycle()?.value
+                val data = AppGraph.datasets.state.collectAsStateWithLifecycle().value as? Loadable.Ready
+                ResultsSheet(
+                    summary = s.summary,
+                    units = settings.units,
+                    status = { f -> data?.value?.progress?.status(f) ?: TrailStatus.PARTWAY },
+                    sync = sync?.toResultsSync(),
+                    signedIn = auth?.isSignedIn == true,
+                    recovered = RecordingGraph.recoveredSessionId == s.summary.sessionId,
+                    onSignIn = { done(); onSignIn() },
+                    onDone = ::done,
+                )
             }
-            is RecordingState.NeedsPermission -> BottomPanel(Modifier.align(Alignment.BottomCenter)) {
-                val approximate = requester.locationAccess() == LocationAccess.APPROXIMATE
-                Text(if (approximate) "$PRECISE_OFF_MESSAGE." else "Location is needed to record a walk.", fontSize = 16.sp, color = Color(0xFF1E2A24))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (requester.status(Perm.LOCATION_WHILE_IN_USE) == PermStatus.PERMANENTLY_DENIED) {
-                        Button(onClick = { openAppSettings(context) }) { Text("Open settings") }
-                    } else {
-                        Button(onClick = { onStartTapped() }) { Text(if (approximate) "Use precise location" else "Allow location") }
+            is RecordingState.Recover -> AlertDialog(
+                onDismissRequest = {},
+                title = { Text(stringResource(Res.string.recovery_title)) },
+                text = { Text(stringResource(Res.string.recovery_body)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        RecordingGraph.recoveredSessionId = s.sessionId
+                        RecordingGraph.scope.launch { controller.finishRecovered(s.sessionId) }
+                    }) { Text(stringResource(Res.string.recovery_finish)) }
+                },
+                dismissButton = { TextButton(onClick = { controller.discardRecovered(s.sessionId) }) { Text(stringResource(Res.string.recovery_discard)) } },
+            )
+            is RecordingState.Finalizing, is RecordingState.Stopped -> BottomSheetSurface(bottom) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = BtTheme.spacing.screenH, vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    if (s is RecordingState.Stopped) {
+                        Banner(stringResource(Res.string.record_stopped_reason, s.reason), Res.drawable.ic_warning, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
                     }
-                    TextButton(onClick = { controller.dismiss() }) { Text("Not now") }
+                    BusyIndicator(48.dp)
+                    Text(stringResource(Res.string.record_matching), style = MaterialTheme.typography.titleMedium)
                 }
             }
-            is RecordingState.Finalizing, is RecordingState.Stopped -> BottomPanel(Modifier.align(Alignment.BottomCenter)) {
-                if (s is RecordingState.Stopped) Text("Recording stopped: ${s.reason}", fontSize = 15.sp, color = Color(0xFFB3261E))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CircularProgressIndicator(Modifier.height(24.dp))
-                    Text("Matching your walk to trails…", fontSize = 16.sp, color = Color(0xFF1E2A24))
-                }
+            is RecordingState.Recording -> BottomSheetSurface(bottom, maxFraction = 0.7f) {
+                RecordingSheet(s, controller, settings, context, onFinish = { confirmFinish = true })
             }
-            is RecordingState.Recording, RecordingState.Idle -> BottomPanel(Modifier.align(Alignment.BottomCenter)) {
-                val r = s as? RecordingState.Recording
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    ElapsedStat(r?.startedMs)
-                    Stat("Distance", distance(r?.distanceM ?: 0.0))
-                    Stat("Fixes", (r?.fixCount ?: 0).toString())
-                }
-                Button(
-                    onClick = { if (r != null) RecordingGraph.scope.launch { controller.stop() } else onStartTapped() },
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
-                    shape = RoundedCornerShape(32.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (r != null) Color(0xFFB3261E) else Color(0xFF1B6E3A)),
-                ) { Text(if (r != null) "Stop" else "Start", fontSize = 22.sp, fontWeight = FontWeight.SemiBold) }
-                // Hidden where background location is not declared (Android release builds, ruling R2).
-                if (r == null && geofences.supported) {
-                    TextButton(onClick = { showSettings = true }) {
-                        Text("Settings")
+            RecordingState.Idle, is RecordingState.NeedsPermission -> BottomCard(bottom) {
+                if (s is RecordingState.NeedsPermission) {
+                    val approximate = requester.locationAccess() == LocationAccess.APPROXIMATE
+                    val settingsOnly = requester.status(Perm.LOCATION_WHILE_IN_USE) == PermStatus.PERMANENTLY_DENIED
+                    Column(
+                        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.errorContainer, MaterialTheme.shapes.small).padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            stringResource(if (approximate) Res.string.perm_precise_body else Res.string.record_needs_location),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton(onClick = { if (settingsOnly) openAppSettings(context) else onStartTapped() }) {
+                                Text(stringResource(if (settingsOnly) Res.string.record_open_settings else if (approximate) Res.string.perm_precise_allow else Res.string.perm_location_allow))
+                            }
+                            TextButton(onClick = { controller.dismiss() }) { Text(stringResource(Res.string.record_not_now)) }
+                        }
                     }
                 }
+                IdleContent(onStart = ::onStartTapped, onSettings = if (geofences.supported) ({ showSettings = true }) else null)
             }
         }
 
         if (showSettings) GeofenceSettings(geofences, onClose = { showSettings = false })
+
+        if (confirmFinish && recording != null) {
+            AlertDialog(
+                onDismissRequest = { confirmFinish = false },
+                title = { Text(stringResource(Res.string.record_finish_title)) },
+                text = { Text(stringResource(Res.string.record_finish_body)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmFinish = false
+                        RecordingGraph.scope.launch { controller.stop() }
+                    }) { Text(stringResource(Res.string.record_finish_confirm)) }
+                },
+                dismissButton = { TextButton(onClick = { confirmFinish = false }) { Text(stringResource(Res.string.record_keep_walking)) } },
+            )
+        }
 
         if (permissionQueue.isNotEmpty()) {
             PermissionFlow(
@@ -205,69 +395,270 @@ private fun RecordContent(controller: RecordingController, launch: SpikeLaunch, 
     }
 }
 
+private fun SyncState.toResultsSync(): ResultsSync? = when (this) {
+    SyncState.SignedOut -> null
+    is SyncState.Idle -> if (pendingWalks > 0) ResultsSync.PENDING else ResultsSync.OK
+    is SyncState.Syncing -> ResultsSync.RUNNING
+    is SyncState.Pending -> ResultsSync.PENDING
+    is SyncState.Error, is SyncState.Rejected -> ResultsSync.FAILED
+}
+
+/** Minimize/close chevron (top-left), state chips (top-center), follow toggle (top-right). */
+@Composable
+private fun TopControls(
+    recording: Boolean,
+    onClose: (() -> Unit)?,
+    chips: @Composable () -> Unit,
+    locate: (@Composable () -> Unit)?,
+) {
+    Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(8.dp)) {
+        if (onClose != null) {
+            MapIconButton(
+                BtIcons.KeyboardArrowDown,
+                stringResource(if (recording) Res.string.record_minimize_a11y else Res.string.record_close_a11y),
+                onClose,
+                Modifier.align(Alignment.TopStart),
+            )
+        }
+        Row(
+            Modifier.align(Alignment.TopCenter).padding(horizontal = 56.dp).heightIn(min = 48.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) { chips() }
+        // Below the map's compass (top-right) so they never overlap.
+        if (locate != null) Box(Modifier.align(Alignment.TopEnd).padding(top = 56.dp)) { locate() }
+    }
+}
+
+@Composable
+private fun RecordingChips(r: RecordingState.Recording) {
+    var explain by remember { mutableStateOf(false) }
+    when {
+        r.waitingForGps -> StateChip(stringResource(Res.string.record_gps_waiting), leading = { BusyIndicator(16.dp) })
+        !r.preciseLocation -> StateChip(stringResource(Res.string.record_gps_approx), icon = Res.drawable.ic_warning)
+        else -> StateChip(stringResource(Res.string.record_gps_ok), leading = {
+            Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, PillShape))
+        })
+    }
+    if (!r.activityAvailable || !r.stepsAvailable) {
+        StateChip(stringResource(Res.string.record_unverified), icon = BtIcons.Info, onClick = { explain = true })
+    }
+    if (explain) {
+        AlertDialog(
+            onDismissRequest = { explain = false },
+            title = { Text(stringResource(Res.string.record_unverified_title)) },
+            text = { Text(stringResource(Res.string.record_unverified_body)) },
+            confirmButton = { TextButton(onClick = { explain = false }) { Text(stringResource(Res.string.common_done)) } },
+        )
+    }
+}
+
+/** ux.md §3.5a: title, what is tracked, Start (64dp), privacy line. */
+@Composable
+private fun IdleContent(onStart: () -> Unit, onSettings: (() -> Unit)?) {
+    Text(stringResource(Res.string.record_idle_title), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+    Text(stringResource(Res.string.record_idle_what), style = MaterialTheme.typography.bodyMedium)
+    PrimaryButton(stringResource(Res.string.record_start), onClick = onStart, modifier = Modifier.fillMaxWidth(), icon = Res.drawable.ic_play_arrow, large = true)
+    Text(stringResource(Res.string.record_idle_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        BtIcon(BtIcons.Lock, null, size = 16.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(6.dp))
+        Text(stringResource(Res.string.record_idle_private), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // Geofence opt-in: debug builds only (rulings R2/R11).
+        if (onSettings != null) TextButton(onClick = onSettings) { Text(stringResource(Res.string.record_settings)) }
+    }
+}
+
+/** ux.md §3.5d RecordSheet: recording dot, time + distance, live provisional trails (TL-8), Finish. */
+@Composable
+private fun RecordingSheet(
+    r: RecordingState.Recording,
+    controller: RecordingController,
+    settings: AppSettings,
+    context: PlatformContext,
+    onFinish: () -> Unit,
+) {
+    val live = remember(r.sessionId) { RecordingGraph.liveCoverage(context, r.sessionId) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    // TL-8: every 30 s, only while this screen is composed (Record visible) and the app is in the foreground.
+    LaunchedEffect(live, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                try {
+                    live.refresh(controller.track.value)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Provisional only: the next round (or Finish) gets it right.
+                }
+                delay(LiveCoverage.INTERVAL_MS)
+            }
+        }
+    }
+    val rows by live.rows.collectAsState()
+    // A status crossing mid-walk: light haptic (no celebration until Finish, ux.md §3.5d).
+    val haptics = LocalHapticFeedback.current
+    val seen = remember(r.sessionId) { HashMap<String, TrailStatus>() }
+    LaunchedEffect(rows) {
+        var crossed = false
+        for (row in rows) {
+            val prev = seen.put(row.trailId, row.status)
+            if (prev != null && row.status.ordinal > prev.ordinal) crossed = true
+        }
+        if (crossed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+    var expanded by rememberSaveable(r.sessionId) { mutableStateOf(false) }
+
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+        Column(Modifier.padding(horizontal = BtTheme.spacing.screenH), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RecordingDot()
+                Text(stringResource(Res.string.record_recording), style = MaterialTheme.typography.labelLarge, color = BtTheme.colors.recording)
+            }
+            Row(Modifier.fillMaxWidth()) {
+                ElapsedStat(r.startedMs, Modifier.weight(1f))
+                LiveStat(Format.distance(r.distanceM, settings.units), stringResource(Res.string.record_distance), Modifier.weight(1f))
+            }
+            if (r.waitingForGps && Clock.System.now().toEpochMilliseconds() - (r.lastFixMs ?: r.startedMs) > GPS_SLOW_MS) {
+                Text(stringResource(Res.string.record_gps_slow), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        // Section header: tap to expand the sheet (peek shows the top two rows).
+        val canExpand = rows.size > 2
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                .then(if (canExpand) Modifier.clickable { expanded = !expanded } else Modifier)
+                .padding(horizontal = BtTheme.spacing.screenH),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                if (rows.isEmpty()) stringResource(Res.string.record_live_header) else stringResource(Res.string.record_live_header_count, rows.size),
+                Modifier.weight(1f).semantics { heading() },
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (canExpand) {
+                val a11y = stringResource(if (expanded) Res.string.record_live_collapse_a11y else Res.string.record_live_expand_a11y)
+                BtIcon(BtIcons.ExpandMore, a11y, Modifier.rotate(if (expanded) 0f else 180f), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Column(
+            Modifier.weight(1f, fill = false).animateContentSize(if (BtTheme.motion.reduced) tween(0) else tween(300))
+                .then(if (expanded) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                .padding(horizontal = BtTheme.spacing.screenH),
+        ) {
+            if (rows.isEmpty()) {
+                Text(stringResource(Res.string.record_live_empty), Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text(stringResource(Res.string.record_live_provisional), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                for (row in if (expanded) rows else rows.take(2)) {
+                    LiveTrailRow(row.name, row.before, row.after, row.status)
+                }
+            }
+        }
+        PrimaryButton(
+            stringResource(Res.string.record_finish),
+            onClick = onFinish,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = BtTheme.spacing.screenH, vertical = 16.dp),
+        )
+    }
+}
+
 /**
  * The map and live track. Isolated so per-second and per-fix UI updates elsewhere don't recompose the map:
  * it only changes when [rememberThrottledTrack] hands it a new list (≤ every 5 s or 10 m).
  */
 @Composable
-private fun RecordMap(controller: RecordingController, launch: SpikeLaunch) {
+private fun RecordMap(controller: RecordingController, style: MapStyle, launch: SpikeLaunch, follow: Boolean, fitWalkAbove: Dp? = null) {
     val track by controller.track.collectAsState()
     val drawn = rememberThrottledTrack(track)
-    val follow = drawn.lastOrNull()?.let { Position(longitude = it.lon, latitude = it.lat) }
-    TrailMap(MapStyle.TOPO, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 48.dp, follow = follow) {
-        TrackLayer(drawn)
+    val at = if (follow) drawn.lastOrNull()?.let { Position(longitude = it.lon, latitude = it.lat) } else null
+    // Results (ux.md §3.5f): frame the whole walk in the map left above the results sheet.
+    val mapController = rememberTrailMapController()
+    val map = mapController.mapState
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val reduced = BtTheme.motion.reduced
+    LaunchedEffect(map, fitWalkAbove != null, fitWalkAbove?.let { it > 0.dp }) {
+        val sheet = fitWalkAbove?.takeIf { it > 0.dp } ?: return@LaunchedEffect
+        val bounds = boundsOf(listOf(track.map { listOf(it.lon, it.lat) })) ?: return@LaunchedEffect
+        map?.fitTo(bounds, DpPadding(left = 40.dp, top = topInset + 72.dp, right = 40.dp, bottom = sheet + 24.dp), animate = !reduced)
+    }
+    val buckets = AppGraph.installedOrNull()?.progress?.snapshot?.collectAsState()?.value?.segmentBuckets.orEmpty()
+    // Track colours follow the map style (a dark map in a light app still gets the dark-map track).
+    val extra = if (style.isDark) BtExtraDark else BtExtraLight
+    TrailMap(style, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 56.dp, follow = at, controller = mapController) {
+        StatusLayers(buckets, dark = style.isDark)
+        TrackLayer(drawn, extra.userTrack, extra.userTrackCasing)
     }
 }
 
-/** Elapsed time with its own 1 s clock, so only this text recomposes every second. */
+/** Elapsed time with its own 1 s clock, so only this text recomposes every second (timer is not a live region). */
 @Composable
-private fun ElapsedStat(startedMs: Long?) {
+private fun ElapsedStat(startedMs: Long, modifier: Modifier = Modifier) {
     var now by remember { mutableLongStateOf(Clock.System.now().toEpochMilliseconds()) }
     LaunchedEffect(startedMs) {
-        while (startedMs != null) {
+        while (true) {
             now = Clock.System.now().toEpochMilliseconds()
             delay(1_000)
         }
     }
-    Stat("Time", elapsed(startedMs?.let { (now - it).coerceAtLeast(0) } ?: 0))
+    LiveStat(Format.duration((now - startedMs).coerceAtLeast(0)), stringResource(Res.string.record_time), modifier)
 }
 
 @Composable
-private fun BottomPanel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Column(
-        modifier
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(start = 12.dp, end = 12.dp, bottom = 36.dp)
-            .fillMaxWidth()
-            .background(Color(0xF7FFFFFF), RoundedCornerShape(20.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) { content() }
-}
-
-@Composable
-private fun Chip(text: String, bg: Color, fg: Color) {
-    Text(
-        text,
-        Modifier.background(bg, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 6.dp),
-        color = fg,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
-    )
-}
-
-@Composable
-private fun Stat(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1E2A24))
-        Text(label, fontSize = 12.sp, color = Color(0xFF5A635D))
+private fun LiveStat(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(modifier.clearAndSetSemantics { contentDescription = "$label $value" }) {
+        Text(value, style = BtTheme.type.statLive)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-internal fun elapsed(ms: Long): String {
-    val s = ms / 1000
-    val two = { v: Long -> v.toString().padStart(2, '0') }
-    return if (s >= 3600) "${s / 3600}:${two(s / 60 % 60)}:${two(s % 60)}" else "${two(s / 60)}:${two(s % 60)}"
+/** Indeterminate spinner; a static ring under reduced motion (Compose indicators always rotate, ux.md §3.5e). */
+@Composable
+private fun BusyIndicator(size: androidx.compose.ui.unit.Dp) {
+    if (BtTheme.motion.reduced) {
+        val c = MaterialTheme.colorScheme.primary
+        Canvas(Modifier.size(size)) {
+            val w = this.size.minDimension / 12
+            drawArc(c, -90f, 270f, false, style = Stroke(w), topLeft = androidx.compose.ui.geometry.Offset(w / 2, w / 2), size = androidx.compose.ui.geometry.Size(this.size.width - w, this.size.height - w))
+        }
+    } else {
+        CircularProgressIndicator(Modifier.size(size), strokeWidth = if (size > 24.dp) 4.dp else 2.dp)
+    }
 }
 
-internal fun distance(m: Double): String = if (m < 1000) "${m.toLong()} m" else "${oneDecimal(m / 1000)} km"
+/** Floating idle card (ux.md §3.5a): 12dp from the edges, above the navigation bar. */
+@Composable
+private fun BottomCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Surface(
+        modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
+            .padding(12.dp).fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 6.dp,
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
+    }
+}
+
+/** Bottom sheet surface (recording / finalizing / results): top-rounded, up to [maxFraction] of the screen height. */
+@Composable
+private fun BottomSheetSurface(modifier: Modifier = Modifier, maxFraction: Float = 0.6f, content: @Composable () -> Unit) {
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val max = maxHeight * maxFraction
+        Surface(
+            Modifier.fillMaxWidth().heightIn(max = max),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp,
+        ) {
+            Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars)) {
+                // Drag-handle look (decorative; the sheet has fixed detents in MVP).
+                Box(
+                    Modifier.padding(top = 10.dp).size(32.dp, 4.dp).align(Alignment.CenterHorizontally)
+                        .background(MaterialTheme.colorScheme.outlineVariant, PillShape),
+                )
+                content()
+            }
+        }
+    }
+}

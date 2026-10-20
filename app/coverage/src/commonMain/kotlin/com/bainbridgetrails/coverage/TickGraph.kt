@@ -20,7 +20,7 @@ class TickGraph(private val index: SegmentIndex, private val junctionM: Double =
         fun link(a: Long, b: Long) = link(a, b, edgeSeen)
         val ids = pts.indices.map { index.segmentIdOf(it) }
         val polylines = ids.map { id ->
-            index.segments.getValue(id).coords.map { index.projection.toXy(it[0], it[1]) }
+            index.segments.getValue(id).projectedLine(index.projection)
         }
         for (s in pts.indices) for (t in 0 until pts[s].size - 1) link(pack(s, t), pack(s, t + 1))
 

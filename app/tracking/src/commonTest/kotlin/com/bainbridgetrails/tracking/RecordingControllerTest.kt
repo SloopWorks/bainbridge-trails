@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -87,11 +88,11 @@ class RecordingControllerTest {
 
     private class Rig(val controller: RecordingController, val recorder: FakeRecorder, val clock: FakeClock, val store: SessionStore, val dir: String)
 
-    private fun TestScope.rig(dir: String = tmpDir(), scope: CoroutineScope = backgroundScope): Rig {
+    private fun TestScope.rig(dir: String = tmpDir(), scope: CoroutineScope = backgroundScope, io: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.Default): Rig {
         val clock = FakeClock(t0)
         val store = SessionStore(dir)
         val recorder = FakeRecorder(store, clock)
-        val controller = RecordingController(store, Finalizer(ds, index, store, CoverageStore(dir)), { clock.now }, recorder, scope)
+        val controller = RecordingController(store, Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir)), { clock.now }, recorder, scope, io = io)
         recorder.controller = controller
         return Rig(controller, recorder, clock, store, dir)
     }
@@ -231,6 +232,22 @@ class RecordingControllerTest {
     }
 
     @Test
+    fun liveDistanceSkipsGpsJumps() = runTest {
+        val r = rig()
+        r.controller.onPermissions(Perm.entries.toSet())
+        r.controller.start()
+        r.walk(0.0, 30.0) // 30 m in 2 s steps of 3 m
+        // A multipath jump 400 m off and back, 2 s apart each: far faster than walking.
+        for (x in listOf(430.0, 30.0)) {
+            val (lon, lat) = proj.toLonLat(Xy(x, 0.0))
+            r.clock.advance(2_000)
+            r.recorder.fix(Fix(r.clock.now, lon, lat, 5.0, false))
+        }
+        val s = assertIs<RecordingState.Recording>(r.controller.state.value)
+        assertEquals(30.0, s.distanceM, 0.5)
+    }
+
+    @Test
     fun staleFixBeforeStartIgnored() = runTest {
         val r = rig()
         r.controller.onPermissions(Perm.entries.toSet())
@@ -246,6 +263,17 @@ class RecordingControllerTest {
         val after = assertIs<RecordingState.Recording>(r.controller.state.value)
         assertEquals(2, after.fixCount)
         assertEquals(3.0, after.distanceM, 0.1)
+    }
+
+    @Test
+    fun fixJustBeforeStartWithinClockSkewCounts() = runTest {
+        val r = rig()
+        r.controller.onPermissions(Perm.entries.toSet())
+        r.controller.start()
+        // Provider time a little behind the wall clock that stamped Start: still this walk's fix.
+        val (lon, lat) = proj.toLonLat(Xy(0.0, 0.0))
+        r.controller.onFix(Fix(t0 - SessionFix.CLOCK_SKEW_TOLERANCE_MS, lon, lat, 5.0, false))
+        assertEquals(1, assertIs<RecordingState.Recording>(r.controller.state.value).fixCount)
     }
 
     @Test
@@ -456,5 +484,93 @@ class RecordingControllerTest {
         assertTrue(assertIs<RecordingState.Recording>(r.controller.state.value).preciseLocation)
         r.controller.onEvent(SessionEvent.SourceState(t0, "precise", false))
         assertFalse(assertIs<RecordingState.Recording>(r.controller.state.value).preciseLocation)
+    }
+
+    /** A recorder whose stop() never writes Stop in time: the controller's stop times out (virtual time). */
+    private class SlowRecorder(val store: SessionStore, val clock: FakeClock) : Recorder {
+        lateinit var c: RecordingController
+        var active: String? = null
+        override fun start(sessionId: String, resume: Boolean) {
+            active = sessionId
+            store.begin(sessionId, clock.now)
+            c.onEvent(SessionEvent.Start(sessionId, clock.now))
+        }
+        override fun stop() = Unit
+        /** The drain finally completes after the controller gave up waiting. */
+        fun lateStop() {
+            store.end(clock.now)
+            active = null
+        }
+    }
+
+    @Test
+    fun stopTimeoutSummaryIsNotShownAgainOnNextLaunch() = runTest {
+        val dir = tmpDir()
+        val clock = FakeClock(t0)
+        val store = SessionStore(dir)
+        val slow = SlowRecorder(store, clock)
+        val c = RecordingController(store, Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir)), { clock.now }, slow, backgroundScope)
+        slow.c = c
+        c.onPermissions(Perm.entries.toSet())
+        val id = assertNotNull(c.start())
+        // Walk the whole trail through the slow recorder.
+        var x = 0.0
+        while (x <= 200.0) {
+            val (lon, lat) = proj.toLonLat(Xy(x, 0.0))
+            clock.advance(2_000)
+            val e = SessionEvent.FixEvent(clock.now, lon, lat, 5.0, false)
+            store.append(e)
+            c.onEvent(e)
+            x += 3.0
+        }
+        c.stop() // times out: merged early (not finalized) and the summary is shown once
+        assertEquals(id, assertIs<RecordingState.Done>(c.state.value).summary.sessionId)
+        assertTrue(CoverageStore(dir).finalizedIds().isEmpty(), "merged before its Stop: not finalized yet")
+        c.dismiss()
+        slow.lateStop()
+
+        // Next launch: the session is merged again (now complete) but its summary is not shown a second time.
+        val r = rig(dir)
+        r.controller.onLaunch()
+        assertIs<RecordingState.Idle>(r.controller.state.value)
+        assertNull(r.controller.notice.value)
+        assertEquals(setOf(id), CoverageStore(dir).finalizedIds())
+        val walk = WalkIndex(dir).all().single()
+        assertEquals(id, walk.sessionId, "one history entry, updated in place")
+        assertTrue(walk.summaryShown)
+    }
+
+    @Test
+    fun earlySummaryShownStillCountsOtherPendingWalks() = runTest {
+        val dir = tmpDir()
+        // "early" was shown after a stop timeout; "later" was stopped from the notification and never shown.
+        recordFinished(dir, "s1700000000000-early", t0, 0.0, 90.0)
+        WalkIndex(dir).upsert(WalkRecord("s1700000000000-early", t0, t0, 0.0, 0.0, verified = true, summaryShown = true))
+        recordFinished(dir, "s1700000100000-later", t0 + 100_000, 90.0, 200.0)
+        val r = rig(dir)
+        r.controller.onLaunch()
+        val done = r.controller.state.first { it is RecordingState.Done } as RecordingState.Done
+        assertEquals("s1700000100000-later", done.summary.sessionId)
+        assertNull(r.controller.notice.value, "only one walk is new to the user")
+        assertEquals(2, CoverageStore(dir).finalizedIds().size)
+    }
+
+    @Test
+    fun startClearsHeldBackRecovery() = runTest {
+        val dir = tmpDir()
+        recordFinished(dir, "stopped", t0, 0.0, 60.0)
+        SessionStore(dir).begin("crashed", t0 + 500_000)
+        val r = rig(dir, io = StandardTestDispatcher(testScheduler)) // file I/O on virtual time so runCurrent covers it
+        r.controller.onLaunch()
+        r.controller.state.first { it is RecordingState.Done }
+        // The user starts a new walk straight from the results sheet (allowed from Done) instead of dismissing it.
+        r.controller.onPermissions(Perm.entries.toSet())
+        assertNotNull(r.controller.start())
+        r.walk(0.0, 30.0)
+        r.controller.stop()
+        assertIs<RecordingState.Done>(r.controller.state.value)
+        r.controller.dismiss()
+        runCurrent() // dismiss() would launch the held-back onLaunch on backgroundScope (advanceUntilIdle skips it)
+        assertIs<RecordingState.Idle>(r.controller.state.value, "the held-back recovery belonged to the earlier sheet")
     }
 }

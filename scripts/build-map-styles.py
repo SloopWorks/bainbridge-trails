@@ -10,8 +10,8 @@ Templates use double-brace placeholders (basemap, trails, contours, hillshade) t
 with local pmtiles:// URLs (StyleTemplate.kt). Never emit a double-brace token anywhere else: an unknown
 placeholder is a hard error at runtime.
 
-Spike only: trail completion `status` is faked in the style from the numeric part of the segment id
-(see STATUS). Real status will come from app state (feature-state or a client-side GeoJSON overlay).
+Trail status / not-counted / halo / dim layers are drawn by the app (Compose LineLayers over the
+"trails" source, decisions.md TL-1); this script only emits the base map and status-independent cues.
 See docs/spikes/map-render/styles.md.
 """
 from __future__ import annotations
@@ -29,24 +29,8 @@ FONT_ITALIC = ["Noto Sans Italic"]
 
 STATUSES = ["not_started", "partway", "nearly_done", "complete"]
 
-# --- fake status (spike) -------------------------------------------------------------------------
-# seg-000123 -> 123 -> floor(123 / 7) % 4 -> status. Runs of 7 consecutive ids share a status, so
-# connected stretches read as one state instead of flickering segment by segment.
-_SEG_NUM = ["to-number", ["slice", ["get", "id"], 4], 0]
-STATUS = [
-    "match",
-    ["%", ["floor", ["/", _SEG_NUM, 7]], 4],
-    0, "complete",
-    1, "partway",
-    2, "not_started",
-    "nearly_done",
-]
 COUNTED = ["==", ["get", "included"], True]
 NOT_COUNTED = ["!=", ["get", "included"], True]
-
-
-def with_status(status: str) -> list:
-    return ["all", COUNTED, ["==", STATUS, status]]
 
 
 # --- status encoding (shared by all styles; colors per style) --------------------------------------
@@ -75,19 +59,6 @@ def interp(stops: dict[float, float | list], curve: list | None = None) -> list:
 
 def width(status: str, extra: float = 0.0) -> list:
     return interp({z: round(w + extra, 2) for z, w in WIDTH[status].items()})
-
-
-def halo_width() -> list:
-    # One halo layer for all counted segments: per-zoom match on status.
-    zooms = list(WIDTH["complete"].keys())
-    stops = {}
-    for z in zooms:
-        m: list = ["match", STATUS]
-        for s in STATUSES[:-1]:
-            m += [s, round(WIDTH[s][z] + HALO_EXTRA, 2)]
-        m.append(round(WIDTH["complete"][z] + HALO_EXTRA, 2))
-        stops[z] = m
-    return interp(stops)
 
 
 def road_width(stops: dict[float, float]) -> list:
@@ -235,79 +206,18 @@ def build(p: dict) -> dict:
     }, kind_in("ferry")))
 
     # ---- trails -----------------------------------------------------------------------------------
+    # decisions.md TL-1: status, not-counted, selected-halo and dim layers are NOT in the style. The app
+    # declares them as Compose LineLayers over this style's "trails" source (source-layer "segments"),
+    # one layer per status bucket filtered by segment id, so coverage changes never reload the style.
+    # Only the status-independent category cue stays here. The "trails" palette entries below are the
+    # reference the app's layer colors mirror (app/composeApp/.../map/StatusLayers.kt).
     t = p["trails"]
-    nc = t["not_counted"]
-    # Not counted (included == false): quiet hairlines, styled by category so the owner can still
-    # read the network; never confused with the four status treatments (no dots/dashes at status
-    # widths, low contrast).
-    L.append(line("trails-nc-other", "trails", "segments", {
-        "line-color": nc["color"],
-        "line-opacity": nc["opacity"],
-        "line-width": interp({12: 0.4, 15: 1.0, 18: 1.8}),
-    }, ["all", NOT_COUNTED,
-        ["!", ["in", ["get", "category"], ["literal", ["seasonal_closed", "beach_access", "easement"]]]]],
-        minzoom=12))
-    L.append(line("trails-nc-easement", "trails", "segments", {
-        "line-color": nc["color"],
-        "line-opacity": nc["opacity"],
-        "line-width": interp({12: 0.5, 15: 1.1, 18: 2.0}),
-        "line-dasharray": [4, 3],
-    }, ["all", NOT_COUNTED, ["==", ["get", "category"], "easement"]], layout={"line-cap": "butt"}, minzoom=12))
-    L.append(line("trails-nc-beach", "trails", "segments", {
-        "line-color": nc["beach"],
-        "line-opacity": 0.9,
-        "line-width": interp({12: 0.6, 15: 1.2, 18: 2.2}),
-    }, ["all", NOT_COUNTED, ["==", ["get", "category"], "beach_access"]], minzoom=12))
-    L.append(line("trails-nc-closed", "trails", "segments", {
-        "line-color": nc["closed"],
-        "line-opacity": 0.9,
-        "line-width": interp({12: 0.6, 15: 1.2, 18: 2.2}),
-        "line-dasharray": [1.5, 2],
-    }, ["all", NOT_COUNTED, ["==", ["get", "category"], "seasonal_closed"]], layout={"line-cap": "butt"},
-        minzoom=12))
-
-    # Counted segments.
     # multi_use_path: paved shared path gets a wide pale "bed" underneath (category cue).
     L.append(line("trails-mup-bed", "trails", "segments", {
         "line-color": t["mup_bed"],
         "line-width": interp({12: 2.5, 15: 9.0, 18: 15.0}),
         "line-opacity": t.get("mup_bed_opacity", 1.0),
     }, ["all", COUNTED, ["==", ["get", "category"], "multi_use_path"]], minzoom=12))
-    L.append(line("trails-halo", "trails", "segments", {
-        "line-color": t["halo"],
-        "line-width": halo_width(),
-        "line-opacity": t.get("halo_opacity", 1.0),
-    }, COUNTED))
-    s = t["status"]
-    L.append(line("trails-not-started", "trails", "segments", {
-        "line-color": s["not_started"],
-        "line-width": width("not_started"),
-        "line-dasharray": DASH["not_started"],
-    }, with_status("not_started")))
-    L.append(line("trails-partway", "trails", "segments", {
-        "line-color": s["partway"],
-        "line-width": width("partway"),
-        "line-dasharray": DASH["partway"],
-    }, with_status("partway"), layout={"line-cap": "butt"}))
-    L.append(line("trails-nearly-done-casing", "trails", "segments", {
-        "line-color": t["casing"],
-        "line-width": width("nearly_done", CASING_EXTRA),
-    }, with_status("nearly_done")))
-    L.append(line("trails-nearly-done", "trails", "segments", {
-        "line-color": s["nearly_done"],
-        "line-width": width("nearly_done"),
-    }, with_status("nearly_done")))
-    if t.get("complete_glow"):
-        L.append(line("trails-complete-glow", "trails", "segments", {
-            "line-color": s["complete"],
-            "line-opacity": t["complete_glow"],
-            "line-width": width("complete", 7.0),
-            "line-blur": interp({11: 3.0, 15: 6.0}),
-        }, with_status("complete")))
-    L.append(line("trails-complete", "trails", "segments", {
-        "line-color": s["complete"],
-        "line-width": width("complete"),
-    }, with_status("complete")))
 
     # ---- labels (online glyphs; offline -> labels silently absent, map unaffected) ----------------
     lab = p["labels"]
@@ -373,7 +283,7 @@ def build(p: dict) -> dict:
         "name": f"Bainbridge Trails - {p['name']}",
         "metadata": {
             "bainbridgetrails:generated": "scripts/build-map-styles.py - edit there, not here",
-            "bainbridgetrails:status": "spike: status faked from segment id; real status comes from app state",
+            "bainbridgetrails:status": "status layers are app-side Compose LineLayers over source trails/segments (TL-1)",
         },
         "glyphs": GLYPHS,
         "sources": sources,

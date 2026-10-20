@@ -108,32 +108,37 @@ class RecordingController(
      */
     suspend fun onLaunch() {
         if (_state.value !is RecordingState.Idle) return
-        val (pending, unfinished) = withContext(io) {
+        val (pending, shown, unfinished) = withContext(io) {
             val done = finalizer.finalizedIds()
-            store.finished().filter { it !in done }.sortedBy { startOf(it) } to store.unfinished().firstOrNull()
+            Triple(store.finished().filter { it !in done }.sortedBy { startOf(it) }, finalizer.shownIds(), store.unfinished().firstOrNull())
         }
         if (_state.value !is RecordingState.Idle) return
         if (pending.isNotEmpty()) {
             _state.value = RecordingState.Finalizing(pending.last())
             var last: SessionSummary? = null
             var saved = 0
+            var failed = 0
             for (id in pending) {
                 try {
-                    last = finalizer.finalize(id)
+                    val summary = finalizer.finalize(id)
+                    // Its results sheet was already shown (merged early after a stop timeout): complete it silently.
+                    if (id in shown) continue
+                    last = summary
                     saved++
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
+                    failed++
                 }
             }
             recoverAfterDismiss = unfinished != null
             if (last != null) {
                 if (saved > 1) _notice.value = "$saved walks saved"
-                _state.value = RecordingState.Done(last)
+                showDone(last)
                 return
             }
-            _notice.value = "Could not finish ${pending.size} saved walk(s)"
-            _state.value = RecordingState.Idle
             recoverAfterDismiss = false
+            if (failed > 0) _notice.value = "Could not finish $failed saved walk(s)"
+            _state.value = RecordingState.Idle
         }
         if (unfinished != null && _state.value is RecordingState.Idle) _state.value = RecordingState.Recover(unfinished)
     }
@@ -161,6 +166,9 @@ class RecordingController(
         }
         val id = newSessionId()
         val optional = Perm.ACTIVITY in granted
+        // A recovery held back behind an earlier results sheet belongs to that sheet: starting a walk from it
+        // (Start is allowed from Done) must not pop the Recover panel when this walk's sheet is dismissed.
+        recoverAfterDismiss = false
         clearTrack()
         _notice.value = null
         recorderStarted = false
@@ -202,11 +210,18 @@ class RecordingController(
 
     fun onFix(fix: Fix) {
         val r = _state.value as? RecordingState.Recording ?: return
-        if (fix.timeMs < r.startedMs) return // R8: a cached pre-start position is not part of the walk
+        if (!SessionFix.isSessionFix(fix.timeMs, r.startedMs)) return // R8: a cached pre-start position is not part of the walk
         _track.value = trackStore.append(fix)
-        // Mock fixes are drawn but never add distance (finalising drops them too).
-        val added = if (fix.isMock) 0.0 else lastRealFix?.let { distanceM(it, fix) } ?: 0.0
-        if (!fix.isMock) lastRealFix = fix
+        // Mock / inaccurate fixes are drawn but never add distance, nor do steps across a gap or faster than walking
+        // (GPS jumps): the live estimate follows the coverage gates the final distance uses (WalkIndex.distanceM).
+        val usable = !fix.isMock && fix.accuracyM.let { it == null || it in 0.0..LIVE_PARAMS.maxAccuracyM }
+        val prev = lastRealFix
+        val added = if (!usable || prev == null) 0.0 else {
+            val d = distanceM(prev, fix)
+            val dtS = (fix.timeMs - prev.timeMs) / 1000.0
+            if (dtS <= 0 || fix.timeMs - prev.timeMs > Gating.MAX_GAP_MS || d / dtS > LIVE_PARAMS.maxSpeedMps) 0.0 else d
+        }
+        if (usable) lastRealFix = fix
         _state.value = r.copy(
             fixCount = r.fixCount + 1,
             lastFixMs = fix.timeMs,
@@ -258,13 +273,24 @@ class RecordingController(
     }
 
     private suspend fun finalizeTo(sessionId: String) {
-        _state.value = try {
-            RecordingState.Done(finalizer.finalize(sessionId))
+        val summary = try {
+            finalizer.finalize(sessionId)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             _notice.value = "Could not finish the walk: ${e.message}"
-            RecordingState.Idle
+            _state.value = RecordingState.Idle
+            return
         }
+        showDone(summary)
+    }
+
+    /**
+     * Shows the results sheet and persists "summary shown" for the walk, so a later re-merge of the same session
+     * (stop-timeout path: merged before its Stop, merged again on the next launch) never shows it a second time.
+     */
+    private suspend fun showDone(summary: SessionSummary) {
+        _state.value = RecordingState.Done(summary)
+        withContext(io) { runCatching { finalizer.markShown(summary.sessionId) } }
     }
 
     /**
@@ -331,6 +357,8 @@ class RecordingController(
 
         private fun defaultSessionId(nowMs: Long): String =
             "s$nowMs-" + Random.nextInt(0, 1 shl 24).toString(16)
+
+        private val LIVE_PARAMS = com.bainbridgetrails.coverage.CoverageParams()
 
         private fun distanceM(a: Fix, b: Fix): Double {
             val r = 6_371_008.8

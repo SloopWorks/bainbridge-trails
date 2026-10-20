@@ -45,7 +45,7 @@ object Geofences {
     fun arrivalText(th: Trailhead, coverage: CoverageState, progress: Progress): String {
         val n = th.trailIds.size
         val k = th.trailIds.count { progress.status(progress.trailFraction(coverage, it)) == TrailStatus.COMPLETE }
-        return "You're at ${th.name} — $k of $n trails here complete"
+        return "You're at ${th.name} — $k of $n ${if (n == 1) "trail" else "trails"} here complete"
     }
 
     /**

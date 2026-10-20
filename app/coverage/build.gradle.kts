@@ -25,3 +25,10 @@ kotlin {
         }
     }
 }
+
+// LoadBench: -Pcoverage.benchXint runs jvmTest interpreted (rough proxy for a debuggable Android build)
+tasks.named<Test>("jvmTest") {
+    val xint = providers.gradleProperty("coverage.benchXint").isPresent
+    if (xint) jvmArgs("-Xint")
+    testLogging { showStandardStreams = xint }
+}

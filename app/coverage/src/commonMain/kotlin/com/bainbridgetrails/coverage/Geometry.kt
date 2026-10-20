@@ -19,10 +19,13 @@ class LocalProjection(
 ) {
     private val cosLat = cos(originLat * PI / 180.0)
 
-    fun toXy(lon: Double, lat: Double): Xy = Xy(
-        x = (lon - originLon) * DEG * cosLat * EARTH_R,
-        y = (lat - originLat) * DEG * EARTH_R,
-    )
+    fun toXy(lon: Double, lat: Double): Xy = Xy(x(lon), y(lat))
+
+    /** [toXy]'s x alone (no allocation). */
+    internal fun x(lon: Double): Double = (lon - originLon) * DEG * cosLat * EARTH_R
+
+    /** [toXy]'s y alone (no allocation). */
+    internal fun y(lat: Double): Double = (lat - originLat) * DEG * EARTH_R
 
     /** Exact inverse of [toXy]: returns lon to lat. */
     fun toLonLat(p: Xy): Pair<Double, Double> =
@@ -44,8 +47,11 @@ fun distanceToSegment(p: Xy, a: Xy, b: Xy): Double {
 }
 
 /** Bearing 0..360, 0 = north (+y), clockwise. */
-fun bearingDeg(a: Xy, b: Xy): Double {
-    val deg = atan2(b.x - a.x, b.y - a.y) * 180.0 / PI
+fun bearingDeg(a: Xy, b: Xy): Double = bearingDeg(a.x, a.y, b.x, b.y)
+
+/** [bearingDeg] on raw coordinates (no [Xy] allocation). */
+internal fun bearingDeg(ax: Double, ay: Double, bx: Double, by: Double): Double {
+    val deg = atan2(bx - ax, by - ay) * 180.0 / PI
     val n = ((deg % 360.0) + 360.0) % 360.0
     return if (n >= 360.0) 0.0 else n
 }
@@ -59,13 +65,16 @@ fun axialDiffDeg(b1: Double, b2: Double): Double {
 /** [lengthM]: share of the line this tick stands for. */
 data class Tick(val p: Xy, val bearingDeg: Double, val lengthM: Double)
 
+/** Number of ticks [resample] puts on a line [totalM] long. */
+internal fun ticksFor(totalM: Double, stepM: Double): Int = max(1, ceil(totalM / stepM - 1e-9).toInt())
+
 /** Points every [stepM] along [line] at the centre of each step: offsets stepM/2, 3stepM/2, ...; always at least 1 point. */
 fun resample(line: List<Xy>, stepM: Double): List<Tick> {
     require(line.size >= 2) { "line needs >= 2 points" }
     require(stepM > 0.0) { "stepM must be > 0" }
     val segLen = DoubleArray(line.size - 1) { hypot(line[it + 1].x - line[it].x, line[it + 1].y - line[it].y) }
     val total = segLen.sum()
-    val n = max(1, ceil(total / stepM - 1e-9).toInt())
+    val n = ticksFor(total, stepM)
     val share = total / n
     val ticks = ArrayList<Tick>(n)
     var seg = 0

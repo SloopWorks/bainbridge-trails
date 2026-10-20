@@ -7,17 +7,25 @@ import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.tracking.CoverageStore
+import com.bainbridgetrails.log.AppLog
 import com.bainbridgetrails.tracking.Finalizer
 import com.bainbridgetrails.tracking.Geofences
+import com.bainbridgetrails.tracking.LocalProgress
 import com.bainbridgetrails.tracking.Perm
+import com.bainbridgetrails.tracking.RecordingState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import com.bainbridgetrails.tracking.Recorder
 import com.bainbridgetrails.tracking.RecordingBus
 import com.bainbridgetrails.tracking.RecordingController
 import com.bainbridgetrails.tracking.SessionStore
 import com.bainbridgetrails.tracking.Trailhead
+import com.bainbridgetrails.tracking.WalkIndex
+import com.bainbridgetrails.graph.AppGraph
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
@@ -34,23 +42,14 @@ internal object RecordingGraph {
     /** Optional permissions already offered in this process (not asked again on every Start). */
     val askedOptional = mutableSetOf<Perm>()
 
-    private var dataset: Deferred<Dataset>? = null
-    private var index: Deferred<SegmentIndex>? = null
     private var trailheads: Deferred<List<Trailhead>>? = null
     private var controller: Deferred<RecordingController>? = null
 
-    /** Ruling R1: parse the bundled dataset once per process, off the main thread. Call at app start. */
-    fun dataset(): Deferred<Dataset> = dataset?.takeUnless { it.failed() } ?: scope.async(Dispatchers.Default) {
-        val trails = Res.readBytes("files/trails.json").decodeToString()
-        val segments = Res.readBytes("files/coverage_segments.json").decodeToString()
-        Dataset.parse(trails, segments)
-    }.also { dataset = it }
+    /** Ruling R1: the bundled dataset, parsed once per process off Main (shared with the UI via [AppGraph.datasets]). */
+    fun dataset(): Deferred<Dataset> = scope.async { AppGraph.datasets.await().dataset }
 
-    /** Segment index for the bundled dataset, built once per process off the main thread. */
-    fun index(): Deferred<SegmentIndex> = index?.takeUnless { it.failed() } ?: scope.async {
-        val ds = dataset().await()
-        withContext(Dispatchers.Default) { SegmentIndex(ds.segments, CoverageParams(), LocalProjection()) }
-    }.also { index = it }
+    /** Segment index for the bundled dataset, built once per process off Main together with the dataset. */
+    fun index(): Deferred<SegmentIndex> = scope.async { AppGraph.datasets.await().index }
 
     /** Bundled trailhead geofence candidates (`files/trailheads.json`), parsed once per process. */
     fun trailheads(): Deferred<List<Trailhead>> = trailheads?.takeUnless { it.failed() } ?: scope.async(Dispatchers.Default) {
@@ -84,11 +83,57 @@ internal object RecordingGraph {
             override fun start(sessionId: String, resume: Boolean) = startRecordingService(context, sessionId, resume)
             override fun stop() = stopRecordingService(context)
         }
-        RecordingController(store, Finalizer(ds, index, store, coverage), { Clock.System.now().toEpochMilliseconds() }, recorder, scope).also {
+        RecordingController(store, Finalizer(ds, index, store, coverage, walks = WalkIndex(dir)), { Clock.System.now().toEpochMilliseconds() }, recorder, scope).also {
             it.bind(RecordingBus.events, RecordingBus.lost)
             it.onLaunch()
+            // Raw-track retention: tracks of walks finalized 30+ days ago are deleted (their ids stay finalized).
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val pruned = LocalProgress.pruneRawTracks(dir, Clock.System.now().toEpochMilliseconds())
+                    if (pruned.isNotEmpty()) AppLog.i("recording", "pruned ${pruned.size} raw tracks")
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    AppLog.e("recording", "raw-track prune failed: ${e.message}")
+                }
+            }
         }
     }.also { controller = it }
+
+    /**
+     * "Also clear this phone" (F9e): deletes every session except the one being recorded, coverage, sticky
+     * completions and walk history ([LocalProgress.wipe]), drops a pending crash recovery and the live-coverage cache.
+     */
+    suspend fun wipeLocal(context: PlatformContext) = withContext(Dispatchers.Main) { // the controller is Main-only
+        val dir = trackingDir(context)
+        val c = controller?.takeIf { it.isCompleted && !it.failed() }?.await()
+        val keep = when (val s = c?.state?.value) {
+            is RecordingState.Recording -> setOf(s.sessionId)
+            is RecordingState.Finalizing -> setOf(s.sessionId)
+            is RecordingState.Stopped -> setOf(s.sessionId)
+            null -> withContext(Dispatchers.IO) { SessionStore(dir).unfinished().toSet() } // controller not built: a recorder may run
+            else -> emptySet()
+        }
+        withContext(Dispatchers.IO) { LocalProgress.wipe(dir, keep) }
+        (c?.state?.value as? RecordingState.Recover)?.let { c.discardRecovered(it.sessionId) }
+        live?.invalidate()
+    }
+
+    private var live: LiveCoverageSession? = null
+
+    /** A walk the user chose to "Count it" after a crash: its results show the recovered banner. */
+    var recoveredSessionId: String? = null
+
+    /**
+     * Provisional coverage for the recording [sessionId] (TL-8), kept for the process so minimising the Record
+     * screen does not lose it. The pre-walk state is read from the coverage store on first use (the walk itself is
+     * only merged when it is finalised).
+     */
+    fun liveCoverage(context: PlatformContext, sessionId: String): LiveCoverageSession =
+        live?.takeIf { it.sessionId == sessionId } ?: LiveCoverageSession(sessionId, create = {
+            val data = AppGraph.datasets.await()
+            val (pre, sticky) = withContext(Dispatchers.IO) { CoverageStore(trackingDir(context)).let { it.load() to it.completedIds() } }
+            LiveCoverage.forDataset(data, pre, sticky)
+        }).also { live = it }
 
     /** A failed load is not cached: the next call (the screen's Retry) starts over. */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)

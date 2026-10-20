@@ -10,7 +10,8 @@ class AndroidMappersTest {
 
     @Test
     fun fixesBeforeSessionStartAreDropped() {
-        assertEquals(false, AndroidMappers.isSessionFix(fixTimeMs = 999, sessionStartMs = 1_000))
+        assertEquals(false, AndroidMappers.isSessionFix(fixTimeMs = 6_999, sessionStartMs = 10_000))
+        assertEquals(true, AndroidMappers.isSessionFix(fixTimeMs = 7_000, sessionStartMs = 10_000)) // clock skew tolerance
         assertEquals(true, AndroidMappers.isSessionFix(fixTimeMs = 1_000, sessionStartMs = 1_000))
         assertEquals(true, AndroidMappers.isSessionFix(fixTimeMs = 1_001, sessionStartMs = 1_000))
     }
