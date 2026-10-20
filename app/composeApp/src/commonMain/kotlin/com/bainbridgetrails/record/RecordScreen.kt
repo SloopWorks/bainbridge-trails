@@ -141,6 +141,15 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.maplibre.spatialk.geojson.Position
 import kotlin.time.Clock
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import com.bainbridgetrails.map.boundsOf
+import com.bainbridgetrails.map.fitTo
+import com.bainbridgetrails.map.rememberTrailMapController
+import org.maplibre.compose.util.DpPadding
 
 private sealed interface Load {
     data object Loading : Load
@@ -216,6 +225,8 @@ private fun RecordContent(
     var showSettings by remember { mutableStateOf(false) }
     var confirmFinish by remember { mutableStateOf(false) }
     var follow by rememberSaveable { mutableStateOf(true) }
+    var resultsSheetH by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
 
     val recording = state as? RecordingState.Recording
     LaunchedEffect(recording != null) {
@@ -266,7 +277,7 @@ private fun RecordContent(
     }
 
     Box(modifier.fillMaxSize()) {
-        RecordMap(controller, style, launch, follow)
+        RecordMap(controller, style, launch, follow = follow && state !is RecordingState.Done, fitWalkAbove = if (state is RecordingState.Done) resultsSheetH else null)
 
         val busy = state is RecordingState.Finalizing || state is RecordingState.Stopped
         TopControls(
@@ -283,7 +294,7 @@ private fun RecordContent(
 
         val bottom = Modifier.align(Alignment.BottomCenter)
         when (val s = state) {
-            is RecordingState.Done -> BottomSheetSurface(bottom, maxFraction = 0.78f) {
+            is RecordingState.Done -> BottomSheetSurface(bottom.onSizeChanged { resultsSheetH = with(density) { it.height.toDp() } }, maxFraction = 0.78f) {
                 val graph = AppGraph.installedOrNull()
                 val auth = graph?.auth?.state?.collectAsStateWithLifecycle()?.value
                 val sync = graph?.sync?.state?.collectAsStateWithLifecycle()?.value
@@ -557,14 +568,24 @@ private fun RecordingSheet(
  * it only changes when [rememberThrottledTrack] hands it a new list (≤ every 5 s or 10 m).
  */
 @Composable
-private fun RecordMap(controller: RecordingController, style: MapStyle, launch: SpikeLaunch, follow: Boolean) {
+private fun RecordMap(controller: RecordingController, style: MapStyle, launch: SpikeLaunch, follow: Boolean, fitWalkAbove: Dp? = null) {
     val track by controller.track.collectAsState()
     val drawn = rememberThrottledTrack(track)
     val at = if (follow) drawn.lastOrNull()?.let { Position(longitude = it.lon, latitude = it.lat) } else null
+    // Results (ux.md §3.5f): frame the whole walk in the map left above the results sheet.
+    val mapController = rememberTrailMapController()
+    val map = mapController.mapState
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val reduced = BtTheme.motion.reduced
+    LaunchedEffect(map, fitWalkAbove != null, fitWalkAbove?.let { it > 0.dp }) {
+        val sheet = fitWalkAbove?.takeIf { it > 0.dp } ?: return@LaunchedEffect
+        val bounds = boundsOf(listOf(track.map { listOf(it.lon, it.lat) })) ?: return@LaunchedEffect
+        map?.fitTo(bounds, DpPadding(left = 40.dp, top = topInset + 72.dp, right = 40.dp, bottom = sheet + 24.dp), animate = !reduced)
+    }
     val buckets = AppGraph.installedOrNull()?.progress?.snapshot?.collectAsState()?.value?.segmentBuckets.orEmpty()
     // Track colours follow the map style (a dark map in a light app still gets the dark-map track).
     val extra = if (style.isDark) BtExtraDark else BtExtraLight
-    TrailMap(style, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 56.dp, follow = at) {
+    TrailMap(style, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 56.dp, follow = at, controller = mapController) {
         StatusLayers(buckets, dark = style.isDark)
         TrackLayer(drawn, extra.userTrack, extra.userTrackCasing)
     }
