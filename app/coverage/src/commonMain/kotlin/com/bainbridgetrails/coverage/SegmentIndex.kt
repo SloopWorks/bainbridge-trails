@@ -50,30 +50,27 @@ class SegmentIndex(
     private val slot: Map<String, Int> = HashMap<String, Int>(ids.size * 2).also { m -> ids.forEachIndexed { i, id -> m[id] = i } }
 
     // Ticks live in flat primitive arrays (startup on debuggable Android builds is dominated by per-object work):
-    // slot s owns global tick indices tickStart[s] until tickStart[s + 1]; tick t of s is tickStart[s] + t.
-    // Positions and spacing are exactly [resample]'s. Counts and spacing are eager (cheap: line lengths only, all
-    // that [Progress] needs); positions, bearings and the grid are built on first matching use (or [prepare]).
-    private val tickStart: IntArray
+    // slot s owns global tick indices start[s] until start[s + 1]; tick t of s is start[s] + t. Positions and
+    // spacing are exactly [resample]'s. Nothing is computed up front: a segment's tick count and spacing (all
+    // [Progress] needs, and only for covered segments) on first ask; positions, bearings and the grid on first
+    // matching use (or [prepare]).
     private val segmentList: List<SegmentGeom> = segments
 
-    /** Per slot: the length each of its ticks stands for ([Tick.lengthM]); 0 without ticks. */
-    private val tickShare: DoubleArray
+    private class SegTicks(val count: Int, val share: Double)
 
-    init {
-        val n = segments.size
-        tickStart = IntArray(n + 1)
-        tickShare = DoubleArray(n)
-        for (s in 0 until n) {
-            val c = segments[s].coords
-            var k = 0
-            if (c.size >= 2) {
-                val total = lineLength(c)
-                k = ticksFor(total, params.tickM)
-                tickShare[s] = total / k
-            }
-            tickStart[s + 1] = tickStart[s] + k
+    /** Per slot, filled on demand. Racy fills are benign: equal immutable values, reference writes are atomic. */
+    private val segTicks = arrayOfNulls<SegTicks>(segments.size)
+
+    private fun segTicks(s: Int): SegTicks = segTicks[s] ?: run {
+        val c = segmentList[s].coords
+        if (c.size < 2) {
+            SegTicks(0, 0.0)
+        } else {
+            val total = lineLength(c)
+            val k = ticksFor(total, params.tickM)
+            SegTicks(k, total / k)
         }
-    }
+    }.also { segTicks[s] = it }
 
     /** Projected length of [c]: the same sum, in the same order, as [resample]'s. */
     private fun lineLength(c: List<List<Double>>): Double {
@@ -99,16 +96,27 @@ class SegmentIndex(
      * [x]/[y]: tick positions; [bearing]: per tick, the bearing for the heading check, smoothed over headingBaselineM
      * (ruling R11); [grid]: cell key -> packed (segment slot, tick index), each cell's entries in (slot, tick) order.
      */
-    private class Ticks(val x: DoubleArray, val y: DoubleArray, val bearing: DoubleArray, val grid: Map<Long, LongArray>)
+    private class Ticks(
+        val start: IntArray,
+        val x: DoubleArray,
+        val y: DoubleArray,
+        val bearing: DoubleArray,
+        val grid: Map<Long, LongArray>,
+    ) {
+        fun count(s: Int): Int = start[s + 1] - start[s]
+    }
 
     private val ticks: Ticks by lazy {
-        val buf = TickBuffer(tickStart.last())
-        for (s in segmentList.indices) {
+        val n = segmentList.size
+        val start = IntArray(n + 1)
+        for (s in 0 until n) start[s + 1] = start[s] + segTicks(s).count
+        val buf = TickBuffer(start[n])
+        for (s in 0 until n) {
             val line = segmentList[s].projectedLine(proj)
             if (line.size >= 2) buf.resample(line, params.tickM, params.headingBaselineM)
-            check(buf.size == tickStart[s + 1]) { "tick count drift on segment ${ids[s]}" }
+            check(buf.size == start[s + 1]) { "tick count drift on segment ${ids[s]}" }
         }
-        Ticks(buf.x, buf.y, buf.b, buildGrid(buf.x, buf.y))
+        Ticks(start, buf.x, buf.y, buf.b, buildGrid(start, buf.x, buf.y))
     }
 
     /**
@@ -121,13 +129,11 @@ class SegmentIndex(
         if (params.matcher == Matcher.HMM) hmm
     }
 
-    private fun count(s: Int): Int = tickStart[s + 1] - tickStart[s]
-
     /**
      * Groups ticks by 50 m cell with one primitive sort: key = (cell number in the ticks' bounding box) shl 40 or
      * global tick index, so each cell's run is in tick order. Falls back to hashing for extents too large to pack.
      */
-    private fun buildGrid(tickX: DoubleArray, tickY: DoubleArray): Map<Long, LongArray> {
+    private fun buildGrid(tickStart: IntArray, tickX: DoubleArray, tickY: DoubleArray): Map<Long, LongArray> {
         val total = tickX.size
         if (total == 0) return emptyMap()
         val cx = IntArray(total) { cell(tickX[it]) }
@@ -162,7 +168,7 @@ class SegmentIndex(
     /** Read access for [TickGraph]: tick positions of every segment, indexed by slot. */
     internal val tickPoints: List<List<Xy>> by lazy {
         val t = ticks
-        List(tickStart.size - 1) { s -> List(count(s)) { Xy(t.x[tickStart[s] + it], t.y[tickStart[s] + it]) } }
+        List(t.start.size - 1) { s -> List(t.count(s)) { Xy(t.x[t.start[s] + it], t.y[t.start[s] + it]) } }
     }
 
     val projection: LocalProjection get() = proj
@@ -177,6 +183,7 @@ class SegmentIndex(
         val tickX = t.x
         val tickY = t.y
         val grid = t.grid
+        val tickStart = t.start
         val out = ArrayList<Long>()
         for (cx in cell(p.x - radius)..cell(p.x + radius)) for (cy in cell(p.y - radius)..cell(p.y + radius)) {
             val entries = grid[cellKey(cx, cy)] ?: continue
@@ -188,9 +195,10 @@ class SegmentIndex(
         return out
     }
 
-    fun tickCount(segmentId: String): Int = slot[segmentId]?.let { count(it) } ?: 0
+    fun tickCount(segmentId: String): Int = slot[segmentId]?.let { segTicks(it).count } ?: 0
 
-    fun tickLengthM(segmentId: String): Double = slot[segmentId]?.let { tickShare[it] } ?: 0.0
+    /** The length each tick of [segmentId] stands for ([Tick.lengthM]); 0 without ticks or for an unknown id. */
+    fun tickLengthM(segmentId: String): Double = slot[segmentId]?.let { segTicks(it).share } ?: 0.0
 
     /** Built on first HMM use, once per index. */
     private val hmm: HmmMatcher by lazy { HmmMatcher(this, TickGraph(this, params.junctionM), params) }
@@ -218,6 +226,8 @@ class SegmentIndex(
         val tickY = tk.y
         val tickBearing = tk.bearing
         val grid = tk.grid
+        val tickStart = tk.start
+        fun count(s: Int) = tickStart[s + 1] - tickStart[s]
         val nSeg = tickStart.size - 1
         val bits = arrayOfNulls<LongArray>(nSeg)
         val dS = DoubleArray(nSeg) { Double.POSITIVE_INFINITY }

@@ -18,9 +18,9 @@ class LoadBench {
         }
         val t = trails.readText()
         val s = segs.readText()
-        val bin = Dataset.parse(t, s).let { SegmentsBinary.encode(it.version, it.segments) }
+        val bin = DatasetBinary.encode(Dataset.parse(t, s), DatasetBinary.hash(t.encodeToByteArray()))
         val params = CoverageParams()
-        for ((name, parse) in listOf<Pair<String, () -> Dataset>>("json" to { Dataset.parse(t, s) }, "bin" to { Dataset.parse(t, bin) })) {
+        for ((name, parse) in listOf<Pair<String, () -> Dataset>>("json" to { Dataset.parse(t, s) }, "bin" to { DatasetBinary.hash(t.encodeToByteArray()); Dataset.fromBinary(bin) })) {
             repeat(3) { round ->
                 val t0 = System.nanoTime()
                 val ds = parse()

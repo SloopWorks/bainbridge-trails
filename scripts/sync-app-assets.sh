@@ -32,8 +32,7 @@ for pair in "${ASSETS[@]}"; do
   echo "$(du -h "$dst" | cut -f1)	${pair##*:}"
 done
 
-# coverage_segments.bin: the app's fast-loading copy of coverage_segments.json (SegmentsBinary; the app falls back to
-# the JSON if it is missing, stale or unreadable). Verified against the JSON by the packer and by :coverage:jvmTest.
-"$ROOT/app/gradlew" -p "$ROOT/app" -q :coverage-eval:run \
-  --args="pack-segments $DEST/coverage_segments.json $DEST/coverage_segments.bin"
-echo "$(du -h "$DEST/coverage_segments.bin" | cut -f1)	coverage_segments.bin"
+# dataset.bin: the app's fast-loading copy of trails.json + coverage_segments.json (DatasetBinary; the app falls back
+# to the JSON if it is missing, stale or unreadable). Verified against the JSON by the packer and by :coverage:jvmTest.
+"$ROOT/app/gradlew" -p "$ROOT/app" -q :coverage-eval:run --args="pack-dataset $DEST $DEST/dataset.bin"
+echo "$(du -h "$DEST/dataset.bin" | cut -f1)	dataset.bin"

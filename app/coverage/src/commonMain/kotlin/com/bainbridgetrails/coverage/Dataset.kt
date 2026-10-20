@@ -40,34 +40,25 @@ class Dataset(
         private val json = Json { ignoreUnknownKeys = true }
 
         fun parse(trailsJson: String, coverageSegmentsJson: String): Dataset {
-            val s = parseSegments(coverageSegmentsJson)
-            return build(trailsJson, s.version, s.segments)
-        }
-
-        /** coverage_segments.json alone (version + segments), e.g. to write [SegmentsBinary]. */
-        fun parseSegments(coverageSegmentsJson: String): SegmentsBinary.Decoded {
+            val t = json.decodeFromString(TrailsFile.serializer(), trailsJson)
             val s = json.decodeFromString(SegmentsFile.serializer(), coverageSegmentsJson)
-            return SegmentsBinary.Decoded(s.version, s.segments)
+            require(t.version == s.version) { "dataset version mismatch: trails=${t.version} segments=${s.version}" }
+            return Dataset(t.trails, t.islandTotalShippableM, s.segments, t.version).validated()
         }
 
-        /** As [parse], with coverage_segments.bin ([SegmentsBinary]) in place of the JSON; same result, much faster. */
-        fun parse(trailsJson: String, coverageSegmentsBin: ByteArray): Dataset {
-            val s = SegmentsBinary.decode(coverageSegmentsBin)
-            return build(trailsJson, s.version, s.segments)
-        }
+        /** As [parse], from dataset.bin ([DatasetBinary]); same result, much faster. */
+        fun fromBinary(datasetBin: ByteArray): Dataset = DatasetBinary.decode(datasetBin).validated()
 
-        /** The `version` of a trails.json document (cheap: no full parse of the trails). */
+        /** The `version` of a trails.json document (no trail objects built). */
         fun trailsVersion(trailsJson: String): String = json.decodeFromString(VersionOnly.serializer(), trailsJson).version
 
-        private fun build(trailsJson: String, segmentsVersion: String, segments: List<SegmentGeom>): Dataset {
-            val t = json.decodeFromString(TrailsFile.serializer(), trailsJson)
-            require(t.version == segmentsVersion) { "dataset version mismatch: trails=${t.version} segments=$segmentsVersion" }
+        private fun Dataset.validated(): Dataset {
             val segIds = segments.mapTo(HashSet()) { it.id }
-            for (tr in t.trails) {
+            for (tr in trails) {
                 val missing = tr.segmentIds.firstOrNull { it !in segIds }
                 require(missing == null) { "trail ${tr.id} segment $missing missing from coverage segments" }
             }
-            return Dataset(t.trails, t.islandTotalShippableM, segments, t.version)
+            return this
         }
     }
 }

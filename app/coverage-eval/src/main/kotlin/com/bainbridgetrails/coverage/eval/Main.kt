@@ -7,7 +7,7 @@ import com.bainbridgetrails.coverage.LocalProjection
 import com.bainbridgetrails.coverage.Matcher
 import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
-import com.bainbridgetrails.coverage.SegmentsBinary
+import com.bainbridgetrails.coverage.DatasetBinary
 import com.bainbridgetrails.coverage.filterFixes
 import com.bainbridgetrails.tracking.Gating
 import com.bainbridgetrails.tracking.SessionStore
@@ -21,13 +21,13 @@ private const val USAGE = """usage:
         [--matchers competitive,hmm] [--hmm-sigmas 10] [--hmm-betas 5] [--off-network 25]  (HMM rows only)
   gpx --data DIR FILE.gpx...
   session --data DIR FILE.jsonl   (re-gate a recorded session; prints counts and per-trail %, no coordinates)
-  pack-segments IN.json OUT.bin   (coverage_segments.json -> the app's coverage_segments.bin, verified by re-reading)"""
+  pack-dataset DIR OUT.bin        (DIR/trails.json + coverage_segments.json -> the app's dataset.bin, verified by re-reading)"""
 
 fun main(args: Array<String>) {
     if (args.isEmpty()) usage()
-    if (args[0] == "pack-segments") {
-        if (args.size != 3) usage("pack-segments takes IN.json OUT.bin")
-        packSegments(File(args[1]), File(args[2]))
+    if (args[0] == "pack-dataset") {
+        if (args.size != 3) usage("pack-dataset takes DIR OUT.bin")
+        packDataset(File(args[1]), File(args[2]))
         return
     }
     val flags = HashMap<String, String>()
@@ -69,16 +69,20 @@ private fun usage(msg: String? = null): Nothing {
     exitProcess(2)
 }
 
-/** Writes [out] (atomically) from [input]; fails unless it decodes back to the same segments. */
-internal fun packSegments(input: File, out: File) {
-    val (version, segments) = Dataset.parseSegments(input.readText()).let { it.version to it.segments }
-    val bytes = SegmentsBinary.encode(version, segments)
-    val back = SegmentsBinary.decode(bytes)
-    check(back.version == version && back.segments == segments) { "pack-segments: round trip differs" }
+/** Writes [out] (atomically) from [dir]'s trails.json + coverage_segments.json; fails unless it decodes back equal. */
+internal fun packDataset(dir: File, out: File) {
+    val trails = File(dir, "trails.json").readBytes()
+    val dataset = Dataset.parse(trails.decodeToString(), File(dir, "coverage_segments.json").readText())
+    val bytes = DatasetBinary.encode(dataset, DatasetBinary.hash(trails))
+    val back = Dataset.fromBinary(bytes)
+    check(
+        back.version == dataset.version && back.islandTotalM == dataset.islandTotalM && back.trails == dataset.trails &&
+            back.segments == dataset.segments,
+    ) { "pack-dataset: round trip differs" }
     val tmp = File(out.parentFile, out.name + ".part")
     tmp.writeBytes(bytes)
-    check(tmp.renameTo(out)) { "pack-segments: cannot write $out" }
-    println("pack-segments: ${segments.size} segments, ${input.length() / 1024} KiB -> ${bytes.size / 1024} KiB ($version)")
+    check(tmp.renameTo(out)) { "pack-dataset: cannot write $out" }
+    println("pack-dataset: ${dataset.trails.size} trails, ${dataset.segments.size} segments -> ${bytes.size / 1024} KiB (${dataset.version})")
 }
 
 private fun doubles(s: String) = s.split(",").map { it.trim().toDouble() }

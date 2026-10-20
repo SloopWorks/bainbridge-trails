@@ -2,6 +2,7 @@ package com.bainbridgetrails.data
 
 import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.Dataset
+import com.bainbridgetrails.coverage.DatasetBinary
 import com.bainbridgetrails.coverage.LocalProjection
 import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
@@ -28,27 +29,26 @@ class TrailData(
     /** Wall time of [Dataset.parse] / [SegmentIndex] construction (debug drawer, perf notes). */
     val parseMs: Long,
     val indexMs: Long,
-    /** Which segments file was parsed: "bin" (coverage_segments.bin) or "json" (fallback). */
-    val segmentsFormat: String = "json",
+    /** What was parsed: "bin" (dataset.bin) or "json" (the fallback). */
+    val format: String = "json",
 ) {
     val progress: Progress = Progress(dataset, index, params)
 }
 
 /**
  * The bundled dataset files (resources in the app, strings in tests); each reader may suspend on I/O.
- * [segmentsBin] (coverage_segments.bin, [com.bainbridgetrails.coverage.SegmentsBinary]) is preferred; the JSON is
- * read only when the binary is absent, unreadable or of another dataset version.
+ * [datasetBin] (dataset.bin, [DatasetBinary]) is preferred; coverage_segments.json is read and the JSON parsed only
+ * when the binary is absent, unreadable, or was not made from these trails.json bytes (stale).
  */
 class DatasetSources(
-    val trails: suspend () -> String,
+    val trailsJson: suspend () -> ByteArray,
     val segmentsJson: suspend () -> String,
-    val segmentsBin: suspend () -> ByteArray? = { null },
+    val datasetBin: suspend () -> ByteArray? = { null },
 )
 
 /**
  * Parses the bundled dataset once per process on [compute] (never Main) and builds the segment index right after
- * (tick counts only: enough for [Progress]). The index's matching geometry is then prepared in the background so
- * the first walk/geofence match is fast, without delaying [state] Ready.
+ * (tick counts only, all [Progress] needs; matching geometry builds on first use or [SegmentIndex.prepare]).
  * [load] is idempotent while loading/loaded; after a failure it starts over (the UI's Retry).
  */
 class DatasetRepository(
@@ -71,9 +71,7 @@ class DatasetRepository(
         _state.value = Loadable.Loading
         job = scope.launch {
             _state.value = try {
-                val data = withContext(compute) { build() }
-                scope.launch(compute) { prepare(data) }
-                Loadable.Ready(data)
+                Loadable.Ready(withContext(compute) { build() })
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -95,20 +93,21 @@ class DatasetRepository(
 
     private suspend fun build(): TrailData {
         parseCount++
-        val trails = sources.trails()
-        val bin = sources.segmentsBin()
+        val trails = sources.trailsJson()
+        val bin = sources.datasetBin()
         val t0 = TimeSource.Monotonic.markNow()
         var format = "bin"
         val dataset = bin?.let { bytes ->
             try {
-                Dataset.parse(trails, bytes)
-            } catch (e: Exception) { // corrupt, truncated or another dataset version
-                AppLog.w(TAG, "coverage_segments.bin unusable (${e.message}); parsing the JSON")
+                require(DatasetBinary.trailsJsonHash(bytes) == DatasetBinary.hash(trails)) { "not made from the bundled trails.json" }
+                Dataset.fromBinary(bytes)
+            } catch (e: Exception) { // stale, corrupt or truncated
+                AppLog.w(TAG, "dataset.bin unusable (${e.message}); parsing the JSON")
                 null
             }
         } ?: run {
             format = "json"
-            Dataset.parse(trails, sources.segmentsJson())
+            Dataset.parse(trails.decodeToString(), sources.segmentsJson())
         }
         val parseMs = t0.elapsedNow().inWholeMilliseconds
         val t1 = TimeSource.Monotonic.markNow()
@@ -116,16 +115,6 @@ class DatasetRepository(
         val indexMs = t1.elapsedNow().inWholeMilliseconds
         AppLog.i(TAG, "dataset ${dataset.version}: ${dataset.trails.size} trails, ${dataset.segments.size} segments; parse ($format) $parseMs ms, index $indexMs ms")
         return TrailData(dataset, index, params, parseMs, indexMs, format)
-    }
-
-    private fun prepare(data: TrailData) {
-        val t = TimeSource.Monotonic.markNow()
-        try {
-            data.index.prepare()
-            AppLog.i(TAG, "index prepared in ${t.elapsedNow().inWholeMilliseconds} ms")
-        } catch (e: Exception) {
-            AppLog.e(TAG, "index prepare failed: ${e.message}") // the first match retries (lazy)
-        }
     }
 
     private companion object {

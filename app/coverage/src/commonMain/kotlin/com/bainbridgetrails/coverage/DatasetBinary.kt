@@ -1,32 +1,40 @@
 package com.bainbridgetrails.coverage
 
 /**
- * Compact binary form of coverage_segments.json (`coverage_segments.bin`), made at asset-sync time
- * (`coverage-eval pack-segments`) so the app skips the 1.7 MB JSON parse at startup. The JSON stays the source of
- * truth (pipeline, coverage-eval); [decode] gives segments equal to `Dataset.parse`'s, coordinates bit-for-bit.
+ * Compact binary form of trails.json + coverage_segments.json (`dataset.bin`), made at asset-sync time
+ * (`coverage-eval pack-dataset`) so the app skips JSON parsing at startup (on a debuggable Android build the JSON
+ * took ~8 s). The JSON stays the source of truth (pipeline, coverage-eval); [decode] gives a [Dataset] equal to
+ * [Dataset.parse]'s, coordinates bit-for-bit.
  *
  * Layout, little-endian:
  * ```
- * i32 MAGIC  i32 FORMAT  str version
- * i32 nStrings  str * nStrings                      // ids, trail ids, categories (deduplicated)
+ * i32 MAGIC  i32 FORMAT  str version  i64 trailsJsonHash  f64 islandTotalM
+ * i32 nStrings  str * nStrings                       // ids, names, categories (deduplicated)
+ * i32 nTrails
+ *   per trail:   i32 idRef  i32 nameRef  f64 computedLengthMi  u8 hasOfficial  [f64 officialLengthMi]
+ *                i32 nSegmentIds  i32 segmentRef * nSegmentIds
  * i32 nSegments
  *   per segment: i32 idRef  f64 lengthM  u8 flags (1 = included, 2 = has category)  [i32 categoryRef]
  *                i32 nTrailIds  i32 trailRef * nTrailIds  i32 nCoords
- * f64 (lon, lat) * sum(nCoords)                     // every segment's coords, in segment order
+ * f64 (lon, lat) * sum(nCoords)                      // every segment's coords, in segment order
  * str = i32 byteLength + UTF-8 bytes
  * ```
- * Bump [FORMAT] on any layout change; a reader refuses other formats (the app then falls back to the JSON).
+ * trailsJsonHash = [hash] of the trails.json bytes it was made from: a reader holding the bundled trails.json can
+ * tell a stale binary without parsing JSON. Bump [FORMAT] on any layout change; readers refuse other formats.
  */
-object SegmentsBinary {
-    const val MAGIC: Int = 0x47535442 // "BTSG"
+object DatasetBinary {
+    const val MAGIC: Int = 0x53445442 // "BTDS"
     const val FORMAT: Int = 1
 
-    class Decoded(val version: String, val segments: List<SegmentGeom>)
-
-    fun encode(version: String, segments: List<SegmentGeom>): ByteArray {
+    fun encode(dataset: Dataset, trailsJsonHash: Long): ByteArray {
         val strings = LinkedHashMap<String, Int>()
         fun ref(s: String): Int = strings.getOrPut(s) { strings.size }
-        for (s in segments) {
+        for (t in dataset.trails) {
+            ref(t.id)
+            ref(t.name)
+            t.segmentIds.forEach(::ref)
+        }
+        for (s in dataset.segments) {
             ref(s.id)
             s.category?.let(::ref)
             s.trailIds.forEach(::ref)
@@ -34,11 +42,24 @@ object SegmentsBinary {
         val w = Writer()
         w.i32(MAGIC)
         w.i32(FORMAT)
-        w.str(version)
+        w.str(dataset.version)
+        w.i64(trailsJsonHash)
+        w.f64(dataset.islandTotalM)
         w.i32(strings.size)
         for (s in strings.keys) w.str(s)
-        w.i32(segments.size)
-        for (s in segments) {
+        w.i32(dataset.trails.size)
+        for (t in dataset.trails) {
+            w.i32(ref(t.id))
+            w.i32(ref(t.name))
+            w.f64(t.computedLengthMi)
+            val official = t.officialLengthMi
+            w.u8(if (official != null) 1 else 0)
+            if (official != null) w.f64(official)
+            w.i32(t.segmentIds.size)
+            for (s in t.segmentIds) w.i32(ref(s))
+        }
+        w.i32(dataset.segments.size)
+        for (s in dataset.segments) {
             w.i32(ref(s.id))
             w.f64(s.lengthM)
             val cat = s.category
@@ -48,7 +69,7 @@ object SegmentsBinary {
             for (t in s.trailIds) w.i32(ref(t))
             w.i32(s.coords.size)
         }
-        for (s in segments) for (c in s.coords) {
+        for (s in dataset.segments) for (c in s.coords) {
             require(c.size == 2) { "segment ${s.id}: coordinate needs [lon, lat], got $c" }
             w.f64(c[0])
             w.f64(c[1])
@@ -56,13 +77,29 @@ object SegmentsBinary {
         return w.toByteArray()
     }
 
-    fun decode(bytes: ByteArray): Decoded {
+    /** The trailsJsonHash in [bytes]' header (cheap; no full decode). */
+    fun trailsJsonHash(bytes: ByteArray): Long {
         val r = Reader(bytes)
-        require(r.i32() == MAGIC) { "not a coverage_segments.bin" }
-        val format = r.i32()
-        require(format == FORMAT) { "coverage_segments.bin format $format, expected $FORMAT" }
+        r.header()
+        r.str()
+        return r.i64()
+    }
+
+    /** Decodes [bytes]; throws [IllegalArgumentException] (or an index error) on a corrupt or foreign file. */
+    fun decode(bytes: ByteArray): Dataset {
+        val r = Reader(bytes)
+        r.header()
         val version = r.str()
+        r.i64() // trailsJsonHash
+        val islandTotalM = r.f64()
         val strings = Array(r.i32()) { r.str() }
+        val trails = List(r.i32()) {
+            val id = strings[r.i32()]
+            val name = strings[r.i32()]
+            val computed = r.f64()
+            val official = if (r.u8() != 0) r.f64() else null
+            TrailMeta(id, name, List(r.i32()) { strings[r.i32()] }, computed, official)
+        }
         val n = r.i32()
         val ids = arrayOfNulls<String>(n)
         val lengths = DoubleArray(n)
@@ -82,7 +119,7 @@ object SegmentsBinary {
             coordStart[i + 1] = coordStart[i] + nc
         }
         val coords = r.f64s(2 * coordStart[n])
-        require(r.atEnd) { "coverage_segments.bin: trailing bytes" }
+        require(r.atEnd) { "dataset.bin: trailing bytes" }
         val segments = List(n) { i ->
             SegmentGeom(
                 id = ids[i]!!,
@@ -93,7 +130,17 @@ object SegmentsBinary {
                 category = categories[i],
             )
         }
-        return Decoded(version, segments)
+        return Dataset(trails, islandTotalM, segments, version)
+    }
+
+    /** 64-bit FNV-1a of [bytes] (trails.json staleness check; not cryptographic). */
+    fun hash(bytes: ByteArray): Long {
+        var h = -0x340d631b7bdddcdbL // 0xcbf29ce484222325
+        for (b in bytes) {
+            h = h xor (b.toLong() and 0xFF)
+            h *= 0x100000001b3L
+        }
+        return h
     }
 
     private class Writer {
@@ -114,11 +161,12 @@ object SegmentsBinary {
             for (k in 0 until 4) buf[n++] = (v ushr (8 * k)).toByte()
         }
 
-        fun f64(v: Double) {
+        fun i64(v: Long) {
             ensure(8)
-            val b = v.toRawBits()
-            for (k in 0 until 8) buf[n++] = (b ushr (8 * k)).toByte()
+            for (k in 0 until 8) buf[n++] = (v ushr (8 * k)).toByte()
         }
+
+        fun f64(v: Double) = i64(v.toRawBits())
 
         fun str(s: String) {
             val b = s.encodeToByteArray()
@@ -136,7 +184,13 @@ object SegmentsBinary {
         val atEnd: Boolean get() = p == b.size
 
         private fun need(k: Int) {
-            if (k < 0 || p + k > b.size) throw IllegalArgumentException("coverage_segments.bin truncated at byte $p")
+            if (k < 0 || p + k > b.size) throw IllegalArgumentException("dataset.bin truncated at byte $p")
+        }
+
+        fun header() {
+            require(b.size >= 8 && i32() == MAGIC) { "not a dataset.bin" }
+            val format = i32()
+            require(format == FORMAT) { "dataset.bin format $format, expected $FORMAT" }
         }
 
         fun u8(): Int {
@@ -152,30 +206,21 @@ object SegmentsBinary {
             return v
         }
 
-        fun f64(): Double {
-            need(8)
-            return Double.fromBits(long(p).also { p += 8 })
+        fun i64(): Long {
+            val lo = i32()
+            val hi = i32()
+            return (hi.toLong() shl 32) or (lo.toLong() and 0xFFFFFFFFL)
         }
 
-        /** [count] doubles in one bounds check. */
+        fun f64(): Double = Double.fromBits(i64())
+
+        /** [count] doubles in one bulk copy. */
         fun f64s(count: Int): DoubleArray {
             need(8 * count)
             val out = DoubleArray(count)
-            var q = p
-            for (i in 0 until count) {
-                out[i] = Double.fromBits(long(q))
-                q += 8
-            }
-            p = q
+            readDoublesLE(b, p, out)
+            p += 8 * count
             return out
-        }
-
-        private fun long(q: Int): Long {
-            val lo = (b[q].toInt() and 0xFF) or ((b[q + 1].toInt() and 0xFF) shl 8) or
-                ((b[q + 2].toInt() and 0xFF) shl 16) or ((b[q + 3].toInt() and 0xFF) shl 24)
-            val hi = (b[q + 4].toInt() and 0xFF) or ((b[q + 5].toInt() and 0xFF) shl 8) or
-                ((b[q + 6].toInt() and 0xFF) shl 16) or ((b[q + 7].toInt() and 0xFF) shl 24)
-            return (hi.toLong() shl 32) or (lo.toLong() and 0xFFFFFFFFL)
         }
 
         fun str(): String {
@@ -185,6 +230,22 @@ object SegmentsBinary {
             p += len
             return s
         }
+    }
+}
+
+/** Fills [dst] with little-endian IEEE doubles from [src] at [offset] (bounds already checked). */
+internal expect fun readDoublesLE(src: ByteArray, offset: Int, dst: DoubleArray)
+
+/** Portable [readDoublesLE] (iOS; the JVM/Android actuals use a bulk ByteBuffer copy). */
+internal fun readDoublesLEPortable(src: ByteArray, offset: Int, dst: DoubleArray) {
+    var q = offset
+    for (i in dst.indices) {
+        val lo = (src[q].toInt() and 0xFF) or ((src[q + 1].toInt() and 0xFF) shl 8) or
+            ((src[q + 2].toInt() and 0xFF) shl 16) or ((src[q + 3].toInt() and 0xFF) shl 24)
+        val hi = (src[q + 4].toInt() and 0xFF) or ((src[q + 5].toInt() and 0xFF) shl 8) or
+            ((src[q + 6].toInt() and 0xFF) shl 16) or ((src[q + 7].toInt() and 0xFF) shl 24)
+        dst[i] = Double.fromBits((hi.toLong() shl 32) or (lo.toLong() and 0xFFFFFFFFL))
+        q += 8
     }
 }
 

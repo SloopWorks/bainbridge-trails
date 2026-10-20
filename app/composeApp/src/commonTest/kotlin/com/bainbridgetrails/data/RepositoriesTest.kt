@@ -2,7 +2,7 @@ package com.bainbridgetrails.data
 
 import com.bainbridgetrails.coverage.CoverageState
 import com.bainbridgetrails.coverage.Dataset
-import com.bainbridgetrails.coverage.SegmentsBinary
+import com.bainbridgetrails.coverage.DatasetBinary
 import com.bainbridgetrails.coverage.Fix
 import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.map.MapStyle
@@ -25,32 +25,37 @@ class RepositoriesTest {
     }
 
     private fun sources(bin: ByteArray? = null, fail: () -> Boolean = { false }) = DatasetSources(
-        trails = { if (fail()) error("boom") else DataFixtures.TRAILS },
+        trailsJson = { if (fail()) error("boom") else DataFixtures.TRAILS.encodeToByteArray() },
         segmentsJson = { jsonReads++; DataFixtures.SEGMENTS },
-        segmentsBin = { bin },
+        datasetBin = { bin },
     )
 
     private var jsonReads = 0
 
-    private fun fixtureBin(version: String = "t1"): ByteArray =
-        SegmentsBinary.encode(version, Dataset.parseSegments(DataFixtures.SEGMENTS).segments)
+    private val jsonDataset get() = Dataset.parse(DataFixtures.TRAILS, DataFixtures.SEGMENTS)
+
+    private fun fixtureBin(trailsJson: String = DataFixtures.TRAILS): ByteArray =
+        DatasetBinary.encode(jsonDataset, DatasetBinary.hash(trailsJson.encodeToByteArray()))
 
     @Test
-    fun datasetPrefersTheBinarySegments() = runTest {
+    fun datasetPrefersTheBinary() = runTest {
         val repo = DatasetRepository(backgroundScope, sources(fixtureBin()), compute = StandardTestDispatcher(testScheduler))
         val data = repo.await()
-        assertEquals("bin", data.segmentsFormat)
+        assertEquals("bin", data.format)
         assertEquals(0, jsonReads, "JSON not read when the binary is usable")
-        assertEquals(Dataset.parse(DataFixtures.TRAILS, DataFixtures.SEGMENTS).segments, data.dataset.segments)
+        assertEquals(jsonDataset.trails, data.dataset.trails)
+        assertEquals(jsonDataset.segments, data.dataset.segments)
+        assertEquals(jsonDataset.version, data.dataset.version)
     }
 
     @Test
     fun datasetFallsBackToJsonOnStaleOrCorruptBinary() = runTest {
-        for (bad in listOf(fixtureBin(version = "t0"), fixtureBin().copyOf(40), byteArrayOf(1, 2, 3))) {
+        val stale = fixtureBin(trailsJson = DataFixtures.TRAILS.replace("t1", "t0"))
+        for (bad in listOf(stale, fixtureBin().copyOf(60), byteArrayOf(1, 2, 3))) {
             jsonReads = 0
             val repo = DatasetRepository(backgroundScope, sources(bad), compute = StandardTestDispatcher(testScheduler))
             val data = repo.await()
-            assertEquals("json", data.segmentsFormat)
+            assertEquals("json", data.format)
             assertEquals(1, jsonReads)
             assertEquals(2, data.dataset.trails.size)
         }
