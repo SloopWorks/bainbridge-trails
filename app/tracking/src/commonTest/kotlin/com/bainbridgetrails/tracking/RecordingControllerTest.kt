@@ -1,6 +1,7 @@
 package com.bainbridgetrails.tracking
 
 import com.bainbridgetrails.coverage.CoverageParams
+import com.bainbridgetrails.coverage.CoverageState
 import com.bainbridgetrails.coverage.Dataset
 import com.bainbridgetrails.coverage.Fix
 import com.bainbridgetrails.coverage.LocalProjection
@@ -456,5 +457,91 @@ class RecordingControllerTest {
         assertTrue(assertIs<RecordingState.Recording>(r.controller.state.value).preciseLocation)
         r.controller.onEvent(SessionEvent.SourceState(t0, "precise", false))
         assertFalse(assertIs<RecordingState.Recording>(r.controller.state.value).preciseLocation)
+    }
+
+    /** A recorder whose stop() never writes Stop in time: the controller's stop times out (virtual time). */
+    private class SlowRecorder(val store: SessionStore, val clock: FakeClock) : Recorder {
+        lateinit var c: RecordingController
+        var active: String? = null
+        override fun start(sessionId: String, resume: Boolean) {
+            active = sessionId
+            store.begin(sessionId, clock.now)
+            c.onEvent(SessionEvent.Start(sessionId, clock.now))
+        }
+        override fun stop() = Unit
+        /** The drain finally completes after the controller gave up waiting. */
+        fun lateStop() {
+            store.end(clock.now)
+            active = null
+        }
+    }
+
+    @Test
+    fun stopTimeoutSummaryIsNotShownAgainOnNextLaunch() = runTest {
+        val dir = tmpDir()
+        val clock = FakeClock(t0)
+        val store = SessionStore(dir)
+        val slow = SlowRecorder(store, clock)
+        val c = RecordingController(store, Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir)), { clock.now }, slow, backgroundScope)
+        slow.c = c
+        c.onPermissions(Perm.entries.toSet())
+        val id = assertNotNull(c.start())
+        // Walk the whole trail through the slow recorder.
+        var x = 0.0
+        while (x <= 200.0) {
+            val (lon, lat) = proj.toLonLat(Xy(x, 0.0))
+            clock.advance(2_000)
+            val e = SessionEvent.FixEvent(clock.now, lon, lat, 5.0, false)
+            store.append(e)
+            c.onEvent(e)
+            x += 3.0
+        }
+        c.stop() // times out: merged early (not finalized) and the summary is shown once
+        assertEquals(id, assertIs<RecordingState.Done>(c.state.value).summary.sessionId)
+        assertTrue(CoverageStore(dir).finalizedIds().isEmpty(), "merged before its Stop: not finalized yet")
+        c.dismiss()
+        slow.lateStop()
+
+        // Next launch: the session is merged again (now complete) but its summary is not shown a second time.
+        val r = rig(dir)
+        r.controller.onLaunch()
+        assertIs<RecordingState.Idle>(r.controller.state.value)
+        assertNull(r.controller.notice.value)
+        assertEquals(setOf(id), CoverageStore(dir).finalizedIds())
+        assertEquals(listOf(id), WalkIndex(dir).all().map { it.sessionId }, "one history entry, updated in place")
+    }
+
+    @Test
+    fun earlySummaryShownStillCountsOtherPendingWalks() = runTest {
+        val dir = tmpDir()
+        // "early" was shown after a stop timeout; "later" was stopped from the notification and never shown.
+        recordFinished(dir, "s1700000000000-early", t0, 0.0, 90.0)
+        CoverageStore(dir).merge("s1700000000000-early", CoverageState.EMPTY, verified = true, finalized = false, summaryShown = true)
+        recordFinished(dir, "s1700000100000-later", t0 + 100_000, 90.0, 200.0)
+        val r = rig(dir)
+        r.controller.onLaunch()
+        val done = r.controller.state.first { it is RecordingState.Done } as RecordingState.Done
+        assertEquals("s1700000100000-later", done.summary.sessionId)
+        assertNull(r.controller.notice.value, "only one walk is new to the user")
+        assertEquals(2, CoverageStore(dir).finalizedIds().size)
+    }
+
+    @Test
+    fun startClearsHeldBackRecovery() = runTest {
+        val dir = tmpDir()
+        recordFinished(dir, "stopped", t0, 0.0, 60.0)
+        SessionStore(dir).begin("crashed", t0 + 500_000)
+        val r = rig(dir)
+        r.controller.onLaunch()
+        r.controller.state.first { it is RecordingState.Done }
+        // The user starts a new walk straight from the results sheet (allowed from Done) instead of dismissing it.
+        r.controller.onPermissions(Perm.entries.toSet())
+        assertNotNull(r.controller.start())
+        r.walk(0.0, 30.0)
+        r.controller.stop()
+        assertIs<RecordingState.Done>(r.controller.state.value)
+        r.controller.dismiss()
+        advanceUntilIdle()
+        assertIs<RecordingState.Idle>(r.controller.state.value, "the held-back recovery belonged to the earlier sheet")
     }
 }

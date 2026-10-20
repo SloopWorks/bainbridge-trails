@@ -108,21 +108,26 @@ class RecordingController(
      */
     suspend fun onLaunch() {
         if (_state.value !is RecordingState.Idle) return
-        val (pending, unfinished) = withContext(io) {
+        val (pending, shown, unfinished) = withContext(io) {
             val done = finalizer.finalizedIds()
-            store.finished().filter { it !in done }.sortedBy { startOf(it) } to store.unfinished().firstOrNull()
+            Triple(store.finished().filter { it !in done }.sortedBy { startOf(it) }, finalizer.shownIds(), store.unfinished().firstOrNull())
         }
         if (_state.value !is RecordingState.Idle) return
         if (pending.isNotEmpty()) {
             _state.value = RecordingState.Finalizing(pending.last())
             var last: SessionSummary? = null
             var saved = 0
+            var failed = 0
             for (id in pending) {
                 try {
-                    last = finalizer.finalize(id)
+                    val summary = finalizer.finalize(id)
+                    // Merged early after a stop timeout and its summary already shown: complete it silently.
+                    if (id in shown) continue
+                    last = summary
                     saved++
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
+                    failed++
                 }
             }
             recoverAfterDismiss = unfinished != null
@@ -131,9 +136,9 @@ class RecordingController(
                 _state.value = RecordingState.Done(last)
                 return
             }
-            _notice.value = "Could not finish ${pending.size} saved walk(s)"
-            _state.value = RecordingState.Idle
             recoverAfterDismiss = false
+            if (failed > 0) _notice.value = "Could not finish $failed saved walk(s)"
+            _state.value = RecordingState.Idle
         }
         if (unfinished != null && _state.value is RecordingState.Idle) _state.value = RecordingState.Recover(unfinished)
     }
@@ -161,6 +166,9 @@ class RecordingController(
         }
         val id = newSessionId()
         val optional = Perm.ACTIVITY in granted
+        // A recovery held back behind an earlier results sheet belongs to that sheet: starting a walk from it
+        // (Start is allowed from Done) must not pop the Recover panel when this walk's sheet is dismissed.
+        recoverAfterDismiss = false
         clearTrack()
         _notice.value = null
         recorderStarted = false
