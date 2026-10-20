@@ -60,6 +60,8 @@ import com.bainbridgetrails.ui.MapTab
 import com.bainbridgetrails.ui.MeScreen
 import com.bainbridgetrails.ui.OnboardingScreen
 import com.bainbridgetrails.ui.ProfileScreen
+import com.bainbridgetrails.ui.WalkDetailScreen
+import com.bainbridgetrails.ui.nowMs
 import com.bainbridgetrails.ui.SettingsScreen
 import com.bainbridgetrails.ui.TrailDetailScreen
 import com.bainbridgetrails.ui.ShowcaseScreen
@@ -161,7 +163,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             if (!AppGraph.celebrated.add(c.key)) return@collect
             val done = runCatching { graph.controller().await() }.getOrNull()?.state?.value as? RecordingState.Done
             if (done?.summary?.sessionId == c.key && nav.currentDestination?.hasRoute(RecordRoute::class) != true) nav.openRecord()
-            nav.navigate(CelebrationRoute(c.key, c.trailIds))
+            nav.navigate(CelebrationRoute(c.key, c.trailIds, c.island, c.preview))
         }
     }
     // F0 step 5 / TL-4: a recovered walk (Count it / Discard) or results finalised away from the Record flow
@@ -226,6 +228,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     onLeaderboard = { nav.navigate(LeaderboardRoute) },
                     onSettings = { nav.navigate(SettingsRoute) },
                     onProfile = { nav.navigate(ProfileRoute) },
+                    onWalk = { nav.navigate(WalkDetailRoute(it)) },
                     onMap = { nav.selectTab(MapRoute) },
                     onSeeAllInProgress = {
                         TrailsListState.query = TrailListQuery(statuses = setOf(TrailStatus.PARTWAY, TrailStatus.NEARLY_DONE))
@@ -235,6 +238,9 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             }
             composable<TrailDetailRoute> { entry ->
                 TrailDetailScreen(graph, settings, entry.toRoute<TrailDetailRoute>().trailId, onBack = { nav.popBackStack() }, onStartWalk = { nav.openRecord() }, onShowOnMap = { nav.selectTab(MapRoute) })
+            }
+            composable<WalkDetailRoute> { entry ->
+                WalkDetailScreen(graph, settings, entry.toRoute<WalkDetailRoute>().sessionId, onBack = { nav.popBackStack() }, onTrail = { nav.navigate(TrailDetailRoute(it)) })
             }
             composable<LeaderboardRoute> { LeaderboardScreen(graph, onBack = { nav.popBackStack() }, onSignIn = { nav.navigate(ProfileRoute) }) }
             composable<ProfileRoute> { ProfileScreen(graph, onBack = { nav.popBackStack() }) }
@@ -265,7 +271,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             ) { entry ->
                 val route = entry.toRoute<CelebrationRoute>()
                 CelebrationScreen(
-                    graph, route.sessionId, route.trailIds,
+                    graph, route.sessionId, route.trailIds, island = route.island, preview = route.preview,
                     onContinue = { nav.popBackStack() },
                     onViewTrail = { id -> nav.navigate(TrailDetailRoute(id)) { popUpTo<CelebrationRoute> { inclusive = true } } },
                 )
@@ -341,6 +347,11 @@ private suspend fun openDebugScreen(nav: NavController, graph: AppGraph.Installe
         "attribution" -> nav.navigate(AttributionRoute)
         "privacy" -> nav.navigate(PrivacyRoute)
         "onboarding" -> nav.navigate(OnboardingRoute)
-        else -> if (screen.startsWith("trail:")) nav.navigate(TrailDetailRoute(screen.substringAfter(':')))
+        "celebrate-island" -> AppGraph.requestCelebration(AppGraph.Celebration("debug-island-${nowMs()}", emptyList(), island = true, preview = true))
+        "walk" -> graph.walks.refreshNow().walks.firstOrNull()?.let { nav.navigate(WalkDetailRoute(it.sessionId)) } // newest walk
+        else -> when {
+            screen.startsWith("trail:") -> nav.navigate(TrailDetailRoute(screen.substringAfter(':')))
+            screen.startsWith("walk:") -> nav.navigate(WalkDetailRoute(screen.substringAfter(':')))
+        }
     }
 }

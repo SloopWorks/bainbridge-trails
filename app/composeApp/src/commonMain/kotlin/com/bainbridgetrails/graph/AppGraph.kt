@@ -97,8 +97,12 @@ object AppGraph {
 
     private var installed: Installed? = null
 
-    /** A request to show the celebration for [trailIds]; [key] dedupes (session id, or a debug-tool key). */
-    data class Celebration(val key: String, val trailIds: List<String>)
+    /**
+     * A request to show the celebration for [trailIds]; [key] dedupes (session id, or a debug-tool key). [island] = this
+     * walk made the island whole (P1-9 variant, also with no newly completed trail); [preview] (debug tools only) shows
+     * the island variant with final numbers (100%, every trail) whatever the real coverage.
+     */
+    data class Celebration(val key: String, val trailIds: List<String>, val island: Boolean = false, val preview: Boolean = false)
 
     private val _celebrations = MutableSharedFlow<Celebration>(replay = 1, extraBufferCapacity = 4)
     /** Celebrations to show (finished walks, debug tools). Replay 1 so one emitted before the shell exists still shows. */
@@ -108,7 +112,7 @@ object AppGraph {
     val celebrated: MutableSet<String> = mutableSetOf()
 
     fun requestCelebration(c: Celebration) {
-        if (c.trailIds.isNotEmpty()) _celebrations.tryEmit(c)
+        if (c.trailIds.isNotEmpty() || c.island) _celebrations.tryEmit(c)
     }
 
     class Installed internal constructor(val context: PlatformContext) {
@@ -177,6 +181,17 @@ object AppGraph {
         /** The recording controller (built once; completes after crash recovery / auto-finalize on launch). */
         fun controller(): Deferred<RecordingController> = RecordingGraph.controller(context)
 
+        /**
+         * Walk detail (P1-6): a finished walk's raw fixes while its session file still exists (deleted 30 days after
+         * the walk); null once pruned or unreadable. Read on IO, drawn on this device only, never synced or logged.
+         */
+        suspend fun rawTrack(sessionId: String): List<com.bainbridgetrails.coverage.Fix>? = withContext(Dispatchers.IO) {
+            runCatching {
+                val store = com.bainbridgetrails.tracking.SessionStore(trackingDir)
+                if (sessionId in store.ids()) store.load(sessionId).fixes else null
+            }.getOrNull()
+        }
+
         /** Re-reads coverage-derived state (after a walk, a debug-tool write, or a sync). */
         fun coverageChanged() {
             progress.refresh()
@@ -216,7 +231,8 @@ object AppGraph {
                         s.summary.newlyCompleted.forEach { analytics.track(AnalyticsEvents.TRAIL_COMPLETED, mapOf("trail" to it)) }
                         graph.coverageChanged()
                         graph.sync.walkFinished() // F11: upload after each finished walk (queued when offline)
-                        requestCelebration(Celebration(s.summary.sessionId, s.summary.newlyCompleted))
+                        val island = s.summary.islandBefore < 1.0 && s.summary.islandAfter >= 1.0
+                        requestCelebration(Celebration(s.summary.sessionId, s.summary.newlyCompleted, island = island))
                     }
                     else -> Unit
                 }

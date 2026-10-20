@@ -118,8 +118,15 @@ Any subset of:
 { "displayName": "Trail Fox" }      // set custom name
 { "displayName": null }             // go anonymous
 { "anonName": "Sleepy Newt 31" }    // after Shuffle / after sign-in; must use the shared word lists
+{ "hiddenFromBoard": true }         // P1-8 "Hide me from the leaderboard" (boolean)
 ```
-`200` → same body as `GET /v1/me`. Errors: `name_invalid`, `name_rejected`, `name_rate_limited`.
+`200` → same body as `GET /v1/me`. Errors: `name_invalid`, `name_rejected`, `name_rate_limited`, `bad_request`.
+
+`hiddenFromBoard` is the user's own choice (column `self_hidden`), separate from an admin hide (`hidden`), so
+turning it off never undoes moderation; an admin hide is not reported in this field. Hiding removes the row from
+the leaderboard snapshot at once (`you` becomes null). Un-hiding brings back the caller's live `you` row at once;
+others see the row again at the next daily snapshot (TL-11). Hidden users still count in the anonymous community
+trail stats (counts < 5 hidden, rounded to 5).
 
 Name rules (server authoritative, TL-9): NFC, trim, collapse spaces; 3–24 characters; only
 `[A-Za-z0-9 À-ÖØ-öø-ÿ'._-]`; ≥ 2 letters; no `@`, `www`, `http`, `.tld`; allowlist first, then severe

@@ -192,7 +192,7 @@ private fun ResultsSync.label() = when (this) {
 
 /** Wide island tile: "Island  11.9% → 12.4%" with "+0.5 pts" in `positive` (polite live region, ux.md §5.5). */
 @Composable
-private fun IslandTile(before: Double, after: Double) {
+internal fun IslandTile(before: Double, after: Double) {
     val points = deltaPoints(before, after)
     val delta = stringResource(Res.string.results_delta_pts, points)
     val spoken = stringResource(Res.string.results_island, Format.percent(before), Format.percent(after), delta)

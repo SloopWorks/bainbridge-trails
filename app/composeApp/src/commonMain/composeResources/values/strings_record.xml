@@ -115,4 +115,6 @@
     <string name="celebrate_a11y_announcement_multi">%1$d trails complete: %2$s. Island progress %3$s.</string>
     <string name="celebrate_island_title">You’ve walked the whole island</string>
     <string name="celebrate_island_body">Every counted trail on Bainbridge, done. Take a bow.</string>
+    <string name="celebrate_island_eyebrow">Island complete</string>
+    <string name="celebrate_island_a11y">You’ve walked the whole island. Every counted trail on Bainbridge, done. Island progress %1$s. %2$d of %3$d trails finished.</string>
 </resources>

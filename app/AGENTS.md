@@ -122,7 +122,8 @@ Check the merged permissions of an APK:
 
 iOS: the geofence prototype's Always request is compiled only with the Swift condition `GEOFENCE_PROTOTYPE`
 (`xcodebuild … SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG GEOFENCE_PROTOTYPE"`); default Debug has no request
-path. Simulator screenshots: launch arguments `-btScreen trails|me|leaderboard|profile|settings|privacy|onboarding|trail:<id>`,
+path. Simulator screenshots: launch arguments `-btScreen trails|me|leaderboard|profile|settings|privacy|onboarding|trail:<id>|walk|walk:<sessionId>|celebrate-island`
+(`walk` = newest walk's detail; `celebrate-island` = the island 100% celebration with final numbers),
 `-btDevSignIn 1`, `-apiBaseUrl http://localhost:8787` (debug binaries only; `xcrun simctl launch <udid>
 com.bainbridgetrails.app -btScreen me`).
 
