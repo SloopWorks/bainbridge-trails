@@ -119,6 +119,9 @@ import org.maplibre.compose.util.DpPadding
 
 private val MiniMapHeight = 260.dp
 
+/** Roads are short: a lower mini map (docs/roads/ux.md §3.1). */
+private val RoadMiniMapHeight = 200.dp
+
 /**
  * Trail detail (ux.md §3.4, product F4): fitted mini map with the trail highlighted, Fraunces header, status +
  * progress, facts grid, trailheads with Directions, official map link, community stats and a sticky Start walk.
@@ -173,6 +176,10 @@ private fun TrailDetailContent(
     val lengthMi = facts?.lengthMi ?: data.dataset.trails.first { it.id == trailId }.displayLengthMi
     val credit = remember(trailId, data) { data.dataset.islandCredit(trailId) }
     val lines = remember(trailId, data) { data.dataset.trailLines(trailId) }
+    // Roads (docs/roads/ux.md §3): road blocks replace the trail facts, chosen by the row's data.
+    val road = facts?.road
+    val roadProfile = DatasetProfile.current == DatasetProfile.ROADS
+    val awaitingRoad = facts == null && roadProfile
     val startWalk = rememberStartWalk(graph, onStartWalk)
     val linkError = { scope.launch { snackbar.showSnackbar(getString(Res.string.map_error_open_link)) } }
 
@@ -198,9 +205,10 @@ private fun TrailDetailContent(
         val scroll = rememberScrollState()
         val density = androidx.compose.ui.platform.LocalDensity.current
         // Past the mini map the floating buttons become a solid bar with the trail name (no text under icons).
-        val collapsed = with(density) { scroll.value.toDp() } > MiniMapHeight - 64.dp
+        val mapHeight = if (roadProfile) RoadMiniMapHeight else MiniMapHeight
+        val collapsed = with(density) { scroll.value.toDp() } > mapHeight - 64.dp
         Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
-            MiniMap(settings, trailId, name, lines, status, snapshot?.segmentBuckets.orEmpty()) {
+            MiniMap(settings, trailId, name, lines, status, snapshot?.segmentBuckets.orEmpty(), mapHeight, road?.roadEnds.orEmpty()) {
                 MapFocus.request(trailId)
                 onShowOnMap()
             }
@@ -210,7 +218,18 @@ private fun TrailDetailContent(
                     .padding(horizontal = BtTheme.spacing.screenH),
             ) {
                 Spacer(Modifier.height(20.dp))
-                Text(name, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
+                Text(name, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                if (road != null || awaitingRoad) {
+                    if (road != null) RoadDetailBody(
+                        data, trailId, road, fraction, status, settings.units,
+                        community = community,
+                        onRetryCommunity = { scope.launch { graph.trailStats.get(force = true) } },
+                        onDirections = { lat, lon, label -> open(directionsUri(lat, lon, label)) },
+                        onShowOnMap = { MapFocus.request(trailId); onShowOnMap() },
+                    )
+                    Spacer(Modifier.height(140.dp))
+                    return@Column
+                }
                 val sub = listOfNotNull(facts?.park, facts?.manager?.takeIf { it != facts?.park }).joinToString(" · ")
                 if (sub.isNotEmpty()) {
                     Text(sub, Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -293,9 +312,9 @@ private fun TrailDetailContent(
             MapIconButton(BtIcons.Map, stringResource(Res.string.detail_map_a11y, name), { MapFocus.request(trailId); onShowOnMap() })
         }
 
-        // Sticky Start walk on a surface fade.
+        // Sticky Start walk on a surface fade (none for an uncounted road: it isn't part of the goal).
         val surface = MaterialTheme.colorScheme.background
-        Box(
+        if (road?.counted != false && !awaitingRoad) Box(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .background(Brush.verticalGradient(0f to surface.copy(alpha = 0f), 0.35f to surface.copy(alpha = 0.94f), 1f to surface))
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
@@ -324,13 +343,17 @@ private fun MiniMap(
     lines: List<List<List<Double>>>,
     status: TrailStatus,
     buckets: Map<TrailStatus, List<String>>,
+    height: Dp = MiniMapHeight,
+    roadEnds: List<RoadEnd> = emptyList(),
     onOpen: () -> Unit,
 ) {
     val style = settings.effectiveMapStyle(androidx.compose.foundation.isSystemInDarkTheme())
     val controller = rememberTrailMapController()
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val reduced = BtTheme.motion.reduced
-    val bounds = remember(lines) { boundsOf(lines) }
+    val spec = StatusLayerSpec.current
+    // A road end can sit just past the road's own geometry: keep the pin in frame.
+    val bounds = remember(lines, roadEnds) { boundsOf(lines + roadEnds.map { listOf(listOf(it.lon, it.lat)) }) }
     val openLatest by rememberUpdatedState(onOpen)
     val interactions = remember {
         MapInteractions(MapInteractions.None) {
@@ -347,11 +370,14 @@ private fun MiniMap(
     LaunchedEffect(controller.mapState, bounds) {
         val map = controller.mapState ?: return@LaunchedEffect
         val b = bounds ?: return@LaunchedEffect
-        map.fitTo(b, DpPadding(left = 64.dp, top = top + 24.dp, right = 64.dp, bottom = 20.dp), animate = false)
+        map.fitTo(
+            b, DpPadding(left = 64.dp, top = top + 24.dp, right = 64.dp, bottom = 20.dp), animate = false,
+            maxZoom = spec.fitZoomRange.endInclusive, minZoom = spec.fitZoomRange.start,
+        )
     }
     val a11y = stringResource(Res.string.detail_map_a11y, name)
     Box(
-        Modifier.fillMaxWidth().height(MiniMapHeight + top)
+        Modifier.fillMaxWidth().height(height + top)
             .clearAndSetSemantics {
                 contentDescription = a11y
                 role = Role.Button
@@ -371,6 +397,8 @@ private fun MiniMap(
                 style,
                 SelectedTrail(trailId, lines, status),
                 reduced,
+                spec = spec,
+                roadEnds = roadEnds,
             )
         }
     }
