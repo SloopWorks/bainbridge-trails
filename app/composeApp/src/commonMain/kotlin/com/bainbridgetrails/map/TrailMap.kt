@@ -103,6 +103,9 @@ enum class AttributionMode {
     Full,
 }
 
+/** Rendered style JSON per style (asset URLs are fixed for the process once [MapAssets.install] ran). Main only. */
+private val RenderedStyles = HashMap<MapStyle, String>()
+
 /** Session flag: the full credit line was already shown once (Timed mode). */
 private var attributionShown = false
 
@@ -162,11 +165,16 @@ fun TrailMap(
 ) {
     val dataDir = rememberMapDataDir()
     var attempt by remember { mutableIntStateOf(0) }
-    val load by produceState<StyleLoad>(StyleLoad.Loading, style, dataDir, attempt) {
+    // A tab switch disposes the map; the rendered style is cached per process so coming back shows the map at once
+    // (no Loading frame, no template re-read).
+    val load by produceState<StyleLoad>(RenderedStyles[style]?.let { StyleLoad.Ready(it) } ?: StyleLoad.Loading, style, dataDir, attempt) {
+        if (value is StyleLoad.Ready) return@produceState
         value = try {
             val urls = MapAssets.install(dataDir)
             // Res.readBytes reads on the calling thread (here Main): read and render the template on IO.
-            StyleLoad.Ready(withContext(Dispatchers.IO) { renderStyleTemplate(Res.readBytes(style.assetPath).decodeToString(), urls) })
+            val json = withContext(Dispatchers.IO) { renderStyleTemplate(Res.readBytes(style.assetPath).decodeToString(), urls) }
+            RenderedStyles[style] = json
+            StyleLoad.Ready(json)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

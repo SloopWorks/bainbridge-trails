@@ -87,6 +87,9 @@ fun StatusLayers(
         }
     }
     fun present(s: TrailStatus) = s == TrailStatus.NOT_STARTED || buckets[s].orEmpty().isNotEmpty()
+    // Layer filters carry every covered segment id as a literal: build them once per coverage change, not per recomposition.
+    val countedFilters = remember(filters) { filters.mapValues { (_, f) -> all(counted, f) } }
+    val namedNcFilters = remember(filters) { filters.mapValues { (_, f) -> all(!counted, named, f) } }
 
     Anchor.Below(LABEL_LAYER) {
         // Unnamed paths outside the island total: faint hairlines, by category (styles.md).
@@ -119,7 +122,7 @@ fun StatusLayers(
         for (s in order) if (present(s)) LineLayer(
             id = "app-trail-halo-${s.name.lowercase()}",
             source = trails, sourceLayer = "segments",
-            filter = all(counted, filters.getValue(s)),
+            filter = countedFilters.getValue(s),
             color = const(p.halo), opacity = const(p.haloOpacity * if (selected != null) TrailLineSpec.DIM_OPACITY else 1f),
             opacityTransition = fade,
             width = width(s, extra = TrailLineSpec.HALO_EXTRA),
@@ -129,7 +132,7 @@ fun StatusLayers(
         for (s in order) if (present(s) && TrailLineSpec.hasCasing(s)) LineLayer(
             id = "app-trail-casing-${s.name.lowercase()}",
             source = trails, sourceLayer = "segments",
-            filter = all(counted, filters.getValue(s)),
+            filter = countedFilters.getValue(s),
             color = const(p.casing), opacity = dim, opacityTransition = fade,
             width = width(s, extra = TrailLineSpec.CASING_EXTRA),
             cap = const(LineCap.Butt), join = const(LineJoin.Round),
@@ -137,21 +140,21 @@ fun StatusLayers(
         if (p.completeGlow > 0f && present(TrailStatus.COMPLETE)) LineLayer(
             id = "app-trail-glow",
             source = trails, sourceLayer = "segments",
-            filter = all(counted, filters.getValue(TrailStatus.COMPLETE)),
+            filter = countedFilters.getValue(TrailStatus.COMPLETE),
             color = const(p.complete), opacity = const(p.completeGlow * if (selected != null) TrailLineSpec.DIM_OPACITY else 1f),
             opacityTransition = fade,
             width = width(TrailStatus.COMPLETE, extra = 4f), blur = const(3.dp),
             cap = const(LineCap.Round), join = const(LineJoin.Round),
         )
         for (s in order) if (present(s)) StatusLine(
-            id = statusLayerId(s), source = trails, filter = all(counted, filters.getValue(s)),
+            id = statusLayerId(s), source = trails, filter = countedFilters.getValue(s),
             status = s, color = p.of(s), opacity = dim, fade = fade,
         )
         // TL-6: named trails that don't count toward the island: status colors, short even dash.
         for (s in order) if (present(s)) LineLayer(
             id = namedNotCountedLayerId(s),
             source = trails, sourceLayer = "segments",
-            filter = all(!counted, named, filters.getValue(s)),
+            filter = namedNcFilters.getValue(s),
             color = const(p.of(s)), opacity = dim, opacityTransition = fade,
             width = width(s, scale = TrailLineSpec.NOT_COUNTED_NAMED_SCALE),
             dasharray = const(TrailLineSpec.notCountedNamedDash),
