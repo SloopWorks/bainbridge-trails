@@ -599,12 +599,27 @@
        "category"
       ],
       "state_route",
-      2.1,
+      1.26,
       "arterial",
-      1.7,
+      1.02,
       "collector",
-      1.35,
-      1.0
+      0.81,
+      0.6
+     ],
+     12,
+     [
+      "match",
+      [
+       "get",
+       "category"
+      ],
+      "state_route",
+      2.52,
+      "arterial",
+      2.04,
+      "collector",
+      1.62,
+      1.2
      ],
      13,
      [
@@ -614,12 +629,12 @@
        "category"
       ],
       "state_route",
-      5.88,
+      4.2,
       "arterial",
-      4.76,
+      3.4,
       "collector",
-      3.78,
-      2.8
+      2.7,
+      2.0
      ],
      15,
      [
@@ -652,7 +667,80 @@
       11.0
      ]
     ],
-    "line-opacity": 1.0
+    "line-opacity": [
+     "interpolate",
+     [
+      "linear"
+     ],
+     [
+      "zoom"
+     ],
+     10,
+     [
+      "match",
+      [
+       "get",
+       "category"
+      ],
+      "collector",
+      0.75,
+      "residential",
+      0.55,
+      1.0
+     ],
+     12,
+     [
+      "match",
+      [
+       "get",
+       "category"
+      ],
+      "collector",
+      0.85,
+      "residential",
+      0.7,
+      1.0
+     ],
+     13,
+     [
+      "match",
+      [
+       "get",
+       "category"
+      ],
+      "collector",
+      0.95,
+      "residential",
+      0.85,
+      1.0
+     ],
+     15,
+     [
+      "match",
+      [
+       "get",
+       "category"
+      ],
+      "collector",
+      1.0,
+      "residential",
+      1.0,
+      1.0
+     ],
+     18,
+     [
+      "match",
+      [
+       "get",
+       "category"
+      ],
+      "collector",
+      1.0,
+      "residential",
+      1.0,
+      1.0
+     ]
+    ]
    }
   },
   {
@@ -660,7 +748,7 @@
    "type": "line",
    "source": "trails",
    "source-layer": "segments",
-   "minzoom": 10,
+   "minzoom": 12,
    "filter": [
     "all",
     [
@@ -731,7 +819,7 @@
    "type": "line",
    "source": "trails",
    "source-layer": "segments",
-   "minzoom": 10,
+   "minzoom": 13,
    "filter": [
     "all",
     [
