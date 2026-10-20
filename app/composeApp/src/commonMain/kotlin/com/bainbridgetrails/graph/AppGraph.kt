@@ -146,7 +146,10 @@ object AppGraph {
         private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() }
 
         /** Bearer comes from [auth]; a 401 signs out locally. Base URL is read per request (debug drawer switch). */
-        val api: ApiClient = ApiClient(platformHttpEngine(), token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized(it) })
+        val api: ApiClient = ApiClient(
+            platformHttpEngine(), token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized(it) },
+            dataset = { DatasetProfile.current.key }, // RD-7: the roads goal scopes coverage, board and stats
+        )
         val auth: AuthRepository by lazy {
             AuthRepository(api, SessionStore(privateDir, clock), localAnonName = { profile.anonName() }, io = Dispatchers.IO, scope = scope)
         }
@@ -165,10 +168,23 @@ object AppGraph {
                 currentUserId = { (auth.state.value as? AuthState.SignedIn)?.session?.userId },
                 coverage = StoreCoverage(trackingDir),
                 datasetVersion = { datasets.await().dataset.version },
+                uploadable = { uploadableSegments() },
                 onCoverageChanged = { coverageChanged() },
                 now = clock,
                 io = Dispatchers.IO,
             )
+        }
+
+        /**
+         * RD-7: the roads goal uploads only its counted `rseg-` segments (the server refuses the trail competitors'
+         * `seg-` ids); trails uploads everything (null), as in v1.
+         */
+        private suspend fun uploadableSegments(): ((String) -> Boolean)? {
+            val profile = DatasetProfile.current
+            if (profile == DatasetProfile.TRAILS) return null
+            val ids = datasets.await().dataset.segments
+                .filter { it.included && it.id.startsWith(profile.segmentIdPrefix) }.mapTo(HashSet()) { it.id }
+            return ids::contains
         }
 
         /** App came to the foreground (App's lifecycle effect): sync when due, send a pending name change. */

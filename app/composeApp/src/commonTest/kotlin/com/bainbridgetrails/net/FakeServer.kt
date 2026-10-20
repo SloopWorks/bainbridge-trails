@@ -54,8 +54,8 @@ class FakeServer {
         respond(reply.body, HttpStatusCode.fromValue(reply.status), headersOf(*headers.toTypedArray()))
     }
 
-    fun client(token: () -> String? = { null }, onUnauthorized: suspend (bearer: String) -> Unit = {}) =
-        ApiClient(engine, baseUrl = { "http://test.local/" }, token = { token() }, onUnauthorized = onUnauthorized, timeouts = false)
+    fun client(token: () -> String? = { null }, onUnauthorized: suspend (bearer: String) -> Unit = {}, dataset: String = "trails") =
+        ApiClient(engine, baseUrl = { "http://test.local/" }, token = { token() }, onUnauthorized = onUnauthorized, timeouts = false, dataset = { dataset })
 }
 
 object Fixtures {

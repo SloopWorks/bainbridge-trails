@@ -49,6 +49,35 @@ class ApiClientTest {
         assertEquals(true, ok.accepted)
     }
 
+    /** RD-7 (api.md "Datasets"): the roads build scopes every progress call; trails requests stay as they were. */
+    @Test
+    fun roadsClientSendsDatasetEverywhere() = runTest {
+        server.on("PUT /v1/coverage", Reply.json(Fixtures.coverage()))
+        server.on("GET /v1/coverage", Reply.json(Fixtures.coverage()))
+        server.on("GET /v1/leaderboard", Reply.json("""{"entries":[],"you":null,"totalRanked":0,"dataset":"roads"}"""))
+        server.on("GET /v1/stats", Reply.json("""{"datasetVersion":"v","dataset":"roads","trails":{}}"""))
+        val c = server.client(token = { "t" }, dataset = "roads")
+        c.putCoverage(CoverageUpload("v", 5, mapOf("rseg-000001" to "Aw==")))
+        val body = Json.parseToJsonElement(server.last("PUT /v1/coverage").body).jsonObject
+        assertEquals("\"roads\"", body["dataset"].toString())
+        c.getCoverage()
+        assertEquals("dataset=roads", server.last("GET /v1/coverage").query)
+        c.leaderboard(50)
+        assertEquals("limit=50&dataset=roads", server.last("GET /v1/leaderboard").query)
+        assertIs<ApiResult.Ok<TrailStatsDto>>(c.trailStats())
+        assertEquals("dataset=roads", server.last("GET /v1/stats").query)
+    }
+
+    @Test
+    fun trailsClientKeepsTheV1Requests() = runTest {
+        server.on("GET /v1/coverage", Reply.json(Fixtures.coverage()))
+        server.on("GET /v1/trails/stats", Reply.json("""{"datasetVersion":"v","trails":{}}"""))
+        val c = server.client(token = { "t" })
+        c.getCoverage()
+        assertEquals("", server.last("GET /v1/coverage").query)
+        assertIs<ApiResult.Ok<TrailStatsDto>>(c.trailStats())
+    }
+
     @Test
     fun idTokenRequestOmitsNulls() = runTest {
         server.on("POST /v1/auth/google", Reply.json(Fixtures.auth()))

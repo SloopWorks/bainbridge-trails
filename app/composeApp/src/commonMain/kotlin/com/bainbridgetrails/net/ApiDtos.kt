@@ -63,6 +63,8 @@ data class CoverageUpload(
     val tickM: Int = 5,
     val segments: Map<String, String>,
     val walks: List<WalkDto> = emptyList(),
+    /** RD-7: "roads" for the roads goal; null (omitted) = the server default, trails. [ApiClient] sets it. */
+    val dataset: String? = null,
 )
 
 /** `PUT|GET /v1/coverage` 200. */
