@@ -2,16 +2,23 @@
 
   data/roads/dist/roads.json              app metadata (roads, island totals, dataset `version`)
   data/roads/dist/segments.tiles.geojson  tippecanoe input: TILE_PROPS only, road_ids comma-joined
-  data/roads/dist/coverage_segments.json  per-segment geometry (6-dp lon/lat) for on-device coverage
+  data/roads/dist/coverage_segments.json  per-segment geometry (6-dp lon/lat) for on-device coverage, plus the
+                                          trail dataset's shippable segments as matching-only competitors
   data/roads/dist/road_ends.json          public road ends at the water, derived from shipping geometry
   data/roads/dist/ATTRIBUTION.md          credits for every source used
 Never reads data/roads/canonical/private/. Road metadata is recomputed from shippable segments only,
 so every road the app lists can actually be completed in the app; `agency_only_length_mi` is what is
 missing. Road ends come from OSM geometry + the island boundary (both ODbL), with the City's road-end
 layer used only to corroborate - its coordinates never ship.
+
+Trail competitors (docs/roads/decisions.md RD-2b): a walk on a trail beside a road has, in a roads-only dataset,
+nothing to compete with the road, so the matcher credits the road (9.7 % of walked trail metres in the prototype).
+Every segment of the trail dataset's data/dist/coverage_segments.json is appended with `included: false`,
+`road_ids: []` and its own `seg-*` id: present for matching, never scored (`SegmentGeom.isScored`), never tiled.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -21,10 +28,10 @@ from shapely.geometry import Point
 from shapely.strtree import STRtree
 
 from ..boundary import island_polygon
-from ..dist import attribution_md, canonical_commit_date, dataset_version, _features
+from ..dist import attribution_md, canonical_commit_date, _features
 from ..fetch import FetchError, Source, _from_cache
 from ..geo import to_utm
-from .build import DEFAULT_CACHE, DEFAULT_CANONICAL, DEFAULT_SOURCES, ROADS, SHARED_CACHE
+from .build import DATA, DEFAULT_CACHE, DEFAULT_CANONICAL, DEFAULT_SOURCES, ROADS, SHARED_CACHE
 from .names import clean
 
 MI = 1609.344
@@ -37,6 +44,11 @@ ROAD_ENDS_SOURCE = "cobi_rd_road_ends"
 SHORE_M = 40.0          # endpoint this close to the island boundary is a road end at the water
 JUNCTION_M = 1.0        # endpoints this close to another segment's are the same junction
 CORROBORATE_M = 120.0   # distance within which a City road-end point confirms a derived road end
+TRAIL_COVERAGE = DATA / "dist" / "coverage_segments.json"     # trail dataset (scripts/bitrails dist)
+TRAIL_CANONICAL = DATA / "canonical" / "segments.geojson"     # its provenance: geometry_redistributable, sources
+TRAIL_SOURCES = DATA / "sources.yaml"
+# trail-dataset connector subtypes that are part of a road (bitrails/classify.py CONNECTOR_FOOTWAYS + walkway)
+ROAD_PROXY_SUBTYPES = frozenset({"sidewalk", "crossing", "traffic_island", "link", "access_aisle", "walkway"})
 
 
 def segment_road_map(roads_doc: dict) -> dict[str, list[str]]:
@@ -76,10 +88,44 @@ def write_tile_input(segments: Path, out: Path, seg_roads: dict[str, list[str]])
     return out
 
 
-def coverage_segments_doc(segments: Path, seg_roads: dict[str, list[str]], version: str) -> dict:
+def trail_competitors(trail_coverage: Path, trail_canonical: Path) -> tuple[list[dict], set[str]]:
+    """(competitor entries, source ids of their trail provenance) from the trail dataset's shipped coverage segments.
+
+    Road-proxy footways (connector subtypes in ROAD_PROXY_SUBTYPES: sidewalks, crossings, walkways, ...) are left
+    out: walking one is walking the road beside it, so it must credit the road, not compete with it.
+    Each entry keeps its `seg-*` id, coords and trail `category`, with `included: false` and `road_ids: []`. Every id
+    must be redistributable in the trail dataset's canonical provenance (the trail dist already refuses anything
+    else; this re-checks, because these coordinates now ship a second time)."""
+    prov = {f["properties"]["id"]: f["properties"] for f in _features(trail_canonical)}
+    out, sources = [], set()
+    for s in json.loads(Path(trail_coverage).read_text())["segments"]:
+        p = prov.get(s["id"])
+        if not p or not p.get("geometry_redistributable"):
+            raise ValueError(f"trail competitor {s['id']}: geometry not redistributable (or unknown); "
+                             "refusing to ship it")
+        if p.get("category") == "connector" and p.get("subtype") in ROAD_PROXY_SUBTYPES:
+            continue
+        sources.update(p.get("sources", []))
+        out.append({"id": s["id"], "length_m": s["length_m"], "included": False, "road_ids": [],
+                    "coords": s["coords"], "category": s.get("category")})
+    return sorted(out, key=lambda s: s["id"]), sources
+
+
+def roads_version(segments: Path, competitors: list[dict] | None, commit_iso: str) -> str:
+    """`<date>+<hash>`; the hash covers the competitors too, so new trail data (or a new competitor filter) is a new
+    roads dataset version. With no competitors it equals the trail dataset's `dataset_version` formula."""
+    h = hashlib.sha256(Path(segments).read_bytes())
+    if competitors:
+        h.update(json.dumps(competitors, sort_keys=True, separators=(",", ":")).encode())
+    return f"{commit_iso[:10]}+{h.hexdigest()[:8]}"
+
+
+def coverage_segments_doc(segments: Path, seg_roads: dict[str, list[str]], version: str,
+                          competitors: list[dict] | None = None) -> dict:
     """Geometry for on-device coverage and map matching: same contract as the trail dataset's
     coverage_segments.json, with `road_ids` in place of `trail_ids`. Fixed orientation: coords run so
-    that the first (lon, lat), after 6-dp rounding, is <= the last, lexicographically."""
+    that the first (lon, lat), after 6-dp rounding, is <= the last, lexicographically. `competitors`
+    (trail_competitors) follow the road segments, in id order."""
     out = []
     for f in _features(segments):
         p = f["properties"]
@@ -91,7 +137,12 @@ def coverage_segments_doc(segments: Path, seg_roads: dict[str, list[str]], versi
         out.append({"id": p["id"], "length_m": p["length_m"], "included": bool(p["included"]),
                     "road_ids": list(seg_roads.get(p["id"], [])), "coords": coords,
                     "category": p["category"], "ownership": p["ownership"]})
-    return {"version": version, "segments": sorted(out, key=lambda s: s["id"])}
+    out.sort(key=lambda s: s["id"])
+    comp = list(competitors or [])
+    clash = {s["id"] for s in out} & {c["id"] for c in comp}
+    if clash:
+        raise ValueError(f"competitor id clash with road segments: {sorted(clash)[:5]}")
+    return {"version": version, "segments": out + comp}
 
 
 def _road_row(r: dict, ids: list[str], info: dict[str, dict]) -> dict:
@@ -202,21 +253,37 @@ def used_source_ids(segments: Path, road_ends: dict) -> set[str]:
 
 def run_dist(canonical: Path = DEFAULT_CANONICAL, out_dir: Path = ROADS / "dist",
              sources_path: Path = DEFAULT_SOURCES, cache_dir: Path = DEFAULT_CACHE,
-             boundary: Path | None = None, date: str | None = None) -> dict:
+             boundary: Path | None = None, date: str | None = None,
+             trail_coverage: Path | None = TRAIL_COVERAGE, trail_canonical: Path = TRAIL_CANONICAL,
+             trail_sources: Path = TRAIL_SOURCES) -> dict:
+    """trail_coverage=None ships no trail competitors (a roads-only experiment); by default it fails loudly when
+    the trail dataset has not been built, because the competitors are a correctness fix, not an option."""
     seg = canonical / "segments.geojson"
+    if trail_coverage is not None and not Path(trail_coverage).exists():
+        raise FileNotFoundError(f"{trail_coverage}: trail dataset not built (run scripts/bitrails dist); it supplies "
+                                "the matching-only trail competitors (docs/roads/decisions.md RD-2b)")
     out_dir.mkdir(parents=True, exist_ok=True)
     info = shippable_info(seg, canonical / "elevation.json")
-    version = dataset_version(seg, date or canonical_commit_date(canonical))
+    competitors, trail_prov = (trail_competitors(trail_coverage, trail_canonical) if trail_coverage
+                               else ([], set()))
+    version = roads_version(seg, competitors, date or canonical_commit_date(canonical))
     canon = json.loads((canonical / "roads.json").read_text())
     doc = dist_roads_doc(canon, info, version)
     (out_dir / "roads.json").write_text(json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False) + "\n")
     seg_roads = segment_road_map(doc)
     write_tile_input(seg, out_dir / "segments.tiles.geojson", seg_roads)
-    cov = coverage_segments_doc(seg, seg_roads, version)
+    cov = coverage_segments_doc(seg, seg_roads, version, competitors)
     (out_dir / "coverage_segments.json").write_text(json.dumps(cov, separators=(",", ":")))
     ends = road_ends_doc(seg, seg_roads, doc, version, boundary, cache_dir)
     (out_dir / "road_ends.json").write_text(json.dumps(ends, sort_keys=True, indent=2, ensure_ascii=False) + "\n")
     sources = yaml.safe_load(Path(sources_path).read_text())["sources"]
-    md = attribution_md(used_source_ids(seg, ends), sources).replace("`bitrails dist`", "`bitroads dist`")
+    # competitors ship trail geometry only (no names): credit the trail sources whose geometry is redistributable
+    trail_geom = set()
+    if trail_prov:
+        trail_srcs = [s for s in yaml.safe_load(Path(trail_sources).read_text())["sources"]
+                      if s["id"] in trail_prov and s.get("redistribution") == "yes"]
+        trail_geom = {s["id"] for s in trail_srcs}
+        sources = sources + [s for s in trail_srcs if s["id"] not in {x["id"] for x in sources}]
+    md = attribution_md(used_source_ids(seg, ends) | trail_geom, sources).replace("`bitrails dist`", "`bitroads dist`")
     (out_dir / "ATTRIBUTION.md").write_text(md)
     return doc

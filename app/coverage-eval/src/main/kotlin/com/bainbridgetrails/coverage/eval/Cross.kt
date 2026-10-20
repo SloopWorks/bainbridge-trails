@@ -38,8 +38,12 @@ internal fun runCross(scored: Dataset, flags: Map<String, String>) {
         .let { if (limit > 0) it.take(limit) else it }
     println("walking ${trails.size} ${walkDir.name} trails against ${scored.trails.size} scored features (${scored.version})")
 
-    // Variant B: the walked dataset's segments as pure competitors — present for matching, never credited.
-    val competitors = walked.segments.map { SegmentGeom(it.id, it.lengthM, included = false, trailIds = emptyList(), coords = it.coords, category = it.category) }
+    // Variant B: the walked dataset's segments as pure competitors — present for matching, never credited. A roads
+    // dist built since RD-2b already ships them (same seg-* ids), so only the missing ones are added: variant B then
+    // equals scored-only, which is the check that the shipped competitors are complete.
+    val present = scored.segments.mapTo(HashSet()) { it.id }
+    println("${walked.segments.count { it.id in present }} of ${walked.segments.size} walked segments already in the scored dataset")
+    val competitors = walked.segments.filter { it.id !in present }.map { SegmentGeom(it.id, it.lengthM, included = false, trailIds = emptyList(), coords = it.coords, category = it.category) }
     val variants = listOf(
         "scored-only" to scored,
         "with-competitors" to Dataset(scored.trails, scored.islandTotalM, scored.segments + competitors, scored.version),
