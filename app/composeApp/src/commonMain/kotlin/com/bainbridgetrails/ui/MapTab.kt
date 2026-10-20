@@ -275,7 +275,9 @@ fun MapTab(
             val o = e.screenOffset
             val rect = DpRect(o.x - half, o.y - half, o.x + half, o.y + half)
             val layers = if (spec.drawRoadEnds) spec.tappableLayerIds + ROAD_END_LAYER else spec.tappableLayerIds
-            val features = runCatching { map.queryRenderedFeatures(rect, layers) }.getOrDefault(emptyList())
+            val features = runCatching { map.queryRenderedFeatures(rect, layers) }
+                .onFailure { com.bainbridgetrails.log.AppLog.w("map", "tap query failed: ${it.message}") }
+                .getOrDefault(emptyList())
             val segs = d.dataset.segmentsById
             val tapGeo = e.position ?: map.positionFromScreenLocation(o) ?: return@launch
             val zoom = map.cameraPosition.zoom

@@ -375,7 +375,7 @@ private fun MiniMap(
         val map = controller.mapState ?: return@LaunchedEffect
         val b = bounds ?: return@LaunchedEffect
         map.fitTo(
-            b, DpPadding(left = 64.dp, top = top + 24.dp, right = 64.dp, bottom = 20.dp), animate = false,
+            b, DpPadding(left = 64.dp, top = top + 24.dp, right = 64.dp, bottom = 36.dp), animate = false,
             maxZoom = spec.fitZoomRange.endInclusive, minZoom = spec.fitZoomRange.start,
         )
     }
