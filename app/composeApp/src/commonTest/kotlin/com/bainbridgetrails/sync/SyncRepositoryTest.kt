@@ -49,9 +49,14 @@ class SyncRepositoryTest {
 
     private fun cov(json: String) = CoverageState.decode(json)
 
-    private fun TestScope.repo(scope: CoroutineScope = backgroundScope) = SyncRepository(
+    private fun TestScope.repo(
+        scope: CoroutineScope = backgroundScope,
+        dataset: String = "trails",
+        uploadable: ((String) -> Boolean)? = null,
+    ) = SyncRepository(
         scope = scope,
-        api = server.client(token = { user?.let { "tok-$it" } }),
+        api = server.client(token = { user?.let { "tok-$it" } }, dataset = dataset),
+        uploadable = { uploadable },
         queuePath = path,
         currentUserId = { user },
         coverage = local,
@@ -92,6 +97,25 @@ class SyncRepositoryTest {
         assertEquals(cov("""{"seg-000001":"Aw==","seg-000009":"AQ=="}"""), local.state)
         assertEquals(setOf("trail-x"), local.completed)
         assertEquals(1, changes)
+    }
+
+    /** Roads (RD-7): only the goal's counted rseg- bits go up; a filtered segment never forces a re-upload. */
+    @Test
+    fun roadsUploadOnlyUploadableSegmentsWithDataset() = runTest {
+        local.state = cov("""{"rseg-000001":"Aw==","rseg-000002":"AQ==","seg-000003":"AQ=="}""")
+        walks += LocalWalk("s1", 600)
+        server.on("PUT /v1/coverage") { Reply.json(Fixtures.coverage(Json.parseToJsonElement(it.body).jsonObject["segments"].toString())) }
+        server.on("GET /v1/coverage", Reply.json(Fixtures.coverage()))
+        val repo = repo(dataset = "roads", uploadable = { it == "rseg-000001" })
+
+        repo.syncOnce()
+        val up = uploads().single()
+        assertEquals(mapOf("rseg-000001" to "Aw=="), segments(up))
+        assertEquals("roads", up["dataset"]!!.jsonPrimitive.content)
+
+        repo.syncOnce() // nothing new to send: a pull, not a second upload
+        assertEquals(1, uploads().size)
+        assertEquals("dataset=roads", server.last("GET /v1/coverage").query)
     }
 
     @Test

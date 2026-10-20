@@ -30,7 +30,7 @@ data class SessionSummary(
     val endedAt: Long = 0,
     /** Gated, filtered GPS path length. */
     val distanceM: Double = 0.0,
-    /** Distinct matched ticks of this walk on any mapped segment × tick length. */
+    /** Distinct matched ticks of this walk on the goal's mapped segments × tick length (roads: `rseg-` only, RP-18). */
     val matchedM: Double = 0.0,
 )
 
@@ -78,7 +78,7 @@ class Finalizer(
         val startedAt = session.startMs ?: session.fixes.minOfOrNull { it.timeMs } ?: startOf(sessionId)
         val endedAt = session.stopMs ?: session.fixes.maxOfOrNull { it.timeMs } ?: startedAt
         val distanceM = WalkIndex.distanceM(gate.fixes, index.projection, params)
-        val matchedM = walked.totalCoveredM(index)
+        val matchedM = dataset.rules.matchedM(walked, index)
         afterMatch()
 
         CoverageStore.writeLock.withLock {
@@ -90,6 +90,8 @@ class Finalizer(
             val completed = mutableListOf<String>()
             val nowComplete = HashSet<String>()
             for (t in dataset.trails) {
+                // Roads (RP-3): uncounted roads never rise, complete or celebrate.
+                if (!progress.counts(t.id)) continue
                 val b = progress.trailFraction(before, t.id)
                 val a = progress.trailFraction(after, t.id)
                 if (progress.status(a) == TrailStatus.COMPLETE) nowComplete += t.id

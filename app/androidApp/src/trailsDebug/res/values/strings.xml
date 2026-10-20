@@ -1,0 +1,4 @@
+<resources>
+    <!-- Debug label: tells the two dev installs apart on one phone (ux.md 1.2). -->
+    <string name="app_name">Trails dev</string>
+</resources>

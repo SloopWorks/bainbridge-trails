@@ -114,6 +114,11 @@ class SyncRepository(
     private val io: CoroutineDispatcher = Dispatchers.Default,
     private val backoffMs: List<Long> = listOf(30_000L, 120_000L, 600_000L),
     private val newWalkId: () -> String = { Uuid.random().toString() },
+    /**
+     * Which local segments may go up (roads: counted `rseg-` only, RD-7); null = all. Filtered before the baseline
+     * delta, so a segment that never goes up never forces an upload either.
+     */
+    private val uploadable: suspend () -> ((String) -> Boolean)? = { null },
 ) {
     private val file = JsonFile(queuePath, SyncFile.serializer())
     private val _state = MutableStateFlow<SyncState>(SyncState.SignedOut)
@@ -234,7 +239,8 @@ class SyncRepository(
     private suspend fun run(start: SyncFile, state: CoverageState): SyncState {
         var f = start
         val version = datasetVersion()
-        val local = withContext(io) { Bitsets.fromState(state) }
+        val keep = uploadable()
+        val local = withContext(io) { Bitsets.fromState(state).let { all -> if (keep == null) all else all.filterKeys(keep) } }
         val delta = Bitsets.minus(local, f.baseline)
         if (f.pending.isEmpty() && delta.isEmpty()) {
             // Nothing to upload: pull (a new device gets its history; another device's walks arrive).

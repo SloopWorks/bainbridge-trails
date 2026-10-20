@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Roads build copy (docs/roads/product.md §2-3, RP-1). Every override key is "roads_" + the trail key with the SAME
+  arguments in the same order (one exception: roads_stat_island_info adds %1$s, the island total). Roads-only keys
+  (no trail twin) also start with "roads_". GoalVocabulary.Roads maps trail key -> roads twin; the guard test
+  (GoalVocabularyGuardTest) fails when a /trail/i string has no twin here or a twin is not registered.
+  Screen-only keys added by the roads screens live in strings_roads_screens.xml.
+  Compose resources substitute %1$s / %1$d only: a literal percent sign is a bare "%".
+-->
+<resources>
+    <!-- §3.1 Common, tabs, errors -->
+    <string name="roads_app_name">Bainbridge Roads</string>
+    <string name="roads_common_loading_trails">Loading roads…</string>
+    <string name="roads_map_loading_trails">Loading roads…</string>
+    <string name="roads_nav_trails">Roads</string>
+    <string name="roads_trails_title">Roads</string>
+    <string name="roads_error_dataset_title">Roads didn’t load</string>
+    <string name="roads_error_dataset_body">Something went wrong reading the road data. Try again, or reinstall if it keeps happening.</string>
+    <string name="roads_settings_attribution_dataset">Road data version %1$s</string>
+
+    <!-- §3.2 Onboarding (%1$s of onboarding_1_body = goal_distance_mi/km of floor(island total)) -->
+    <string name="roads_onboarding_1_title">Walk every road on the island</string>
+    <string name="roads_onboarding_1_body">Bainbridge has over %1$s of public road. Pick a street, walk it, and watch the island fill in, one road at a time.</string>
+    <string name="roads_onboarding_2_body">Walk or run, and the roads you cover light up. Finish a road across as many walks as you like, in any direction. A road counts as complete at %1$d%.</string>
+    <string name="roads_onboarding_3_body">We sync which road sections you’ve covered — never your GPS track or walk times.</string>
+    <string name="roads_onboarding_privacy_body">Your GPS tracks never leave this phone. We sync which road sections you’ve covered — never your GPS track or walk times.</string>
+    <string name="roads_onboarding_2_milestones">It’s a big island. You’ll get a milestone every %1$s of new road along the way.</string>
+
+    <!-- §3.3 Map and legend -->
+    <string name="roads_map_search_hint">Find a road</string>
+    <string name="roads_map_a11y">Road map. %1$d of %2$d roads complete.</string>
+    <string name="roads_map_legend_footnote">Colors show how much of each stretch you’ve walked. Every public road counts the same, whatever its type.</string>
+    <string name="roads_map_legend_not_counted_body">Drawn so you can find your way, but not part of the island total.</string>
+    <string name="roads_map_preview_open">View road</string>
+    <string name="roads_map_preview_multi_title">Roads on this section</string>
+    <string name="roads_legend_types">Road types</string>
+    <string name="roads_cat_state_route">State route</string>
+    <string name="roads_cat_arterial">Arterial</string>
+    <string name="roads_cat_collector">Collector</string>
+    <string name="roads_cat_residential">Residential street</string>
+    <string name="roads_cat_lane">Lane or alley</string>
+    <string name="roads_legend_private">Private road</string>
+    <string name="roads_legend_unknown">Not confirmed public</string>
+    <string name="roads_legend_private_body">Private roads aren’t counted. Please respect No Trespassing signs.</string>
+    <string name="roads_legend_unknown_body">We couldn’t confirm these are public, so they don’t count yet. If they’re confirmed, walks you’ve already done there will count.</string>
+
+    <!-- §3.4 Roads list -->
+    <string name="roads_trails_search_hint">Search roads</string>
+    <string name="roads_trails_count">%1$d of %2$d roads</string>
+    <string name="roads_trails_empty_title">No roads match</string>
+    <string name="roads_trails_empty_search_title">No roads called “%1$s”</string>
+    <string name="roads_trails_first_walk_banner">Pick a road and tap Start walk. Short streets are quick wins. Progress shows up here after your first walk.</string>
+    <string name="roads_trails_sort_length">Shortest first</string>
+    <string name="roads_filter_type">Road type</string>
+    <string name="roads_filter_type_all">All types</string>
+    <string name="roads_type_sheet_title">Filter by road type</string>
+    <string name="roads_row_partly_public">Partly private</string>
+    <string name="roads_cat_state_route_plural">State routes</string>
+    <string name="roads_cat_arterial_plural">Arterials</string>
+    <string name="roads_cat_collector_plural">Collectors</string>
+    <string name="roads_cat_residential_plural">Residential streets</string>
+
+    <!-- §3.5 Road detail -->
+    <string name="roads_detail_managed_by">Maintained by %1$s</string>
+    <plurals name="roads_detail_community_completed">
+        <item quantity="one">%1$d person has walked this whole road</item>
+        <item quantity="other">%1$d people have walked this whole road</item>
+    </plurals>
+    <string name="roads_detail_community_few">Be one of the first to finish this road</string>
+    <string name="roads_detail_partly_counted">Only the public part of this road counts. Progress is measured on that part.</string>
+    <string name="roads_detail_not_found">Road not found</string>
+    <string name="roads_detail_type">Type</string>
+    <string name="roads_detail_climb">Climb</string>
+    <string name="roads_detail_climb_info">Total up and down along the road, either direction.</string>
+    <string name="roads_detail_flat">Flat</string>
+    <string name="roads_detail_surface">Surface</string>
+    <string name="roads_surface_paved">Paved</string>
+    <string name="roads_surface_gravel">Gravel</string>
+    <string name="roads_surface_dirt">Dirt</string>
+    <string name="roads_surface_unpaved">Unpaved</string>
+    <string name="roads_detail_speed">Speed limit</string>
+    <string name="roads_detail_speed_value">%1$d mph</string>
+    <string name="roads_detail_public_length">Public part: %1$s of %2$s</string>
+    <string name="roads_owner_city">City of Bainbridge Island</string>
+    <string name="roads_owner_state">Washington State (WSDOT)</string>
+    <string name="roads_owner_county">Kitsap County</string>
+    <string name="roads_owner_parks">Bainbridge Island Parks &amp; Trails District</string>
+    <string name="roads_owner_school">Bainbridge Island School District</string>
+    <string name="roads_reason_private">Private road. It isn’t part of the island total. Please respect No Trespassing signs.</string>
+    <string name="roads_reason_unknown">We couldn’t confirm this road is public, so it doesn’t count yet. If it’s confirmed, walks you’ve already done here will count.</string>
+    <string name="roads_reason_lane">Lanes and alleys aren’t part of the island total.</string>
+    <string name="roads_caution_fast">Fast traffic (%1$d mph). Walk facing traffic and keep to the shoulder.</string>
+    <string name="roads_caution_state_route">State highway. Walk facing traffic and keep to the shoulder.</string>
+    <string name="roads_detail_road_end">Road end at the water</string>
+    <string name="roads_detail_road_end_body">Public shore access at the end of this road.</string>
+
+    <!-- §3.6 Record and live -->
+    <string name="roads_record_idle_what">Walk or run along public roads. Your route is matched to mapped roads; only the road sections you cover count. Bikes and cars don’t count.</string>
+    <string name="roads_record_live_header">Roads on this walk</string>
+    <string name="roads_record_live_header_count">Roads on this walk (%1$d)</string>
+    <string name="roads_record_live_empty">No roads yet. Head along a public road and it’ll show up here.</string>
+    <string name="roads_record_live_expand_a11y">Show all roads on this walk</string>
+    <string name="roads_record_live_collapse_a11y">Show fewer roads</string>
+    <string name="roads_record_finish_body">We’ll match it to roads and save it.</string>
+    <string name="roads_record_matching">Matching your walk to roads…</string>
+    <string name="roads_record_loading_failed">Road data didn’t load.</string>
+
+    <!-- §3.7 Permissions -->
+    <string name="roads_perm_location_body">Used only while you record a walk, to match your steps to roads. Your track stays on this phone.</string>
+    <string name="roads_perm_precise_body">Roads here run close to each other and to trails, so we need precise location to tell them apart.</string>
+
+    <!-- §3.8 Results -->
+    <string name="roads_results_trails_header">Roads</string>
+    <string name="roads_results_no_progress">No new road progress this walk.</string>
+    <string name="roads_results_no_progress_hint">Only public roads count. Trails, private roads and stretches you’ve already covered don’t add progress.</string>
+    <string name="roads_results_approx_warning">Recorded with approximate location, so some roads may not have matched. Turn on precise location in Settings.</string>
+    <string name="roads_results_new_miles">+%1$s of new road</string>
+    <string name="roads_results_milestone_eyebrow">Milestone</string>
+
+    <!-- §3.9 Celebration + milestones -->
+    <plurals name="roads_celebrate_title_multi">
+        <item quantity="one">%1$d road complete!</item>
+        <item quantity="other">%1$d roads complete!</item>
+    </plurals>
+    <string name="roads_celebrate_body">You’ve walked %1$s of the island’s roads and finished %2$d of %3$d.</string>
+    <string name="roads_celebrate_view_trail">View road</string>
+    <string name="roads_celebrate_eyebrow">Road complete</string>
+    <plurals name="roads_celebrate_eyebrow_multi">
+        <item quantity="one">%1$d road complete</item>
+        <item quantity="other">%1$d roads complete</item>
+    </plurals>
+    <string name="roads_celebrate_trails_count">%1$d of %2$d roads complete</string>
+    <string name="roads_celebrate_a11y_announcement">Road complete: %1$s. Island progress %2$s. %3$d of %4$d roads finished.</string>
+    <string name="roads_celebrate_a11y_announcement_multi">%1$d roads complete: %2$s. Island progress %3$s.</string>
+    <string name="roads_celebrate_island_title">You’ve walked every road on the island</string>
+    <string name="roads_celebrate_island_body">Every public road on Bainbridge, done, on foot. Take a bow.</string>
+    <string name="roads_celebrate_island_eyebrow">Every road</string>
+    <string name="roads_celebrate_island_a11y">You’ve walked every road on the island. Every public road on Bainbridge, done. Island progress %1$s. %2$d of %3$d roads finished.</string>
+    <string name="roads_milestone_eyebrow">Milestone</string>
+    <string name="roads_milestone_miles">%1$s of road walked</string>
+    <string name="roads_milestone_miles_body">That’s %1$s of the island. Next milestone at %2$s.</string>
+    <plurals name="roads_milestone_roads">
+        <item quantity="one">Your first road</item>
+        <item quantity="other">%1$d roads complete</item>
+    </plurals>
+    <string name="roads_milestone_cat_state_route">Every state route, done</string>
+    <string name="roads_milestone_cat_arterial">Every arterial, done</string>
+    <string name="roads_milestone_cat_collector">Every collector, done</string>
+    <string name="roads_milestone_cat_residential">Every residential street, done</string>
+    <string name="roads_milestone_a11y">Milestone: %1$s.</string>
+
+    <!-- §3.10 Me -->
+    <string name="roads_me_hero_caption">of public road walked</string>
+    <string name="roads_me_hero_a11y">Island map of your roads: %1$s walked, %2$d of %3$d roads complete</string>
+    <string name="roads_me_stat_trails">Roads completed</string>
+    <string name="roads_me_stat_miles">Road miles walked</string>
+    <string name="roads_me_stat_km">Road km walked</string>
+    <string name="roads_me_stat_miles_phone">Road miles on this phone</string>
+    <string name="roads_me_stat_km_phone">Road km on this phone</string>
+    <string name="roads_stat_island_info">Public road you’ve covered, out of %1$s on the island. Walking the same stretch twice counts once.</string>
+    <string name="roads_stat_trails_info">Public roads you’ve covered at least %1$d% of. On partly private roads only the public part counts.</string>
+    <string name="roads_stat_miles_info">Distance you’ve walked on mapped roads, across all walks on this phone. Repeats count.</string>
+    <string name="roads_me_in_progress_empty">Roads you’ve started will show here.</string>
+    <plurals name="roads_me_history_trails">
+        <item quantity="zero">No roads</item>
+        <item quantity="one">1 road</item>
+        <item quantity="other">%1$d roads</item>
+    </plurals>
+    <string name="roads_me_leaderboard_row_unranked">Not on the board yet. Walk a road to get ranked.</string>
+    <string name="roads_walk_no_track_note">Routes are deleted from this phone after 30 days. The roads this walk added to are outlined.</string>
+    <string name="roads_me_hero_pct">%1$s of the island</string>
+    <string name="roads_me_next_milestone">Next milestone: %1$s · %2$s to go</string>
+    <string name="roads_me_by_type">By road type</string>
+    <string name="roads_me_type_row">%1$d of %2$d</string>
+    <string name="roads_me_type_row_a11y">%1$s: %2$d of %3$d roads complete, %4$s walked.</string>
+
+    <!-- §3.11 Leaderboard, account, privacy -->
+    <string name="roads_board_subtitle">Ranked by share of the island’s roads walked. Ties go to more roads completed.</string>
+    <string name="roads_board_col_trails">Roads</string>
+    <plurals name="roads_board_row_a11y">
+        <item quantity="one">Rank %1$d, %2$s, %3$s of the island’s roads, %4$d road completed</item>
+        <item quantity="other">Rank %1$d, %2$s, %3$s of the island’s roads, %4$d roads completed</item>
+    </plurals>
+    <plurals name="roads_board_row_you_a11y">
+        <item quantity="one">You. Rank %1$d, %2$s of the island’s roads, %3$d road completed</item>
+        <item quantity="other">You. Rank %1$d, %2$s of the island’s roads, %3$d roads completed</item>
+    </plurals>
+    <string name="roads_board_empty_body">No one’s on it yet. Walk a road and sign in to claim the top spot.</string>
+    <string name="roads_board_not_ranked">Walk any public road to appear on the board.</string>
+    <string name="roads_board_signed_out_prompt">Sign in to appear on the board. Only your name, island % and roads completed are shown.</string>
+    <string name="roads_board_signed_out_body">Sign in to add your progress. Only your name, island % and roads completed are shown.</string>
+    <string name="roads_board_separate_note">This board is for roads. Trails have their own board in Bainbridge Trails.</string>
+    <string name="roads_profile_privacy_note">We sync which road sections you’ve covered — never your GPS track or walk times. Your public name is a random one unless you choose your own.</string>
+    <string name="roads_privacy_lead">We sync which road sections you’ve covered — never your GPS track or walk times.</string>
+    <string name="roads_privacy_account_body">We store your account id, your public name, and which road sections you’ve covered (as on/off flags per 5 m of road). From those we compute your island % and roads completed for the leaderboard.</string>
+    <string name="roads_privacy_board_body">Others see only your name, island % and roads completed — never your GPS track or walk times. Use a random name if you prefer.</string>
+</resources>

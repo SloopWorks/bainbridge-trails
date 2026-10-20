@@ -1,7 +1,7 @@
 <!-- shipyard-deploy:begin -->
 ## Shipyard Deploy
 
-This repository publishes development builds of `com.bainbridgetrails.app.dev` (Gradle variant `debug`)
+This repository publishes development builds of `com.bainbridgetrails.app.dev` (Gradle variant `trailsDebug`)
 to the Shipyard Deploy project `bainbridge-trails`. Configuration lives in `.shipyard-deploy.yaml`;
 read it rather than hard-coding a project or a channel name.
 
@@ -26,7 +26,7 @@ shipyard-deploy publish <apk>                 # publish; the channel is created 
 That is the whole list. `login`, `logout`, `rollback`, `enroll-code`,
 `devices`, `channels create` and `resume` belong to a human.
 
-Build the APK first with `./gradlew :androidApp:assembleDebug` (from `app/`).
+Build the APK first with `./gradlew :androidApp:assembleTrailsDebug` (from `app/`).
 Every command takes `--json` and returns a single object; exit code 0 means it worked.
 
 ### Do not
@@ -50,7 +50,7 @@ Every command takes `--json` and returns a single object; exit code 0 means it w
 ### This repository
 
 - The Gradle plugin is opt-in: build with
-  `./gradlew -PshipyardDeployPluginRepository=file://$HOME/.m2/repository :androidApp:assembleDebug`
+  `./gradlew -PshipyardDeployPluginRepository=file://$HOME/.m2/repository :androidApp:assembleTrailsDebug`
   (the module is `:androidApp`, not `:app`). Without the property the APK carries no Shipyard metadata
   and `publish` refuses it.
 - Publishing needs a publisher token scoped to project `bainbridge-trails`, passed as
@@ -68,12 +68,19 @@ Before the first build, copy the map data and dataset (built by `pipeline/` into
 scripts/sync-app-assets.sh          # from the repo root
 ```
 
+Goal flavours (docs/roads/decisions.md RD-1): dimension `goal`, flavours `trails` (`com.bainbridgetrails.app`) and
+`roads` (`com.bainbridgetrails.roads`); debug adds `.dev`. `BuildConfig.GOAL` fixes `DatasetProfile` in
+`BtApplication` (roads is locked; the trails debug drawer keeps its dataset switch). The roads APK drops the trail
+dataset assets, trailsRelease drops the roads ones. Copy differs only through `GoalVocabulary` / `LocalGoal`
+(`strings_roads.xml`, guarded by `GoalVocabularyGuardTest`). iOS runs trails.
+
 Full verification set (run all before handing back work):
 
 ```sh
 cd app
 ./gradlew :coverage:jvmTest :tracking:jvmTest :composeApp:testAndroidHostTest \
-  :androidApp:assembleDebug :androidApp:assembleRelease :composeApp:linkDebugFrameworkIosSimulatorArm64
+  :androidApp:assembleTrailsDebug :androidApp:assembleRoadsDebug :androidApp:assembleTrailsRelease \
+  :androidApp:assembleRoadsRelease :composeApp:linkDebugFrameworkIosSimulatorArm64
 cd .. && xcodebuild -project app/iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/bt-dd build
 ```
@@ -88,7 +95,7 @@ Gradle properties (`-P…` or `gradle.properties`):
 | `googleWebClientId=<id>` | empty | Google OAuth **web** client id for Credential Manager (`BuildConfig.GOOGLE_WEB_CLIENT_ID`); the backend's `GOOGLE_CLIENT_IDS` must include it. Empty = the Google button says "not configured" (debug still offers dev sign-in). |
 | `shipyardDeployPluginRepository=<maven repo>` | unset | Applies the Shipyard Deploy plugin (see above). |
 | `btVersionCode=<int>` / `btVersionName=<str>` | `1` / `1.0` | `versionCode` / `versionName` of both variants (set by CI/release tooling). |
-| `BT_RELEASE_STORE_FILE`, `BT_RELEASE_STORE_PASSWORD`, `BT_RELEASE_KEY_ALIAS`, `BT_RELEASE_KEY_PASSWORD` | unset | Release signing; each read from `-P…` first, then the environment variable of the same name. All four set → `androidApp-release.apk` signed with that key; any missing → `androidApp-release-unsigned.apk`. Never commit a keystore or put passwords in `gradle.properties` in the repo (use `~/.gradle/gradle.properties` or CI secrets). |
+| `BT_RELEASE_STORE_FILE`, `BT_RELEASE_STORE_PASSWORD`, `BT_RELEASE_KEY_ALIAS`, `BT_RELEASE_KEY_PASSWORD` | unset | Release signing; each read from `-P…` first, then the environment variable of the same name. All four set → `androidApp-<goal>-release.apk` signed with that key; any missing → `androidApp-<goal>-release-unsigned.apk`. Never commit a keystore or put passwords in `gradle.properties` in the repo (use `~/.gradle/gradle.properties` or CI secrets). |
 | `releaseSignWithDebugKey=true` | off | Signs release with the local debug key so an R8 build can be installed for testing. Local only; never distribute such an APK. |
 
 ## Release builds (R8)
@@ -100,8 +107,8 @@ build. After touching keep rules, dependencies, or anything `@Serializable`, smo
 emulator (the release package `com.bainbridgetrails.app` installs alongside the `.dev` debug app):
 
 ```sh
-./gradlew :androidApp:assembleRelease -PreleaseSignWithDebugKey=true
-adb -s emulator-5554 install -r androidApp/build/outputs/apk/release/androidApp-release.apk
+./gradlew :androidApp:assembleTrailsRelease -PreleaseSignWithDebugKey=true
+adb -s emulator-5554 install -r androidApp/build/outputs/apk/trails/release/androidApp-trails-release.apk
 adb -s emulator-5554 logcat -b crash -c
 adb -s emulator-5554 shell am start -W -n com.bainbridgetrails.app/.MainActivity   # not `monkey -p`: it can surface .dev
 # walk Map (trails render), Trails, a trail detail, Me, Settings (change units, relaunch: persisted), Record idle
@@ -110,7 +117,7 @@ adb -s emulator-5554 logcat -b crash -d   # must be empty
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes to `main` and on PRs: `android` (unit tests + `assembleDebug` with
+`.github/workflows/ci.yml` runs on pushes to `main` and on PRs: `android` (unit tests + both flavours' debug builds with
 `-PdebugDrawer=off`), `backend` (`npm ci`, `npm test`, `tsc --noEmit`), `ios` (simulator framework link +
 unsigned `xcodebuild` simulator build). CI has no map data: `data/dist/` and the synced Compose resources are
 gitignored and the pipeline (uv + tippecanoe) is too heavy to run there, so the app builds without them and the
@@ -118,7 +125,7 @@ real-dataset tests in `:coverage` (`assumeDataFiles`) report as skipped. Reprodu
 worktree: `git worktree add --detach /tmp/bt-ci HEAD && cd /tmp/bt-ci/app && ./gradlew --no-build-cache -PdebugDrawer=off …`.
 
 Check the merged permissions of an APK:
-`$ANDROID_HOME/build-tools/<ver>/aapt2 dump permissions androidApp/build/outputs/apk/debug/androidApp-debug.apk`.
+`$ANDROID_HOME/build-tools/<ver>/aapt2 dump permissions androidApp/build/outputs/apk/trails/debug/androidApp-trails-debug.apk`.
 
 iOS: the geofence prototype's Always request is compiled only with the Swift condition `GEOFENCE_PROTOTYPE`
 (`xcodebuild … SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG GEOFENCE_PROTOTYPE"`); default Debug has no request
@@ -148,4 +155,4 @@ cd backend && npm install && cp .dev.vars.example .dev.vars && npm run dev   # w
 ## Devices
 
 Two Android targets may be attached (emulator + the owner's USB phone). Always set `ANDROID_SERIAL` or pass
-`-s`; `installDebug` installs on every attached device.
+`-s`; `installTrailsDebug` / `installRoadsDebug` install on every attached device.

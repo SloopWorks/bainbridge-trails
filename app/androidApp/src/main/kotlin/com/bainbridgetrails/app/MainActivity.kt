@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.App
 import com.bainbridgetrails.auth.AuthConfig
+import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.SpikeLaunch
 import com.bainbridgetrails.nav.NavRequests
@@ -25,8 +26,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge() // the shell draws behind system bars and applies insets itself
         super.onCreate(savedInstanceState)
-        // Before warmUp: the first read of DatasetProfile.current fixes the dataset for the process (debug only).
-        DebugTools.selectDataset(this, intent)
+        // Before warmUp: the first read of DatasetProfile.current fixes the dataset for the process. BtApplication
+        // already applied the flavour (RD-1); a trails debug build may still pick a dataset with `--es dataset roads`.
+        if (!DatasetProfile.isFixed) DebugTools.selectDataset(this, intent)
         AppGraph.warmUp() // dataset parse (off Main) overlaps the first composition instead of following it
         preloadMapNative()
         // Spike only, debuggable builds only (this activity is exported, so release must ignore extras):
