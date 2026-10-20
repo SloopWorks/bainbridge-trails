@@ -149,7 +149,10 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             composable<OnboardingRoute> {
                 OnboardingScreen(onDone = {
                     graph.settings.update { it.copy(onboardingDone = true) }
-                    nav.selectTab(MapRoute)
+                    // Back to Map (F1 step 2). Onboarding is pushed over Map (first run) or over Settings (Show intro).
+                    if (!nav.popBackStack<MapRoute>(inclusive = false)) {
+                        nav.navigate(MapRoute) { popUpTo<OnboardingRoute> { inclusive = true } }
+                    }
                 })
             }
             composable<CelebrationRoute> { entry ->
