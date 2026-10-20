@@ -21,6 +21,7 @@ import com.bainbridgetrails.data.AppSettings
 import com.bainbridgetrails.data.Loadable
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.IslandCamera
+import com.bainbridgetrails.map.StatusLayers
 import com.bainbridgetrails.map.TrailMap
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.common_loading_trails
@@ -34,7 +35,10 @@ fun MapTab(graph: AppGraph.Installed, settings: AppSettings, camera: CameraPosit
     val dataset by AppGraph.datasets.state.collectAsStateWithLifecycle()
     val snapshot by graph.progress.snapshot.collectAsStateWithLifecycle()
     Box(modifier.fillMaxSize()) {
-        TrailMap(settings.effectiveMapStyle(isSystemInDarkTheme()), Modifier.fillMaxSize(), initialCamera = camera ?: IslandCamera, controlsTopPadding = 52.dp)
+        val style = settings.effectiveMapStyle(isSystemInDarkTheme())
+        TrailMap(style, Modifier.fillMaxSize(), initialCamera = camera ?: IslandCamera, controlsTopPadding = 52.dp) {
+            StatusLayers(snapshot?.segmentBuckets.orEmpty(), style.isDark)
+        }
         val pill = when {
             dataset is Loadable.Loading -> stringResource(Res.string.common_loading_trails)
             snapshot != null -> "${stringResource(Res.string.me_stat_island)} ${Format.percent(snapshot!!.islandFraction)}"

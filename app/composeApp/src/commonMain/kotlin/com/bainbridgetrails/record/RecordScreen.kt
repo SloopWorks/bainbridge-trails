@@ -34,7 +34,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.MapStyle
+import com.bainbridgetrails.map.StatusLayers
 import com.bainbridgetrails.map.SpikeLaunch
 import com.bainbridgetrails.map.TrailMap
 import com.bainbridgetrails.tracking.Perm
@@ -214,7 +216,9 @@ private fun RecordMap(controller: RecordingController, launch: SpikeLaunch) {
     val track by controller.track.collectAsState()
     val drawn = rememberThrottledTrack(track)
     val follow = drawn.lastOrNull()?.let { Position(longitude = it.lon, latitude = it.lat) }
+    val buckets = AppGraph.installedOrNull()?.progress?.snapshot?.collectAsState()?.value?.segmentBuckets.orEmpty()
     TrailMap(MapStyle.TOPO, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 48.dp, follow = follow) {
+        StatusLayers(buckets, dark = false)
         TrackLayer(drawn)
     }
 }
