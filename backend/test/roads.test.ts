@@ -122,7 +122,7 @@ describe("coverage per dataset", () => {
     expect((await syncTrail(h, token, trailFull(ROTARY), [walk])).status).toBe(200);
     // the same walk id is new for roads
     expect((await syncRoad(h, token, roadFull(ROAD), [walk])).status).toBe(200);
-    const walks = await env.DB.prepare("SELECT dataset FROM walks WHERE user_id = ? ORDER BY dataset").bind(userId).all<{ dataset: string }>();
+    const walks = await env.DB.prepare("SELECT dataset FROM walks_v2 WHERE user_id = ? ORDER BY dataset").bind(userId).all<{ dataset: string }>();
     expect(walks.results.map((r) => r.dataset)).toEqual(["roads", "trails"]);
     // reusing it again within roads credits nothing, so new coverage is implausible
     const other = Object.keys(ROADS.segments).find((id) => id !== ROAD_SEG)!;
@@ -203,6 +203,30 @@ describe("leaderboard and stats per dataset", () => {
   });
 });
 
+describe("per-dataset sync state", () => {
+  it("upload rate limit is per dataset (cov:<dataset>:<id>)", async () => {
+    const h = harness();
+    const { token, userId } = await devLogin(h);
+    let last = 0;
+    for (let i = 0; i < 31; i++) last = (await h.call("PUT", "/v1/coverage", { token, body: upload({}) })).status;
+    expect(last).toBe(429);
+    expect((await h.call("PUT", "/v1/coverage", { token, body: roadUpload({}) })).status).toBe(200);
+    const keys = await env.DB.prepare("SELECT key FROM rate_limits WHERE key LIKE ? ORDER BY key").bind(`cov:%${userId}`).all<{ key: string }>();
+    expect(keys.results.map((r) => r.key)).toEqual([`cov:roads:${userId}`, `cov:trails:${userId}`]);
+    expect((await h.call("DELETE", "/v1/me", { token })).status).toBe(204);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM rate_limits WHERE key LIKE ?").bind(`%${userId}`).first("n")).toBe(0);
+  });
+
+  it("a new metrics row starts stale (metrics_version NULL) and is computed on first read", async () => {
+    const { ensureMetricsStmt, getMetricsRow, metricsFor } = await import("../src/users");
+    const h = harness();
+    const { userId } = await devLogin(h);
+    await ensureMetricsStmt(env, userId, "roads").run();
+    expect((await getMetricsRow(env, userId, "roads"))!.metrics_version).toBeNull();
+    expect((await metricsFor(env, userId, "roads", h.clock.t)).metrics_version).toBe(ROADS.version);
+  });
+});
+
 describe("lifecycle across datasets", () => {
   it("DELETE /v1/me clears every dataset", async () => {
     const h = harness();
@@ -211,7 +235,7 @@ describe("lifecycle across datasets", () => {
     await syncTrail(h, u.token, trailFull(ROTARY));
     await h.call("POST", "/v1/admin/snapshot", ADMIN);
     expect((await h.call("DELETE", "/v1/me", { token: u.token })).status).toBe(204);
-    for (const t of ["user_metrics", "coverage", "user_trails", "user_completed", "walks", "leaderboard_snapshot"]) {
+    for (const t of ["user_metrics", "coverage", "user_trails", "user_completed", "walks_v2", "leaderboard_snapshot_v2"]) {
       const r = await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE user_id = ?`).bind(u.userId).first<{ n: number }>();
       expect(r!.n, t).toBe(0);
     }
