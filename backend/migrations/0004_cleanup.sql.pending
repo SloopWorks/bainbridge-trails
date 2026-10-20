@@ -1,0 +1,19 @@
+-- RD-7 cleanup (destructive). NOT applied by `wrangler d1 migrations apply` while it ends in `.pending`.
+-- Apply only after the Worker with migration 0003 is live everywhere (no previous Worker can still serve):
+--   git mv migrations/0004_cleanup.sql.pending migrations/0004_cleanup.sql && npm run migrate:remote
+-- Tested by test/migrations.test.ts.
+
+-- Walk ids the previous Worker credited during the deploy window (after 0003's backfill) were trails walks.
+INSERT INTO walks_v2 (user_id, dataset, walk_id) SELECT user_id, 'trails', walk_id FROM walks WHERE true
+ON CONFLICT DO NOTHING;
+DROP TABLE walks;
+
+-- Pre-RD-7 snapshots (replaced by the *_v2 tables keyed by dataset).
+DROP TABLE leaderboard_snapshot;
+DROP TABLE trail_stats_snapshot;
+DROP TABLE snapshot_meta;
+
+-- Legacy per-user metric/sync columns: superseded by user_metrics. Cleared rather than dropped (D1/SQLite
+-- DROP COLUMN rewrites the table; nothing reads them any more).
+UPDATE users SET island_m = 0, island_rank = 0, covered_m = 0, trails_completed = 0, reached_at = NULL,
+  metrics_version = NULL, coverage_rev = 0, backfilled = 0, walk_count = 0, last_walk_upload_at = NULL;

@@ -198,7 +198,7 @@ describe("PUT/GET /v1/coverage", () => {
   it("stores no walk times/durations and no coverage timestamps (P0-1)", async () => {
     const cols = async (t: string) =>
       ((await env.DB.prepare(`SELECT name FROM pragma_table_info('${t}')`).all<{ name: string }>()).results.map((r) => r.name));
-    expect(await cols("walks")).toEqual(["user_id", "dataset", "walk_id"]);
+    expect(await cols("walks_v2")).toEqual(["user_id", "dataset", "walk_id"]);
     expect(await cols("coverage")).toEqual(["user_id", "segment_id", "bits"]);
   });
 });

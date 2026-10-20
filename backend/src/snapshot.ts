@@ -62,12 +62,12 @@ export async function rebuildSnapshot(env: Env, now: number, dataset: Dataset): 
     if (r.done) e.done++;
   }
   const insB = env.DB.prepare(
-    "INSERT INTO leaderboard_snapshot (dataset, user_id, ord, display_name, island_rank, trails_completed, reached_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO leaderboard_snapshot_v2 (dataset, user_id, ord, display_name, island_rank, trails_completed, reached_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
   );
-  const insS = env.DB.prepare("INSERT INTO trail_stats_snapshot (dataset, trail_id, walkers, completed, median_fraction) VALUES (?, ?, ?, ?, ?)");
+  const insS = env.DB.prepare("INSERT INTO stats_snapshot_v2 (dataset, trail_id, walkers, completed, median_fraction) VALUES (?, ?, ?, ?, ?)");
   const stmts: D1PreparedStatement[] = [
-    env.DB.prepare("DELETE FROM leaderboard_snapshot WHERE dataset = ?").bind(dataset),
-    env.DB.prepare("DELETE FROM trail_stats_snapshot WHERE dataset = ?").bind(dataset),
+    env.DB.prepare("DELETE FROM leaderboard_snapshot_v2 WHERE dataset = ?").bind(dataset),
+    env.DB.prepare("DELETE FROM stats_snapshot_v2 WHERE dataset = ?").bind(dataset),
   ];
   userRows.forEach((u, i) => stmts.push(insB.bind(dataset, u.id, i + 1, publicName(u), u.island_rank, u.trails_completed, u.reached_at)));
   for (const trailId of Object.keys(meta.trails)) {
@@ -76,7 +76,7 @@ export async function rebuildSnapshot(env: Env, now: number, dataset: Dataset): 
   }
   stmts.push(
     env.DB.prepare(
-      `INSERT INTO snapshot_meta (dataset, snap_id, generated_at, dataset_version, total_ranked) VALUES (?1, ?2, ?3, ?4, ?5)
+      `INSERT INTO snapshot_meta_v2 (dataset, snap_id, generated_at, dataset_version, total_ranked) VALUES (?1, ?2, ?3, ?4, ?5)
        ON CONFLICT (dataset) DO UPDATE SET snap_id = ?2, generated_at = ?3, dataset_version = ?4, total_ranked = ?5`,
     ).bind(dataset, crypto.randomUUID(), now, meta.version, userRows.length),
   );
@@ -91,7 +91,7 @@ export async function rebuildSnapshots(env: Env, now: number): Promise<Record<Da
   return out;
 }
 
-const META_SQL = "SELECT snap_id, generated_at, dataset_version, total_ranked FROM snapshot_meta WHERE dataset = ?";
+const META_SQL = "SELECT snap_id, generated_at, dataset_version, total_ranked FROM snapshot_meta_v2 WHERE dataset = ?";
 
 /** Current snapshot of a dataset (built if missing or computed with another dataset version), cached per isolate. */
 export async function getSnapshot(env: Env, now: number, dataset: Dataset): Promise<Snapshot> {
@@ -103,10 +103,10 @@ export async function getSnapshot(env: Env, now: number, dataset: Dataset): Prom
   const cached = memo.get(dataset);
   if (cached && cached.snap_id === meta!.snap_id) return cached;
   const [b, s] = await env.DB.batch<unknown>([
-    env.DB.prepare("SELECT user_id, display_name, island_rank, trails_completed, reached_at FROM leaderboard_snapshot WHERE dataset = ? ORDER BY ord").bind(
+    env.DB.prepare("SELECT user_id, display_name, island_rank, trails_completed, reached_at FROM leaderboard_snapshot_v2 WHERE dataset = ? ORDER BY ord").bind(
       dataset,
     ),
-    env.DB.prepare("SELECT trail_id, walkers, completed, median_fraction FROM trail_stats_snapshot WHERE dataset = ?").bind(dataset),
+    env.DB.prepare("SELECT trail_id, walkers, completed, median_fraction FROM stats_snapshot_v2 WHERE dataset = ?").bind(dataset),
   ]);
   const stats = new Map(((s?.results ?? []) as StatsSnapRow[]).map((r) => [r.trail_id, r]));
   const snap = { ...meta!, board: (b?.results ?? []) as BoardSnapRow[], stats };
@@ -117,18 +117,18 @@ export async function getSnapshot(env: Env, now: number, dataset: Dataset): Prom
 /** New snap_id + ranked count for every dataset (a user edit can touch any of them). */
 const touch = (env: Env) =>
   env.DB.prepare(
-    `UPDATE snapshot_meta SET snap_id = lower(hex(randomblob(16))),
-       total_ranked = (SELECT COUNT(*) FROM leaderboard_snapshot l WHERE l.dataset = snapshot_meta.dataset)`,
+    `UPDATE snapshot_meta_v2 SET snap_id = lower(hex(randomblob(16))),
+       total_ranked = (SELECT COUNT(*) FROM leaderboard_snapshot_v2 l WHERE l.dataset = snapshot_meta_v2.dataset)`,
   );
 
 /** Hide / deletion: drop the user's rows from every dataset now (not at the next rebuild). */
 export function snapshotRemove(env: Env, userId: string): D1PreparedStatement[] {
-  return [env.DB.prepare("DELETE FROM leaderboard_snapshot WHERE user_id = ?").bind(userId), touch(env)];
+  return [env.DB.prepare("DELETE FROM leaderboard_snapshot_v2 WHERE user_id = ?").bind(userId), touch(env)];
 }
 
 /** Rename / admin reset: show the new public name now, in every dataset. */
 export function snapshotRename(env: Env, userId: string, name: string): D1PreparedStatement[] {
-  return [env.DB.prepare("UPDATE leaderboard_snapshot SET display_name = ? WHERE user_id = ?").bind(name, userId), touch(env)];
+  return [env.DB.prepare("UPDATE leaderboard_snapshot_v2 SET display_name = ? WHERE user_id = ?").bind(name, userId), touch(env)];
 }
 
 export function median(sorted: number[]): number {

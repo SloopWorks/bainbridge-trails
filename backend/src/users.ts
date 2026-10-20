@@ -56,12 +56,14 @@ export async function getMetricsRow(env: Env, userId: string, dataset: Dataset):
   return env.DB.prepare(`SELECT ${METRICS_COLS} FROM user_metrics WHERE user_id = ? AND dataset = ?`).bind(userId, dataset).first<MetricsRow>();
 }
 
-/** Inserts the empty row for (user, dataset) if missing; a new row is current for the bundled dataset. */
+/**
+ * Inserts the empty row for (user, dataset) if missing. metrics_version NULL forces one recompute from `coverage`,
+ * so rows the user already has in that dataset (e.g. written before the row existed) are never shadowed by zeros.
+ */
 export function ensureMetricsStmt(env: Env, userId: string, dataset: Dataset): D1PreparedStatement {
-  return env.DB.prepare("INSERT INTO user_metrics (user_id, dataset, metrics_version) VALUES (?, ?, ?) ON CONFLICT DO NOTHING").bind(
+  return env.DB.prepare("INSERT INTO user_metrics (user_id, dataset, metrics_version) VALUES (?, ?, NULL) ON CONFLICT DO NOTHING").bind(
     userId,
     dataset,
-    METAS[dataset].version,
   );
 }
 
@@ -103,7 +105,8 @@ export async function recomputeMetrics(env: Env, row: MetricsRow, now: number): 
     }
   }
   const rank = islandRank(meta, m.islandM);
-  const reachedAt = rank > row.island_rank || row.reached_at === null ? now : row.reached_at;
+  // a fresh (empty) row stays unreached: reached_at is first set by the user's first accepted upload
+  const reachedAt = rank > row.island_rank ? now : (row.reached_at ?? (cov.size > 0 ? now : null));
   const stmts: D1PreparedStatement[] = [
     env.DB.prepare(
       `UPDATE user_metrics SET coverage_rev = CASE WHEN coverage_rev = ?3 THEN coverage_rev + 1 ELSE NULL END,

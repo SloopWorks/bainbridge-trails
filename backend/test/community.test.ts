@@ -274,9 +274,9 @@ describe("profile, moderation, deletion", () => {
       ["name_reports", "reporter_id"],
       ["name_reports", "target_id"],
       ["user_completed", "user_id"],
-      ["walks", "user_id"],
+      ["walks_v2", "user_id"],
       ["user_metrics", "user_id"],
-      ["leaderboard_snapshot", "user_id"],
+      ["leaderboard_snapshot_v2", "user_id"],
     ] as const) {
       const r = await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${col} = ?`).bind(u.userId).first<{ n: number }>();
       expect(r!.n, `${table}.${col}`).toBe(0);
@@ -359,7 +359,7 @@ describe("cron trigger", () => {
     await env.DB.prepare("INSERT INTO rate_limits (key, window_start, count) VALUES ('name:live', ?, 1)").bind(t - 23 * 3_600_000).run();
     await env.DB.prepare("INSERT INTO daily_salt (day, salt) VALUES ('2000-01-01', 'x')").run();
     await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ('dead', ?, 1)").bind(userId).run();
-    await env.DB.prepare("UPDATE snapshot_meta SET dataset_version = 'old'").run();
+    await env.DB.prepare("UPDATE snapshot_meta_v2 SET dataset_version = 'old'").run();
 
     await worker.scheduled(createScheduledController({ scheduledTime: new Date(t), cron: "17 9 * * *" }), env);
     const one = async (sql: string) => (await env.DB.prepare(sql).first<{ n: number }>())!.n;
@@ -373,7 +373,7 @@ describe("cron trigger", () => {
       .first<{ metrics_version: string; island_m: number }>();
     expect(u!.metrics_version).toBe(META.version);
     expect(u!.island_m).toBeGreaterThan(30);
-    const metas = await env.DB.prepare("SELECT dataset, generated_at, dataset_version FROM snapshot_meta ORDER BY dataset").all();
+    const metas = await env.DB.prepare("SELECT dataset, generated_at, dataset_version FROM snapshot_meta_v2 ORDER BY dataset").all();
     expect(metas.results).toEqual([
       { dataset: "roads", generated_at: t, dataset_version: METAS.roads.version },
       { dataset: "trails", generated_at: t, dataset_version: META.version },

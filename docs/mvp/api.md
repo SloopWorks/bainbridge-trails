@@ -207,7 +207,7 @@ keys sorted. Server responses are always normalized this way.
 - Only segments that count (included, or on a named trail) are stored. Other well-formed ids are accepted
   and listed in `ignoredSegments` (not stored, not returned). Ids not matching `seg-NNNNNN` (roads:
   `rseg-NNNNNN`) → `400`.
-- `429 rate_limited`: 30 uploads/hour per account (both datasets together). Upload per finished walk + once on
+- `429 rate_limited`: 30 uploads/hour per account and dataset. Upload per finished walk + once on
   sign-in, not continuously.
 
 ### `GET /v1/coverage?dataset=trails|roads`
@@ -300,7 +300,7 @@ RD-7 (`docs/roads/decisions.md`): one account, two goals. `dataset` = `trails` (
 - Per dataset: coverage, metrics, sticky completions, walk-id crediting and plausibility state, leaderboard,
   community stats. A road's fraction is measured over its counted (included) segments only; completion
   threshold 0.85, sticky (TL-7).
-- Per account (all datasets): sign-in, name, `hiddenFromBoard`, admin hide, reports, deletion, upload rate limit.
+- Per account (all datasets): sign-in, name, `hiddenFromBoard`, admin hide, reports, deletion. (The 30/h upload limit is per dataset.)
 - `GET /v1/me` `metrics` stay the **trails** dataset's; the roads app reads its metrics from
   `GET /v1/coverage?dataset=roads` (and every `PUT` response).
 - Client changes for the roads build: send `"dataset": "roads"` in `PUT /v1/coverage`, add `?dataset=roads` to
