@@ -41,8 +41,9 @@ Point a debug build at the local backend: Android emulator via the debug drawer 
 
 ### What the owner must supply before release
 
-1. **Google sign-in (Android):** a Google Cloud OAuth *web* client id → build with `-PgoogleWebClientId=…`
-   and list it in the backend's `GOOGLE_CLIENT_IDS`; an Android OAuth client for the release signing key.
+1. **Google sign-in (Android):** **Done (dev):** project `bainbridge-trails`, web client id in `app/gradle.properties`
+   and the backend's `GOOGLE_CLIENT_IDS`, Android dev client configured 2026-10-20 ([runbook](docs/setup/google-sign-in.md)).
+   Still needed: an Android OAuth client for the release signing key.
 2. **Sign in with Apple (iOS):** an Apple Developer team, the Sign in with Apple capability on the bundle id
    (`com.bainbridgetrails.app`, entitlement already in the project), signing team in Xcode; bundle id in the
    backend's `APPLE_CLIENT_IDS` (optional `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` for revocation).

@@ -129,7 +129,7 @@ To unblock sign-in and sync integration before the final domain exists, the Work
 Cloudflare account at **https://bainbridge-trails-api.patjackson52.workers.dev** (D1 `bainbridge-trails`,
 id in `wrangler.jsonc`; migrations 0001–0002 applied; `ADMIN_TOKEN` secret set, local copy in
 `~/.config/bainbridge-trails/admin-token`, 0600). Dev auth is off there (host check). Redeploy with `npm run deploy`.
-`GOOGLE_CLIENT_IDS` / `APPLE_CLIENT_IDS` are empty until the owner creates the OAuth clients.
+`GOOGLE_CLIENT_IDS` holds the web client id (configured 2026-10-20, see `docs/setup/google-sign-in.md`); `APPLE_CLIENT_IDS` is empty until the owner sets up Sign in with Apple.
 Before publishing: add a custom domain (Workers route), switch `ApiConfig.PROD_BASE_URL` and the iOS metadata URLs.
 
 ## Deploy (owner only — agents never deploy)
