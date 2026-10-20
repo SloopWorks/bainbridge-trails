@@ -25,14 +25,18 @@ class SyncRepositoryTest {
     private val path = DataFixtures.tmpDir("sync") + "/sync.json"
     private var user: String? = "u1"
     private val walks = mutableListOf<LocalWalk>()
-    private val local = FakeCoverage()
+    private val local = FakeCoverage { walks.toList() }
     private var changes = 0
     private var ids = 0
 
-    class FakeCoverage : LocalCoverage {
+    class FakeCoverage(private val walks: () -> List<LocalWalk>) : LocalCoverage {
         var state: CoverageState = CoverageState.EMPTY
         var completed: Set<String> = emptySet()
-        override suspend fun load() = state
+        var snapshots = 0
+        override suspend fun snapshot(): LocalSnapshot {
+            snapshots++
+            return LocalSnapshot(state, walks())
+        }
         override suspend fun mergeRemote(state: CoverageState, completed: Set<String>): Boolean {
             val next = this.state.union(state)
             val nextCompleted = this.completed + completed
@@ -51,7 +55,6 @@ class SyncRepositoryTest {
         queuePath = path,
         currentUserId = { user },
         coverage = local,
-        localWalks = { walks.toList() },
         datasetVersion = { "v1" },
         onCoverageChanged = { changes++ },
         now = { 1_000_000L },
@@ -211,14 +214,70 @@ class SyncRepositoryTest {
     }
 
     @Test
-    fun tooManyWalksFallsBackToSmallerBatches() = runTest {
-        repeat(250) { walks += LocalWalk("s$it", 60) }
+    fun tooManyWalksSendsOneSmallerUploadNeverASecondBatch() = runTest {
+        // The account was already backfilled elsewhere (cap 200). A second batch would always be implausible
+        // (its durations exceed the seconds since the first), so walks beyond the cap are dropped, not queued.
+        local.state = cov("""{"seg-000001":"Aw=="}""")
+        repeat(250) { walks += LocalWalk("s$it", 60L + it) }
         server.on("PUT /v1/coverage") {
             val n = (Json.parseToJsonElement(it.body).jsonObject["walks"] as JsonArray).size
             if (n > 200) Reply.error(400, "too_many_walks") else Reply.json(Fixtures.coverage())
         }
-        assertIs<SyncState.Idle>(repo().syncOnce())
-        assertEquals(listOf(250, 200, 50), uploads().map { walkIds(it).size })
+        server.on("GET /v1/coverage", Reply.json(Fixtures.coverage()))
+        val repo = repo()
+        assertIs<SyncState.Idle>(repo.syncOnce())
+        assertEquals(listOf(250, 200), uploads().map { walkIds(it).size })
+        assertEquals(mapOf("seg-000001" to "Aw=="), segments(uploads()[1]), "the one upload carries every bit")
+        val sent = uploads()[1]["walks"]!!.jsonArray.map { it.jsonObject["durationS"]!!.jsonPrimitive.content.toLong() }
+        assertEquals(60L + 50, sent.min(), "the longest walks are kept (largest plausibility allowance)")
+        assertEquals(SyncState.Idle(1_000_000L, 0), repo.state.value)
+        repo.syncOnce()
+        assertEquals(2, uploads().size, "nothing left queued")
+    }
+
+    @Test
+    fun firstBackfillIsOneUploadOfUpTo2000Walks() = runTest {
+        local.state = cov("""{"seg-000001":"Aw=="}""")
+        repeat(2100) { walks += LocalWalk("s$it", 60) }
+        server.on("PUT /v1/coverage", Reply.json(Fixtures.coverage()))
+        server.on("GET /v1/coverage", Reply.json(Fixtures.coverage()))
+        val repo = repo()
+        assertIs<SyncState.Idle>(repo.syncOnce())
+        assertEquals(listOf(2000), uploads().map { walkIds(it).size })
+        repo.syncOnce()
+        assertEquals(1, uploads().size, "walks beyond 2000 are not sent in a later (implausible) batch")
+    }
+
+    @Test
+    fun implausibleWithoutWalksKeepsBitsForTheNextUpload() = runTest {
+        // P1-2: bits uploaded without their walk (should not happen any more) are refused; they must not join the
+        // baseline, or they would never reach the server once their walk arrives.
+        walks += LocalWalk("s1", 600)
+        server.on("PUT /v1/coverage", Reply.json(Fixtures.coverage()))
+        val repo = repo()
+        repo.syncOnce()
+
+        local.state = cov("""{"seg-000001":"Aw=="}""")
+        server.on("PUT /v1/coverage", Reply.error(422, "implausible", "\"newlyCoveredM\":10,\"allowedM\":0"))
+        repo.syncOnce()
+        assertTrue(walkIds(uploads()[1]).isEmpty())
+        assertFalse(repo.rejectedNotice.value, "nothing of the user's was refused yet")
+
+        walks += LocalWalk("s2", 600)
+        server.on("PUT /v1/coverage", Reply.json(Fixtures.coverage()))
+        repo.syncOnce()
+        val third = uploads()[2]
+        assertEquals(mapOf("seg-000001" to "Aw=="), segments(third), "bits are sent again, with their walk")
+        assertEquals(1, walkIds(third).size)
+    }
+
+    @Test
+    fun walksAndCoverageComeFromOneSnapshot() = runTest {
+        walks += LocalWalk("s1", 600)
+        local.state = cov("""{"seg-000001":"Aw=="}""")
+        server.on("PUT /v1/coverage", Reply.json(Fixtures.coverage()))
+        repo().syncOnce()
+        assertEquals(1, local.snapshots)
     }
 
     @Test

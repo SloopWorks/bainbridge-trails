@@ -65,11 +65,11 @@ class ApiClientTest {
 
     @Test
     fun unauthorizedWithTokenClearsSession() = runTest {
-        var cleared = 0
+        val cleared = mutableListOf<String>()
         server.on("GET /v1/me", Reply.error(401, "unauthorized"))
-        val r = server.client(token = { "dead" }, onUnauthorized = { cleared++ }).getMe()
+        val r = server.client(token = { "dead" }, onUnauthorized = { cleared += it }).getMe()
         assertIs<ApiError.Unauthorized>(r.errorOrNull())
-        assertEquals(1, cleared)
+        assertEquals(listOf("dead"), cleared, "the bearer the 401 answered")
     }
 
     @Test

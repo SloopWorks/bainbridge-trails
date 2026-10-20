@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Debug configuration's Info.plist: Info.plist plus local networking. Keep the other keys in sync. -->
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Plain HTTP to a local `wrangler dev` (localhost) from the simulator; public hosts stay HTTPS-only. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>TrailMatching</key>
+		<string>Precise location is needed to match your walk to trails.</string>
+	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Used only while you record a walk; your route stays on your phone.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Keeps bike and car rides from counting as walks.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+</dict>
+</plist>

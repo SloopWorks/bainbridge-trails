@@ -73,7 +73,8 @@ class IosLocationSource : LocationSource {
         m.startUpdatingLocation()
         if (!IosMappers.isPreciseAccuracy(m.accuracyAuthorization)) {
             m.requestTemporaryFullAccuracyAuthorizationWithPurposeKey(PURPOSE_KEY) { _ ->
-                onPrecise(IosMappers.isPreciseAccuracy(m.accuracyAuthorization))
+                // The answer may arrive after stop() or a restart: report only for the manager still running.
+                if (manager === m) onPrecise(IosMappers.isPreciseAccuracy(m.accuracyAuthorization))
             }
         }
     }

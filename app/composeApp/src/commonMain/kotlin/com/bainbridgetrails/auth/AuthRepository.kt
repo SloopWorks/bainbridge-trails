@@ -8,8 +8,12 @@ import com.bainbridgetrails.net.AuthResponse
 import com.bainbridgetrails.net.DevAuthRequest
 import com.bainbridgetrails.net.IdTokenRequest
 import com.bainbridgetrails.net.MeDto
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,6 +61,11 @@ class AuthRepository(
     /** The device's anon name, sent at sign-in so a new account keeps it (api.md). */
     private val localAnonName: suspend () -> String? = { null },
     private val io: CoroutineDispatcher = Dispatchers.Default,
+    /**
+     * Runs sign-out listeners after a 401, outside the failed API call's stack: a listener (sync) may wait on a
+     * lock that the caller of that API call holds.
+     */
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
     private val _state = MutableStateFlow<AuthState>(AuthState.Loading)
     val state: StateFlow<AuthState> = _state.asStateFlow()
@@ -120,7 +129,7 @@ class AuthRepository(
                 _state.value = AuthState.SignedIn(session)
             }
             AppLog.i(TAG, "signed in ($provider, new=${r.isNewUser})")
-            listeners.forEach { runCatching { it.onSignedIn(r) }.onFailure { e -> AppLog.e(TAG, "listener: ${e.message}") } }
+            notify { it.onSignedIn(r) }
             SignInResult.Success(r.user, r.isNewUser)
         }
     }
@@ -143,11 +152,20 @@ class AuthRepository(
         return result
     }
 
-    /** A call got `401 unauthorized`: the token is dead (expired, revoked, account gone). Sign in again. */
-    suspend fun handleUnauthorized() {
-        if (token() == null) return
-        AppLog.w(TAG, "session rejected by server; signing out locally")
-        clearLocal(deleted = false, wipeLocal = false)
+    /**
+     * A call sent with [bearer] got `401 unauthorized`: that token is dead (expired, revoked, account gone). Only flips
+     * the auth state here; listeners run on [scope], never inside the failing call. A 401 for an older token than
+     * the current session's is ignored.
+     */
+    suspend fun handleUnauthorized(bearer: String) {
+        val signedOut = mutex.withLock {
+            if (token() != bearer) return@withLock false
+            AppLog.w(TAG, "session rejected by server; signing out locally")
+            withContext(io) { store.clear() }
+            _state.value = AuthState.SignedOut
+            true
+        }
+        if (signedOut) scope.launch { notify { it.onSignedOut(deleted = false, wipeLocal = false) } }
     }
 
     private suspend fun clearLocal(deleted: Boolean, wipeLocal: Boolean) {
@@ -156,7 +174,20 @@ class AuthRepository(
             withContext(io) { store.clear() }
             _state.value = AuthState.SignedOut
         }
-        listeners.forEach { runCatching { it.onSignedOut(deleted, wipeLocal) }.onFailure { e -> AppLog.e(TAG, "listener: ${e.message}") } }
+        notify { it.onSignedOut(deleted, wipeLocal) }
+    }
+
+    /** Runs [event] on every listener; a failing listener is logged, cancellation propagates. */
+    private suspend fun notify(event: suspend (AuthListener) -> Unit) {
+        for (l in listeners.toList()) {
+            try {
+                event(l)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.e(TAG, "listener: ${e.message}")
+            }
+        }
     }
 
     private companion object {

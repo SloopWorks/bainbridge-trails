@@ -16,6 +16,7 @@ import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
+import com.bainbridgetrails.shared.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -252,7 +253,9 @@ class RecordingService : Service() {
     private fun goForeground() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Recording", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL_ID, getString(R.string.notif_channel_recording), NotificationManager.IMPORTANCE_LOW).apply {
+                description = getString(R.string.notif_channel_recording_desc)
+            },
         )
         val stopIntent = PendingIntent.getService(
             this,
@@ -268,14 +271,14 @@ class RecordingService : Service() {
         }
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentTitle("Recording walk")
-            .setContentText("Tap to open")
+            .setContentTitle(getString(R.string.notif_recording_title))
+            .setContentText(getString(R.string.notif_recording_tap))
             .setOngoing(true)
             .setContentIntent(openIntent)
             .addAction(
                 Notification.Action.Builder(
                     Icon.createWithResource(this, android.R.drawable.ic_media_pause),
-                    "Stop",
+                    getString(R.string.notif_recording_stop),
                     stopIntent,
                 ).build(),
             )

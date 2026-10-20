@@ -29,6 +29,7 @@ import com.sloopworks.debugdrawer.DebugPlugin
 import com.sloopworks.debugdrawer.DebugScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Dataset version, counts and load timings (parse once per process: ruling R1). */
@@ -75,7 +76,7 @@ class CoveragePlugin(private val context: Context) : DebugPlugin {
             }
             OutlinedButton(onClick = {
                 AppGraph.scope.launch {
-                    withContext(Dispatchers.IO) { CoverageStore(graph.trackingDir).reset() }
+                    withContext(Dispatchers.IO) { CoverageStore.writeLock.withLock { CoverageStore(graph.trackingDir).reset() } }
                     graph.coverageChanged()
                     message = "Coverage reset"
                     AppLog.w("debug", "coverage reset from debug drawer")
@@ -86,11 +87,11 @@ class CoveragePlugin(private val context: Context) : DebugPlugin {
                 val d = ready ?: return@Button
                 val target = snapshot?.trails?.firstOrNull { it.status != TrailStatus.COMPLETE } ?: return@Button
                 AppGraph.scope.launch {
-                    withContext(Dispatchers.IO) {
+                    withContext(Dispatchers.IO) { CoverageStore.writeLock.withLock {
                         val store = CoverageStore(graph.trackingDir)
                         store.inject(coverTrail(d, target.trailId))
                         store.addCompleted(setOf(target.trailId))
-                    }
+                    } }
                     graph.coverageChanged()
                     AppGraph.requestCelebration(AppGraph.Celebration("debug-${target.trailId}", listOf(target.trailId)))
                     message = "Completed ${target.name}"
@@ -103,7 +104,7 @@ class CoveragePlugin(private val context: Context) : DebugPlugin {
                     val d = ready ?: return@OutlinedButton
                     val target = snapshot?.trails?.firstOrNull { it.status == TrailStatus.NOT_STARTED } ?: return@OutlinedButton
                     AppGraph.scope.launch {
-                        withContext(Dispatchers.IO) { CoverageStore(graph.trackingDir).inject(coverTrail(d, target.trailId, share)) }
+                        withContext(Dispatchers.IO) { CoverageStore.writeLock.withLock { CoverageStore(graph.trackingDir).inject(coverTrail(d, target.trailId, share)) } }
                         graph.coverageChanged()
                         message = "$label: ${target.name}"
                     }

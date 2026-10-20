@@ -58,6 +58,7 @@ import com.bainbridgetrails.resources.delete_dialog_title
 import com.bainbridgetrails.resources.delete_done
 import com.bainbridgetrails.resources.delete_local_checkbox
 import com.bainbridgetrails.resources.delete_title
+import com.bainbridgetrails.resources.error_delete_signin_again
 import com.bainbridgetrails.resources.error_offline_delete
 import com.bainbridgetrails.resources.error_offline_signin
 import com.bainbridgetrails.resources.error_server
@@ -353,7 +354,14 @@ private fun SignedInContent(graph: AppGraph.Installed, auth: AuthState.SignedIn,
                             deleting = false
                             val msg = when (r) {
                                 is ApiResult.Ok -> getString(Res.string.delete_done)
-                                is ApiResult.Failure -> getString(if (r.error is ApiError.Offline) Res.string.error_offline_delete else Res.string.error_server)
+                                is ApiResult.Failure -> getString(
+                                    when (r.error) {
+                                        is ApiError.Offline -> Res.string.error_offline_delete
+                                        // The 401 signed this phone out; nothing was deleted (F9e needs a live session).
+                                        is ApiError.Unauthorized -> Res.string.error_delete_signin_again
+                                        else -> Res.string.error_server
+                                    },
+                                )
                             }
                             snackbar.showSnackbar(msg)
                         }

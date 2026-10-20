@@ -19,8 +19,10 @@ fun MainViewController() = run {
         .also { debugAutostartRecording() } // debug builds + `-autostartRecording 1` only (simulator verification)
 }
 
-/** Null without `key=value` arguments: a normal launch (tab shell). */
+/** Null without `key=value` arguments: a normal launch (tab shell). Debug binaries only. */
+@OptIn(ExperimentalNativeApi::class)
 private fun spikeLaunchFromArguments(): SpikeLaunch? {
+    if (!Platform.isDebugBinary) return null
     val args = NSProcessInfo.processInfo.arguments.map { it.toString() }
     val options = args.filter { '=' in it && !it.startsWith("-") }
         .associate { it.substringBefore('=') to it.substringAfter('=') }

@@ -98,7 +98,8 @@ class SessionStore(dir: String) {
      */
     fun finished(): List<String> = ids().filter { tailState(it) == Tail.STOPPED }
 
-    private fun ids(): List<String> {
+    /** Every session file id (finished, open or unreadable), sorted. */
+    fun ids(): List<String> {
         if (!SystemFileSystem.exists(sessionsDir)) return emptyList()
         return SystemFileSystem.list(sessionsDir)
             .map { it.name }

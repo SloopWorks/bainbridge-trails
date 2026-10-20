@@ -30,6 +30,8 @@ internal class IosPlatformSignIn(private val bridge: () -> AppleSignInBridge? = 
         val apple = bridge() ?: return PlatformCredential.NotConfigured
         return suspendCancellableCoroutine { cont ->
             apple.signIn { outcome -> if (cont.isActive) cont.resume(outcome.toCredential()) }
+            // Screen left mid-sign-in: drop the Swift side's pending completion so the next sign-in can start.
+            cont.invokeOnCancellation { apple.cancel() }
         }
     }
 }

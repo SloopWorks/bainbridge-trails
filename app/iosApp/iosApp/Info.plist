@@ -4,12 +4,6 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<!-- Plain HTTP to a local `wrangler dev` (localhost) from the simulator; public hosts stay HTTPS-only. -->
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
 	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
 	<dict>
 		<key>TrailMatching</key>

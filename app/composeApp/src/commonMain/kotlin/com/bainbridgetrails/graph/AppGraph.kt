@@ -122,9 +122,9 @@ object AppGraph {
         private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() }
 
         /** Bearer comes from [auth]; a 401 signs out locally. Base URL is read per request (debug drawer switch). */
-        val api: ApiClient = ApiClient(platformHttpEngine(), token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized() })
+        val api: ApiClient = ApiClient(platformHttpEngine(), token = { auth.token() }, onUnauthorized = { auth.handleUnauthorized(it) })
         val auth: AuthRepository by lazy {
-            AuthRepository(api, SessionStore(privateDir, clock), localAnonName = { profile.anonName() }, io = Dispatchers.IO)
+            AuthRepository(api, SessionStore(privateDir, clock), localAnonName = { profile.anonName() }, io = Dispatchers.IO, scope = scope)
         }
         val profile: ProfileRepository by lazy {
             ProfileRepository(api, appDataDir(context) + "/profile.json", isSignedIn = { auth.token() != null }, io = Dispatchers.IO)
@@ -140,7 +140,6 @@ object AppGraph {
                 queuePath = "$privateDir/sync.json",
                 currentUserId = { (auth.state.value as? AuthState.SignedIn)?.session?.userId },
                 coverage = StoreCoverage(trackingDir),
-                localWalks = { withContext(Dispatchers.IO) { WalkIndex(trackingDir).all().map { LocalWalk(it.sessionId, it.durationMs / 1000) } } },
                 datasetVersion = { datasets.await().dataset.version },
                 onCoverageChanged = { coverageChanged() },
                 now = clock,
@@ -154,31 +153,18 @@ object AppGraph {
             scope.launch { if (auth.token() != null) profile.flushPending() }
         }
 
-        /** F9e "also clear this phone": coverage, sticky completions and walk history. */
-        internal suspend fun wipeLocalProgress() = withContext(Dispatchers.IO) {
-            CoverageStore.writeLock.withLock { CoverageStore(trackingDir).reset() }
-            Path(trackingDir, "walks.json").let { if (SystemFileSystem.exists(it)) SystemFileSystem.delete(it) }
+        /**
+         * F9e "also clear this phone": raw tracks of every walk not being recorded (so nothing is re-finalized on the
+         * next launch), coverage, sticky completions, finalized ids, walk history and the live-coverage cache. The
+         * sync queue/baseline/walk ids were already deleted by `sync.onSignedOut(wipe = true)`.
+         */
+        internal suspend fun wipeLocalProgress() {
+            RecordingGraph.wipeLocal(context)
+            coverageChanged()
         }
 
         internal fun startRemote() {
-            auth.addListener(object : AuthListener {
-                override suspend fun onSignedIn(response: AuthResponse) {
-                    profile.onSignedIn(response.user)
-                    leaderboard.onAuthChanged()
-                    sync.onSignedIn() // backfill (TL-2)
-                }
-
-                override suspend fun onSignedOut(deleted: Boolean, wipeLocal: Boolean) {
-                    val wipe = deleted && wipeLocal
-                    sync.onSignedOut(wipe)
-                    profile.onSignedOut()
-                    leaderboard.onAuthChanged()
-                    if (wipe) {
-                        wipeLocalProgress()
-                        coverageChanged()
-                    }
-                }
-            })
+            auth.addListener(SessionListener(sync, profile, onAuthChanged = { leaderboard.onAuthChanged() }, clearPhone = { wipeLocalProgress() }))
             scope.launch {
                 profile.load()
                 if (auth.load().isSignedIn) {

@@ -50,9 +50,13 @@ sealed interface SyncState {
 /** One finished local walk as sync needs it: the local session id and its duration (never its times). */
 data class LocalWalk(val sessionId: String, val durationS: Long)
 
-/** Local coverage as sync sees it (production: tracking's CoverageStore under its write lock). */
+/** Local coverage and the finished walks that produced it, read together. */
+data class LocalSnapshot(val state: CoverageState, val walks: List<LocalWalk>)
+
+/** Local coverage as sync sees it (production: tracking's CoverageStore + WalkIndex under its write lock). */
 interface LocalCoverage {
-    suspend fun load(): CoverageState
+    /** Coverage + finished walks in one consistent read (a walk's bits never appear without the walk). */
+    suspend fun snapshot(): LocalSnapshot
 
     /** Unions [state] and sticky [completed] into the store; true when anything changed. */
     suspend fun mergeRemote(state: CoverageState, completed: Set<String>): Boolean
@@ -84,6 +88,14 @@ internal data class SyncFile(
  * Triggers: [onSignedIn], [walkFinished], [onForeground] (> 15 min since the last attempt or work pending),
  * [syncNow] (manual). Retryable failures back off 30 s → 2 min → 10 min, then wait for the next trigger.
  * A 422 is not retried: the refused bits join the baseline, the walks leave the queue, [rejectedNotice] is set.
+ * A 422 for an upload without walks keeps its bits out of the baseline (they go again with the next walk).
+ *
+ * One upload per pass, never batches: after an account's first accepted upload the server requires Σ durations of
+ * new walks ≤ time since the last walk upload, so a second batch sent right after the first is always refused.
+ * The first upload (backfill) carries up to [MAX_WALKS_FIRST] walks, later ones [MAX_WALKS_AFTER_FIRST] (also on
+ * `too_many_walks`, e.g. an account already backfilled from another device). Known limitation: walks beyond the cap
+ * (> 2000 local walks at first sign-in, > 200 queued later) are dropped from the queue uncredited; their coverage is
+ * still sent. The longest walks are kept, since the coverage allowance grows with Σ durations.
  */
 @OptIn(ExperimentalUuidApi::class)
 class SyncRepository(
@@ -92,9 +104,8 @@ class SyncRepository(
     private val queuePath: String,
     /** Signed-in user id, null when signed out. */
     private val currentUserId: () -> String?,
+    /** Local coverage + finished local walks (StoreCoverage). */
     private val coverage: LocalCoverage,
-    /** Finished local walks (WalkIndex / WalkHistoryRepository). */
-    private val localWalks: suspend () -> List<LocalWalk>,
     /** Bundled dataset version (`DatasetRepository.await().dataset.version`). */
     private val datasetVersion: suspend () -> String,
     /** Local coverage changed through a merge (refresh progress/map). */
@@ -145,6 +156,7 @@ class SyncRepository(
     /** Signed out: stop syncing. [wipe] (account deleted + "clear this phone") also forgets walk ids. */
     suspend fun onSignedOut(wipe: Boolean) {
         retryJob?.cancel()
+        job?.cancel() // a running pass holds runLock; never wait on it from its own call stack
         runLock.withLock {
             withContext(io) {
                 if (wipe) file.delete() else file.write(SyncFile(walkIds = readFileNow().walkIds))
@@ -177,13 +189,14 @@ class SyncRepository(
     /** One full sync pass (tests call it directly). */
     suspend fun syncOnce(): SyncState = runLock.withLock {
         val userId = currentUserId() ?: return@withLock SyncState.SignedOut.also { _state.value = it }
-        var f = prepare(userId)
+        val snapshot = coverage.snapshot()
+        var f = prepare(userId, snapshot.walks)
         val backfill = f.lastSuccessAt == null
         _state.value = SyncState.Syncing(backfill)
         f = f.copy(lastAttemptAt = now())
         write(f)
         val result = try {
-            run(f)
+            run(f, snapshot.state)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -196,9 +209,8 @@ class SyncRepository(
     }
 
     /** Account switch → backfill; new local walks → queue. */
-    private suspend fun prepare(userId: String): SyncFile {
+    private suspend fun prepare(userId: String, walks: List<LocalWalk>): SyncFile {
         var f = readFile()
-        val walks = localWalks()
         val known = f.walkIds.toMutableMap()
         val added = mutableListOf<WalkDto>()
         for (w in walks) {
@@ -219,11 +231,11 @@ class SyncRepository(
         return f
     }
 
-    private suspend fun run(start: SyncFile): SyncState {
+    private suspend fun run(start: SyncFile, state: CoverageState): SyncState {
         var f = start
         val version = datasetVersion()
-        val local = withContext(io) { Bitsets.fromState(coverage.load()) }
-        var delta = Bitsets.minus(local, f.baseline)
+        val local = withContext(io) { Bitsets.fromState(state) }
+        val delta = Bitsets.minus(local, f.baseline)
         if (f.pending.isEmpty() && delta.isEmpty()) {
             // Nothing to upload: pull (a new device gets its history; another device's walks arrive).
             return when (val r = api.getCoverage()) {
@@ -237,22 +249,17 @@ class SyncRepository(
         }
         var cap = if (f.acceptedOnce) MAX_WALKS_AFTER_FIRST else MAX_WALKS_FIRST
         while (true) {
-            val walks = f.pending.take(cap)
+            // One upload only (see class doc): over the cap, keep the longest walks (largest allowance).
+            val walks = if (f.pending.size <= cap) f.pending else f.pending.sortedByDescending { it.durationS }.take(cap)
             val upload = CoverageUpload(version, TICK_M, delta, walks)
             when (val r = api.putCoverage(upload)) {
                 is ApiResult.Ok -> {
-                    val sentIds = walks.mapTo(HashSet()) { it.id }
-                    f = merge(f, r.value, sent = delta).copy(
-                        pending = f.pending.filterNot { it.id in sentIds },
-                        acceptedOnce = true,
-                        lastSuccessAt = now(),
-                    )
+                    val dropped = f.pending.size - walks.size
+                    if (dropped > 0) AppLog.w(TAG, "$dropped walks over the per-upload cap were not credited")
+                    f = merge(f, r.value, sent = delta).copy(pending = emptyList(), acceptedOnce = true, lastSuccessAt = now())
                     write(f)
                     AppLog.i(TAG, "uploaded ${walks.size} walks, ${delta.size} segments; +${r.value.newlyCoveredM ?: 0.0} m")
-                    if (f.pending.isEmpty()) return SyncState.Idle(now(), 0)
-                    // More walks than one upload allows: send the rest (their bits went with the first batch).
-                    delta = emptyMap()
-                    cap = MAX_WALKS_AFTER_FIRST
+                    return SyncState.Idle(now(), 0)
                 }
                 is ApiResult.Failure -> {
                     if (r.error is ApiError.TooManyWalks && cap > MAX_WALKS_AFTER_FIRST) {
@@ -268,6 +275,11 @@ class SyncRepository(
     private suspend fun failure(f: SyncFile, error: ApiError, sent: Map<String, String>, walks: List<WalkDto>): SyncState = when {
         error is ApiError.Unauthorized -> SyncState.SignedOut // the client already cleared the session
         error.isRetryable -> SyncState.Pending(f.pending.size, error)
+        error is ApiError.Implausible && walks.isEmpty() -> {
+            // Bits without a walk: keep them out of the baseline so they go again with the next walk (P1-2).
+            AppLog.w(TAG, "upload without walks rejected: $error")
+            SyncState.Error(error)
+        }
         error is ApiError.Implausible || error is ApiError.WalkLimit -> {
             // Don't retry the same payload (api.md): give up on these bits and walks for this account; keep them locally.
             AppLog.w(TAG, "upload rejected: $error")

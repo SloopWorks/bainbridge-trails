@@ -54,7 +54,7 @@ class FakeServer {
         respond(reply.body, HttpStatusCode.fromValue(reply.status), headersOf(*headers.toTypedArray()))
     }
 
-    fun client(token: () -> String? = { null }, onUnauthorized: suspend () -> Unit = {}) =
+    fun client(token: () -> String? = { null }, onUnauthorized: suspend (bearer: String) -> Unit = {}) =
         ApiClient(engine, baseUrl = { "http://test.local/" }, token = { token() }, onUnauthorized = onUnauthorized, timeouts = false)
 }
 

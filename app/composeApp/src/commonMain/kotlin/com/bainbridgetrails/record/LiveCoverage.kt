@@ -130,4 +130,10 @@ class LiveCoverageSession(
         val l = live ?: create().also { live = it }
         _rows.value = withContext(compute) { l.update(track) }
     }
+
+    /** The stored pre-walk state changed under the walk (local wipe): re-read it on the next [refresh]. */
+    suspend fun invalidate() = mutex.withLock {
+        live = null
+        _rows.value = emptyList()
+    }
 }
