@@ -248,8 +248,13 @@ private fun TrailMapOverlay(
                 modifier = Modifier.align(Alignment.TopStart).padding(top = controlsTopPadding),
             )
         }
+        // The logo sits on a chrome-coloured pill: otherwise a basemap label clipped by the screen edge behind it
+        // (e.g. a Kitsap place name on the wider iOS framing) reads as a broken fragment of the credit.
+        val creditBg = (if (dark) Color(0xFF13201B) else Color(0xFFFBFAF6)).copy(alpha = 0.95f)
         Row(Modifier.align(Alignment.BottomStart), verticalAlignment = Alignment.CenterVertically) {
-            MaplibreLogo()
+            Box(Modifier.background(creditBg, RoundedCornerShape(12.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                MaplibreLogo()
+            }
             if (mode != AttributionMode.Full) {
                 val desc = stringResource(Res.string.map_attribution_a11y)
                 Box(
@@ -268,7 +273,7 @@ private fun TrailMapOverlay(
                     ATTRIBUTION,
                     modifier = Modifier
                         .padding(start = 4.dp)
-                        .background((if (dark) Color(0xFF13201B) else Color(0xFFFBFAF6)).copy(alpha = 0.95f), RoundedCornerShape(6.dp))
+                        .background(creditBg, RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                     fontSize = 11.sp,
                     color = if (dark) Color(0xFFDCE6E1) else Color(0xFF26302B),
