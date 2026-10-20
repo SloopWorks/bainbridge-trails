@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Road dataset pipeline: scripts/bitroads <fetch|reconcile|build|dist> [options]
+set -euo pipefail
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec uv run --project "$repo/pipeline" python -m bitrails.roads "$@"

@@ -1,0 +1,212 @@
+# Bainbridge Island ROAD data sources (survey 2026-10-19). Top-level key: sources.
+# Same schema as data/sources.yaml (the trail survey): id, name, url, kind, endpoint, license,
+#   redistribution (yes|no|unknown), attribution; optional geometry_rank, notes, format, query.
+#
+# This file covers the "walk/bike every road" dataset only. It deliberately does NOT repeat the
+# two shared, redistributable inputs the roads build reads from the trails cache (data/raw/):
+#   osm_island_boundary    -> island clip polygon (committed in data/raw/, see data/sources.yaml)
+#   usgs_3dep_dem_island   -> elevation profiles (gitignored, `bitrails fetch --only usgs_3dep_dem_island`)
+#
+# Line sources the roads build reconciles (bitroads.build.ROAD_LINE_SOURCES), in rank order:
+#   osm_overpass_roads (rank 1, ships) -> cobi_rd_streets (2) -> wsdot_local_agency_public_road (3)
+#   -> wsdot_state_route_lines (4). Everything else here is attributes/POIs/reference only.
+sources:
+- id: osm_overpass_roads
+  name: OpenStreetMap road centerlines via Overpass API (island area)
+  url: https://www.openstreetmap.org/copyright
+  kind: overpass
+  endpoint: https://overpass-api.de/api/interpreter
+  license: 'ODbL 1.0. osm.org/copyright: "You are free to copy, distribute, transmit and adapt our data,
+    as long as you credit OpenStreetMap and its contributors." Derived databases must stay under ODbL
+    (share-alike).'
+  redistribution: 'yes'
+  attribution: (c) OpenStreetMap contributors, ODbL 1.0 - https://www.openstreetmap.org/copyright
+  geometry_rank: 1
+  notes: 'ONLY redistributable road geometry; the app draws this. Query = carriageway classes
+    (motorway..residential, living_street, road, *_link) + service roads that are NAMED or
+    service=alley. Tested 2026-10-19 (island area 3600000000+3148366): 1327 ways, 336.0 km raw
+    (before island clip / junction split): residential 828, tertiary 159, secondary 151, primary 77,
+    service 51 named + 5 alley, unclassified 21, living_street 1, links 5.
+    Deliberately EXCLUDED and measured on 2026-10-19 so the exclusion is auditable:
+    highway=service with service=driveway 7215 ways / 326.8 km, unnamed service 151.1 km over
+    1535 ways, service=parking_aisle 157 / 7.7 km, drive-through 8 / 0.4 km, emergency_access 2,
+    slipway 5. Footways/paths/steps/cycleways/tracks belong to the TRAIL dataset
+    (osm_overpass_trails) and are not fetched here.
+    Tag coverage on the 1246 carriageway ways (326.0 km) 2026-10-19: name 93.0%, shoulder 40.3%
+    (497 ways shoulder=yes), surface 43.1%, lanes 29.9%, maxspeed 18.9%, bicycle 11.9%
+    (128 designated), sidewalk 3.2%, lit 0.6%, access=private only 16 ways -> OSM alone cannot
+    tell public from private road on this island; cobi_rd_streets / wsdot_local_agency_public_road do.
+    oneway=yes is just 6.9 km, so dual-carriageway double counting is negligible here.
+    POST form field data= with a non-curl User-Agent (default curl UA gets 406); public instance
+    returns 502 "at capacity" under load - retry with backoff.'
+  query: '[out:json][timeout:300];rel(3148366);map_to_area->.a;(way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"](area.a);way["highway"="service"]["name"](area.a);way["highway"="service"]["service"="alley"](area.a););out
+    geom;'
+  format: json
+- id: cobi_rd_streets
+  name: City of Bainbridge Island - street centerlines (rd_Streets, layer 0)
+  url: https://gis.bainbridgewa.gov/server/rest/services/Roads/rd_Streets/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://gis.bainbridgewa.gov/server/rest/services/Roads/rd_Streets/FeatureServer/0/query
+  license: 'No reuse/redistribution license stated on the service (serviceDescription is the unfilled
+    ArcGIS template "REQUIRED: A brief narrative summary of the data set."). Treat as the trail
+    pipeline treats COBI layers: attributes and validation yes, geometry does not ship.'
+  redistribution: unknown
+  attribution: City of Bainbridge Island (GIS), rd_Streets
+  geometry_rank: 2
+  notes: 'THE ownership/attribute source for roads. Verified 2026-10-19: ArcGIS Server, esriGeometryPolyline,
+    native SR wkid 103180/6597 (NAD83(2011) WA North ftUS; pass outSR=4326), maxRecordCount 2000,
+    count 1465, f=geojson paging fast (200 features in ~0.5 s - unlike the trails layer on the same host).
+    Fields used downstream: Street_Lab/Rd_Name/Road_Name (name), Rd_Class, Maint, Status, Rd_Surface,
+    Speed_Limi, PFRC (functional class), Local_Acce, Mini_width (ROW width ft), Priority, Rd_Length.
+    Totals by Maint (sum Shape__Length / 5280): COBI 139.8 mi over 896 features; blank 64.7 mi / 541;
+    Private 2.8 mi / 26; "Privately Maintained" 0.1 mi / 1. By Rd_Class: Private 54.2 mi / 459,
+    Residential Suburban 51.3 mi / 368, Collector 46.9 mi / 196, Secondary Arterial 30.2 mi / 164,
+    Residential Urban 24.7 mi / 277, Primary Arterial 0.2 mi / 1 -> ~207 mi of centerline in all,
+    which cross-checks the 202.5 mi of OSM carriageway. Blank Maint is 51.3 mi Rd_Class=Private plus
+    11.8 mi Residential Suburban, so blank Maint != public. Status and Rd_Surface are mostly blank
+    (203.0 of 207 mi), so surface must come from OSM. Dirty values to fold: "Privately Maintained",
+    " PRIVATE", "None".'
+  query: where=1%3D1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: wsdot_local_agency_public_road
+  name: WSDOT - Local Agency Public Road (statewide LRS, line layer 0)
+  url: https://data.wsdot.wa.gov/arcgis/rest/services/Shared/LocalAgencyPublicRoadData/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://data.wsdot.wa.gov/arcgis/rest/services/Shared/LocalAgencyPublicRoadData/FeatureServer/0/query
+  license: 'copyrightText "Washington State Department of Transportation"; no explicit grant on the
+    service. The statewide OCIO geospatial disclaimer (Washington State Data Disclaimer, 2016-02-04)
+    says "all data created by the state, using government funds, is in the public domain but commercial
+    use and licensing of state data is prohibited", disclaims warranties and requires indemnification.
+    That sentence is ambiguous for a paid app, so redistribution stays unknown until the owner either
+    gets written permission from WSDOT (onlinemapsupport@wsdot.wa.gov) or decides not to ship the
+    geometry. Used here for attributes and the public/private denominator only.'
+  redistribution: unknown
+  attribution: Washington State Department of Transportation (Local Agency Public Road)
+  geometry_rank: 3
+  notes: 'Authoritative jurisdiction + federal functional class for every PUBLIC road, and it flags
+    private roads it inventories. Verified 2026-10-19 with the island envelope
+    geometry=-122.5928063,47.5740930,-122.4793619,47.7212543&geometryType=esriGeometryEnvelope&inSR=4326:
+    768 features. By Jurisdiction/CityName (sum of the Length field, miles): City/Bainbridge Island
+    152.3 mi / 498 features; Private/Bainbridge Island 34.3 mi / 230; County/(null) 26.6 mi / 42
+    (that is mainland Kitsap inside the envelope - the island clip drops it); BI Metro Parks and Rec
+    Dist 0.9 mi / 5; Bainbridge Island Sch Dist 0.2 mi / 1. By FederalFunctionalClassDesc: Urban Local
+    Access 118.1, Urban Minor Arterial 34.3, Urban Private 34.3, Urban Major Collector 22.3,
+    Rural Minor Collector 2.2, Rural Local Access 2.1, Rural Major Collector 1.0 mi.
+    Fields: RoadName, RoadNumber, Jurisdiction, CityName, FederalFunctionalClassDesc/Code, Length,
+    RouteIdentifier, InventoryDirection (i only - no both-direction double count), LRSDate.
+    LRS geometry is route-centerline and offset from OSM in places: it is a MATCH/ATTRIBUTE source,
+    not a geometry source.'
+  query: where=1%3D1&outFields=*&outSR=4326&geometry=-122.5928063%2C47.5740930%2C-122.4793619%2C47.7212543&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&f=geojson
+  format: geojson
+- id: wsdot_state_route_lines
+  name: WSDOT - State Route Lines 1:24K (LRSData layer 4)
+  url: https://data.wsdot.wa.gov/arcgis/rest/services/Shared/LRSData/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://data.wsdot.wa.gov/arcgis/rest/services/Shared/LRSData/FeatureServer/4/query
+  license: Same WSDOT / OCIO position as wsdot_local_agency_public_road - attributes and validation only.
+  redistribution: unknown
+  attribution: Washington State Department of Transportation (State Route Lines 1:24K)
+  geometry_rank: 4
+  notes: 'SR 305 is the only state route on the island and the only road the City does not maintain.
+    Verified 2026-10-19 with the island envelope: 17 features, every one StateRouteNumber 305,
+    15.2 km / 9.5 mi inside the envelope including the Agate Pass bridge and the mainland stub;
+    the island clip leaves ~13 km, which matches the 12.7 km of OSM highway=primary.
+    Fields: StateRouteNumber, RouteID, DISPLAY, DIRECTION (b = both), RT_TYPEA, BARM/EARM, LRS_Date.'
+  query: where=1%3D1&outFields=*&outSR=4326&geometry=-122.5928063%2C47.5740930%2C-122.4793619%2C47.7212543&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&f=geojson
+  format: geojson
+- id: cobi_rd_road_ends
+  name: City of Bainbridge Island - road ends and shore access points
+  url: https://gis.bainbridgewa.gov/server/rest/services/Roads/rd_RoadEnds_Shoreaccesspts/FeatureServer
+  kind: arcgis_rest
+  endpoint: https://gis.bainbridgewa.gov/server/rest/services/Roads/rd_RoadEnds_Shoreaccesspts/FeatureServer/0/query
+  license: No reuse/redistribution license stated (same position as cobi_rd_streets).
+  redistribution: unknown
+  attribution: City of Bainbridge Island (GIS), road ends / shore access points
+  notes: 'Points, not geometry for the network: the payoff layer for a road-walking app (public water
+    access at the end of a public road). Verified 2026-10-19: 65 features - type Road-End 58, Park 6,
+    blank 1; ex_access (access exists today) Yes 41, No 19, Maybe 1, Rough 1, blank 2.
+    Fields: name, type, ex_access, use_, notes (prose description), nmtp, shguidebk, re_id, rid, reach.
+    Names and the fact a road end is public can ship as attributes; the prose `notes` text is COBI
+    copy, so quote it only if the owner clears redistribution.'
+  query: where=1%3D1&outFields=*&outSR=4326&f=geojson
+  format: geojson
+- id: cobi_rd_road_inventory
+  name: City of Bainbridge Island - 2024 road inventory (rd_BainbridgeWA2024__inventory)
+  url: https://gis.bainbridgewa.gov/server/rest/services/Roads/rd_BainbridgeWA2024__inventory/FeatureServer/0
+  kind: reference_only
+  endpoint: null
+  license: No reuse/redistribution license stated.
+  redistribution: unknown
+  attribution: City of Bainbridge Island (GIS), 2024 road inventory
+  notes: 'Not fetched: same centerlines as cobi_rd_streets plus maintenance-program fields
+    (CLASS, PASS, TWOPASS, STR_NO, BLK_NO, CL_mi, Width, Addon, COMMENT_20). Verified reachable
+    2026-10-19 (esriGeometryPolyline, maxRecordCount 2000). Pull it only if the roads app wants
+    per-block pavement width / sweeping class; reconciling it would double the agency geometry.'
+- id: wsdot_roadway_shoulder
+  name: WSDOT - Shoulder (RoadwayCharacteristicData layer 9)
+  url: https://data.wsdot.wa.gov/arcgis/rest/services/Shared/RoadwayCharacteristicData/FeatureServer/9
+  kind: reference_only
+  endpoint: null
+  license: Same WSDOT / OCIO position as wsdot_local_agency_public_road.
+  redistribution: unknown
+  attribution: Washington State Department of Transportation (Roadway Characteristics - Shoulder)
+  notes: 'Shoulder width/type along SR 305 - the walkability input for the only road on the island with
+    highway traffic. Verified 2026-10-19: 28 features inside the island envelope. Sibling layers in the
+    same service: Lane Information (3), Legal Speed Limits (4), Roadway Width (7), Rural Urban (8),
+    Surface Type (11). Phase 2 enrichment, not needed for a first roads dataset.'
+- id: wsdot_traffic_counts
+  name: WSDOT - Traffic Counts (TrafficData layer 0, AADT)
+  url: https://data.wsdot.wa.gov/arcgis/rest/services/Shared/TrafficData/FeatureServer/0
+  kind: reference_only
+  endpoint: null
+  license: Same WSDOT / OCIO position as wsdot_local_agency_public_road.
+  redistribution: unknown
+  attribution: Washington State Department of Transportation (Traffic Counts)
+  notes: 'AADT count stations: 9 inside the island envelope (verified 2026-10-19). Would let the app
+    rank a road by traffic exposure rather than by class alone. Phase 2.'
+- id: cobi_rd_snow_priority
+  name: City of Bainbridge Island - snow priority routes
+  url: https://gis.bainbridgewa.gov/server/rest/services/Roads/rd_SnowPriorityRoutes/FeatureServer/0
+  kind: reference_only
+  endpoint: null
+  license: No reuse/redistribution license stated.
+  redistribution: unknown
+  attribution: City of Bainbridge Island (GIS), snow priority routes
+  notes: 'Polyline, fields predir/rd_name/rd_desig/suffix/rd_class/priority. A second, independent
+    witness that a road is city-maintained (the City only plows its own), useful to settle
+    cobi_rd_streets rows with a blank Maint. Verified reachable 2026-10-19.'
+- id: cobi_rd_row_vacations
+  name: City of Bainbridge Island - right-of-way vacations
+  url: https://gis.bainbridgewa.gov/server/rest/services/Roads/rd_ROWVacations/FeatureServer/0
+  kind: reference_only
+  endpoint: null
+  license: No reuse/redistribution license stated.
+  redistribution: unknown
+  attribution: City of Bainbridge Island (GIS), ROW vacations
+  notes: 'Points (id, resolution, row_name). A vacated right-of-way is no longer public: check against
+    any road-end or stub the app wants to call walkable. Verified reachable 2026-10-19.'
+- id: wa_ocio_data_disclaimer
+  name: Washington State Data Disclaimer (OCIO Geospatial Program Office, 2016-02-04)
+  url: https://watech.wa.gov/sites/default/files/2023-11/Washington%2520State%2520Data%2520Disclaimer%25202016.pdf
+  kind: reference_only
+  endpoint: null
+  license: 'Quoted 2026-10-19: "It should be noted that all data created by the state, using government
+    funds, is in the public domain but commercial use and licensing of state data is prohibited."
+    Also: data is disclosed "as is" without warranty, and the user agrees to indemnify the OCIO.'
+  redistribution: 'no'
+  attribution: n/a
+  notes: 'The licence text behind every wsdot_* entry above. Read it before shipping any WSDOT
+    geometry in a paid app; the safe default (and what this pipeline does) is to ship OSM geometry
+    only and keep WSDOT as attributes plus the public-road denominator.'
+- id: usgs_3dep_dem_island
+  name: USGS 3DEP 1/3 arc-second DEM, Bainbridge Island extract (shared with the trail dataset)
+  url: https://www.usgs.gov/3d-elevation-program
+  kind: reference_only
+  endpoint: null
+  license: USGS 3DEP elevation data is a work of the U.S. Government and free of copyright restrictions.
+  redistribution: 'yes'
+  attribution: Elevation data courtesy of the U.S. Geological Survey (3DEP)
+  notes: 'Listed so the generated data/roads/dist/ATTRIBUTION.md can credit the elevation source.
+    The roads build does NOT fetch it: it reads the same cached GeoTIFF as the trail build from
+    data/raw/usgs_3dep_dem_island/latest.tiff (`bitrails fetch --only usgs_3dep_dem_island`),
+    which is where data/sources.yaml defines and downloads it.'

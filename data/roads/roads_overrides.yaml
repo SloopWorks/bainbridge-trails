@@ -1,0 +1,28 @@
+# Manual corrections to the road dataset, applied by `bitroads build` after classification.
+# Schema: bitrails/roads/overrides.py. Two keyed maps, both optional:
+#
+# segments:                      # stable registry ids (data/roads/registry/segments.json)
+#   seg-001234:
+#     ownership: private         # one of public_state public_city public_county public_parks
+#                                #        public_school private unknown
+#     category: residential      # state_route arterial collector residential lane driveway unknown
+#     name: Northeast Day Road West
+#     drop: true                 # keep it on the map but never count it and never group it
+#     note: why, with the date and who checked
+#
+# streets:                       # matched on the direction/abbreviation-insensitive name key, so
+#   NE Day Rd W:                 # "NE Day Rd W" and "Northeast Day Road West" are the same entry
+#     ownership: public_city
+#     note: ...
+#
+# Candidates waiting on a human verdict are listed in data/roads/reports/qa.md:
+#   - `different`-kind name mismatches: the geometric match lent a centerline a neighbouring
+#     street's name (e.g. seg-002137 "Northeast Wild Cherry Lane" vs WSDOT "Foster St NE").
+#   - `ownership_disagreement` rows: WSDOT says private, the City says COBI-maintained, or vice
+#     versa. The build takes WSDOT; override here when local knowledge says otherwise.
+#   - `unknown ownership` rows: no agency centerline matched and the street's other segments do not
+#     agree, so the segment is uncounted. Most are private plat roads; confirm and set them.
+# Nothing is overridden yet: every row above needs eyes on the ground, and guessing would put a
+# wrong number in the island total.
+segments: {}
+streets: {}
