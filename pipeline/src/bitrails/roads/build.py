@@ -1,6 +1,7 @@
 """`bitroads build`: cached road sources -> canonical road segments + roads (offline, deterministic).
 
-normalize -> reconcile -> assign stable ids (once) -> classify -> group into roads -> write:
+normalize -> reconcile -> split long segments (~120 m, split.py) -> assign stable ids (once) -> classify ->
+group into roads -> write:
   data/roads/canonical/segments.geojson         redistributable geometry only (OSM; repo safe)
   data/roads/canonical/private/agency_only.geojson   agency-only geometry (gitignored)
   data/roads/canonical/elevation.json           {segment_id: [[dist_m, elev_m], ...]} 20 m profiles
@@ -37,6 +38,7 @@ from .classify import (CATEGORIES, OWNERSHIPS, RoadRule, RoadSegment, classify, 
 from .group import Road, build_roads
 from .overrides import apply_overrides, load_overrides
 from .qa import qa_report_text
+from .split import split_long
 
 MI = 1609.344
 DATA = REPO_ROOT / "data"
@@ -221,11 +223,14 @@ def run_build(sources_path: Path = DEFAULT_SOURCES, cache_dir: Path = DEFAULT_CA
     per_source = load_road_sources(sources, cache_dir, island, log)
     result = reconcile(per_source, sources, None)
 
+    # RD-2a: cut long segments into ~120 m pieces before ids are issued (ids are per piece, add-only)
+    pieces = {s.id: split_long([s]) for s in result.segments}
+    canonical = [p for s in result.segments for p in pieces[s.id]]
     registry = Registry.load(registry_path, prefix=ID_PREFIX)
-    provisional = [s.id for s in result.segments]
-    segments = assign_ids(result.segments, registry, finalize=not degraded)
-    rekey = dict(zip(provisional, (s.id for s in segments)))
-    conflicts = sorted((Conflict(c.kind, tuple(sorted({rekey[i] for i in c.segment_ids})), c.detail)
+    segments = assign_ids(canonical, registry, finalize=not degraded)
+    final = dict(zip((p.id for p in canonical), (s.id for s in segments)))
+    rekey = {sid: [final[p.id] for p in ps] for sid, ps in pieces.items()}
+    conflicts = sorted((Conflict(c.kind, tuple(sorted({j for i in c.segment_ids for j in rekey[i]})), c.detail)
                         for c in result.conflicts), key=lambda c: (c.kind, c.segment_ids, c.detail))
     report_text = conflict_report_text(ReconcileResult(segments, conflicts))
 

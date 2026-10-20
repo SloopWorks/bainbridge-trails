@@ -55,21 +55,36 @@ their geometry held in `data/roads/canonical/private/` (gitignored) and credited
    agency features transfer attributes onto the canonical segment they substantially overlap, and
    agency geometry with no OSM counterpart is appended as an agency-only segment (258 of those,
    `missing_in_osm` in `reports/conflicts.md`).
-3. **stable ids** — `data/roads/registry/segments.json`, ids `rseg-NNNNNN`, matched by
+3. **split long segments** (`roads/split.py`, decision RD-2a) — the app paints progress per segment,
+   so every reconciled segment longer than **150 m** is cut into *n* equal pieces along the line,
+   *n* = round(L / 120 m) raised until no piece exceeds 150 m. Equal pieces leave no stub remainder;
+   the cut is direction-independent and keeps the original endpoints bit-for-bit, so junctions with
+   unsplit neighbours stay shared and ids are stable run to run. **All** segments are split, counted
+   or not, so the geometry never depends on the inclusion rule or overrides (both change without a
+   rebuild). Pieces inherit every tag and source reference of their parent.
+4. **stable ids** — `data/roads/registry/segments.json`, ids `rseg-NNNNNN`, matched by
    fingerprint/geometry so an id survives a source refresh. Ids are never reused. The namespace is
    distinct from the trail dataset's `seg-` on purpose: the backend keys coverage by segment id.
-4. **classify** — see below.
-5. **infer ownership** — a segment no agency source matched inherits the ownership that ≥80 % of its
-   own street's attested length agrees on (`ownership_source: inferred:name`); 159 segments today.
+   When a segment is replaced, each new id's `supersedes` lists the retired ids it overlaps (most of
+   the old line under the new one, or — for a split piece — most of the new line on the old one).
+   The 2026-10-20 split retired 878 ids and issued 2435 (`rseg-002262`…`rseg-004696`); 804 retired
+   ids have successors recorded. The other 74 are agency-only entries whose geometry sidecar
+   (`registry/private/`, gitignored) was not in the building checkout, so no overlap could be computed.
+5. **classify** — see below.
+6. **infer ownership** — a segment no agency source matched inherits the ownership that ≥80 % of its
+   own street's attested length agrees on (`ownership_source: inferred:name`); 179 segments today.
    Unnamed unmatched segments stay `unknown`.
-6. **overrides** — `data/roads/roads_overrides.yaml`, by segment id or street name, may set
+7. **overrides** — `data/roads/roads_overrides.yaml`, by segment id or street name, may set
    `ownership`, `category`, `name` or `drop: true`. Empty today; every candidate needs a human.
-7. **group into roads** — segments sharing a street key (direction- and abbreviation-insensitive)
-   and hanging together within 50 m become one road; a reused name in two places becomes two roads.
-8. **elevation** — 20 m DEM samples, 2 m hysteresis per segment; a road's `climb_total_m` is the
+8. **group into roads** — segments sharing a street key (direction- and abbreviation-insensitive)
+   and hanging together within 50 m (endpoint to endpoint) become one road; a reused name in two
+   places becomes two roads. Since the split, a street's interior is visible to this rule every
+   ≤150 m, which joined 34 same-name fragments (mostly agency-only stubs) into their street.
+9. **elevation** — 20 m DEM samples, 2 m hysteresis per segment; a road's `climb_total_m` is the
    direction-free sum (gain + loss) over its segments.
-9. **dist** — recompute every road row from shippable segments only, so each road the app lists can
-   actually be completed, and record what is missing as `agency_only_length_mi`.
+10. **dist** — recompute every road row from shippable segments only, so each road the app lists can
+   actually be completed, and record what is missing as `agency_only_length_mi`. Append the trail
+   dataset's segments to `coverage_segments.json` as matching-only competitors (below).
 
 ## Classification
 
@@ -83,7 +98,7 @@ residential/unclassified/living_street/road, City `Residential *`, WSDOT `*Local
 `Jurisdiction` → `public_city` / `public_county` / `public_parks` / `public_school` / `private`; else
 the City layer (`Maint=COBI` → `public_city`; `Maint`/`Status`/`Rd_Class` private, or a " PVT" name
 marker → `private`); else OSM `access=private|no` → `private`; else `unknown`. WSDOT outranks the
-City layer because it is the federal-reporting public-road inventory; the 63 centerlines where the
+City layer because it is the federal-reporting public-road inventory; the 100 segments where the
 two disagree are listed in `reports/qa.md`, never averaged.
 
 **Street names.** OSM spells names out ("Northeast Dingley Road"), the agencies abbreviate and move
@@ -115,13 +130,42 @@ Segment properties: `id`, `name`, `agency_names`, `category`, `ownership`, `owne
 
 `data/roads/dist/` is generated and gitignored — see `data/roads/dist/README.md` for each file.
 
+### Trail competitors in `coverage_segments.json` (decision RD-2b)
+
+A walk on a trail that runs beside a road has, in a roads-only dataset, nothing to compete for it, so
+the matcher (`bufferM = offNetworkM = 30`) credits the road: 9.7 % of walked trail metres in the
+prototype. `bitroads dist` therefore appends the trail dataset's shipped segments
+(`data/dist/coverage_segments.json`, built by `bitrails dist`, which must exist — dist fails loudly
+otherwise) after the road segments:
+
+- each keeps its own `seg-*` id (no collision with `rseg-*`), `length_m`, `coords` and its **trail**
+  `category`, with `included: false` and `road_ids: []` and no `ownership`. `SegmentGeom.isScored` is
+  false for them, so they take part in matching only: never credited, never counted, never drawn in
+  the Me chart, never synced;
+- they are **not** in `segments.tiles.geojson` / `roads.pmtiles` and not in `roads.json`;
+- **road-proxy footways are left out**: connector subtypes `sidewalk`, `crossing`, `walkway`,
+  `traffic_island`, `link`, `access_aisle` (2689 segments, 56.6 km). Walking a sidewalk is walking the
+  road; as competitors they cost 0.7–4.1 points of road-walk completion in the sweep (1.5 at σ = 5 m,
+  buffer 30 m) and bought nothing on trail walks (`coverage-eval cross`: 0.33–1.21 % either way);
+- every competitor id is re-checked against the trail dataset's canonical provenance
+  (`geometry_redistributable: true`); all are OSM geometry (`osm_overpass_trails`, ODbL), credited in
+  the roads `ATTRIBUTION.md`. No trail names or attributes ship in the roads dataset;
+- the dataset `version` hash covers the competitor list, so a trail rebuild is a new roads version.
+
+4848 competitors, 228.3 km; `coverage_segments.json` grows from 0.8 MB to 2.4 MB, `roads_dataset.bin`
+from 468 KB to 1.3 MB.
+
 `data/roads/reports/`: `conflicts.md` (reconcile, by registry id), `qa.md` (the rows a human must
 settle), `summary.md` (the human read-out with every number in this document).
 
-## Current numbers (build of 2026-10-19)
+## Current numbers (build of 2026-10-20)
 
-2261 segments (2003 shippable), 371.0 km mapped. Counted: **264.3 km / 164.2 mi**, of which
-261.5 km / 162.5 mi has shippable geometry. 777 named roads, 442 counted; 664 roads reach the app.
+3818 segments (3445 shippable, 2654 counted), 371.0 km mapped. Counted: **264.3 km / 164.2 mi**, of
+which 261.5 km / 162.5 mi has shippable geometry. 743 named roads, 436 counted; 664 roads reach the app.
+
+Segment length after the split (counted, shippable): n 2619, median 109 m, mean 100 m, p90 133 m,
+max 150 m (was n 1462, median 122 m, mean 179 m, p90 398 m, max 1674 m; 64 % of length in segments
+over 200 m, now 0 %).
 
 | category | km | counted km | | ownership | km | counted km |
 |---|---|---|---|---|---|---|

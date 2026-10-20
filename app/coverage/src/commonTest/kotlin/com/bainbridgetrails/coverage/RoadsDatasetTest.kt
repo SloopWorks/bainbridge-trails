@@ -36,6 +36,21 @@ class RoadsDatasetTest {
         assertEquals("residential", d.segments.single().category)
     }
 
+    /** RD-2b: the roads coverage_segments.json carries the trail dataset's segments as matching-only competitors. */
+    @Test
+    fun trailCompetitorsParseAndAreNeverScored() {
+        val withCompetitor = coverageJson.replace(
+            "]}",
+            """,{"id":"seg-000123","length_m":40.0,"included":false,"road_ids":[],
+                 "coords":[[-122.53,47.6301],[-122.5295,47.6301]],"category":"agency_trail"}]}""",
+        )
+        val d = Dataset.parse(roadsJson, withCompetitor)
+        assertEquals(listOf("rseg-000099", "seg-000123"), d.segments.map { it.id })
+        assertEquals(listOf(true, false), d.segments.map { it.isScored })
+        val back = Dataset.fromBinary(DatasetBinary.encode(d, DatasetBinary.hash(roadsJson.encodeToByteArray())))
+        assertEquals(d.segments, back.segments)
+    }
+
     @Test
     fun stillReadsTheTrailDatasetSpelling() {
         val d = Dataset.parse(

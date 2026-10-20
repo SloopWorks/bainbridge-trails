@@ -3,8 +3,10 @@ import json
 import pytest
 from shapely.geometry import Polygon
 
-from bitrails.roads.dist import (TILE_PROPS, coverage_segments_doc, dist_roads_doc, road_ends_doc,
-                                 segment_road_map, shippable_info, used_source_ids, write_tile_input)
+from bitrails.dist import dataset_version
+from bitrails.roads.dist import (TILE_PROPS, coverage_segments_doc, dist_roads_doc, road_ends_doc, roads_version,
+                                 segment_road_map, shippable_info, trail_competitors, used_source_ids,
+                                 write_tile_input)
 
 PUB = "seg-000001"
 
@@ -108,3 +110,83 @@ def test_attribution_lists_geometry_and_attribute_sources(tmp_path):
     d, _ = canon(tmp_path, segs=[feat(PUB, sources=["osm_overpass_roads", "cobi_rd_streets"])])
     used = used_source_ids(d / "segments.geojson", {"road_ends": []})
     assert {"osm_overpass_roads", "cobi_rd_streets", "usgs_3dep_dem_island", "protomaps_basemap"} <= used
+
+
+def trail_dist(tmp_path, segs=None, canon_feats=None):
+    """A minimal trail dataset: dist/coverage_segments.json + canonical/segments.geojson."""
+    segs = segs if segs is not None else [
+        {"id": "seg-000007", "length_m": 50.0, "included": True, "trail_ids": ["trail-x"],
+         "coords": [[-122.5, 47.6], [-122.4995, 47.6]], "category": "agency_trail"},
+        {"id": "seg-000008", "length_m": 20.0, "included": False, "trail_ids": [],
+         "coords": [[-122.4995, 47.6], [-122.4993, 47.6]], "category": "informal"}]
+    d = tmp_path / "trails"
+    (d / "dist").mkdir(parents=True)
+    (d / "canonical").mkdir()
+    (d / "dist" / "coverage_segments.json").write_text(json.dumps({"version": "t1", "segments": segs}))
+    feats = canon_feats if canon_feats is not None else [
+        {"type": "Feature", "geometry": {"type": "LineString", "coordinates": s["coords"]},
+         "properties": {"id": s["id"], "geometry_redistributable": True, "sources": ["osm_overpass_trails"]}}
+        for s in segs]
+    (d / "canonical" / "segments.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": feats}))
+    return d / "dist" / "coverage_segments.json", d / "canonical" / "segments.geojson"
+
+
+def test_trail_competitors_are_matching_only_and_keep_their_ids(tmp_path):
+    cov_path, canon_path = trail_dist(tmp_path)
+    comp, sources = trail_competitors(cov_path, canon_path)
+    assert [c["id"] for c in comp] == ["seg-000007", "seg-000008"]
+    for c in comp:
+        assert c["included"] is False and c["road_ids"] == [] and "trail_ids" not in c
+    assert comp[0]["category"] == "agency_trail"
+    assert sources == {"osm_overpass_trails"}
+
+
+def test_road_proxy_footways_are_not_competitors(tmp_path):
+    # a walk on a sidewalk or crossing is a walk on the road: it must credit the road, not compete with it
+    segs = [{"id": f"seg-00001{k}", "length_m": 10.0, "included": False, "trail_ids": [],
+             "coords": [[-122.5, 47.6 + k * 1e-4], [-122.4999, 47.6 + k * 1e-4]], "category": "connector"}
+            for k in range(3)]
+    cov_path, canon_path = trail_dist(tmp_path, segs=segs, canon_feats=[
+        {"type": "Feature", "geometry": {"type": "LineString", "coordinates": s["coords"]},
+         "properties": {"id": s["id"], "geometry_redistributable": True, "sources": ["osm_overpass_trails"],
+                        "category": "connector", "subtype": sub}}
+        for s, sub in zip(segs, ["sidewalk", "walkway", "named_path"])])
+    comp, _ = trail_competitors(cov_path, canon_path)
+    assert [c["id"] for c in comp] == ["seg-000012"]
+
+
+def test_trail_competitors_refuse_geometry_the_trail_dataset_may_not_ship(tmp_path):
+    cov_path, canon_path = trail_dist(tmp_path, canon_feats=[
+        {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-122.5, 47.6], [-122.4995, 47.6]]},
+         "properties": {"id": "seg-000007", "geometry_redistributable": False, "sources": ["x"]}}])
+    with pytest.raises(ValueError, match="not redistributable"):
+        trail_competitors(cov_path, canon_path)
+
+
+def test_coverage_doc_appends_competitors_after_roads_and_they_are_not_tiled(tmp_path):
+    d, doc = canon(tmp_path)
+    cov_path, canon_path = trail_dist(tmp_path)
+    comp, _ = trail_competitors(cov_path, canon_path)
+    cov = coverage_segments_doc(d / "segments.geojson", {PUB: ["road-koura-road"]}, "v1", competitors=comp)
+    assert [s["id"] for s in cov["segments"]] == [PUB, "seg-000007", "seg-000008"]
+    assert cov["segments"][0]["road_ids"] == ["road-koura-road"]
+    out = write_tile_input(d / "segments.geojson", tmp_path / "t.geojson", {})
+    assert [f["properties"]["id"] for f in json.loads(out.read_text())["features"]] == [PUB]
+
+
+def test_coverage_doc_rejects_competitor_id_clash(tmp_path):
+    d, _ = canon(tmp_path)
+    clash = [{"id": PUB, "length_m": 1.0, "included": False, "road_ids": [], "coords": [[0, 0], [1, 1]]}]
+    with pytest.raises(ValueError, match="clash"):
+        coverage_segments_doc(d / "segments.geojson", {}, "v1", competitors=clash)
+
+
+def test_roads_version_changes_with_the_competitors(tmp_path):
+    d, _ = canon(tmp_path)
+    cov_path, canon_path = trail_dist(tmp_path)
+    comp, _ = trail_competitors(cov_path, canon_path)
+    v0 = roads_version(d / "segments.geojson", [], "2026-10-20T00:00:00Z")
+    v1 = roads_version(d / "segments.geojson", comp, "2026-10-20T00:00:00Z")
+    v2 = roads_version(d / "segments.geojson", comp[:1], "2026-10-20T00:00:00Z")
+    assert len({v0, v1, v2}) == 3 and v1.startswith("2026-10-20+")
+    assert v0 == dataset_version(d / "segments.geojson", "2026-10-20T00:00:00Z")
