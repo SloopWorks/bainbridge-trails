@@ -123,6 +123,15 @@ Locally: `curl -XPOST -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8787/v1/
 - **Dev auth** needs `ALLOW_DEV_AUTH=true` **and** a request host of `localhost`, `127.0.0.1` or `10.0.2.2`.
   A physical phone on the LAN can't use it; use an emulator or simulator, or `adb reverse tcp:8787 tcp:8787`.
 
+## Temporary deployment (2026-10-20)
+
+To unblock sign-in and sync integration before the final domain exists, the Worker runs on the owner's
+Cloudflare account at **https://bainbridge-trails-api.patjackson52.workers.dev** (D1 `bainbridge-trails`,
+id in `wrangler.jsonc`; migrations 0001–0002 applied; `ADMIN_TOKEN` secret set, local copy in
+`~/.config/bainbridge-trails/admin-token`, 0600). Dev auth is off there (host check). Redeploy with `npm run deploy`.
+`GOOGLE_CLIENT_IDS` / `APPLE_CLIENT_IDS` are empty until the owner creates the OAuth clients.
+Before publishing: add a custom domain (Workers route), switch `ApiConfig.PROD_BASE_URL` and the iOS metadata URLs.
+
 ## Deploy (owner only — agents never deploy)
 
 Needs the owner's Cloudflare account. All free tier.

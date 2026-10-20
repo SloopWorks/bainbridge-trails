@@ -6,8 +6,11 @@ package com.bainbridgetrails.config
  * Read [baseUrl] when building a request (not once at startup) so a drawer switch applies after its restart.
  */
 object ApiConfig {
-    /** Placeholder until the Worker is deployed under the owner's account. */
-    const val PROD_BASE_URL = "https://api.bainbridgetrails.app"
+    /**
+     * TEMPORARY workers.dev host (deployed 2026-10-20) so sign-in and sync can be integrated now.
+     * TODO(before store release): switch to the final custom domain; also metadata/ios/en-US/{privacy,support}_url.txt.
+     */
+    const val PROD_BASE_URL = "https://bainbridge-trails-api.patjackson52.workers.dev"
 
     var resolver: () -> String = { PROD_BASE_URL }
 

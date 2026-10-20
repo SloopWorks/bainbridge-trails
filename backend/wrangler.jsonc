@@ -11,9 +11,9 @@
     {
       "binding": "DB",
       "database_name": "bainbridge-trails",
-      // PLACEHOLDER: replace with the id printed by `npx wrangler d1 create bainbridge-trails` (see README).
+      // Created 2026-10-20 (temp workers.dev deployment; see README "Temporary deployment").
       // Local dev / tests ignore it and use a local SQLite file under .wrangler/.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "bc5e5e39-3f3d-4d81-a998-6b4a6d0d2045",
       "migrations_dir": "migrations"
     }
   ],

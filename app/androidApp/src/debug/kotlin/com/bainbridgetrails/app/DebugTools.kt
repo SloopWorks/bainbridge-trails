@@ -40,7 +40,7 @@ object DebugTools {
                 // Prod first: the drawer treats the first backend as active when nothing is overridden,
                 // which matches backendUrl(default = prod).
                 backends = listOf(
-                    Backend("prod", "Prod (placeholder)", ApiConfig.PROD_BASE_URL),
+                    Backend("prod", "Prod (temp workers.dev)", ApiConfig.PROD_BASE_URL),
                     Backend("local", "Local wrangler dev", LOCAL_BASE_URL),
                 ),
                 plugins = listOf(TrailsDataPlugin, CoveragePlugin(app), RecordingPlugin(app)),
