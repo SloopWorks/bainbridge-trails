@@ -42,6 +42,9 @@ import com.bainbridgetrails.resources.me_stat_trails
 import com.bainbridgetrails.resources.me_stat_trails_value
 import com.bainbridgetrails.resources.me_title
 import org.jetbrains.compose.resources.pluralStringResource
+import com.bainbridgetrails.ui.components.StatTile
+import com.bainbridgetrails.ui.components.StatTileRow
+import com.bainbridgetrails.ui.components.TrailRow
 import org.jetbrains.compose.resources.stringResource
 
 /** Me tab (F7). Placeholder: stat tiles, in-progress trails, walk history, links. */
@@ -69,17 +72,17 @@ fun MeScreen(
         ) {
             item { Text(stringResource(Res.string.me_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 12.dp)) }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatTile(stringResource(Res.string.me_stat_island), Format.percent(s?.islandFraction ?: 0.0), Modifier.weight(1f))
+                StatTileRow {
+                    StatTile(Format.percent(s?.islandFraction ?: 0.0), stringResource(Res.string.me_stat_island), Modifier.weight(1f), emphasis = true)
                     StatTile(
-                        stringResource(Res.string.me_stat_trails),
                         // Denominator from the dataset (never hard-coded).
                         stringResource(Res.string.me_stat_trails_value, s?.trailsCompleted ?: 0, data.dataset.trails.size),
+                        stringResource(Res.string.me_stat_trails),
                         Modifier.weight(1f),
                     )
                     StatTile(
-                        stringResource(if (settings.units == Units.MILES) Res.string.me_stat_miles else Res.string.me_stat_km),
                         Format.distance(history?.trailMetresWalked ?: 0.0, settings.units).substringBefore(' '),
+                        stringResource(if (settings.units == Units.MILES) Res.string.me_stat_miles else Res.string.me_stat_km),
                         Modifier.weight(1f),
                     )
                 }
@@ -94,10 +97,7 @@ fun MeScreen(
             item { Text(stringResource(Res.string.me_in_progress), style = MaterialTheme.typography.titleMedium) }
             if (inProgress.isEmpty()) item { Text(stringResource(Res.string.me_in_progress_empty)) }
             items(inProgress, key = { "p-" + it.trailId }) { t ->
-                Row(Modifier.fillMaxWidth().clickable { onTrail(t.trailId) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(t.name, Modifier.weight(1f))
-                    StatusChip(t.status, t.fraction)
-                }
+                TrailRow(t.name, Format.lengthMi(t.lengthMi, settings.units), t.fraction, t.status, onClick = { onTrail(t.trailId) })
             }
             item { Text(stringResource(Res.string.me_history), style = MaterialTheme.typography.titleMedium) }
             val walks = history?.walks.orEmpty()

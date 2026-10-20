@@ -24,6 +24,7 @@ import com.bainbridgetrails.map.MapStyle
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.settings_about
 import com.bainbridgetrails.resources.settings_attribution_dataset
+import com.bainbridgetrails.resources.settings_attribution_fonts
 import com.bainbridgetrails.resources.settings_map
 import com.bainbridgetrails.resources.settings_match_dark
 import com.bainbridgetrails.resources.settings_show_intro
@@ -57,6 +58,7 @@ fun SettingsScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: () 
         Choice(stringResource(Res.string.settings_units_km), settings.units == Units.KILOMETRES) { graph.settings.update { it.copy(units = Units.KILOMETRES) } }
         Section(Res.string.settings_about)
         (dataset as? Loadable.Ready)?.let { Text(stringResource(Res.string.settings_attribution_dataset, it.value.dataset.version)) }
+        Text(stringResource(Res.string.settings_attribution_fonts), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = onShowIntro) { Text(stringResource(Res.string.settings_show_intro)) }
     }
 }

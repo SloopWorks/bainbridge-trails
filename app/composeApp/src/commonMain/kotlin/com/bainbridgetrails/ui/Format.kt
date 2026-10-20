@@ -22,6 +22,31 @@ object Format {
         return "${tenths / 10}.${tenths % 10}%"
     }
 
+    /**
+     * Whole-number percentage for space-constrained spots (ProgressRing label), rounded down like [percent]:
+     * "0%", "<1%" for anything under 1%, "100%" only at exactly 1.
+     */
+    fun percentWhole(fraction: Double): String {
+        if (fraction <= 0.0) return "0%"
+        if (fraction >= 1.0) return "100%"
+        val whole = floor(fraction * 100 + 1e-9).toLong().coerceAtMost(99L)
+        return if (whole == 0L) "<1%" else "$whole%"
+    }
+
+    /** Spoken duration for screen readers, minute precision: "1 hour 8 minutes", "12 minutes", "0 minutes". */
+    fun durationSpoken(ms: Long): String {
+        val totalMin = (ms / 60_000).coerceAtLeast(0)
+        val h = totalMin / 60
+        val m = totalMin % 60
+        val hours = if (h == 1L) "1 hour" else "$h hours"
+        val mins = if (m == 1L) "1 minute" else "$m minutes"
+        return when {
+            h == 0L -> mins
+            m == 0L -> hours
+            else -> "$hours $mins"
+        }
+    }
+
     /** Distance in the user's units with one decimal, e.g. "2.4 mi" / "3.9 km". */
     fun distance(metres: Double, units: Units): String {
         val v = when (units) {
