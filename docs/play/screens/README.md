@@ -142,3 +142,55 @@ which are content times, not the walker's.
   apps were built from different trees; F1's code path is unchanged at `a2edb45`.
 - Operator slip: one stray `adb emu geo fix -122.5 47.6` (a 6 km jump) was sent during walk 2; the coverage/plausibility
   pipeline absorbed it (walk 2 synced, Manitou 98 %).
+
+## Showcase captures (run 2)
+
+Captured from the `FxShowcaseScreen` (`screen=fx`) at commit `f2e10cc` plus the working tree at build time (HEAD has since moved to `79c7784`; the
+concurrent edits were not in these binaries). Android: Pixel 9 Pro emulator, trails app, roads app for the three `kraken_*` effects (`--es dataset roads`); iOS:
+iPhone 17 Pro simulator, trails app (`-btDataset roads` for kraken effects). Android dark = `cmd uimode night yes` + `--es theme dark` (night mode restored to `no`).
+Android reduced = `--es reduced 1`, light, final frame. iOS = light, `t=` at the plan § 2 hero timing (t0 where none is named). Each launch waited 22–35 s on Android
+(cold start + style load) and 6 s on iOS; blank-map Android shots were re-taken. Widths 600 px. The debug HUD (top right) and control sheet (bottom) are part of the
+showcase screen and cover the map edges: on iOS the HUD overlaps the `treasure_found` burst pin and the `play_wake` title, and the sheet cuts the lower tentacles of
+`kraken_attack`/`kraken_recede` (no launch option hides the HUD or moves the camera; the Android shots, whose HUD is narrower, show these in full).
+
+| file | effect | variant | platform | shows |
+|---|---|---|---|---|
+| `fx-treasure_glint-dark-t0-android.png` | treasure_glint | dark, t0 | Android | five Fay Island treasure pins, glint at the start frame |
+| `fx-treasure_glint-reduced-android.png` | treasure_glint | reduced | Android | five shell-in-ring pins on the Fay map |
+| `fx-treasure_glint-light-t0-ios.png` | treasure_glint | light, t0 | iOS | same effect on iOS at the hero timing |
+| `fx-exploration_fog-dark-t0-android.png` | exploration_fog | dark, t0 | Android | fog squares over the island, lifted 1 in 3 |
+| `fx-exploration_fog-reduced-android.png` | exploration_fog | reduced | Android | fog squares over the island, 20 lifted |
+| `fx-exploration_fog-light-t0-ios.png` | exploration_fog | light, t0 | iOS | same effect on iOS at the hero timing |
+| `fx-riddle_marker-dark-t0-android.png` | riddle_marker | dark, t0 | Android | unlit riddle lantern pin on Winslow |
+| `fx-riddle_marker-reduced-android.png` | riddle_marker | reduced | Android | unlit riddle lantern pin on Winslow |
+| `fx-riddle_marker-light-t0-ios.png` | riddle_marker | light, t0 | iOS | same effect on iOS at the hero timing |
+| `fx-kraken_lurk-dark-t0-android.png` | kraken_lurk | dark, t0 | Android | ripple ring off Manitou, eye not yet surfaced (t0) |
+| `fx-kraken_lurk-reduced-android.png` | kraken_lurk | reduced | Android | ripple ring and surfaced eye off Manitou |
+| `fx-kraken_lurk-light-t0-ios.png` | kraken_lurk | light, t0 | iOS | same effect on iOS at the hero timing |
+| `fx-ferry_crossing-dark-t0-android.png` | ferry_crossing | dark, t0 | Android | ferry run preset on the Eagle Harbor crossing, boat at the start frame |
+| `fx-ferry_crossing-reduced-android.png` | ferry_crossing | reduced | Android | Eagle Harbor crossing map, ferry lane dashed |
+| `fx-ferry_crossing-light-t0-ios.png` | ferry_crossing | light, t0 | iOS | same effect on iOS at the hero timing |
+| `fx-frog_rock-dark-t700-android.png` | frog_rock | dark, t700 | Android | frog on its rock mid-blink (700 ms) |
+| `fx-frog_rock-reduced-android.png` | frog_rock | reduced | Android | frog on its rock, final frame |
+| `fx-frog_rock-light-t700-ios.png` | frog_rock | light, t700 | iOS | same effect on iOS at the hero timing |
+| `fx-kraken_attack-dark-t1100-android.png` | kraken_attack | dark, t1100 | Android | Manitou stretch inked, tentacles and splash rising at 1100 ms |
+| `fx-kraken_attack-reduced-android.png` | kraken_attack | reduced | Android | Manitou stretch inked, final frame |
+| `fx-kraken_attack-light-t1100-ios.png` | kraken_attack | light, t1100 | iOS | same effect on iOS at the hero timing |
+| `fx-kraken_recede-dark-t0-android.png` | kraken_recede | dark, t0 | Android | tentacles and pool with the repelled stretch un-drawn (t0) |
+| `fx-kraken_recede-reduced-android.png` | kraken_recede | reduced | Android | repelled stretch drawn plain, final frame |
+| `fx-kraken_recede-light-t0-ios.png` | kraken_recede | light, t0 | iOS | same effect on iOS at the hero timing |
+| `fx-treasure_found-dark-t400-android.png` | treasure_found | dark, t400 | Android | found treasure burst with sparkles and 4 other pins (400 ms) |
+| `fx-treasure_found-reduced-android.png` | treasure_found | reduced | Android | found-shell state, final frame |
+| `fx-treasure_found-light-t400-ios.png` | treasure_found | light, t400 | iOS | same effect on iOS at the hero timing |
+| `fx-riddle_light-dark-t400-android.png` | riddle_light | dark, t400 | Android | lit riddle pin on Winslow, lighting at 400 ms |
+| `fx-riddle_light-reduced-android.png` | riddle_light | reduced | Android | lit riddle pin on Winslow, final frame |
+| `fx-riddle_light-light-t400-ios.png` | riddle_light | light, t400 | iOS | same effect on iOS at the hero timing |
+| `fx-claim_pop-dark-t500-android.png` | claim_pop | dark, t500 | Android | score chip "1,190 · Salal Scout" and +25 pop on the map (500 ms) |
+| `fx-claim_pop-reduced-android.png` | claim_pop | reduced | Android | score chip and pop, final frame |
+| `fx-claim_pop-light-t500-ios.png` | claim_pop | light, t500 | iOS | same effect on iOS at the hero timing |
+| `fx-play_wake-dark-t1900-android.png` | play_wake | dark, t1900 | Android | "The island is awake" moment over a dotted constellation (1900 ms) |
+| `fx-play_wake-reduced-android.png` | play_wake | reduced | Android | wake moment, final frame |
+| `fx-play_wake-light-t1900-ios.png` | play_wake | light, t1900 | iOS | same effect on iOS at the hero timing |
+
+Not captured: none; all 12 effects x 3 variants (36 images). Caveats: `kraken_lurk` at t0 shows only the ripple ring (the eye surfaces later; see the reduced shot);
+`exploration_fog`, `treasure_glint` and `ferry_crossing` at t0 are the start frame of an ambient loop, so a still cannot show motion.
