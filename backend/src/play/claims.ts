@@ -25,12 +25,13 @@ import {
  * Request (both fields optional; absent = a pure upload, byte-identical response):
  *   "playConfig": "2026.11.0",
  *   "play": [{ "walkId": "<uuid in walks[]>", "claims": [{ "id": "<occurrence key>", "kind": "treasure", "weekId":
- *             "2026-10-26", "band"?: 60|80|95 }], "dayKey"?: "<week id>", "hints"?: { "<riddle item id>": 1 } }]
+ *             "2026-10-26", "band"?: 60|80|95, "capped"?: true }], "dayKey"?: "<week id>", "hints"?: { "<riddle item id>": 1 } }]
  * Any other field (a client `marks`, `total`, `tier` …) is ignored: every mark is derived here.
  *
  * Checks per claim, after the coverage plausibility passed and inside the same `DB.batch` that credits the walks
  * (the coverage_rev compare-and-swap makes the read-evaluate-write atomic):
- *   0. repeat: an occurrence this user already claimed (or claimed earlier in this upload) is a no-op `accepted`;
+ *   0. repeat: an occurrence this user already claimed (or claimed earlier in this upload) is a no-op `accepted`,
+ *      also listed in `capped` when it is stored with 0 marks (a retry after a lost response, review P1-9);
  *   1. `stale_config`: `playConfig` is not one of the Worker's kept packs;
  *   2. `unknown_item`: no enabled, non-killed item of this goal with that id and a type matching `kind`;
  *      `bad_occurrence`: malformed key, no occurrence starting on that date, placement index out of range or not
@@ -41,13 +42,15 @@ import {
  *      one, or the occurrence ended before the server island date − 2 days;
  *   4. `no_bits`: a kraken stretch with less than `band` % of its length covered, or a feature riddle whose answer
  *      has less than `minM` covered (after the merge);
- *   7. marks from the pack (tier / band / stars and hints / item marks); over the weekly found cap the claim is
- *      accepted with 0 marks and listed in `capped`.
+ *   7. marks from the pack (tier / band / stars and hints / item marks); over the weekly found cap, or sent with
+ *      `capped: true` (the client's daily found cap, review P1-4 (a)), the claim is accepted with 0 marks and listed
+ *      in `capped`: the key is stored (Logbook restore, idempotency) and never paid later.
  * Kill switches (`kill`, `enabled:false`, `expires`) are always the CURRENT pack's, whichever version is named.
  * Caps (weekly found cap, grace days, clock tolerance) always come from the CURRENT pack, never from the version the
  * client names (P2-6); marks stay per named version. An open-ended ("always") occurrence is booked to the server's
  * current week whatever `weekId` the client sent (P2-5), so a week boundary never doubles the weekly cap.
- * W-DAY: a `dayKey` counts only on a credited walk of at least 10 minutes (P2-3).
+ * W-DAY: a `dayKey` counts only on a credited walk of at least 10 minutes (P2-3); the walks whose `dayKey` was booked
+ * are answered in `dayAccepted` (review P1-3).
  * Challenge claims (L3-3, `challenges.ts`): only solo challenges are claimable (`ch-sweep`); the island challenge
  * is credited by the daily cron, so a client claim for it is `unknown_item`. A solo claim is accepted until the week's
  * end + 7 days when the user's contributions (stored + this upload's) reach the target, else `no_bits`.
@@ -90,6 +93,8 @@ export interface PlayClaim {
   kind: string;
   weekId: string;
   band?: unknown;
+  /** Client-side daily found cap reached: store the key with 0 marks (only a literal `true`). */
+  capped?: boolean;
 }
 
 export interface PlayElement {
@@ -138,7 +143,7 @@ export function parsePlay(body: Record<string, unknown>): PlayUpload | null {
       if (!isObject(c) || !isShortString(c.id, 128) || !isShortString(c.kind, 32) || !isShortString(c.weekId, 32)) {
         throw invalid("claim must be { id, kind, weekId } strings");
       }
-      claims.push({ id: c.id, kind: c.kind, weekId: c.weekId, band: c.band });
+      claims.push({ id: c.id, kind: c.kind, weekId: c.weekId, band: c.band, ...(c.capped === true ? { capped: true } : {}) });
     }
     if (e.dayKey !== undefined && e.dayKey !== null && !isShortString(e.dayKey, 32)) throw invalid("dayKey must be a week id");
     const hints: Record<string, number> = {};
@@ -191,6 +196,8 @@ export interface ClaimContext {
   coverage: CoverageMap;
   /** Occurrence keys this user already claimed in this dataset. */
   existing: ReadonlySet<string>;
+  /** Those of `existing` stored with 0 marks (capped), reported as `capped` on a repeat. */
+  existingZero?: ReadonlySet<string>;
   /** Stored week rows (only the weeks the upload names). */
   weeks: ReadonlyMap<string, WeekState>;
   /** Trails / roads this upload newly completed (sticky set), for solo `completed` challenges. */
@@ -210,8 +217,10 @@ export interface Evaluation {
   config: string | null;
   accepted: string[];
   rejected: { id: string; code: ClaimCode }[];
-  /** Accepted with 0 marks: over the weekly found cap. */
+  /** Accepted with 0 marks: over the weekly found cap, sent `capped: true`, or a repeat of a claim stored with 0. */
   capped: string[];
+  /** Walks (ids) whose `dayKey` was booked (W-DAY). */
+  dayAccepted: string[];
   inserts: ClaimInsert[];
   /** Per week: day keys and found marks to add. */
   weekDelta: Map<string, WeekState>;
@@ -358,6 +367,7 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
     accepted: [],
     rejected: [],
     capped: [],
+    dayAccepted: [],
     inserts: [],
     weekDelta: new Map(),
     foundMarks: 0,
@@ -371,13 +381,15 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
     return d;
   };
   const claimed = new Set(ctx.existing);
+  const zero = new Set(ctx.existingZero ?? []);
   const capPerWeek = capsNow().foundPerWeek;
   const current = weekIdAt(ctx.now);
 
   for (const el of play.elements) {
     for (const c of el.claims) {
       if (claimed.has(c.id)) {
-        ev.accepted.push(c.id); // repeat: a no-op that still reports accepted
+        ev.accepted.push(c.id); // repeat: a no-op that still reports accepted (and capped when stored with 0)
+        if (zero.has(c.id)) ev.capped.push(c.id);
         continue;
       }
       const ch = checkOccurrence(c, play.config, ctx);
@@ -402,10 +414,11 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
       // an open-ended occurrence is active in every week: the server picks the week (P2-5)
       const wk = ch.occ.end === null ? current : c.weekId;
       const found = (ctx.weeks.get(wk)?.found ?? 0) + (ev.weekDelta.get(wk)?.found ?? 0);
-      if (marks > 0 && found + marks > capPerWeek) {
+      if (marks > 0 && (c.capped === true || found + marks > capPerWeek)) {
         marks = 0;
         ev.capped.push(c.id);
       }
+      if (marks === 0) zero.add(c.id);
       claimed.add(c.id);
       ev.accepted.push(c.id);
       ev.inserts.push({ occ: c.id, kind: c.kind as ClaimKind, week: wk, marks });
@@ -427,6 +440,7 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
     if (have >= MAX_DAY_KEYS_PER_WEEK) continue;
     week(k).dayKeys += 1;
     ev.dayMarks += DAY_MARKS;
+    ev.dayAccepted.push(el.walkId);
   }
   return ev;
 }
@@ -438,15 +452,15 @@ export async function loadPlayState(
   dataset: Dataset,
   play: PlayUpload,
   now: number,
-): Promise<{ existing: Set<string>; weeks: Map<string, WeekState>; progress: Map<string, number> }> {
+): Promise<{ existing: Set<string>; existingZero: Set<string>; weeks: Map<string, WeekState>; progress: Map<string, number> }> {
   const { occs, weeks } = playKeys(play, now);
   const challengeOccs = [...new Set(play.elements.flatMap((e) => e.claims.filter((c) => c.kind === "challenge").map((c) => c.id)))];
   const [claims, weekRows, progressRows] = await Promise.all([
     occs.length === 0
-      ? { results: [] as { occ: string }[] }
-      : env.DB.prepare("SELECT occ FROM play_claims WHERE user_id = ?1 AND dataset = ?2 AND occ IN (SELECT value FROM json_each(?3))")
+      ? { results: [] as { occ: string; marks: number }[] }
+      : env.DB.prepare("SELECT occ, marks FROM play_claims WHERE user_id = ?1 AND dataset = ?2 AND occ IN (SELECT value FROM json_each(?3))")
           .bind(userId, dataset, JSON.stringify(occs))
-          .run<{ occ: string }>(),
+          .run<{ occ: string; marks: number }>(),
     weeks.length === 0
       ? { results: [] as { week: string; day_keys: number; found_marks: number }[] }
       : env.DB.prepare(
@@ -462,9 +476,28 @@ export async function loadPlayState(
   ]);
   return {
     existing: new Set(claims.results.map((r) => r.occ)),
+    existingZero: new Set(claims.results.filter((r) => r.marks === 0).map((r) => r.occ)),
     weeks: new Map(weekRows.results.map((r) => [r.week, { dayKeys: r.day_keys, found: r.found_marks }])),
     progress: new Map(progressRows.results.map((r) => [r.occ, r.progress])),
   };
+}
+
+/**
+ * The no-change path of `PUT /v1/coverage` (no new coverage, walk or completion) runs its Play statements outside the
+ * coverage_rev compare-and-swap, so they must not insert claims or move week / found / day / progress / stretch counts
+ * (review P2-14). True by construction (no fresh walk → no claim or dayKey accepted; no completion → no progress);
+ * this guards it. Throws (a 500) rather than write unguarded.
+ */
+export function assertNoPlayWrites(ev: Evaluation): void {
+  const moves =
+    ev.inserts.length > 0 ||
+    ev.stretches.length > 0 ||
+    ev.foundMarks !== 0 ||
+    ev.dayMarks !== 0 ||
+    ev.dayAccepted.length > 0 ||
+    [...ev.weekDelta.values()].some((d) => d.dayKeys !== 0 || d.found !== 0) ||
+    [...ev.progress.values()].some((n) => n !== 0);
+  if (moves) throw new Error("play: a no-change coverage upload must not write claims or week deltas");
 }
 
 /**
@@ -541,5 +574,5 @@ export async function playSummary(env: Env, userId: string, dataset: Dataset, no
 /** The `play` object of a coverage response. */
 export async function playResponse(env: Env, userId: string, dataset: Dataset, now: number, ev: Evaluation) {
   const s = await playSummary(env, userId, dataset, now);
-  return { accepted: ev.accepted, rejected: ev.rejected, capped: ev.capped, total: s.total, week: s.week };
+  return { accepted: ev.accepted, rejected: ev.rejected, capped: ev.capped, dayAccepted: ev.dayAccepted, total: s.total, week: s.week };
 }

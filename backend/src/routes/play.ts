@@ -1,7 +1,7 @@
 import type { UserRow } from "../auth";
 import type { Deps } from "../deps";
 import { ApiError, json } from "../http";
-import { challengesBody } from "../play/challenges";
+import { challengesBody, playLog } from "../play/challenges";
 import { CLAIM_KINDS, playSummary } from "../play/claims";
 import { CONTENT_BODY, CURRENT, contentEtag, tidesFor } from "../play/config";
 import { parseDataset } from "../segments";
@@ -42,15 +42,17 @@ export function playTides(path: string): Response {
  * GET /v1/play/me?dataset=trails|roads (schedule.md § 7.2, product § 3.6.5): the Play chip summary and the Logbook
  * restore after a reinstall. `total` = the server total, `week` = this week's finds + W-DAY marks (`weekId` = the
  * server's current week), `perKind` = claim counts, `occ` = every claimed occurrence key (re-marked found, never
- * claimed twice). No times, no days, no positions. No side effects.
+ * claimed twice), `log` = the server-only credits (W-WEEK, F-RETREAT, C-ISLAND: `{week, kind, marks}`, review P0-2)
+ * for the Logbook. No times, no days, no positions. No side effects.
  */
 export async function playMe(url: URL, env: Env, deps: Deps, user: UserRow): Promise<Response> {
   const dataset = parseDataset(url.searchParams.get("dataset") ?? undefined);
-  const [summary, claims] = await Promise.all([
+  const [summary, claims, log] = await Promise.all([
     playSummary(env, user.id, dataset, deps.now()),
     env.DB.prepare("SELECT occ, kind FROM play_claims WHERE user_id = ? AND dataset = ? ORDER BY occ")
       .bind(user.id, dataset)
       .run<{ occ: string; kind: string }>(),
+    playLog(env, user.id, dataset),
   ]);
   const perKind: Record<string, number> = Object.fromEntries(CLAIM_KINDS.map((k) => [k, 0]));
   for (const c of claims.results) if (c.kind in perKind) perKind[c.kind]!++;
@@ -61,6 +63,7 @@ export async function playMe(url: URL, env: Env, deps: Deps, user: UserRow): Pro
     week: summary.week,
     perKind,
     occ: claims.results.map((c) => c.occ),
+    log,
   });
 }
 

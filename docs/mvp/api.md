@@ -371,7 +371,8 @@ Only when signed in **and** Play is on. Two optional body fields next to the cov
 "playConfig": "2026.11.0",
 "play": [ { "walkId": "6f1c2a7e-9a43-4c1e-8f0b-2d1e5b7c9a10",
             "claims": [ { "id": "treasure-weekly-roads@2026-10-26#07", "kind": "treasure", "weekId": "2026-10-26" },
-                        { "id": "kraken-roads@2026-10-29#0", "kind": "ink", "weekId": "2026-10-26", "band": 95 } ],
+                        { "id": "kraken-roads@2026-10-29#0", "kind": "ink", "weekId": "2026-10-26", "band": 95 },
+                        { "id": "egg-madrone@2026-10-26", "kind": "egg", "weekId": "2026-10-26", "capped": true } ],
             "dayKey": "2026-10-26",
             "hints": { "riddle-madrone": 1 } } ]
 ```
@@ -384,7 +385,9 @@ Only when signed in **and** Play is on. Two optional body fields next to the cov
 - `kind` ∈ `treasure`, `egg`, `riddle`, `ink` (kraken stretch), `lore`, `challenge`; `band` (60 / 80 / 95) only on
   `ink`. `weekId` = the week id the claim belongs to. `dayKey` = the week id, sent once per island day on the walk
   that earned W-DAY (server: ≤ 7 per week). `hints` = hints used per riddle item claimed on this walk (0–2 count).
-  `playConfig` = the pack version the phone evaluated the claims against.
+  `playConfig` = the pack version the phone evaluated the claims against. `capped: true` (optional, only the literal
+  `true` counts) = the phone's daily found cap was reached: the claim is checked as usual and, when valid, stored with
+  0 marks and listed in `capped` (the key is kept for the Logbook restore and is never paid by a later claim).
 - No marks, times, days or coordinates: any other field (a client `marks`, `total`, `tier`) is ignored. The server
   derives every mark from the pack named by `playConfig` and the accepted coverage.
 - Evaluated only after the coverage passes plausibility, in the same batch that credits the walks: a `422` rejects
@@ -396,15 +399,21 @@ Only when signed in **and** Play is on. Two optional body fields next to the cov
 "play": {
   "accepted": ["treasure-weekly-roads@2026-10-26#07"],
   "rejected": [ { "id": "kraken-roads@2026-10-29#0", "code": "no_bits" } ],
-  "capped": [],
+  "capped": ["egg-madrone@2026-10-26"],
+  "dayAccepted": ["6f1c2a7e-9a43-4c1e-8f0b-2d1e5b7c9a10"],
   "total": 4180,
   "week": 140
 }
 ```
 
 - `accepted`: claim ids now stored, including re-sent ones (a repeat is a no-op that still reports `accepted`) and
-  `capped` ones. `rejected`: the others with a code; keep them `local_only`, do not resend. `capped`: accepted
-  with 0 marks because the week id's found marks reached 2,800 (`week_cap`).
+  `capped` ones. `rejected`: the others with a code; keep them `local_only`, do not resend. `capped` (a subset of
+  `accepted`): accepted with 0 marks because the week id's found marks reached 2,800 (`week_cap`) or the claim was
+  sent with `capped: true`; a repeat of a claim stored with 0 marks (a retry after a lost response) is listed here
+  too, so a retry never shows marks the server did not pay.
+- `dayAccepted`: the `walkId`s whose `dayKey` was booked by this upload (W-DAY +15). A `dayKey` not listed was
+  ignored (walk under 10 minutes, not credited by this upload, week over 7, `dayKey` late or in the future): settle
+  it `local_only`. A walk already credited by an earlier upload (a retry) books nothing and is not listed.
 - `total`: the server's marks total for this goal (W-COV, W-DONE, W-SQUARE, finds, W-DAY, W-WEEK, challenges,
   F-RETREAT). `week`: this server week's finds + W-DAY marks. Show the server values; client totals are display only.
 - Rejection codes (per claim, checked in this order after a repeat check):
@@ -436,7 +445,10 @@ No side effects.
   "total": 4180,
   "week": 140,
   "perKind": { "treasure": 3, "egg": 1, "riddle": 1, "ink": 1, "lore": 2, "challenge": 0 },
-  "occ": ["egg-madrone@2026-10-26", "kraken-roads@2026-10-29#0", "treasure-weekly-roads@2026-10-26#07"]
+  "occ": ["egg-madrone@2026-10-26", "kraken-roads@2026-10-29#0", "treasure-weekly-roads@2026-10-26#07"],
+  "log": [ { "week": "2026-10-19", "kind": "week", "marks": 50 },
+           { "week": "2026-10-26", "kind": "island_challenge", "marks": 75 },
+           { "week": "2026-10-26", "kind": "retreat", "marks": 50 } ]
 }
 ```
 
@@ -444,6 +456,12 @@ No side effects.
 `occ` = every claimed occurrence key, sorted (re-mark them found; never claim them again). It includes the rows the
 daily cron credits: `kraken-<goal>@<Thursday>` (kind `ink`, no `#n`) = F-RETREAT for that attack and
 `ch-krakenweek@<Thursday>` (kind `challenge`) = C-ISLAND.
+
+`log` = every credit only the daily cron pays (never claimed by the phone), for the Logbook: `kind` `week` = W-WEEK
+of a closed kept week (`week` = that week's id; a week closed as not kept is not listed), `retreat` = F-RETREAT and
+`island_challenge` = C-ISLAND (`week` = the attack's week). `marks` = what was paid (0 when the weekly found cap was
+reached). Sorted by `week`, then `kind`. Each credit is written once, so the list only grows and is identical across
+calls: key Logbook entries `"<kind>@<week>"` and write them idempotently.
 
 ### Challenges (`challenge` claims, contributions, cron)
 

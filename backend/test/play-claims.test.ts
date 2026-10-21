@@ -2,7 +2,7 @@ import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:
 import { beforeEach, describe, expect, it } from "vitest";
 import derivedTrails from "../src/data/play/derived-trails.json";
 import { handle } from "../src/index";
-import { evaluatePlay, parsePlay } from "../src/play/claims";
+import { assertNoPlayWrites, evaluatePlay, parsePlay } from "../src/play/claims";
 import { CURRENT } from "../src/play/config";
 import type { PlayPack } from "../src/play/recurrence";
 import { type Harness, META, devLogin, fullBits, harness, trailFull, upload } from "./helpers";
@@ -22,9 +22,9 @@ const FAIRY_STRETCH = ["seg-007562", "seg-007560", "seg-007557", "seg-007558"];
 const ROTARY = "trail-rotary-park-trails"; // 1 included segment, 30.8 m, not quiet
 const ROTARY_SEG = META.trails[ROTARY]![0]!;
 
-type Claim = { id: string; kind: string; weekId: string; band?: number; [k: string]: unknown };
+type Claim = { id: string; kind: string; weekId: string; band?: number; capped?: unknown; [k: string]: unknown };
 type Element = { walkId: string; claims: Claim[]; dayKey?: string; hints?: Record<string, number>; [k: string]: unknown };
-type PlayRes = { accepted: string[]; rejected: { id: string; code: string }[]; capped: string[]; total: number; week: number };
+type PlayRes = { accepted: string[]; rejected: { id: string; code: string }[]; capped: string[]; dayAccepted: string[]; total: number; week: number };
 type CovRes = { accepted?: boolean; metrics: unknown; play?: PlayRes };
 
 const claim = (id: string, kind: string, weekId = WEEK, extra: Partial<Claim> = {}): Claim => ({ id, kind, weekId, ...extra });
@@ -98,6 +98,7 @@ describe("claims on PUT /v1/coverage", () => {
       week: p.week,
       perKind: { treasure: 1, egg: 1, riddle: 0, ink: 0, lore: 0, challenge: 0 },
       occ: [EGG, TREASURE0],
+      log: [], // only server-only credits (W-WEEK, F-RETREAT, C-ISLAND)
     });
     const roads = await (await h.call("GET", "/v1/play/me?dataset=roads", { token })).json();
     expect(roads).toMatchObject({ dataset: "roads", total: 0, week: 0, occ: [] });
@@ -494,6 +495,112 @@ describe("claims on PUT /v1/coverage", () => {
     for (const t of ["play_claims", "play_weeks", "play_totals"]) {
       expect(await rows(`SELECT * FROM ${t} WHERE user_id = ?`, userId)).toEqual([]);
     }
+  });
+});
+
+// branch review round 1 (docs/play/reviews/2026-10-21-branch-round1.md)
+describe("review round 1", () => {
+  // P1-3: the client settles W-DAY from the server's answer, never from having sent it
+  it("dayAccepted lists walks whose dayKey was booked", async () => {
+    const booked = crypto.randomUUID();
+    const p = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [], dayKey: WEEK }], { walkId: booked }));
+    expect(p.dayAccepted).toEqual([booked]);
+    expect(p.week).toBe(15);
+    // under 10 minutes: ignored, not listed
+    const p2 = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [], dayKey: WEEK }], { durationS: 599 }));
+    expect(p2.dayAccepted).toEqual([]);
+    // no dayKey: not listed
+    expect((await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [] }]))).dayAccepted).toEqual([]);
+    // the week already has 7 day keys: ignored, not listed
+    await env.DB.prepare("UPDATE play_weeks SET day_keys = 7 WHERE user_id = ? AND week = ?").bind(userId, WEEK).run();
+    expect((await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [], dayKey: WEEK }]))).dayAccepted).toEqual([]);
+    // a walk this upload does not credit (here: a re-sent one) books nothing
+    expect((await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [], dayKey: WEEK }], { walkId: booked }))).dayAccepted).toEqual([]);
+  });
+
+  // P1-4 (a): the client's daily found cap → the key is stored with 0 marks (restore + idempotency), nothing paid
+  it("capped:true claim stored with 0 marks", async () => {
+    const p = await playOf(
+      await syncPlay({}, (w) => [{ walkId: w, claims: [claim(TREASURE0, "treasure", WEEK, { capped: true }), claim(EGG, "egg", WEEK, { capped: "yes" })] }]),
+    );
+    expect(p.accepted).toEqual([TREASURE0, EGG]);
+    expect(p.capped).toEqual([TREASURE0]); // only a literal `true` caps
+    expect(p.rejected).toEqual([]);
+    expect(p.total).toBe(20);
+    expect(p.week).toBe(20);
+    expect(await rows("SELECT occ, marks FROM play_claims WHERE user_id = ? ORDER BY occ", userId)).toEqual([
+      { occ: EGG, marks: 20 },
+      { occ: TREASURE0, marks: 0 },
+    ]);
+    expect(await rows("SELECT found_marks FROM play_weeks WHERE user_id = ?", userId)).toEqual([{ found_marks: 20 }]);
+    // the key is kept: listed for the Logbook restore, and never paid by a later uncapped claim
+    const me = (await (await h.call("GET", "/v1/play/me?dataset=trails", { token })).json()) as { occ: string[] };
+    expect(me.occ).toEqual([EGG, TREASURE0]);
+    const again = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [claim(TREASURE0, "treasure")] }]));
+    expect(again.accepted).toEqual([TREASURE0]);
+    expect(again.capped).toEqual([TREASURE0]);
+    expect(again.total).toBe(20);
+    // a capped claim is still checked: an invalid one is rejected, not stored
+    const bad = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [claim(KRAKEN0, "ink", WEEK, { band: 95, capped: true })] }]));
+    expect(codes(bad)).toEqual({ [KRAKEN0]: "no_bits" });
+    expect(bad.capped).toEqual([]);
+  });
+
+  // P1-9: a retried upload after a lost response reports the stored outcome
+  it("repeat of a capped claim reports capped", async () => {
+    await env.DB.prepare("INSERT INTO play_weeks (user_id, dataset, week, found_marks) VALUES (?, 'trails', ?, 2770)").bind(userId, WEEK).run();
+    const walkId = crypto.randomUUID();
+    const build = (w: string) => [{ walkId: w, claims: [claim(TREASURE0, "treasure"), claim(EGG, "egg")] }];
+    const first = await playOf(await syncPlay({}, build, { walkId }));
+    expect(first.capped).toEqual([EGG]);
+    const retry = await playOf(await syncPlay({}, build, { walkId }));
+    expect(retry.accepted).toEqual([TREASURE0, EGG]);
+    expect(retry.capped).toEqual([EGG]);
+    expect(retry.rejected).toEqual([]);
+    expect(retry.total).toBe(first.total);
+    // a repeat inside one upload of a claim capped by that upload is capped too
+    await env.DB.prepare("UPDATE play_weeks SET found_marks = 2800 WHERE user_id = ?").bind(userId).run();
+    const LADYBUG = `egg-ladybug@${WEEK}`;
+    const twice = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [claim(LADYBUG, "egg"), claim(LADYBUG, "egg")] }]));
+    expect(twice.accepted).toEqual([LADYBUG, LADYBUG]);
+    expect(twice.capped).toEqual([LADYBUG, LADYBUG]);
+  });
+
+  // P2-14: the no-change path runs outside the coverage compare-and-swap: it must write nothing but the monotone totals
+  it("no-change upload writes no claims or week deltas", async () => {
+    const walkId = crypto.randomUUID();
+    await playOf(await syncPlay(trailFull(ROTARY), (w) => [{ walkId: w, claims: [claim(TREASURE0, "treasure")], dayKey: WEEK }], { walkId }));
+    const snapshot = async () => ({
+      claims: await rows("SELECT * FROM play_claims WHERE user_id = ? ORDER BY occ", userId),
+      weeks: await rows("SELECT * FROM play_weeks WHERE user_id = ?", userId),
+      totals: await rows("SELECT * FROM play_totals WHERE user_id = ?", userId),
+      progress: await rows("SELECT * FROM play_progress WHERE user_id = ?", userId),
+    });
+    const before = await snapshot();
+    // same walk, same coverage, new claims + a dayKey: nothing new is credited
+    const p = await playOf(
+      await syncPlay(trailFull(ROTARY), (w) => [{ walkId: w, claims: [claim(TREASURE0, "treasure"), claim(EGG, "egg")], dayKey: WEEK }], { walkId }),
+    );
+    expect(p.accepted).toEqual([TREASURE0]);
+    expect(codes(p)).toEqual({ [EGG]: "not_this_walk" });
+    expect(p.dayAccepted).toEqual([]);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("assertNoPlayWrites throws on an evaluation that writes", () => {
+    const walkId = crypto.randomUUID();
+    const ev = (fresh: number) =>
+      evaluatePlay(parsePlay({ playConfig: PACK, play: [{ walkId, claims: [claim(EGG, "egg")], dayKey: WEEK }] })!, {
+        dataset: "trails",
+        now: THU,
+        packFor: (v) => (v === PACK ? CURRENT : null),
+        freshWalks: fresh > 0 ? new Map([[walkId, fresh]]) : new Map(),
+        coverage: new Map(),
+        existing: new Set(),
+        weeks: new Map(),
+      });
+    expect(() => assertNoPlayWrites(ev(0))).not.toThrow();
+    expect(() => assertNoPlayWrites(ev(3600))).toThrow(/no-change/);
   });
 });
 

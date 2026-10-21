@@ -21,7 +21,7 @@ import {
   allowedGrowthM,
   limitsFrom,
 } from "../plausibility";
-import { type Evaluation, evaluatePlay, loadPlayState, parsePlay, playResponse, playStatements } from "../play/claims";
+import { type Evaluation, assertNoPlayWrites, evaluatePlay, loadPlayState, parsePlay, playResponse, playStatements } from "../play/claims";
 import { packByVersion } from "../play/config";
 import { walkDerivedMarks } from "../play/marks";
 import { LIMITS, rateLimit } from "../ratelimit";
@@ -243,6 +243,7 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
         freshWalks: new Map(fresh.map((w) => [w.id, w.durationS])),
         coverage: merged,
         existing: playState.existing,
+        existingZero: playState.existingZero,
         weeks: playState.weeks,
         newlyCompleted,
         progress: playState.progress,
@@ -254,7 +255,10 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
       if (!playEval) {
         return json({ ...coverageBody(meta, merged, completed, m), accepted: true, newlyCoveredM: 0, ignoredSegments: upload.ignored });
       }
-      // nothing new to credit: no claim can be accepted fresh (no new walk); keep the monotone totals current
+      // nothing new to credit: no claim can be accepted fresh (no new walk). This batch runs outside the coverage_rev
+      // compare-and-swap, so it may only refresh the monotone totals (MAX of walk-derived marks, + 0 found / week):
+      // asserted before writing (review P2-14).
+      assertNoPlayWrites(playEval);
       await env.DB.batch(playStmts);
       return json({
         ...coverageBody(meta, merged, completed, m),

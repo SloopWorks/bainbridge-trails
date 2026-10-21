@@ -1,7 +1,7 @@
 import { communityCount, MIN_COMMUNITY_COUNT } from "../routes/board";
 import { DATASETS, type Dataset } from "../segments";
 import { type ClaimCode, inGoal, killed, rotationStretches } from "./claims";
-import { CURRENT } from "./config";
+import { CURRENT, PUBLISHED } from "./config";
 import { DERIVED } from "./derived";
 import { itemMarks } from "./marks";
 import {
@@ -289,6 +289,53 @@ export async function challengesBody(
     return entry;
   });
   return { dataset, minCount: MIN_COMMUNITY_COUNT, current };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// GET /v1/play/me `log`: the server-only credits (review P0-2)
+
+export type LogKind = "week" | "retreat" | "island_challenge";
+export interface LogEntry {
+  week: string;
+  kind: LogKind;
+  marks: number;
+}
+
+const LOG_ORDER: Record<LogKind, number> = { island_challenge: 0, retreat: 1, week: 2 };
+
+/** True when `itemId` is an island challenge in any kept pack (the cron credits only those; solo ones are claimed). */
+function isIslandChallenge(itemId: string): boolean {
+  for (const pack of PUBLISHED.values()) {
+    const item = pack.items.find((i) => i.id === itemId);
+    if (item && challengeDef(item)?.scope === "island") return true;
+  }
+  return false;
+}
+
+/**
+ * Marks only the daily cron credits, so the Logbook can show them (the client never claims them): W-WEEK
+ * (`play_weeks.kept > 0`; a week closed as not kept is not a credit), F-RETREAT (claim rows `kraken-<goal>@<Thursday>`,
+ * kind `ink` without `#n`: a client `ink` claim always names a stretch) and C-ISLAND (claim rows of an island
+ * challenge, kind `challenge`). A cron credit over the weekly found cap is listed with 0 marks. Sorted by week, then
+ * kind. Derived from the rows the cron writes once, so it is stable across calls and cron runs.
+ */
+export async function playLog(env: Env, userId: string, dataset: Dataset): Promise<LogEntry[]> {
+  const [weeks, claims] = await env.DB.batch<{ week: string; kind: string; occ: string; marks: number }>([
+    env.DB.prepare("SELECT week, 'week' AS kind, '' AS occ, kept AS marks FROM play_weeks WHERE user_id = ?1 AND dataset = ?2 AND kept > 0").bind(
+      userId,
+      dataset,
+    ),
+    env.DB.prepare(
+      `SELECT week, kind, occ, marks FROM play_claims
+        WHERE user_id = ?1 AND dataset = ?2 AND ((kind = 'ink' AND instr(occ, '#') = 0) OR kind = 'challenge')`,
+    ).bind(userId, dataset),
+  ]);
+  const out: LogEntry[] = weeks!.results.map((r) => ({ week: r.week, kind: "week", marks: r.marks }));
+  for (const c of claims!.results) {
+    if (c.kind === "ink") out.push({ week: c.week, kind: "retreat", marks: c.marks });
+    else if (isIslandChallenge(c.occ.slice(0, c.occ.indexOf("@")))) out.push({ week: c.week, kind: "island_challenge", marks: c.marks });
+  }
+  return out.sort((a, b) => (a.week < b.week ? -1 : a.week > b.week ? 1 : LOG_ORDER[a.kind] - LOG_ORDER[b.kind]));
 }
 
 // ---------------------------------------------------------------------------------------------------------------

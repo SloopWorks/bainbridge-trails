@@ -179,6 +179,59 @@ describe("kraken aggregates", () => {
   });
 });
 
+describe("server-only credits in GET /v1/play/me log", () => {
+  type Me = { log: { week: string; kind: string; marks: number }[]; occ: string[]; total: number };
+  const me = async (token: string, dataset = "trails") => {
+    const res = await h.call("GET", `/v1/play/me?dataset=${dataset}`, { token });
+    expect(res.status).toBe(200);
+    return (await res.json()) as Me;
+  };
+
+  // P0-2: W-WEEK, F-RETREAT and C-ISLAND reach the Logbook
+  it("closed W-WEEK week listed once; second call identical", async () => {
+    const p = await player();
+    // a client-claimed stretch of the attack (kind ink with #n) is not a server-only credit
+    expect((await syncPlay(p.token, trailFull(FAIRY), [{ id: KRAKEN0, kind: "ink", weekId: WEEK, band: 95 }])).accepted).toEqual([KRAKEN0]);
+    expect((await me(p.token)).log).toEqual([]);
+    await seedAttack("2026-11-12", [4, 3, 5], [{ userId: p.userId, stretches: 3 }]);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO play_weeks (user_id, dataset, week, day_keys) VALUES (?, 'trails', '2026-11-09', 2)").bind(p.userId),
+      // one walking day only: closes as not kept (kept = 0), never listed
+      env.DB.prepare("INSERT INTO play_weeks (user_id, dataset, week, day_keys) VALUES (?, 'trails', '2026-11-16', 1)").bind(p.userId),
+    ]);
+    const at = Date.UTC(2026, 10, 18, 9, 17);
+    await playDaily(env, at);
+    const expected = [
+      { week: "2026-11-09", kind: "island_challenge", marks: 75 },
+      { week: "2026-11-09", kind: "retreat", marks: 50 },
+      { week: "2026-11-09", kind: "week", marks: 40 },
+    ];
+    const first = await me(p.token);
+    expect(first.log).toEqual(expected);
+    // the cron again, and the week after (2026-11-16 closes as not kept): nothing new
+    await playDaily(env, at);
+    await playDaily(env, Date.UTC(2026, 10, 30, 9, 17));
+    expect(await one("SELECT kept FROM play_weeks WHERE user_id = ? AND week = '2026-11-16'", p.userId)).toEqual({ kept: 0 });
+    const second = await me(p.token);
+    expect(second.log).toEqual(expected);
+    expect(second).toEqual(first);
+    // per goal
+    expect((await me(p.token, "roads")).log).toEqual([]);
+  });
+
+  it("capped server credit listed with 0 marks", async () => {
+    const p = await player();
+    await seedAttack("2026-11-12", [4, 3, 5], [{ userId: p.userId, stretches: 3 }]);
+    await env.DB.prepare("INSERT INTO play_weeks (user_id, dataset, week, found_marks) VALUES (?, 'trails', '2026-11-09', 2740)").bind(p.userId).run();
+    await playDaily(env, Date.UTC(2026, 10, 18, 9, 17));
+    // F-RETREAT +50 still fits under 2,800 (2,790); C-ISLAND +75 does not: stored and listed with 0
+    expect((await me(p.token)).log).toEqual([
+      { week: "2026-11-09", kind: "island_challenge", marks: 0 },
+      { week: "2026-11-09", kind: "retreat", marks: 50 },
+    ]);
+  });
+});
+
 describe("W-WEEK", () => {
   it("W-WEEK from day_keys ≥ 2", async () => {
     const p = await player("roads");
@@ -296,6 +349,33 @@ describe("challenges", () => {
     const w = await devLogin(h);
     p = await syncPlay(w.token, trailFull(FAIRY), [{ id: "ch-krakenweek@2026-10-29", kind: "challenge", weekId: WEEK }]);
     expect(p.rejected).toEqual([{ id: "ch-krakenweek@2026-10-29", code: "unknown_item" }]);
+  });
+
+  // P0-1 (server side): the client claims once its completions over several walks reach the target
+  it("sweep claim accepted at target, rejected below", async () => {
+    const u = await devLogin(h);
+    h.clock.t = pdt(2026, 10, 31, 9); // Sat: window open
+    // walk 1: two completions; a claim below the target is rejected
+    let p = await syncPlay(u.token, { ...trailFull(SHORT[0]!), ...trailFull(SHORT[1]!) }, [sweep]);
+    expect(p.rejected).toEqual([{ id: SWEEP, code: "no_bits" }]);
+    // walk 2: the third completion, no claim on it
+    h.clock.t = pdt(2026, 10, 31, 15);
+    p = await syncPlay(u.token, trailFull(SHORT[2]!));
+    expect(await one("SELECT progress FROM play_progress WHERE user_id = ? AND occ = ?", u.userId, SWEEP)).toEqual({ progress: 3 });
+    // walk 3 completes nothing new and carries the claim: the stored contributions reach the target → +100
+    h.clock.t = pdt(2026, 11, 1, 10);
+    p = await syncPlay(u.token, {}, [sweep]);
+    expect(p.accepted).toEqual([SWEEP]);
+    expect(p.capped).toEqual([]);
+    expect(await one("SELECT kind, week, marks FROM play_claims WHERE user_id = ? AND occ = ?", u.userId, SWEEP)).toEqual({
+      kind: "challenge",
+      week: WEEK,
+      marks: 100,
+    });
+    // a solo challenge is client-claimed: never in the server-only log
+    const me = (await (await h.call("GET", "/v1/play/me?dataset=trails", { token: u.token })).json()) as { log: unknown[]; perKind: { challenge: number } };
+    expect(me.log).toEqual([]);
+    expect(me.perKind.challenge).toBe(1);
   });
 
   it("response has no names scores ranks or timestamps", async () => {
