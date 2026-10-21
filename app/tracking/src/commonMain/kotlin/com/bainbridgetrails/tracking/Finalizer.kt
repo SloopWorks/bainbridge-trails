@@ -2,9 +2,12 @@ package com.bainbridgetrails.tracking
 
 import com.bainbridgetrails.coverage.CoverageParams
 import com.bainbridgetrails.coverage.Dataset
+import com.bainbridgetrails.coverage.Fix
 import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.coverage.TrailStatus
+import com.bainbridgetrails.coverage.keptFixes
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -51,6 +54,11 @@ data class SessionSummary(
  * coverage merge all happen inside it, so a concurrent sync merge is never mistaken for this walk's rise and
  * sync never sees this walk's bits without its walk record (the record is written first).
  * [onWork] is a test hook invoked inside the background context; [afterMatch] runs after matching, before the lock.
+ *
+ * [onGated] (Play, docs/play/product.md §3.6.2, PD-12) is read on every [finalize]; when it returns a hook, the hook
+ * gets the walk's gated fixes after the coverage fix filter ([keptFixes]: no mock, inaccurate, spike or too-fast fix)
+ * and the summary, after the merge and outside the coverage lock. Null (Play off, the default) does no extra work. A
+ * hook failure never fails the walk.
  */
 class Finalizer(
     private val dataset: Dataset,
@@ -64,6 +72,7 @@ class Finalizer(
     /** Wall clock for [WalkRecord.finalizedAt]. */
     private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val afterMatch: suspend () -> Unit = {},
+    private val onGated: () -> (suspend (sessionId: String, kept: List<Fix>, summary: SessionSummary) -> Unit)? = { null },
 ) {
     private val progress = Progress(dataset, index, params)
     private val mutex = Mutex()
@@ -80,6 +89,20 @@ class Finalizer(
     }
 
     suspend fun finalize(sessionId: String): SessionSummary = withContext(Dispatchers.Default) { mutex.withLock {
+        val (summary, gatedFixes) = finalizeLocked(sessionId)
+        onGated()?.let { hook ->
+            try {
+                hook(sessionId, keptFixes(gatedFixes, params, index.projection), summary)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Play is optional: its failure must not lose or change the walk (PF0-3).
+            }
+        }
+        summary
+    } }
+
+    private suspend fun finalizeLocked(sessionId: String): Pair<SessionSummary, List<Fix>> {
         onWork()
         val session = store.load(sessionId)
         val gate = Gating.gate(session, index.projection)
@@ -90,7 +113,7 @@ class Finalizer(
         val matchedM = dataset.rules.matchedM(walked, index)
         afterMatch()
 
-        CoverageStore.writeLock.withLock {
+        val summary = CoverageStore.writeLock.withLock {
             val before = coverage.load()
             val sticky = coverage.completedIds()
             val after = before.union(walked)
@@ -164,7 +187,8 @@ class Finalizer(
                 countedByCategory = countedByCategory,
             )
         }
-    } }
+        return summary to gate.fixes
+    }
 }
 
 /** Session ids are "s<startMs>-<rand>"; 0 when the id carries no start time. */

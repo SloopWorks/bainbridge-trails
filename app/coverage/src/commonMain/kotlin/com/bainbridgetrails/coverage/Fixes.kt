@@ -37,7 +37,21 @@ private const val MIN_SPEED_BASIS_S = 10.0
  * piece's fixes with |t_j - t_i| <= smoothWindowS / 2 (no cascade; never across a break). A fix with no neighbour in the
  * window keeps its position, so sparse recordings (interval > smoothWindowS / 2) are unchanged. smoothWindowS = 0 disables it.
  */
-fun filterFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection): List<List<Xy>> {
+fun filterFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection): List<List<Xy>> =
+    acceptedPieces(fixes, params, proj).map { piece -> smooth(piece.map { it.xy }, piece.map { it.fix.timeMs }, params.smoothWindowS) }
+
+/**
+ * The fixes [filterFixes] keeps (rules 1-5: sorted and de-duplicated, not mock, accurate, not a spike, inside the speed
+ * limit, in a piece of >= 2 fixes), as the original [Fix]es in time order: positions are never smoothed (rule 6 moves
+ * points, never membership). Play re-checks its claims against exactly these (docs/play/product.md §3.6.2).
+ */
+fun keptFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection): List<Fix> =
+    acceptedPieces(fixes, params, proj).flatMap { piece -> piece.map { it.fix } }
+
+private class Accepted(val fix: Fix, val xy: Xy)
+
+/** Rules 1-5 of [filterFixes]: the unsmoothed pieces. */
+private fun acceptedPieces(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection): List<List<Accepted>> {
     val accepted = fixes.sortedBy { it.timeMs }
         .distinctBy { it.timeMs }
         .filter { f -> !f.isMock && f.accuracyM.let { it == null || (it >= 0.0 && it <= params.maxAccuracyM) } }
@@ -54,13 +68,11 @@ fun filterFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection)
     val seq = accepted.filterIndexed { i, _ -> keep[i] }
     val xy = accXy.filterIndexed { i, _ -> keep[i] }
 
-    val pieces = ArrayList<List<Xy>>()
-    var pts = ArrayList<Xy>()
-    var times = ArrayList<Long>()
+    val pieces = ArrayList<List<Accepted>>()
+    var piece = ArrayList<Accepted>()
     fun flush() {
-        if (pts.size >= 2) pieces.add(smooth(pts, times, params.smoothWindowS))
-        pts = ArrayList()
-        times = ArrayList()
+        if (piece.size >= 2) pieces.add(piece)
+        piece = ArrayList()
     }
 
     for (i in seq.indices) {
@@ -83,8 +95,7 @@ fun filterFixes(fixes: List<Fix>, params: CoverageParams, proj: LocalProjection)
                 continue
             }
         }
-        pts.add(p)
-        times.add(t)
+        piece.add(Accepted(seq[i], p))
     }
     flush()
     return pieces
