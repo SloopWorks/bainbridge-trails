@@ -12,6 +12,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +31,11 @@ import com.bainbridgetrails.map.StatusLayers
 import com.bainbridgetrails.map.TrailMap
 import com.bainbridgetrails.map.rememberTrailMapController
 import com.bainbridgetrails.play.fx.FxBand
+import com.bainbridgetrails.play.fx.FxClock
+import com.bainbridgetrails.play.fx.FxHostState
+import com.bainbridgetrails.play.fx.FxInstance
+import com.bainbridgetrails.play.fx.FxSpec
+import com.bainbridgetrails.play.fx.FxStage
 import com.bainbridgetrails.play.fx.FxGlobalStateSink
 import com.bainbridgetrails.play.fx.FxHostInputs
 import com.bainbridgetrails.play.fx.FxLayerContext
@@ -42,8 +49,12 @@ import com.bainbridgetrails.play.fx.PlayMapContent
 import com.bainbridgetrails.play.fx.WithFxRenderOptions
 import com.bainbridgetrails.play.fx.effects.ExplorationFog
 import com.bainbridgetrails.play.fx.effects.FerryCrossing
-import com.bainbridgetrails.play.fx.effects.FrogRockStamp
+import com.bainbridgetrails.play.fx.effects.FrogRock
+import com.bainbridgetrails.play.fx.effects.KrakenAttack
 import com.bainbridgetrails.play.fx.effects.KrakenInk
+import com.bainbridgetrails.play.fx.effects.KrakenRecede
+import com.bainbridgetrails.play.fx.effects.RiddleLight
+import com.bainbridgetrails.play.fx.effects.TreasureFound
 import com.bainbridgetrails.play.fx.effects.KrakenLurk
 import com.bainbridgetrails.play.fx.effects.RiddleMarker
 import com.bainbridgetrails.play.fx.effects.TreasureGlint
@@ -72,7 +83,7 @@ private const val TAG = "FxShowcase"
 fun FxShowcaseScreen(launch: SpikeLaunch = SpikeLaunch(screen = SpikeLaunch.Screen.FX), modifier: Modifier = Modifier) {
     var preset by remember { mutableStateOf(FxPresets.initial(launch.fx, launch.preset)) }
     var state by remember { mutableStateOf(launch.state?.takeIf { it in preset.states } ?: preset.states.first()) }
-    var dark by remember { mutableStateOf(launch.theme.equals("dark", ignoreCase = true)) }
+    var dark by remember { mutableStateOf((launch.theme ?: preset.theme).equals("dark", ignoreCase = true)) }
     var reduced by remember { mutableStateOf(launch.reduced) }
     var pausedAt by remember { mutableStateOf(launch.t) }
     val time = remember { FxShowcaseTime() }
@@ -87,12 +98,15 @@ fun FxShowcaseScreen(launch: SpikeLaunch = SpikeLaunch(screen = SpikeLaunch.Scre
             Column(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f)) {
                     val d = data
-                    if (d != null) key(preset.id, state) { ShowcaseMap(preset, state, d, dark, time, stats) }
+                    if (d != null) key(preset.id, state) { ShowcaseMap(preset, state, d, dark, time, stats, pausedAt) }
+                    if (d != null && preset.effect in FxPresets.screenEffects) {
+                        key(preset.id, state, pausedAt == null) { FxScreenScene(preset, state, d, pausedAt) }
+                    }
                     FxHud(stats, Modifier.align(Alignment.TopEnd).windowInsetsPadding(WindowInsets.safeDrawing).padding(8.dp))
                 }
                 FxControls(
                     preset, state, dark, reduced, pausedAt,
-                    onPreset = { preset = it; state = it.states.first() },
+                    onPreset = { preset = it; state = it.states.first(); it.theme?.let { th -> dark = th == "dark" } },
                     onState = { state = it },
                     onDark = { dark = it },
                     onReduced = { reduced = it },
@@ -105,24 +119,37 @@ fun FxShowcaseScreen(launch: SpikeLaunch = SpikeLaunch(screen = SpikeLaunch.Scre
 }
 
 @Composable
-private fun ShowcaseMap(preset: FxPreset, state: String, data: FxShowcaseData, dark: Boolean, time: FxShowcaseTime, stats: FxShowcaseStats) {
+private fun ShowcaseMap(
+    preset: FxPreset, state: String, data: FxShowcaseData, dark: Boolean, time: FxShowcaseTime, stats: FxShowcaseStats, pausedAt: Long?,
+) {
     val controller = rememberTrailMapController()
+    val frozen = remember { FxShowcaseFrozen() }
     val registry = remember(data) {
         FxRendererRegistry(
             listOf(
-                ExplorationFog, KrakenLurk, KrakenInk, FerryCrossing(data.ferry, now = time::islandNow),
-                RiddleMarker(), FrogRockStamp, TreasureGlint,
-            ).map { ShowcaseRenderer(it, time) },
+                ExplorationFog, KrakenLurk, KrakenAttack(), KrakenRecede, FerryCrossing(data.ferry, now = time::islandNow),
+                RiddleMarker(), RiddleLight, FrogRock, TreasureGlint, TreasureFound,
+            ).map { ShowcaseRenderer(it, time, frozen) },
         )
     }
     val host = rememberFxHost(FxHostInputs(ambientOff = false, renderers = registry), controller)
     SideEffect { stats.host = host }
     val specs = remember(preset, state, data) { FxPresets.specs(preset, state, data) }
-    LaunchedEffect(host, specs) {
+    // Paused (`t`): OVERLAY parts are drawn still at `t` by the showcase (never retired by the scene), and the finite
+    // Layer parts of a hero are held, so a screenshot can be taken at any key frame.
+    val reduced = BtTheme.motion.reduced
+    val still = pausedAt != null
+    val sceneSpecs = remember(specs, still) { if (still) FxShowcaseFrozen.held(specs) else specs }
+    SideEffect {
+        frozen.atMs = pausedAt ?: 0L
+        frozen.items = if (still) FxShowcaseFrozen.items(specs, reduced) else emptyList()
+    }
+    LaunchedEffect(host, sceneSpecs) {
         time.restart(FxPresets.FerryStart)
-        specs.forEach { host.spawn(it) }
-        stats.note = "${preset.id} · $state · ${specs.size} items" + if (preset.effect == KrakenInk.kind && specs.isEmpty()) " · needs dataset=roads" else ""
-        AppLog.i(TAG, "spawned ${specs.size} for ${preset.id}/$state")
+        sceneSpecs.forEach { host.spawn(it) }
+        val kraken = preset.effect == KrakenInk.kind || preset.effect == KrakenRecede.kind
+        stats.note = "${preset.id} · $state · ${specs.size} items" + if (kraken && specs.isEmpty()) " · needs dataset=roads" else ""
+        AppLog.i(TAG, "spawned ${sceneSpecs.size} for ${preset.id}/$state (still=$still)")
     }
     LaunchedEffect(controller) {
         snapshotFlow { controller.mapState }.filterNotNull().collectLatest { m ->
@@ -145,7 +172,7 @@ private fun ShowcaseMap(preset: FxPreset, state: String, data: FxShowcaseData, d
         AppLog.i(TAG, "layer order (${if (dark) "dark" else "light"}) total=${ids.size}: " + interesting.joinToString(" < ") { (i, id) -> "$i:$id" })
     }
     val style = if (dark) MapStyle.DARK else MapStyle.TOPO
-    val overlay: @Composable MapOverlayScope.() -> Unit = remember(host) { { FxOverlay(host) } }
+    val overlay: @Composable MapOverlayScope.() -> Unit = remember(host) { { FxOverlay(host); FrozenOverlays(host, frozen) } }
     WithFxRenderOptions(host) { renderOptions ->
         TrailMap(
             style, Modifier.fillMaxSize(), initialCamera = preset.camera, controlsTopPadding = 52.dp, controller = controller,
@@ -179,19 +206,60 @@ class FxShowcaseTime {
     fun map(nowMs: Long, baseMs: Long): Long = pausedAt?.let { baseMs + it } ?: (baseMs + ((nowMs - baseMs) * warp).toLong())
 }
 
-/** Delegates to [inner], with the showcase's warp / pause applied to the Layer-tier clock. */
-private class ShowcaseRenderer(private val inner: FxRenderer, private val time: FxShowcaseTime) : FxRenderer {
+/** Paused showcase: the OVERLAY items drawn still at [atMs] (spawned at 0, never in the scene). */
+@Stable
+internal class FxShowcaseFrozen {
+    var items: List<FxLive> by mutableStateOf(emptyList())
+    var atMs: Long by mutableLongStateOf(0L)
+
+    fun of(kind: String): List<FxLive> = items.filter { it.instance.spec.kind == kind }
+
+    companion object {
+        /** Held for an hour: the hero's finite Layer parts outlive the still frame. */
+        private const val HOLD_MS = 3_600_000
+
+        /** What the scene spawns while paused: no OVERLAY items; finite Layer parts held. */
+        fun held(specs: List<FxSpec>): List<FxSpec> = specs.filter { it.band != FxBand.OVERLAY }.map {
+            if (it.timeline.runLoopMs == null) it.copy(timeline = it.timeline.copy(despawnMs = it.timeline.despawnMs + HOLD_MS)) else it
+        }
+
+        fun items(specs: List<FxSpec>, reduced: Boolean): List<FxLive> = specs.filter { it.band == FxBand.OVERLAY }.mapIndexed { i, s ->
+            FxLive(FxInstance(s, seq = -1L - i, spawnedAtMs = 0L), FxStage.RUN, t = 0, reduced = reduced)
+        }
+    }
+}
+
+/** The paused OVERLAY items, drawn by their renderers against a still clock at [FxShowcaseFrozen.atMs]. */
+@Composable
+private fun MapOverlayScope.FrozenOverlays(host: FxHostState, frozen: FxShowcaseFrozen) {
+    val items = frozen.items
+    if (items.isEmpty()) return
+    val ctx = host.overlayContext ?: return
+    val clock = remember { FxClock() }
+    SideEffect { clock.frame.longValue = frozen.atMs }
+    val still = remember(ctx, clock) { FxOverlayContext(ctx.map, clock, ctx.palette, ctx.reduced) { null } }
+    for (item in items) {
+        val renderer = host.renderers[item.instance.spec.kind] ?: continue
+        key(item.instance.seq) { with(renderer) { Overlay(item, still) } }
+    }
+}
+
+/** Delegates to [inner], with the showcase's warp / pause applied to the Layer-tier clock and paused items added. */
+private class ShowcaseRenderer(private val inner: FxRenderer, private val time: FxShowcaseTime, private val frozen: FxShowcaseFrozen) : FxRenderer {
     override val kind: String = inner.kind
 
     override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
-        val base = live.minOfOrNull { it.instance.spawnedAtMs } ?: nowMs
-        inner.writeGlobalState(live, time.map(nowMs, base), out)
+        val all = live + frozen.of(kind)
+        val base = all.minOfOrNull { it.instance.spawnedAtMs } ?: nowMs
+        inner.writeGlobalState(all, time.map(nowMs, base), out)
     }
 
     @Composable
     @MaplibreComposable
     override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
-        inner.Layers(band, live, ctx)
+        val still = frozen.of(kind)
+        val all = remember(live, still) { if (still.isEmpty()) live else live + still }
+        inner.Layers(band, all, ctx)
     }
 
     @Composable
