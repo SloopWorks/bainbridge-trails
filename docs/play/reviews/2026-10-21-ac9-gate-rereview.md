@@ -20,3 +20,5 @@ VERDICT: **FIX-FIRST for one item**; every other previous finding FIXED.
 
 EVIDENCE: `git show a2edb45` read in full; HEAD files checked; host tests `ui.*` + `play.*` 221/0 fresh; images
 e2e-03-wake-android, e2e-04-map-play-android, e2e-06-record-find-ios inspected.
+
+**Closed (next commit):** measured chip compaction (`PlayChipRow.layoutFor` + `PlayChipRowLayout`, 7 tests), persisted quiet-banner day (`PlaySettings.quietAnnouncedOn`), Celebration lines freeze on the first non-empty section. AC 9 is met on the code; only on-device perf numbers remain (no physical Android device attached; iOS device needs a signing team).
