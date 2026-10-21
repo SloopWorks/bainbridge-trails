@@ -3,6 +3,7 @@ package com.bainbridgetrails.ui.theme
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -42,6 +43,58 @@ object BtDuration {
     /** Stagger between rows for progress fills (max [staggerRows] rows). */
     const val stagger = 30
     const val staggerRows = 8
+}
+
+/**
+ * Play motion (docs/play/ux.md §1.4, effects.md §1.7): compositions of [BtEasing] / [BtDuration] only, no new curve.
+ * Both easings map 0 → 0 and 1 → 1 and leave the range on the way, so they work on any animated value.
+ */
+object PlayMotion {
+    /** Peak of [overshootSettle]: 108 % of the change. */
+    const val OVERSHOOT = 1.08f
+
+    /** Dip of [anticipate]: −8 % of the change. */
+    const val ANTICIPATE_DIP = -0.08f
+
+    /** Share of the duration spent going out to the overshoot (2/3) / down into the dip (30 %). */
+    private const val OVERSHOOT_SPLIT = 2f / 3f
+    private const val ANTICIPATE_SPLIT = 0.3f
+
+    /**
+     * `emphasizedDecelerate` out to 108 % over the first 2/3, then `standard` back to 100 %. Chrome only (Play chip
+     * bump, rank badge earn); never on map pins (Layer tier, spike S4).
+     */
+    val overshootSettle: Easing = Easing { t ->
+        if (t < OVERSHOOT_SPLIT) {
+            OVERSHOOT * BtEasing.emphasizedDecelerate.transform(t / OVERSHOOT_SPLIT)
+        } else {
+            OVERSHOOT + (1f - OVERSHOOT) * BtEasing.standard.transform((t - OVERSHOOT_SPLIT) / (1f - OVERSHOOT_SPLIT))
+        }
+    }
+
+    /** `emphasizedAccelerate` dip to −8 % over the first 30 %, then `emphasized` to the target. Map heroes only (wind-up before a lift). */
+    val anticipate: Easing = Easing { t ->
+        if (t < ANTICIPATE_SPLIT) {
+            ANTICIPATE_DIP * BtEasing.emphasizedAccelerate.transform(t / ANTICIPATE_SPLIT)
+        } else {
+            ANTICIPATE_DIP + (1f - ANTICIPATE_DIP) * BtEasing.emphasized.transform((t - ANTICIPATE_SPLIT) / (1f - ANTICIPATE_SPLIT))
+        }
+    }
+
+    /**
+     * A scale bump that ends where it starts (1 → 1.08 → 1) on [overshootSettle]'s timing: the Play chip on
+     * `claim_pop`. Callers pass `BtTheme.motion.reduced` and get a snap (the chip crossfades its value instead).
+     */
+    fun bump(reduced: Boolean, durationMs: Int = BtDuration.short4): AnimationSpec<Float> =
+        if (reduced) {
+            snap()
+        } else {
+            keyframes {
+                durationMillis = durationMs
+                1f at 0 using BtEasing.emphasizedDecelerate
+                OVERSHOOT at (durationMs * OVERSHOOT_SPLIT).toInt() using BtEasing.standard
+            }
+        }
 }
 
 /**

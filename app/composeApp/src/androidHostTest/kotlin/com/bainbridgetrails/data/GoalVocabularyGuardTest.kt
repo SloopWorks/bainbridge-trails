@@ -61,6 +61,29 @@ class GoalVocabularyGuardTest {
         if (problems.isNotEmpty()) fail(problems.joinToString("\n"))
     }
 
+    /**
+     * Play (docs/play/product.md §7.3): keys marked (goal) speak of the goal even where the trail text does not say
+     * "trail" (e.g. play_intro_1 "around the island" vs roads "along the island's roads"), so the /trail/i rule above
+     * cannot find them. Each has a registered roads twin with the same arguments.
+     */
+    @Test
+    fun everyGoalTaggedPlayKeyHasARoadsTwin() {
+        val strings = GoalVocabulary.Roads.stringOverrides.map { (k, v) -> k.key to v.key }.toMap()
+        val plurals = GoalVocabulary.Roads.pluralOverrides.map { (k, v) -> k.key to v.key }.toMap()
+        val problems = mutableListOf<String>()
+        PLAY_GOAL_KEYS.forEach { k ->
+            val base = entries[k] ?: return@forEach run { problems += "$k is missing" }
+            val twin = entries["roads_$k"] ?: return@forEach run { problems += "$k has no roads_$k" }
+            if (twin.plural != base.plural) problems += "roads_$k: plural/string kind differs"
+            if (placeholders(twin) != placeholders(base)) problems += "roads_$k: placeholders ${placeholders(twin)} != ${placeholders(base)}"
+            val registered = if (base.plural) plurals[k] else strings[k]
+            if (registered != "roads_$k") problems += "roads_$k is not registered in GoalVocabulary.Roads"
+        }
+        // A play_ twin nobody tagged is a spec drift: product §7.3 is the list.
+        entries.keys.filter { it.startsWith("roads_play_") }.forEach { if (it.removePrefix("roads_") !in PLAY_GOAL_KEYS) problems += "$it is not goal-tagged in product §7.3" }
+        if (problems.isNotEmpty()) fail(problems.joinToString("\n"))
+    }
+
     @Test
     fun extraArgOverridesKeepTheTrailArgs() {
         EXTRA_ARGS.forEach { k ->
@@ -176,6 +199,13 @@ class GoalVocabularyGuardTest {
         val TRAIL_ONLY = setOf(
             "detail_trailheads", "detail_trailhead_row", "detail_official_map", "detail_official_map_host",
             "trails_filter_park", "trails_filter_park_all", "trails_filter_park_none", "trails_park_sheet_title",
+            "play_kind_park_complete", // (v2) W-PARKC: parks are trails-only (docs/play/product.md §3.2)
+        )
+
+        /** docs/play/product.md §7.3 keys marked (goal): each has a `roads_` twin. */
+        val PLAY_GOAL_KEYS = setOf(
+            "play_intro_1", "play_about_marks", "play_detail_section", "play_kraken_body", "play_challenge_sweep_body",
+            "play_challenge_crossing_body", "play_kind_complete",
         )
 
         /** Overridden keys stored in a holder and looked up through the vocabulary where they are rendered ("file:key"). */

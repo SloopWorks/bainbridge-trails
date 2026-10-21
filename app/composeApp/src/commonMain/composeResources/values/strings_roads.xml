@@ -194,4 +194,13 @@
     <string name="roads_privacy_lead">We sync which road sections you’ve covered — never your GPS track or walk times.</string>
     <string name="roads_privacy_account_body">We store your account id, your public name, and which road sections you’ve covered (as on/off flags per 5 m of road). From those we compute your island % and roads completed for the leaderboard.</string>
     <string name="roads_privacy_board_body">Others see only your name, island % and roads completed — never your GPS track or walk times. Use a random name if you prefer.</string>
+
+    <!-- Play (docs/play/product.md §7.3, keys tagged (goal)); registered in GoalVocabulary.Roads -->
+    <string name="roads_play_intro_1">Find treasures, easter eggs and riddles along the island’s roads.</string>
+    <string name="roads_play_about_marks">Marks come from your walks: new road, finished roads, walking days and things you find.</string>
+    <string name="roads_play_detail_section">Play on this road</string>
+    <string name="roads_play_kraken_body">It’s inking %1$s. Walk most of an inked road to send it back.</string>
+    <string name="roads_play_challenge_sweep_body">Finish %1$d roads this weekend. Short streets count.</string>
+    <string name="roads_play_challenge_crossing_body">In the %1$d minutes after a ferry leaves, walk %2$s of new road.</string>
+    <string name="roads_play_kind_complete">Road complete</string>
 </resources>
