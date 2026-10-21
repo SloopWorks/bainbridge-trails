@@ -1,5 +1,23 @@
 package com.bainbridgetrails.record
 
+import com.bainbridgetrails.ui.play.components.rememberPlay
+import com.bainbridgetrails.ui.play.map.PlayMarkerLogic
+import com.bainbridgetrails.ui.play.record.FindMoment
+import com.bainbridgetrails.ui.play.record.FindMomentModel
+import com.bainbridgetrails.ui.play.record.FindsChip
+import com.bainbridgetrails.ui.play.record.PlayNearbyStrip
+import com.bainbridgetrails.ui.play.record.PlayRecordLogic
+import com.bainbridgetrails.ui.play.record.ResultsPlayLogic
+import com.bainbridgetrails.ui.play.record.ResultsPlaySectionView
+import com.bainbridgetrails.ui.play.record.itemsById
+import com.bainbridgetrails.play.config.TierName
+import com.bainbridgetrails.resources.play_find_title_egg
+import com.bainbridgetrails.resources.play_find_title_treasure
+import com.bainbridgetrails.resources.play_kraken_repelled_you
+import com.bainbridgetrails.resources.play_tier_agate
+import com.bainbridgetrails.resources.play_tier_glass_float
+import com.bainbridgetrails.resources.play_tier_sea_glass
+import com.bainbridgetrails.resources.play_tier_ships_bell
 import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -144,6 +162,7 @@ import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PillShape
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.maplibre.spatialk.geojson.Position
@@ -238,6 +257,27 @@ private fun RecordContent(
     val density = LocalDensity.current
 
     val recording = state as? RecordingState.Recording
+    // Play (ux.md §3.8): null while off; finds are provisional and sensed by the graph-level PlaySensing observer.
+    val installed = remember { AppGraph.installedOrNull() }
+    val play = if (installed != null) rememberPlay(installed, settings.play.enabled) else null
+    val sensed = play?.sensed?.collectAsState()?.value.orEmpty()
+    val sensedAtStart = remember(recording?.sessionId) { sensed }
+    val findsThisWalk = if (recording != null) (sensed - sensedAtStart).size else 0
+    var moment by remember { mutableStateOf<FindMomentModel?>(null) }
+    val titles = PlayRecordLogic.FindTitles(
+        stringResource(Res.string.play_find_title_treasure), stringResource(Res.string.play_find_title_egg), stringResource(Res.string.play_kraken_repelled_you),
+    )
+    val tierNames = mapOf(
+        TierName.sea_glass to stringResource(Res.string.play_tier_sea_glass), TierName.agate to stringResource(Res.string.play_tier_agate),
+        TierName.glass_float to stringResource(Res.string.play_tier_glass_float), TierName.ships_bell to stringResource(Res.string.play_tier_ships_bell),
+    )
+    LaunchedEffect(play) {
+        play?.finds?.collectLatest { f ->
+            moment = PlayRecordLogic.moment(f, play.itemsById()[f.occurrence.itemId], { tierNames[it] ?: it.name }, titles)
+            delay(4_000)
+            moment = null
+        }
+    }
     LaunchedEffect(recording != null) {
         while (recording != null) {
             controller.tick()
@@ -300,6 +340,7 @@ private fun RecordContent(
             onClose = if (busy) null else if (state is RecordingState.Done) ::done else onClose,
             chips = {
                 recording?.let { r -> RecordingChips(r) }
+                FindsChip(findsThisWalk)
                 notice?.let { StateChip(it) }
             },
             locate = if (recording != null || state == RecordingState.Idle) ({
@@ -335,6 +376,17 @@ private fun RecordContent(
                     onDone = ::done,
                     milestones = milestones,
                     islandTotalM = data?.value?.dataset?.islandTotalM ?: 0.0,
+                    play = play?.let { repo ->
+                        {
+                            val st by repo.store.state.collectAsStateWithLifecycle()
+                            val results by repo.claimResults.collectAsStateWithLifecycle()
+                            val section = remember(st, results, s.summary.sessionId) {
+                                val items = repo.itemsById()
+                                ResultsPlayLogic.section(s.summary.sessionId, st.logbook, results[s.summary.sessionId], { items[it]?.copy?.title ?: it }, summaryShown = false)
+                            }
+                            section?.let { ResultsPlaySectionView(it) }
+                        }
+                    },
                 )
             }
             is RecordingState.Recover -> AlertDialog(
@@ -363,7 +415,24 @@ private fun RecordContent(
                 }
             }
             is RecordingState.Recording -> BottomSheetSurface(bottom, maxFraction = 0.7f) {
-                RecordingSheet(s, controller, settings, context, onFinish = { confirmFinish = true })
+                RecordingSheet(s, controller, settings, context, onFinish = { confirmFinish = true }, nearby = play?.let { repo ->
+                    {
+                        val agenda by repo.agenda.collectAsState()
+                        val config by repo.config.collectAsState()
+                        val track by controller.track.collectAsState()
+                        val here = track.lastOrNull()
+                        val items = config?.config?.items
+                        val rows = remember(agenda, here?.lat, here?.lon, sensed) {
+                            val a = agenda
+                            if (a == null || here == null || items == null || a.day.quietDay) emptyList()
+                            else PlayRecordLogic.nearby(
+                                PlayMarkerLogic.markers(a, items.associate { it.id to it.lore }, emptySet()),
+                                com.bainbridgetrails.play.schedule.GeoPoint(here.lat, here.lon), sensed,
+                            ) { m -> m.tier?.let { tierNames[it] } ?: items.firstOrNull { it.id == m.itemId }?.copy?.title ?: m.itemId }
+                        }
+                        PlayNearbyStrip(rows, { Format.distance(it, settings.units) })
+                    }
+                })
             }
             RecordingState.Idle, is RecordingState.NeedsPermission -> BottomCard(bottom) {
                 if (s is RecordingState.NeedsPermission) {
@@ -387,6 +456,12 @@ private fun RecordContent(
                     }
                 }
                 IdleContent(onStart = ::onStartTapped, onSettings = if (geofences.supported) ({ showSettings = true }) else null)
+            }
+        }
+
+        moment?.let { m ->
+            Box(Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 56.dp, start = 16.dp, end = 16.dp)) {
+                FindMoment(m, onDismiss = { moment = null })
             }
         }
 
@@ -504,6 +579,7 @@ private fun RecordingSheet(
     settings: AppSettings,
     context: PlatformContext,
     onFinish: () -> Unit,
+    nearby: (@Composable () -> Unit)? = null,
 ) {
     val live = remember(r.sessionId) { RecordingGraph.liveCoverage(context, r.sessionId) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -581,6 +657,8 @@ private fun RecordingSheet(
                     LiveTrailRow(row.name, row.before, row.after, row.status)
                 }
             }
+            // Play Nearby (ux.md §3.8): after the pure live list, expanded sheet only.
+            if (expanded || rows.size <= 2) nearby?.invoke()
         }
         PrimaryButton(
             stringResource(Res.string.record_finish),
