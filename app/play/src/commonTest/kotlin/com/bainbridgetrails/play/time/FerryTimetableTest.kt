@@ -63,6 +63,29 @@ class FerryTimetableTest {
     }
 
     @Test
+    fun `pack weekendDates run the holiday column`() {
+        val ferry = FerryTimetable.of(
+            com.bainbridgetrails.play.config.Ferry(
+                route = "seattle-bainbridge", crossingMin = 35,
+                timetables = listOf(
+                    kotlinx.serialization.json.Json.parseToJsonElement(
+                        """{ "id": "fall", "from": "2026-09-20", "to": "2026-12-26",
+                             "weekday": { "fromSeattle": ["05:30"], "fromBainbridge": ["04:45"] },
+                             "weekend": { "fromSeattle": ["06:10"], "fromBainbridge": ["05:20"] },
+                             "holiday": { "fromSeattle": ["06:10"], "fromBainbridge": ["05:20", "07:55"] },
+                             "weekendDates": ["2026-11-26"] }""",
+                    ) as kotlinx.serialization.json.JsonObject,
+                ),
+            ),
+        )
+        assertNotNull(ferry)
+        assertEquals(LocalDate(2026, 12, 26), ferry.validUntil)
+        assertEquals(FerryTimetable.Column.HOLIDAY, ferry.column(LocalDate(2026, 11, 26)))  // Thanksgiving (Thu)
+        assertEquals(listOf("05:20", "07:55"), ferry.departures(LocalDate(2026, 11, 26), FerryTimetable.Terminal.BAINBRIDGE)!!.map { it.local })
+        assertEquals(listOf("05:20"), ferry.departures(LocalDate(2026, 11, 29), FerryTimetable.Terminal.BAINBRIDGE)!!.map { it.local })
+    }
+
+    @Test
     fun `expired timetable returns null`() {
         assertNull(ferry.column(LocalDate(2027, 3, 21)))
         assertNull(ferry.departures(LocalDate(2027, 6, 1), FerryTimetable.Terminal.BAINBRIDGE))

@@ -725,8 +725,8 @@ recorded. A kraken stretch additionally requires daylight and the tide rule (§1
 This pack encodes product § 4 exactly (product is the authority). Coordinates are real where cited (Frog Rock per
 [Wikipedia](https://en.wikipedia.org/wiki/Frog_Rock_(Bainbridge_Island,_Washington)), snapped point computed from
 `data/roads/dist/coverage_segments.json`; Eagle Harbor station per NOAA). Places marked `"verify": true` must be
-confirmed by the owner before `enabled: true`. **Ferry times are illustrative placeholders, not the real WSF
-timetable**; the owner fills them from the WSF schedule. v2 items are present as `"enabled": false` drafts with a
+confirmed by the owner before `enabled: true`. **Ferry times in this example are illustrative placeholders, not the real WSF
+timetable**; the shipped pack and `data/play/ferry-timetable.json` carry the WSF schedule (product OD-15). v2 items are present as `"enabled": false` drafts with a
 `_v2` note so the schema is exercised; cut items are absent.
 
 ```json

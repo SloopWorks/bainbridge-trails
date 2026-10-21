@@ -20,7 +20,9 @@ fetched by `scripts/build-tides.mjs` (date in each file's `fetched` field).
 ## Ferry timetable — Washington State Ferries
 
 `data/play/ferry-timetable.json` holds Seattle–Bainbridge departures for the ambient ferry sprite (visual only).
-**The committed values are a placeholder** (`"source": "placeholder"`): the illustrative times from
-docs/play/schedule.md §4.7, not the WSF schedule. The owner copies each season from the WSF schedule
-(<https://wsdot.wa.gov/ferries/schedule>) before the ferry sprite ships. Times are approximate for gameplay; the
-app never tells anyone to catch a ferry.
+The committed values are the WSF **Fall 2026** Seattle/Bainbridge Island sailing schedule (Sep 20 – Dec 26, 2026),
+copied 2026-10-21 from <https://wsdot.wa.gov/ferries/schedule/scheduledetailbyroute.aspx?route=sea-bi> and
+cross-checked against the WSF Best Times to Travel PDF
+(<https://wsdot.wa.gov/sites/default/files/2026-09/WSF-BTTT-SEA-BI-Fall2026.pdf>); `source` in the file names both.
+The owner copies each new season (winter 2026–27 starts Dec 27) into the file and the pack's `ferry` block and bumps
+`validUntil`. Times are approximate for gameplay; the app never tells anyone to catch a ferry.

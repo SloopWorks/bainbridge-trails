@@ -1,4 +1,4 @@
-# agenda-trails.tsv: PlayScheduler over pack 2026.11.0, 2026-10-26 → 2027-12-31, island time (PlaySchedulerGoldenTest)
+# agenda-trails.tsv: PlayScheduler over pack 2026.11.1, 2026-10-26 → 2027-12-31, island time (PlaySchedulerGoldenTest)
 # regenerate: cd app && ./gradlew :play:jvmTest -Pplay.updateGolden=true
 # resolvable = window ∩ civil daylight ∩ playHours (∩ tide ≤ 2.44 m for the kraken); view = never sensed
 # permanent	occ	start	resolvable	placements
