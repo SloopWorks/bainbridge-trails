@@ -9,8 +9,8 @@ import java.io.File
 
 /**
  * The committed v1 pack and its committed companions (tides 2026–2029, ferry timetable, derived per-goal tables), read
- * by relative path from the Gradle test working directory (`app/play`). The island datasets are gitignored:
- * [withData] skips the calling test without them.
+ * by relative path from the Gradle test working directory (`app/play`). The island datasets are gitignored: [withData]
+ * runs on them when built here, else on the committed fixture ([JvmDatasetPlaceIndex.index]); it never skips.
  */
 internal object RealPack {
     val ROOT = File("../..")
@@ -37,6 +37,7 @@ internal object RealPack {
         config: PlayConfig = this.config,
     ): PlayScheduler = PlayScheduler(config, index, tides, ferry, derived)
 
-    /** A scheduler over the real datasets, or a skipped test. */
-    fun withData(test: String): PlayScheduler = scheduler(JvmDatasetPlaceIndex.loadOrSkip(test))
+    /** A scheduler over the island map data (the real datasets, or the committed fixture). [test] is kept for callers. */
+    @Suppress("UNUSED_PARAMETER")
+    fun withData(test: String): PlayScheduler = scheduler(JvmDatasetPlaceIndex.index)
 }

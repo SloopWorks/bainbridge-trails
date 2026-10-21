@@ -2,12 +2,12 @@
 // Hermetic: the rule tests use a small fixture dataset; the two real-data tests skip when the (gitignored) map data
 // is not built, as in CI.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import {
-  MIN_SQUARE_PLAYERS, ROOT, PATHS, chartSquare, derive, epochDay, formatJson, hhmm, loadCoastline, loadMapData, makeIndex, readPublished, run,
-  suppressSmallCounts, sunDay, validatePack,
+  FIXTURE, MIN_SQUARE_PLAYERS, ROOT, PATHS, buildFixture, chartSquare, decodePolyline, derive, encodePolyline, epochDay, formatJson, hhmm,
+  loadCoastline, loadMapData, makeIndex, readPublished, run, simplifyLine, suppressSmallCounts, sunDay, validatePack,
 } from "./build-play-content.mjs";
 
 const realPack = () => JSON.parse(readFileSync(join(ROOT, PATHS.pack), "utf8"));
@@ -258,6 +258,77 @@ test("--check passes on the repository", () => {
 // --- real data (skipped in CI) -------------------------------------------------------------------------------
 
 const data = loadMapData();
+
+// --- JVM test fixture (review round 1 P1-7) -------------------------------------------------------------------------
+
+test("polyline round-trips micro-degrees, carrying the position across rows", () => {
+  const a = [[-122.484202, 47.582274], [-122.48421, 47.582288], [-122.5, 47.6]];
+  const b = [[-122.499999, 47.600001]];
+  const ea = encodePolyline(a);
+  const eb = encodePolyline(b, ea.end);
+  const da = decodePolyline(ea.str);
+  assert.deepEqual(da.map(([lat, lon]) => [lon / 1e6, lat / 1e6]), a);
+  assert.deepEqual(decodePolyline(eb.str, da.at(-1)).map(([lat, lon]) => [lon / 1e6, lat / 1e6]), b);
+  assert.ok(eb.str.length <= 4, `a 1 µdeg step is short (${eb.str})`);
+});
+
+test("simplifyLine keeps the ends and every vertex beyond the tolerance", () => {
+  const straight = [[-122.5, 47.6], [-122.4995, 47.6], [-122.499, 47.6]];
+  assert.deepEqual(simplifyLine(straight, 5), [straight[0], straight[2]]);
+  const kink = [[-122.5, 47.6], [-122.4995, 47.6002], [-122.499, 47.6]]; // ≈ 22 m off the chord
+  assert.deepEqual(simplifyLine(kink, 5), kink);
+  assert.deepEqual(simplifyLine([kink[0]], 5), [kink[0]]);
+});
+
+test("buildFixture: lossless referenced/included segments, simplified others, compact ids and features", () => {
+  const raw = {
+    trails: { version: "t1", trails: [{ id: "trail-a", name: "A", park: "P", segment_ids: ["seg-000002", "seg-000001"], climb_total_m: 3 }] },
+    trailSegments: {
+      segments: [
+        { id: "seg-000001", included: true, coords: [[-122.5, 47.6], [-122.4995, 47.600001], [-122.499, 47.6]], category: "connector" },
+        { id: "seg-000002", included: false, coords: [[-122.499, 47.6], [-122.498, 47.601]] },
+        { id: "seg-000005", included: false, coords: [[-122.5, 47.61], [-122.4995, 47.6100001], [-122.4990004, 47.61]], category: "informal" },
+      ],
+    },
+    trailheads: { trailheads: [{ id: "th-1", lat: 47.6, lon: -122.5, name: "x" }] },
+    roads: {
+      version: "r1",
+      roads: [{ id: "road-b", name: "B", category: "residential", public: true, ownership: "public_city", counted: true, speed_mph: null, segment_ids: ["rseg-000010"] }],
+    },
+    roadSegments: { segments: [{ id: "rseg-000010", included: true, coords: [[-122.5, 47.62], [-122.49, 47.62]], category: "residential" }, { id: "seg-000001", included: false, coords: [[-122.5, 47.6], [-122.499, 47.6]] }] },
+  };
+  const fx = JSON.parse(buildFixture(raw));
+  assert.deepEqual(fx.versions, { trails: "t1", roads: "r1" });
+  assert.deepEqual(fx.trailheads, [["th-1", 47.6, -122.5]]);
+  assert.deepEqual(fx.features.trails, { columns: ["id", "park", "segments"], rows: [["trail-a", "P", [1, 0]]] });
+  assert.deepEqual(fx.features.roads.columns, ["id", "counted", "category", "public", "ownership", "segments"]);
+  assert.deepEqual(fx.features.roads.rows, [["road-b", true, "residential", true, "public_city", [0]]]);
+  const t = fx.segments.trails;
+  assert.deepEqual(t.rows.map((r) => r.slice(0, 3)), [["seg-000001", 1, 0], [1, 0, -1], [3, 2, 1]]);
+  assert.deepEqual(t.categories, ["connector", "informal"]);
+  let pos = [0, 0];
+  const lines = t.rows.map((r) => {
+    const pts = decodePolyline(r[3], pos);
+    pos = pts.at(-1);
+    return pts.map(([lat, lon]) => [lon / 1e6, lat / 1e6]);
+  });
+  assert.deepEqual(lines[0], raw.trailSegments.segments[0].coords, "included: lossless, nothing simplified");
+  assert.deepEqual(lines[1], raw.trailSegments.segments[1].coords, "referenced: lossless");
+  assert.deepEqual(lines[2], [[-122.5, 47.61], [-122.499, 47.61]], "other: simplified and rounded to 1e-5");
+  assert.deepEqual(fx.segments.roads.rows.map((r) => r[0]), ["rseg-000010", "seg-000001"], "a prefix change restarts with the id");
+  assert.throws(() => buildFixture({ ...raw, roadSegments: { segments: [{ id: "rseg-000010", included: true, coords: [[-122.5000001, 47.62]] }] } }), /beyond 1e-6/);
+});
+
+test("committed JVM fixture is within budget and current (currency skipped without data)", (t) => {
+  const file = join(ROOT, FIXTURE.path);
+  assert.ok(existsSync(file), `${FIXTURE.path} missing: node scripts/build-play-content.mjs --fixture`);
+  assert.ok(statSync(file).size <= FIXTURE.maxBytes, `${FIXTURE.path}: ${statSync(file).size} bytes`);
+  const fx = JSON.parse(readFileSync(file, "utf8"));
+  for (const g of ["trails", "roads"]) assert.equal(fx.versions[g], JSON.parse(readFileSync(join(ROOT, PATHS.derived, `${g}.json`), "utf8")).dataset, `${g} version`);
+  if (!data.raw) return t.skip("no map data");
+  assert.equal(readFileSync(file, "utf8"), buildFixture(data.raw), "stale: node scripts/build-play-content.mjs --fixture");
+});
+
 
 test("derives 370 roadSafety roads on 2026-10-20 data (skip without data)", (t) => {
   if (!data.idx) return t.skip("no map data");

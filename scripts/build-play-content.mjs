@@ -7,6 +7,8 @@
 //                                                       # byte-equal; map-data checks only when data/dist and
 //                                                       # data/roads/dist exist (prints "skipped: no map data")
 //   node scripts/build-play-content.mjs --agenda [DATE] # print the 14-day agenda table (PR body) and exit
+//   node scripts/build-play-content.mjs --fixture       # write the committed :play JVM test fixture from the map
+//                                                       # data and exit (the default run and --check do it too)
 //
 // Inputs:  data/play/play-content.json (the one file the owner edits), data/play/published/<version>.json (immutable
 //          snapshots), data/play/tides/*.json (scripts/build-tides.mjs; optional, read only), map data
@@ -14,7 +16,8 @@
 //          app/.../files/coastline.json).
 // Outputs: data/play/derived/{trails,roads}.json (committed, so CI never needs the map data), the published snapshot,
 //          app/composeApp/src/commonMain/composeResources/files/play/{play-content.json,derived-*.json,tides/*} and
-//          backend/src/data/play/{current.json,<version>.json (last 8 published),derived-*.json,tides/*}.
+//          backend/src/data/play/{current.json,<version>.json (last 8 published),derived-*.json,tides/*},
+//          app/play/src/jvmTest/resources/fixture/places.json (committed map-data fixture for :play's JVM tests).
 //
 // Node built-ins only. Every exported function is pure over its arguments (scripts/build-play-content.test.mjs).
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -226,7 +229,7 @@ export function loadMapData(root = ROOT) {
   const raw = Object.fromEntries(need.map((k) => [k, readJson(root, PATHS[k])]));
   raw.coastline = loadCoastline(root);
   raw.trailheads = existsSync(join(root, PATHS.trailheads)) ? readJson(root, PATHS.trailheads) : null;
-  return { idx: makeIndex(raw) };
+  return { idx: makeIndex(raw), raw };
 }
 
 export function makeIndex(raw) {
@@ -301,6 +304,174 @@ export function computeStretch(idx, id) {
     }
   }
   return { lengthM: r1(lengthM), shoreM: r1(shoreM), segments };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// JVM test fixture (review round 1 P1-7): the map data `:play`'s dataset tests read (JvmDatasetPlaceIndex), compact
+// and committed, so CI runs the agenda goldens, e2e ids, kraken stretches, roadSafety, chart squares and quiet zones
+// without the gitignored data/dist and data/roads/dist. Format (FIXTURE.schema 1):
+//   versions                 the datasets' version strings (= data/play/derived/<goal>.json "dataset")
+//   trailheads               [[id, lat, lon]]
+//   features.<goal>          {columns, rows}: one feature per line, a tuple over `columns` (the fields Play reads
+//                            that the goal's rows carry: id, park, counted, category, public, ownership, speed_mph;
+//                            null = absent) + `segments`, its segment_ids as indices into segments.<goal>.rows
+//   segments.<goal>.categories  segment category table
+//   segments.<goal>.rows     one segment per line: [id, flags, category index (-1 = none), polyline]
+//     id     the id string when its prefix differs from the previous row's, else the gap from its number
+//            ("rseg-000012" after "rseg-000011" is 1); numbers keep the prefix's zero-padded width
+//     flags  1 = included, 2 = simplified
+//     polyline  Google encoded polyline at 1e-6 deg (lat then lon per vertex), deltas carried across the rows of a
+//            goal. Lossless (the source has ≤ 6 decimals) for every segment a feature references or the goal counts:
+//            the placement points, lengths and chart squares the goldens pin are exactly the dataset's. Other
+//            segments (only quiet-zone counts read them) are Douglas-Peucker simplified (FIXTURE.toleranceM) and
+//            rounded to 1e-5 deg.
+
+export const FIXTURE = { schema: 1, toleranceM: 5, maxBytes: 600 * 1024, path: "app/play/src/jvmTest/resources/fixture/places.json" };
+
+/** Google encoded polyline value (signed varint, 5-bit groups + 63). */
+function encodeSigned(v) {
+  let u = v < 0 ? ~(v << 1) : v << 1;
+  let s = "";
+  while (u >= 0x20) {
+    s += String.fromCharCode((0x20 | (u & 0x1f)) + 63);
+    u >>>= 5;
+  }
+  return s + String.fromCharCode(u + 63);
+}
+
+/** Decodes a polyline written by [encodePolyline]; returns integer [lat, lon] micro-degrees. Test helper. */
+export function decodePolyline(str, start = [0, 0]) {
+  const out = [];
+  let [lat, lon] = start;
+  let i = 0;
+  const next = () => {
+    let shift = 0;
+    let result = 0;
+    let b;
+    do {
+      b = str.charCodeAt(i++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    return result & 1 ? ~(result >>> 1) : result >>> 1;
+  };
+  while (i < str.length) {
+    lat += next();
+    lon += next();
+    out.push([lat, lon]);
+  }
+  return out;
+}
+
+/** [[lon, lat]] → polyline of integer micro-degrees from [start] ([lat, lon] µdeg); returns { str, end }. */
+export function encodePolyline(coords, start = [0, 0]) {
+  let [plat, plon] = start;
+  let str = "";
+  for (const [lon, lat] of coords) {
+    const y = Math.round(lat * 1e6);
+    const x = Math.round(lon * 1e6);
+    str += encodeSigned(y - plat) + encodeSigned(x - plon);
+    plat = y;
+    plon = x;
+  }
+  return { str, end: [plat, plon] };
+}
+
+/** Douglas-Peucker over [[lon, lat]] in local metres; keeps both ends. */
+export function simplifyLine(coords, toleranceM) {
+  if (coords.length <= 2) return coords.slice();
+  const xy = coords.map(toXY);
+  const keep = new Uint8Array(coords.length);
+  keep[0] = keep[coords.length - 1] = 1;
+  const stack = [[0, coords.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    let max = -1;
+    let at = -1;
+    for (let i = a + 1; i < b; i++) {
+      const d = ptSeg(xy[i], xy[a], xy[b]);
+      if (d > max) {
+        max = d;
+        at = i;
+      }
+    }
+    if (max > toleranceM) {
+      keep[at] = 1;
+      stack.push([a, at], [at, b]);
+    }
+  }
+  return coords.filter((_, i) => keep[i]);
+}
+
+const FEATURE_FIELDS = ["id", "park", "counted", "category", "public", "ownership", "speed_mph"];
+
+/** Feature rows as tuples over the columns present in [list]; segment_ids become row indices into [segIndex]. */
+function fixtureFeatures(list, segIndex) {
+  const columns = FEATURE_FIELDS.filter((k) => list.some((f) => f[k] != null)).concat("segments");
+  const rows = list.map((f) =>
+    columns.map((k) => (k === "segments" ? (f.segment_ids ?? []).map((id) => segIndex.get(id) ?? id) : (f[k] ?? null))),
+  );
+  return { columns, rows };
+}
+
+function fixtureSegments(segments, referenced, toleranceM) {
+  const categories = [];
+  const rows = [];
+  let pos = [0, 0];
+  let prev = null; // { prefix, n }
+  for (const s of segments) {
+    const m = /^(.*?)(\d+)$/.exec(s.id);
+    if (!m) throw new Error(`fixture: segment id ${s.id} has no numeric suffix`);
+    const [prefix, digits] = [m[1], m[2]];
+    const n = Number(digits);
+    const sameRun = prev && prev.prefix === prefix && String(n).padStart(digits.length, "0") === digits && prev.width === digits.length;
+    const id = sameRun ? n - prev.n : s.id;
+    prev = { prefix, n, width: digits.length };
+    const lossless = s.included === true || referenced.has(s.id);
+    let coords = s.coords;
+    if (lossless) {
+      for (const c of coords) for (const v of c) if (r6(v) !== v) throw new Error(`fixture: ${s.id} has a coordinate beyond 1e-6 (${v})`);
+    } else {
+      coords = simplifyLine(coords, toleranceM).map(([lon, lat]) => [Math.round(lon * 1e5) / 1e5, Math.round(lat * 1e5) / 1e5]);
+    }
+    let cat = -1;
+    if (s.category != null) {
+      cat = categories.indexOf(s.category);
+      if (cat < 0) cat = categories.push(s.category) - 1;
+    }
+    const enc = encodePolyline(coords, pos);
+    pos = enc.end;
+    rows.push([id, (s.included === true ? 1 : 0) | (lossless ? 0 : 2), cat, enc.str]);
+  }
+  return { categories, rows };
+}
+
+/**
+ * The fixture text from the raw dataset files ({ trails, trailSegments, trailheads, roads, roadSegments }, as
+ * [loadMapData] reads them). Deterministic: one feature / segment per line, so a data refresh diffs by row.
+ */
+export function buildFixture(raw, { toleranceM = FIXTURE.toleranceM } = {}) {
+  const sources = { trails: [raw.trails.trails, raw.trailSegments.segments], roads: [raw.roads.roads, raw.roadSegments.segments] };
+  const feats = {};
+  const segs = {};
+  for (const [g, [features, segments]] of Object.entries(sources)) {
+    const segIndex = new Map(segments.map((s, i) => [s.id, i]));
+    feats[g] = fixtureFeatures(features, segIndex);
+    segs[g] = fixtureSegments(segments, new Set(features.flatMap((f) => f.segment_ids ?? [])), toleranceM);
+  }
+  const trailheads = (raw.trailheads?.trailheads ?? []).map((t) => [t.id, t.lat, t.lon]);
+  const j = JSON.stringify;
+  const list = (xs) => (xs.length ? `[\n${xs.map(j).join(",\n")}\n]` : "[]");
+  const block = (o) => `{${Object.entries(o).map(([k, v]) => `${j(k)}:${Array.isArray(v) && k === "rows" ? list(v) : j(v)}`).join(",")}}`;
+  return (
+    `{"schema":${FIXTURE.schema},` +
+    `"about":${j("Generated by node scripts/build-play-content.mjs --fixture from data/dist and data/roads/dist (format: FIXTURE in that script); do not edit.")},` +
+    `"toleranceM":${toleranceM},` +
+    `"versions":${j({ trails: raw.trails.version ?? null, roads: raw.roads.version ?? null })},\n` +
+    `"trailheads":${list(trailheads)},\n` +
+    `"features":{\n"trails":${block(feats.trails)},\n"roads":${block(feats.roads)}},\n` +
+    `"segments":{\n"trails":${block(segs.trails)},\n"roads":${block(segs.roads)}}}\n`
+  );
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1553,6 +1724,14 @@ export function run(argv, { root = ROOT, log = console.log, logErr = console.err
     log(agenda(pack, from));
     return 0;
   }
+  if (argv.includes("--fixture")) {
+    const data = loadMapData(root);
+    if (data.missing) {
+      logErr(`--fixture needs the map data (${data.missing.join(", ")} missing)`);
+      return 1;
+    }
+    return writeFixture(root, data.raw, { check: false, log, fail: logErr }) ? 0 : 1;
+  }
 
   // 1. canonical format (the owner's file stays human-editable and diff-stable)
   const formatted = formatJson(pack);
@@ -1590,6 +1769,7 @@ export function run(argv, { root = ROOT, log = console.log, logErr = console.err
         }
       }
     }
+    writeFixture(root, data.raw, { check, log, fail });
     const r = d.roads.roadSafety;
     log(`roadSafety: ${r.pass} of ${r.counted} counted roads pass`);
     for (const g of GOALS) {
@@ -1599,6 +1779,7 @@ export function run(argv, { root = ROOT, log = console.log, logErr = console.err
   } else {
     log("skipped: no map data (derived files kept as committed)");
     for (const g of GOALS) if (!existsSync(join(root, `${PATHS.derived}/${g}.json`))) fail(`${PATHS.derived}/${g}.json: missing; build it where the map data exists`);
+    if (!existsSync(join(root, FIXTURE.path))) fail(`${FIXTURE.path}: missing; build it where the map data exists (--fixture)`);
   }
   const ferryFile = join(root, "data/play/ferry-timetable.json");
   if (existsSync(ferryFile)) for (const w of ferryDrift(pack, JSON.parse(readFileSync(ferryFile, "utf8")))) log(`warning: ${w}`);
@@ -1648,6 +1829,29 @@ export function run(argv, { root = ROOT, log = console.log, logErr = console.err
   if (!check) log("\n" + agenda(pack, pack.epoch));
   return 0;
 }
+/** Writes (or, with [check], compares) the JVM test fixture; false when it is stale or over [FIXTURE.maxBytes]. */
+function writeFixture(root, raw, { check, log, fail }) {
+  const text = buildFixture(raw);
+  const bytes = Buffer.byteLength(text);
+  let ok = true;
+  if (bytes > FIXTURE.maxBytes) {
+    fail(`${FIXTURE.path}: ${bytes} bytes > ${FIXTURE.maxBytes}; raise FIXTURE.toleranceM or trim the fixture`);
+    ok = false;
+  }
+  const file = join(root, FIXTURE.path);
+  const cur = existsSync(file) ? readFileSync(file, "utf8") : null;
+  if (cur !== text) {
+    if (check) {
+      fail(`${FIXTURE.path}: stale against the map data; run node scripts/build-play-content.mjs --fixture`);
+      return false;
+    }
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, text);
+    log(`wrote ${FIXTURE.path} (${bytes} bytes)`);
+  }
+  return ok;
+}
+
 function report(problems, logErr) {
   for (const p of problems) logErr(`error: ${p}`);
   logErr(`play content: ${problems.length} error(s)`);
