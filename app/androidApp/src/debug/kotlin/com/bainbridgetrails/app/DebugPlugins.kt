@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +25,11 @@ import com.bainbridgetrails.data.Loadable
 import com.bainbridgetrails.data.TrailData
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.log.AppLog
+import com.bainbridgetrails.play.DebugPlayClock
+import com.bainbridgetrails.play.PlayClockMode
+import com.bainbridgetrails.play.PlayConfigSource
+import com.bainbridgetrails.play.PlayTideOverride
+import com.bainbridgetrails.play.SystemPlayClock
 import com.bainbridgetrails.tracking.CoverageStore
 import com.bainbridgetrails.tracking.SessionStore
 import com.bainbridgetrails.ui.Format
@@ -32,6 +39,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.days
 
 /**
  * The roads prototype (docs/roads/plan.md P1): runs the whole app on `data/roads/dist` instead of the trail dataset.
@@ -207,5 +215,84 @@ class RecordingPlugin(private val context: Context) : DebugPlugin {
             Text("Walks in history: ${history?.walks?.size ?: 0}")
             Text("Trail km walked: ${Format.oneDecimal((history?.trailMetresWalked ?: 0.0) / 1000)}")
         }
+    }
+}
+
+/**
+ * Play time travel and pack tools (schedule.md § 4.1, plan.md L2-3): Real / Fixed / Offset Play clock (+1 d, +7 d,
+ * next Thu 06:00, Mar 30), tide override (low / high / expired), config source (bundled / cached / fetch now), agenda
+ * dump and benchmark. Writes `AppGraph.playClock` (a DebugPlayClock bound by DebugTools). Until the Settings toggle
+ * lands (L2-7) this is also where Play is turned on in debug builds.
+ */
+class PlayClockPlugin(private val context: Context) : DebugPlugin {
+    override val id = "bt-play-clock"
+    override val title = "Play clock"
+
+    @Composable
+    override fun Content(scope: DebugScope) {
+        val graph = remember { AppGraph.install(context) }
+        val settings by graph.settings.settings.collectAsStateWithLifecycle()
+        val clock = AppGraph.playClock as? DebugPlayClock
+        val overrides by (clock ?: SystemPlayClock).overrides.collectAsStateWithLifecycle()
+        var output by remember { mutableStateOf<String?>(null) }
+        val enabled = settings?.play?.enabled == true
+        val play = if (enabled) graph.playOrNull else null
+        val configState = play?.config?.collectAsStateWithLifecycle()
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Play: ${if (enabled) "on" else "off"}")
+            OutlinedButton(onClick = { graph.settings.update { it.copy(play = it.play.copy(enabled = !enabled, everToggled = true)) } }) {
+                Text(if (enabled) "Turn Play off" else "Turn Play on (debug)")
+            }
+            if (clock == null) {
+                Text("No debug Play clock bound.")
+                return@Column
+            }
+            Text("Now: ${DebugPlayClock.describe(clock.now())} · ${overrides.mode}")
+            Text("Tide: ${overrides.tide.name.lowercase()} · bundled pack forced: ${overrides.bundledConfig}")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { clock.set(PlayClockMode.Real) }) { Text("Real") }
+                OutlinedButton(onClick = { clock.fixAt(clock.now()) }) { Text("Fixed") }
+                OutlinedButton(onClick = { clock.startAt(clock.now()) }) { Text("Offset") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { clock.shift(1.days) }) { Text("+1 d") }
+                OutlinedButton(onClick = { clock.shift(7.days) }) { Text("+7 d") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { clock.fixAt(DebugPlayClock.nextThursday(clock.now())) }) { Text("Next Thu 06:00") }
+                OutlinedButton(onClick = { clock.fixAt(DebugPlayClock.nextMar30(clock.now())) }) { Text("Mar 30") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (t in PlayTideOverride.entries) OutlinedButton(enabled = t != overrides.tide, onClick = { clock.setTide(t) }) {
+                    Text(t.name.lowercase())
+                }
+            }
+            val cs = configState?.value
+            Text("Pack: ${cs?.version ?: "—"} (${cs?.source?.name?.lowercase() ?: "Play off"})" + (cs?.rejected?.let { " · rejected: $it" } ?: ""))
+            if (play != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { AppGraph.scope.launch { play.content.use(PlayConfigSource.BUNDLED); play.reload() } }) { Text("Bundled") }
+                    OutlinedButton(onClick = { AppGraph.scope.launch { play.content.use(PlayConfigSource.CACHED); play.reload() } }) { Text("Cached") }
+                    OutlinedButton(onClick = { AppGraph.scope.launch { play.content.fetchNow(); play.reload() } }) { Text("Fetch now") }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { AppGraph.scope.launch { output = play.agendaDump().also { AppLog.i("play", it) } } }) { Text("Agenda dump") }
+                    OutlinedButton(onClick = { AppGraph.scope.launch { output = play.benchmark() } }) { Text("Benchmark") }
+                }
+                OutlinedButton(onClick = { AppGraph.scope.launch { play.store.clearFinds(); output = "Finds cleared" } }) { Text("Clear finds") }
+            }
+            output?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+}
+
+/** "Play FX" panel: a stub until the effects showcase lands (plan.md L2-4 / L2-5). */
+object PlayFxPlugin : DebugPlugin {
+    override val id = "bt-play-fx"
+    override val title = "Play FX"
+
+    @Composable
+    override fun Content(scope: DebugScope) {
+        Column(Modifier.padding(16.dp)) { Text("Effects showcase and FX HUD arrive with L2-4 / L2-5.") }
     }
 }

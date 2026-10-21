@@ -30,6 +30,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.withLock
@@ -47,6 +50,15 @@ import com.bainbridgetrails.data.TrailStatsRepository
 import com.bainbridgetrails.net.ApiClient
 import com.bainbridgetrails.net.AuthResponse
 import com.bainbridgetrails.net.platformHttpEngine
+import com.bainbridgetrails.play.DatasetPlaceIndex
+import com.bainbridgetrails.play.PlayClock
+import com.bainbridgetrails.play.PlayContentRepository
+import com.bainbridgetrails.play.PlayGate
+import com.bainbridgetrails.play.PlayRepository
+import com.bainbridgetrails.play.PlayStateStore
+import com.bainbridgetrails.play.SystemPlayClock
+import com.bainbridgetrails.play.playGoal
+import com.bainbridgetrails.play.schedule.DerivedGoal
 import com.bainbridgetrails.sync.LocalWalk
 import com.bainbridgetrails.sync.StoreCoverage
 import com.bainbridgetrails.sync.SyncRepository
@@ -106,6 +118,12 @@ object AppGraph {
 
     /** Debug builds swap this for a logging implementation; release keeps [NoOpAnalytics] (spec: no analytics). */
     var analytics: Analytics = NoOpAnalytics
+
+    /**
+     * The time Play runs on (schedule.md § 4.1). Release keeps [SystemPlayClock]; debug entry points (Android
+     * DebugTools, iOS debug binaries) bind a [com.bainbridgetrails.play.DebugPlayClock] for time travel. Read per use.
+     */
+    var playClock: PlayClock = SystemPlayClock
 
     private var installed: Installed? = null
 
@@ -191,6 +209,58 @@ object AppGraph {
         fun onForeground() {
             sync.onForeground()
             scope.launch { if (auth.token() != null) profile.flushPending() }
+            playOrNull?.let { play -> scope.launch { play.onForeground() } } // Play off: null, nothing runs
+        }
+
+        // --- Play (docs/play/plan.md L2-3; PD-1: nothing exists while Play is off)
+
+        private val playGate = PlayGate(scope, settings.settings.map { it?.play }) { createPlay() }
+
+        /**
+         * Play while it is on, else null. Created lazily the first time `settings.play.enabled` is true and never
+         * constructed while off; started/stopped with the toggle (its state and files are kept when off).
+         */
+        val playOrNull: PlayRepository? get() = playGate.current
+
+        internal fun startPlayGate() = playGate.start()
+
+        private fun createPlay(): PlayRepository {
+            val goal = DatasetProfile.current.playGoal
+            val dir = appDataDir(context) + "/play"
+            val content = PlayContentRepository(
+                api = api,
+                dir = dir,
+                bundled = { withContext(Dispatchers.IO) { Res.readBytes("files/play/play-content.json").decodeToString() } },
+                bundledTides = { year -> readResourceOrNull("files/play/tides/${PlayContentRepository.STATION}-$year.json") },
+                playOn = { settings.settings.value?.play?.enabled == true },
+                now = clock,
+                forceBundled = { playClock.overrides.value.bundledConfig },
+                io = Dispatchers.IO,
+            )
+            val derived = suspend { readResourceOrNull("files/play/derived-${goal.name}.json") }
+            return PlayRepository(
+                scope = scope,
+                goal = goal,
+                clock = { playClock },
+                content = content,
+                places = { DatasetPlaceIndex(goal, datasets.await().dataset, derived()) },
+                derived = { derived()?.let { DerivedGoal.decode(it) } },
+                store = PlayStateStore("$dir/${goal.name}-state.json", Dispatchers.IO),
+                track = flow {
+                    val controller = runCatching { controller().await() }.getOrNull() ?: return@flow
+                    emitAll(controller.track)
+                },
+                api = api,
+            )
+        }
+
+        private suspend fun readResourceOrNull(path: String): String? = withContext(Dispatchers.IO) {
+            try {
+                Res.readBytes(path).decodeToString()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                null
+            }
         }
 
         /**
@@ -241,6 +311,7 @@ object AppGraph {
         datasets.load()
         graph.coverageChanged()
         graph.startRemote()
+        graph.startPlayGate()
         scope.launch {
             // Building the controller at launch finalizes stopped walks and finds unfinished ones right away
             // (progress and history are then current on every tab, not only after the Record tab opens).

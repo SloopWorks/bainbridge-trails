@@ -12,6 +12,7 @@ import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.log.AppLog
 import com.bainbridgetrails.log.LogLevel
+import com.bainbridgetrails.nav.DebugLaunch
 import com.sloopworks.debugdrawer.Backend
 import com.sloopworks.debugdrawer.BuildInfo
 import com.sloopworks.debugdrawer.DebugDrawer
@@ -45,7 +46,7 @@ object DebugTools {
                     Backend("prod", "Prod (temp workers.dev)", ApiConfig.PROD_BASE_URL),
                     Backend("local", "Local wrangler dev", LOCAL_BASE_URL),
                 ),
-                plugins = listOf(DatasetPlugin(app), TrailsDataPlugin, CoveragePlugin(app), RecordingPlugin(app)),
+                plugins = listOf(DatasetPlugin(app), TrailsDataPlugin, CoveragePlugin(app), RecordingPlugin(app), PlayClockPlugin(app), PlayFxPlugin),
             ),
             app,
         )
@@ -61,6 +62,8 @@ object DebugTools {
             }
         }
         AppGraph.analytics = LogAnalytics()
+        // Play time travel (schedule.md § 4.1): MainActivity filled DebugLaunch from `--es playClock/playTide/playConfig`.
+        AppGraph.playClock = DebugLaunch.playClockFromLaunch()
         AuthConfig.devSignInEnabled = true // `signin_dev` → POST /v1/auth/dev (local wrangler dev only)
         AppLog.i("debug", "debug tools installed; backend ${ApiConfig.baseUrl}; geofencePrototype=${BuildConfig.GEOFENCE_PROTOTYPE}")
     }

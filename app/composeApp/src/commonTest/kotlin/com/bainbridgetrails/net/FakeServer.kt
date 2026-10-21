@@ -9,7 +9,15 @@ import io.ktor.http.headersOf
 import kotlinx.io.IOException
 
 /** A request as the fake server saw it. */
-data class Recorded(val method: String, val path: String, val query: String, val body: String, val bearer: String?)
+data class Recorded(
+    val method: String,
+    val path: String,
+    val query: String,
+    val body: String,
+    val bearer: String?,
+    /** The `If-None-Match` request header (Play content ETag revalidation). */
+    val ifNoneMatch: String? = null,
+)
 
 /** Reply from a [FakeServer] handler; [offline] simulates a network failure. */
 data class Reply(val status: Int = 200, val body: String = "", val headers: Map<String, String> = emptyMap(), val offline: Boolean = false) {
@@ -45,6 +53,7 @@ class FakeServer {
             query = req.url.encodedQuery,
             body = (req.body as? TextContent)?.text.orEmpty(),
             bearer = req.headers[HttpHeaders.Authorization]?.removePrefix("Bearer "),
+            ifNoneMatch = req.headers[HttpHeaders.IfNoneMatch],
         )
         requests += rec
         if (!online) throw IOException("offline")

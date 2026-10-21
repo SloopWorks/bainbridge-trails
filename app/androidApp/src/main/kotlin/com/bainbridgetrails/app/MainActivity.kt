@@ -19,6 +19,7 @@ import com.bainbridgetrails.auth.AuthConfig
 import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.map.SpikeLaunch
+import com.bainbridgetrails.nav.DebugLaunch
 import com.bainbridgetrails.nav.NavRequests
 import com.sloopworks.debugdrawer.DebugDrawerHost
 
@@ -38,7 +39,14 @@ class MainActivity : ComponentActivity() {
         val extras = if (debuggable) intent.extras else null
         // `dataset` is not a spike option (it was consumed by selectDataset above): leaving it in would make
         // `--es dataset roads` on its own open the style spike instead of the tab shell.
-        val options = extras?.keySet()?.minus(DATASET_EXTRA)?.associateWith { extras.getString(it).orEmpty() }.orEmpty()
+        // Play debug options (plan.md L2-3): `--es playClock 2026-10-29T14:00 --es playTide low --es playConfig bundled`;
+        // read into DebugLaunch (DebugTools binds the debug Play clock from them) and kept out of the spike options.
+        extras?.let {
+            DebugLaunch.playClock = it.getString(PLAY_CLOCK_EXTRA)
+            DebugLaunch.playTide = it.getString(PLAY_TIDE_EXTRA)
+            DebugLaunch.playConfig = it.getString(PLAY_CONFIG_EXTRA)
+        }
+        val options = extras?.keySet()?.minus(NON_SPIKE_EXTRAS)?.associateWith { extras.getString(it).orEmpty() }.orEmpty()
         // No options = normal launch (tab shell). Any option = spike launch (scripts): screen/style/camera.
         val launch = if (options.isEmpty()) null else SpikeLaunch.parse(options)
         AuthConfig.googleWebClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
@@ -65,6 +73,10 @@ class MainActivity : ComponentActivity() {
 
         /** `--es dataset roads` (debuggable builds): see DebugTools.selectDataset. */
         const val DATASET_EXTRA = "dataset"
+        const val PLAY_CLOCK_EXTRA = "playClock"
+        const val PLAY_TIDE_EXTRA = "playTide"
+        const val PLAY_CONFIG_EXTRA = "playConfig"
+        val NON_SPIKE_EXTRAS = setOf(DATASET_EXTRA, PLAY_CLOCK_EXTRA, PLAY_TIDE_EXTRA, PLAY_CONFIG_EXTRA)
     }
 
     override fun onNewIntent(intent: Intent) {
