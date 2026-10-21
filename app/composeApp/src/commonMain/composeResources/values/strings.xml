@@ -254,6 +254,9 @@
     <string name="play_challenges_ended">Ended</string>
     <string name="play_show_on_map">Show on map</string>
     <string name="play_challenge_solo">Just you</string>
+    <!-- (goal) the pack's {goal.item} / {goal.items} copy tokens (schedule.md §4.7) -->
+    <string name="play_goal_item">trail</string>
+    <string name="play_goal_items">trails</string>
     <string name="play_challenge_island">Whole island</string>
     <string name="play_challenge_window">%1$s – %2$s</string>
     <string name="play_challenge_progress">%1$s of %2$s</string>
@@ -324,6 +327,7 @@
     <string name="play_log_local_only">Not on the Play board (couldn’t be confirmed)</string>
     <string name="play_log_stamp">Stamped</string>
     <string name="play_log_empty">Your logbook fills in as you walk.</string>
+    <string name="play_log_more">Show older entries</string>
     <string name="play_log_walk_group">Walk · %1$s</string>
     <string name="play_log_week_close">Week close</string>
     <string name="play_kind_coverage">New ground</string>
@@ -387,6 +391,7 @@
     <!-- Play: stories, Me, What's On -->
     <string name="play_stories_title">Island stories</string>
     <string name="play_stories_count">%1$d of %2$d met</string>
+    <string name="play_screen_off">Play is off. You can turn it on in Settings.</string>
     <string name="play_me_card_title">Play</string>
     <string name="play_me_marks">%1$s marks</string>
     <string name="play_me_logbook">Logbook</string>

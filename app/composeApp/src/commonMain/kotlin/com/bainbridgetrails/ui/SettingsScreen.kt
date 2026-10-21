@@ -102,8 +102,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.bainbridgetrails.data.PlaySettings
 import com.bainbridgetrails.play.DebugPlayClock
-import com.bainbridgetrails.play.time.IslandTime
-import com.bainbridgetrails.resources.play_me_stories
 import com.bainbridgetrails.resources.play_settings_about
 import com.bainbridgetrails.resources.play_settings_ambient
 import com.bainbridgetrails.resources.play_settings_ambient_body
@@ -123,11 +121,8 @@ import com.bainbridgetrails.ui.play.sheets.PlayOffSheet
 import com.bainbridgetrails.ui.play.sheets.PlayOptInGraph
 import com.bainbridgetrails.ui.play.sheets.PlaySheet
 import com.bainbridgetrails.ui.play.sheets.PlayToggleFlow
-import com.bainbridgetrails.ui.play.sheets.SnapshotWalkDerived
 import com.bainbridgetrails.ui.theme.BtDuration
 import com.bainbridgetrails.ui.theme.BtEasing
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 /**
  * Map style choice (decisions.md TL-4): Auto = Topo in light mode, Dark in dark mode. Stored as the existing
@@ -163,8 +158,8 @@ fun SettingsScreen(
     onPlayStarted: (Int?) -> Unit = {},
     onRanks: () -> Unit = {},
     onLogbook: () -> Unit = {},
-    onStories: () -> Unit = {},
-    onReplayWake: () -> Unit = {},
+    /** "Replay the island waking up": null hides the row (L2-10 wires PlayWake; until then there is nothing to replay). */
+    onReplayWake: (() -> Unit)? = null,
     onPlayClock: () -> Unit = {},
 ) {
     val auth by graph.auth.state.collectAsStateWithLifecycle()
@@ -233,7 +228,7 @@ fun SettingsScreen(
             settings.play, toggle,
             onSounds = { on -> graph.settings.update { it.copy(play = it.play.copy(sounds = on)) } },
             onAmbient = { on -> graph.settings.update { it.copy(play = it.play.copy(ambient = on)) } },
-            onRanks = onRanks, onLogbook = onLogbook, onStories = onStories, onAbout = { aboutOpen = true },
+            onRanks = onRanks, onLogbook = onLogbook, onAbout = { aboutOpen = true },
             onReplayWake = onReplayWake, onPlayClock = onPlayClock.takeIf { AppGraph.playClock is DebugPlayClock },
         )
         item { Group(stringResource(Res.string.settings_account)) }
@@ -277,7 +272,6 @@ fun SettingsScreen(
 }
 
 /** The Play toggle flow over this graph (production [PlayOptInGraph]); follows settings changed elsewhere. */
-@OptIn(ExperimentalUuidApi::class)
 @Composable
 private fun rememberPlayToggle(graph: AppGraph.Installed, enabled: Boolean): PlayToggleFlow {
     val flow = remember(graph) {
@@ -285,13 +279,6 @@ private fun rememberPlayToggle(graph: AppGraph.Installed, enabled: Boolean): Pla
             PlayOptInGraph(
                 updatePlay = { change -> graph.settings.updateNow { it.copy(play = change(it.play)) } },
                 repo = { graph.playOrNull },
-                walkDerived = { repo ->
-                    val snapshot = graph.progress.refreshNow()
-                    val data = AppGraph.datasets.await()
-                    SnapshotWalkDerived.of(repo.goal, data.dataset, snapshot, repo.config.value?.config)
-                },
-                today = { IslandTime.dateOf(AppGraph.playClock.now()) },
-                newId = { Uuid.random().toString() },
             ),
             enabled,
         )
@@ -308,9 +295,8 @@ private fun LazyListScope.playSection(
     onAmbient: (Boolean) -> Unit,
     onRanks: () -> Unit,
     onLogbook: () -> Unit,
-    onStories: () -> Unit,
     onAbout: () -> Unit,
-    onReplayWake: () -> Unit,
+    onReplayWake: (() -> Unit)?,
     onPlayClock: (() -> Unit)?,
 ) {
     item(key = "play-h") { Group(stringResource(Res.string.play_settings_section)) }
@@ -335,9 +321,9 @@ private fun LazyListScope.playSection(
                 SettingSwitchRow(stringResource(Res.string.play_settings_ambient), play.ambient, onAmbient, description = stringResource(Res.string.play_settings_ambient_body))
                 NavRow(stringResource(Res.string.play_settings_ranks), onRanks)
                 NavRow(stringResource(Res.string.play_settings_logbook), onLogbook)
-                NavRow(stringResource(Res.string.play_me_stories), onStories)
                 NavRow(stringResource(Res.string.play_settings_about), onAbout)
-                NavRow(stringResource(Res.string.play_settings_replay), onReplayWake, trailingIcon = null)
+                // L2-10: AppShell passes onReplayWake once PlayWake replays (ux § 3.1; hidden on the quiet day).
+                if (onReplayWake != null) NavRow(stringResource(Res.string.play_settings_replay), onReplayWake, trailingIcon = null)
                 if (onPlayClock != null) NavRow(stringResource(Res.string.play_settings_clock_debug), onPlayClock)
             }
         }

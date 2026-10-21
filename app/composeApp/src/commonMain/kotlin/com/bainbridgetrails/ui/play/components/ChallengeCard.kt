@@ -21,7 +21,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.data.LocalGoal
@@ -86,9 +88,11 @@ private const val SWEEP = "ch-sweep"
  * never a countdown); title; goal copy; Play bar + progress text; reward + chevron. The whole card is one button.
  * Done: `seaGlassWash` background, Done chip, reward `+n` in `onSurface`. Ended: 60 % art, `play_challenge_ended`
  * replaces the window, no reward. Upcoming: no progress row. Island: shared progress and `{band, count}` only.
+ * [onClick] null = the ChallengeSheet's detail: not a button, no chevron, its own nodes with the `titleLarge` title as
+ * a heading ([detail]).
  */
 @Composable
-fun ChallengeCard(card: ChallengeCardModel, onClick: () -> Unit, modifier: Modifier = Modifier, detail: Boolean = false) {
+fun ChallengeCard(card: ChallengeCardModel, onClick: (() -> Unit)?, modifier: Modifier = Modifier, detail: Boolean = false) {
     val text: ChallengeCardText = ChallengesLogic.text(card, rememberChallengeCopy())
     val title = challengeTitle(card)
     val body = challengeBody(card)
@@ -111,11 +115,16 @@ fun ChallengeCard(card: ChallengeCardModel, onClick: () -> Unit, modifier: Modif
             .heightIn(min = 120.dp)
             .clip(MaterialTheme.shapes.medium)
             .background(bg)
-            .clickable(onClick = onClick)
-            .clearAndSetSemantics {
-                contentDescription = spoken
-                role = Role.Button
-            }
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick).clearAndSetSemantics {
+                        contentDescription = spoken
+                        role = Role.Button
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .padding(BtTheme.spacing.lg),
         verticalArrangement = Arrangement.spacedBy(BtTheme.spacing.sm),
     ) {
@@ -135,7 +144,11 @@ fun ChallengeCard(card: ChallengeCardModel, onClick: () -> Unit, modifier: Modif
                 textAlign = TextAlign.End,
             )
         }
-        Text(title, style = if (detail) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium)
+        Text(
+            title,
+            if (detail) Modifier.semantics { heading() } else Modifier,
+            style = if (detail) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+        )
         Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         val p = card.progress
         val t = card.target
@@ -150,7 +163,7 @@ fun ChallengeCard(card: ChallengeCardModel, onClick: () -> Unit, modifier: Modif
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (reward != null) RewardChip(reward, claimed = done) else Spacer(Modifier.heightIn(min = 32.dp))
             Spacer(Modifier.weight(1f))
-            BtIcon(BtIcons.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (onClick != null) BtIcon(BtIcons.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

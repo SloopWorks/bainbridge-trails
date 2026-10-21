@@ -18,6 +18,7 @@ import com.bainbridgetrails.ui.play.screens.ChallengeBand
 import com.bainbridgetrails.ui.play.screens.ChallengeCopy
 import com.bainbridgetrails.ui.play.screens.ChallengeState
 import com.bainbridgetrails.ui.play.screens.ChallengesLogic
+import com.bainbridgetrails.ui.play.screens.GoalNouns
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -60,11 +61,14 @@ class ChallengeCardTest {
         ),
     )
 
+    /** `play_goal_item(s)` (trails build). */
+    private val nouns = GoalNouns(PlayStringsXml["play_goal_item"], PlayStringsXml["play_goal_items"])
+
     private val bands = listOf(PlayBandCountDto("top", 12), PlayBandCountDto("middle", null), PlayBandCountDto("starting", 40))
 
     @Test
     fun noCountdownText() {
-        val m = ChallengesLogic.model(config, Goal.trails, agenda, server("top", bands), emptyList(), now)
+        val m = ChallengesLogic.model(config, Goal.trails, agenda, server("top", bands), emptyList(), now, nouns)
         val cards = m.solo + m.island
         assertEquals(setOf("ch-sweep", "ch-krakenweek"), cards.map { it.itemId }.toSet())
         val sweep = cards.single { it.itemId == "ch-sweep" }
@@ -82,7 +86,7 @@ class ChallengeCardTest {
 
     @Test
     fun islandShowsBandAndCountOnly() {
-        val m = ChallengesLogic.model(config, Goal.trails, agenda, server("top", bands), emptyList(), now)
+        val m = ChallengesLogic.model(config, Goal.trails, agenda, server("top", bands), emptyList(), now, nouns)
         val kraken = m.island.single()
         assertEquals("ch-krakenweek", kraken.itemId)
         assertTrue(kraken.islandScope)
@@ -93,11 +97,11 @@ class ChallengeCardTest {
         // The band line carries exactly two facts: a band word and a count (no names, ranks or times).
         assertEquals("ChallengeBand(band=top, count=12)", ChallengeBand("top", 12).toString())
         // Counts under 5 come back null: the line is left out (ux §7.2 #2).
-        val few = ChallengesLogic.model(config, Goal.trails, agenda, server("middle", bands), emptyList(), now).island.single()
+        val few = ChallengesLogic.model(config, Goal.trails, agenda, server("middle", bands), emptyList(), now, nouns).island.single()
         assertNull(few.band)
         assertNull(ChallengesLogic.text(few, copy).band)
         // Signed out / offline: no band, progress row omitted, the card still shows.
-        val offline = ChallengesLogic.model(config, Goal.trails, agenda, null, emptyList(), now).island.single()
+        val offline = ChallengesLogic.model(config, Goal.trails, agenda, null, emptyList(), now, nouns).island.single()
         assertNull(offline.band)
         assertNull(ChallengesLogic.text(offline, copy).progress)
         assertNotNull(offline.title)
@@ -109,8 +113,27 @@ class ChallengeCardTest {
             LogEntry("a", LogKind.complete, "Rose Loop", "Trail complete", LocalDate(2026, 10, 31), 100, walkId = "w1"),
             LogEntry("b", LogKind.complete, "Gazzam", "Trail complete", LocalDate(2026, 10, 30), 100, walkId = "w0"),
         )
-        val sweep = ChallengesLogic.model(config, Goal.trails, agenda, null, logged, now).solo.single { it.itemId == "ch-sweep" }
+        val sweep = ChallengesLogic.model(config, Goal.trails, agenda, null, logged, now, nouns).solo.single { it.itemId == "ch-sweep" }
         assertEquals(1, sweep.progress, "only completions inside the window count (PF9-2)")
         assertEquals(3, sweep.target)
+    }
+
+    /**
+     * Goal vocabulary (review L2-7): the pack's `{goal.items}` comes from `play_goal_items` and its roads twin, never a
+     * word hard-coded in the logic, so a roads build never says "trails".
+     */
+    @Test
+    fun goalNounFromResources() {
+        val roads = GoalNouns(PlayStringsXml["roads_play_goal_item"], PlayStringsXml["roads_play_goal_items"])
+        assertEquals(GoalNouns("trail", "trails"), nouns)
+        assertEquals(GoalNouns("road", "roads"), roads)
+        assertEquals("Finish 5 roads; one road at a time.", roads.fill("Finish 5 {goal.items}; one {goal.item} at a time."))
+
+        val roadsNow = scheduler.agenda(now, PlayContext(Goal.roads))
+        val sweep = ChallengesLogic.model(config, Goal.roads, roadsNow, null, emptyList(), now, roads).solo.single { it.itemId == "ch-sweep" }
+        assertTrue("roads" in sweep.body && "trail" !in sweep.body, sweep.body)
+        assertTrue("{goal" !in sweep.body, "every token filled: ${sweep.body}")
+        val trails = ChallengesLogic.model(config, Goal.trails, agenda, null, emptyList(), now, nouns).solo.single { it.itemId == "ch-sweep" }
+        assertTrue("trails" in trails.body, trails.body)
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -73,12 +74,7 @@ fun PlayCard(
                 Text(" " + marksLine.removePrefix(marks).trim(), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 RankBadge(totals.rank)
             }
-            if (nextLine != null) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(BtTheme.spacing.md)) {
-                    PlayBar(totals.fraction, nextLine, Modifier.weight(1f))
-                    Text(nextLine, style = BtTheme.type.numeric, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-                }
-            }
+            if (nextLine != null) PlayBarWithLabel(totals.fraction, nextLine)
         }
         Column(Modifier.padding(top = BtTheme.spacing.sm)) {
             CardLink(stringResource(Res.string.play_me_logbook), null, onLogbook)
@@ -86,6 +82,31 @@ fun PlayCard(
             CardLink(stringResource(Res.string.play_me_whats_on), null, onWhatsOn)
             HorizontalDivider(Modifier.padding(horizontal = BtTheme.spacing.lg), color = MaterialTheme.colorScheme.outlineVariant)
             CardLink(stringResource(Res.string.play_me_stories), stringResource(Res.string.play_stories_count, storiesMet, storiesTotal), onStories)
+        }
+    }
+}
+
+/** Font scale from which a Play bar and its label stack (ux § 2.1's compact step; the bar never collapses). */
+private const val STACK_FONT_SCALE = 1.3f
+
+/**
+ * A PlayBar with its `numeric` label (ux § 2.7 "PlayBar to next rank"): one row ([leading] e.g. a RankBadge, the bar,
+ * the label sharing the width); at font scale ≥ 1.3 stacked (leading, full-width bar, label) so neither collapses.
+ */
+@Composable
+fun PlayBarWithLabel(fraction: Float, label: String, modifier: Modifier = Modifier, leading: (@Composable () -> Unit)? = null) {
+    val labelText = @Composable { m: Modifier -> Text(label, m, style = BtTheme.type.numeric, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    if (LocalDensity.current.fontScale >= STACK_FONT_SCALE) {
+        Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(BtTheme.spacing.sm)) {
+            leading?.invoke()
+            PlayBar(fraction, label, Modifier.fillMaxWidth())
+            labelText(Modifier)
+        }
+    } else {
+        Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(BtTheme.spacing.md)) {
+            leading?.invoke()
+            PlayBar(fraction, label, Modifier.weight(1f))
+            labelText(Modifier.weight(1f, fill = false))
         }
     }
 }

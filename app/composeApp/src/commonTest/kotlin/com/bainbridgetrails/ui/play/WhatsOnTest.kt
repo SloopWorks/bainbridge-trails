@@ -99,4 +99,18 @@ class WhatsOnTest {
         assertEquals("7:31 am island time", WhatsOnLogic.withIslandSuffix("7:31 am", ny, now, islandTime))
         assertFalse(WhatsOnLogic.withIslandSuffix("7:31 am", island, now, islandTime).contains("island"))
     }
+
+    /** A11y (review L2-7): riddle stars are drawn as ★ but spoken through the `play_riddle_stars_a11y` plural. */
+    @Test
+    fun riddleStarsSpokenInWords() {
+        val title = "Bought with a bond"
+        val drawn = WhatsOnLogic.starsText(2)
+        assertEquals("★★", drawn)
+        val spoken = WhatsOnLogic.spoken(title, drawn, PlayStringsXml.plural("play_riddle_stars_a11y", 2))
+        assertEquals("Bought with a bond, Difficulty 2 stars", spoken)
+        assertFalse('★' in spoken)
+        assertEquals("Bought with a bond, Difficulty 1 star", WhatsOnLogic.spoken(title, WhatsOnLogic.starsText(1), PlayStringsXml.plural("play_riddle_stars_a11y", 1)))
+        // Rows without stars keep their window.
+        assertEquals("Weekend sweep, Sat – Sun", WhatsOnLogic.spoken("Weekend sweep", "Sat – Sun", null))
+    }
 }

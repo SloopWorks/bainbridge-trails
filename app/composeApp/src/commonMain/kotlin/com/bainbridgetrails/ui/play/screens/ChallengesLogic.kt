@@ -63,6 +63,14 @@ data class ChallengeCopy(
     val bandStarting: String,
 )
 
+/**
+ * The goal vocabulary for the pack's `{goal.item}` / `{goal.items}` copy tokens (schedule.md § 4.7): production passes
+ * `play_goal_item` / `play_goal_items` through `LocalGoal` (roads twins "road" / "roads"), so the words never mix.
+ */
+data class GoalNouns(val item: String, val items: String) {
+    fun fill(text: String): String = text.replace("{goal.items}", items).replace("{goal.item}", item)
+}
+
 /** A card's lines: [window] days only, never a clock or a countdown (PP-8, PD-4). */
 data class ChallengeCardText(val window: String, val progress: String?, val band: String?)
 
@@ -80,6 +88,7 @@ object ChallengesLogic {
         server: PlayChallengesDto?,
         logbook: List<LogEntry>,
         now: Instant,
+        nouns: GoalNouns,
     ): ChallengesModel {
         val items = config.items.associateBy { it.id }
         val byOcc = server?.current.orEmpty().associateBy { it.occ }
@@ -87,12 +96,12 @@ object ChallengesLogic {
         val seen = HashSet<String>()
         agenda?.active.orEmpty().map { it.occurrence }.filter { it.type == ItemType.challenge && !it.hidden }.forEach { o ->
             val item = items[o.itemId] ?: return@forEach
-            if (seen.add(o.key)) cards += card(item, goal, o.key, o.start, o.end, now, byOcc[o.key] ?: server.forItem(o.itemId), logbook)
+            if (seen.add(o.key)) cards += card(item, goal, o.key, o.start, o.end, now, byOcc[o.key] ?: server.forItem(o.itemId), logbook, nouns)
         }
         val weekEnd = IslandTime.instantOf(IslandTime.weekId(IslandTime.dateOf(now)), kotlinx.datetime.LocalTime(0, 0)) + 7.days
         agenda?.upcoming.orEmpty().filter { it.type == ItemType.challenge && it.start < weekEnd }.forEach { u ->
             val item = items[u.itemId] ?: return@forEach
-            if (seen.add(u.key)) cards += card(item, goal, u.key, u.start, u.end, now, null, logbook)
+            if (seen.add(u.key)) cards += card(item, goal, u.key, u.start, u.end, now, null, logbook, nouns)
         }
         server?.current.orEmpty().filter { it.occ !in seen }.forEach { dto ->
             val item = items[dto.id] ?: return@forEach
@@ -100,7 +109,7 @@ object ChallengesLogic {
             val end = parse(dto.windowEnd) ?: return@forEach
             if (end > now || end < now - 7.days) return@forEach
             seen += dto.occ
-            cards += card(item, goal, dto.occ, start, end, now, dto, logbook)
+            cards += card(item, goal, dto.occ, start, end, now, dto, logbook, nouns)
         }
         val (ended, live) = cards.partition { it.state == ChallengeState.Ended }
         return ChallengesModel(live.filter { !it.islandScope }, live.filter { it.islandScope }, ended)
@@ -117,6 +126,7 @@ object ChallengesLogic {
         now: Instant,
         dto: PlayChallengeDto?,
         logbook: List<LogEntry>,
+        nouns: GoalNouns,
     ): ChallengeCardModel {
         val spec = item.challenge
         val island = spec?.scope == ChallengeScope.island
@@ -145,9 +155,7 @@ object ChallengesLogic {
         } else {
             null
         }
-        val body = item.copy.body
-            .replace("{target}", target?.toString().orEmpty())
-            .replace("{goal.items}", if (goal == Goal.roads) "roads" else "trails")
+        val body = nouns.fill(item.copy.body.replace("{target}", target?.toString().orEmpty()))
         return ChallengeCardModel(
             itemId = item.id,
             occKey = occ,

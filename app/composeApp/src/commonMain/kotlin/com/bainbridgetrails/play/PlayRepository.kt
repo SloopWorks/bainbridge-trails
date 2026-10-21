@@ -35,6 +35,7 @@ import com.bainbridgetrails.play.time.TideTable
 import com.bainbridgetrails.sync.PlayPart
 import com.bainbridgetrails.tracking.SessionSummary
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -150,6 +151,12 @@ class PlayRepository(
     /** True between [start] and [stop]. */
     val running: Boolean get() = job?.isActive == true
 
+    /** This start's turn-on work (restore, then the start balance): the marks of a newly written start balance. */
+    private var turnedOn: CompletableDeferred<Int?>? = null
+
+    /** The start balance of [turnedOn] was handed to a caller (the snackbar shows once). */
+    @Volatile private var startBalanceReported = false
+
     // --- scheduler memo (worker only) -------------------------------------------------------------------------------
     private var placeIndex: PlaceIndex? = null
     private var derivedGoal: DerivedGoal? = null
@@ -183,10 +190,12 @@ class PlayRepository(
     /** Starts the ticker, the pack check and live sensing. Idempotent. */
     fun start() {
         if (running) return
+        val done = CompletableDeferred<Int?>().also { turnedOn = it }
+        startBalanceReported = false
         job = scope.launch {
             content.load()
             store.load()
-            launch { onTurnedOn() }
+            launch { done.complete(onTurnedOn()) }
             launch { content.refreshIfDue() }
             launch { PlaySensing(track, ::sensingTargets, liveSink, { clock().now() }, ::onFind).run() }
             launch {
@@ -198,13 +207,27 @@ class PlayRepository(
                     refresh()
                 }
             }
-        }
+        }.also { j -> j.invokeOnCompletion { done.complete(null) } }
+    }
+
+    /**
+     * The marks of the start balance this start credited ("Your walks so far", the `play_start_balance` snackbar), or
+     * null: none was due (credited once ever, or restored), the input never became ready, Play is off, or it was
+     * already reported (an off/on faster than the gate keeps the same start: no second snackbar).
+     */
+    suspend fun awaitStartBalance(): Int? {
+        val d = turnedOn ?: return null
+        val marks = d.await() ?: return null
+        if (turnedOn !== d || startBalanceReported) return null
+        startBalanceReported = true
+        return marks
     }
 
     /** Stops everything [start] started (Play turned off). State and files are kept. */
     fun stop() {
         job?.cancel()
         job = null
+        turnedOn = null
         _sensed.value = emptySet()
     }
 
@@ -359,8 +382,14 @@ class PlayRepository(
     /**
      * The opt-in starting balance (product § 3.6.4, PF1-2): "Your walks so far" once ever, from the current snapshot;
      * later turn-ons add only walk-derived marks earned while Play was off; nothing after a restore ([StartBalance]).
+     * Idempotent. Returns the marks of a start balance entry this call wrote, else null.
      */
-    suspend fun creditStartBalance() {
+    suspend fun creditStartBalance(): Int? = creditOnce()?.marks
+
+    private class Credit(val marks: Int?)
+
+    /** One attempt; null = the walk-derived input is not available (yet). */
+    private suspend fun creditOnce(): Credit? {
         val derived = try {
             walkDerived()
         } catch (e: CancellationException) {
@@ -368,15 +397,31 @@ class PlayRepository(
         } catch (e: Exception) {
             AppLog.e(TAG, "start balance unavailable: ${e.message}")
             null
-        } ?: return
+        } ?: return null
         val today = IslandTime.dateOf(clock().now())
-        store.update { st -> st.copy(logbook = StartBalance.onEnable(st.logbook, derived, today, newId)) }
+        var credited: Int? = null
+        store.update { st ->
+            val after = StartBalance.onEnable(st.logbook, derived, today, newId)
+            credited = after.entries.drop(st.logbook.entries.size).firstOrNull { it.kind == LogKind.start_balance }?.marks
+            st.copy(logbook = after)
+        }
+        return Credit(credited)
     }
 
-    /** Every turn-on: restore first (so a reinstall never gets a start balance on top), then the starting balance. */
-    private suspend fun onTurnedOn() {
+    /**
+     * Every turn-on: restore first (so a reinstall never gets a start balance on top), then the starting balance. While
+     * the Logbook still has none (PF1-1), an unavailable input is retried a few times on this start (the dataset or the
+     * coverage snapshot can still be loading right after opt-in); the next start tries again.
+     */
+    private suspend fun onTurnedOn(): Int? {
         restore()
-        creditStartBalance()
+        var attempt = 0
+        while (true) {
+            creditOnce()?.let { return it.marks }
+            val lb = store.state.value.logbook
+            if (lb.hasStartBalance || lb.hasRestore || attempt >= START_BALANCE_RETRY_MS.size) return null
+            delay(START_BALANCE_RETRY_MS[attempt++])
+        }
     }
 
     // --- debug drawer --------------------------------------------------------------------------------------------------
@@ -483,6 +528,9 @@ class PlayRepository(
 
         /** A walk is claimed over at most this many island days (a recording left running for days stays bounded). */
         private const val MAX_WALK_DAYS = 3
+
+        /** Start-balance retries on one start while its input is unavailable (PF1-1). */
+        private val START_BALANCE_RETRY_MS = longArrayOf(2_000L, 5_000L, 15_000L)
 
         const val RESTORED_WHAT = "Restored from your account"
         const val RESTORED_WHY = "Your marks so far; earlier detail is not on this phone"

@@ -205,7 +205,7 @@ class GoalVocabularyGuardTest {
         /** docs/play/product.md §7.3 keys marked (goal): each has a `roads_` twin. */
         val PLAY_GOAL_KEYS = setOf(
             "play_intro_1", "play_about_marks", "play_detail_section", "play_kraken_body", "play_challenge_sweep_body",
-            "play_challenge_crossing_body", "play_kind_complete",
+            "play_challenge_crossing_body", "play_kind_complete", "play_goal_item", "play_goal_items",
         )
 
         /** Overridden keys stored in a holder and looked up through the vocabulary where they are rendered ("file:key"). */

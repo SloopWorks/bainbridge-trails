@@ -91,6 +91,10 @@ import com.bainbridgetrails.resources.play_challenge_crossing_body
 import com.bainbridgetrails.resources.roads_play_challenge_crossing_body
 import com.bainbridgetrails.resources.play_kind_complete
 import com.bainbridgetrails.resources.roads_play_kind_complete
+import com.bainbridgetrails.resources.play_goal_item
+import com.bainbridgetrails.resources.roads_play_goal_item
+import com.bainbridgetrails.resources.play_goal_items
+import com.bainbridgetrails.resources.roads_play_goal_items
 import com.bainbridgetrails.resources.roads_app_name
 import com.bainbridgetrails.resources.roads_board_col_trails
 import com.bainbridgetrails.resources.roads_board_empty_body
@@ -350,6 +354,8 @@ class GoalVocabulary private constructor(
             Res.string.play_challenge_sweep_body to Res.string.roads_play_challenge_sweep_body,
             Res.string.play_challenge_crossing_body to Res.string.roads_play_challenge_crossing_body,
             Res.string.play_kind_complete to Res.string.roads_play_kind_complete,
+            Res.string.play_goal_item to Res.string.roads_play_goal_item,
+            Res.string.play_goal_items to Res.string.roads_play_goal_items,
             ),
             plurals = mapOf(
             Res.plurals.detail_community_completed to Res.plurals.roads_detail_community_completed,

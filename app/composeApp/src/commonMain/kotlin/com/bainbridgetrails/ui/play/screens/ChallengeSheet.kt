@@ -21,7 +21,7 @@ import com.bainbridgetrails.ui.play.components.ChallengeCard
 import com.bainbridgetrails.ui.theme.BtTheme
 import org.jetbrains.compose.resources.stringResource
 
-/** ChallengeSheet (ux.md § 3.16): the card in detail (titleLarge); `ch-krakenweek` gets Show on map. */
+/** ChallengeSheet (ux.md § 3.16): the card in detail (titleLarge heading, not a button); `ch-krakenweek` gets Show on map. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChallengeSheet(card: ChallengeCardModel, onShowOnMap: (() -> Unit)?, onDismiss: () -> Unit) {
@@ -31,7 +31,7 @@ fun ChallengeSheet(card: ChallengeCardModel, onShowOnMap: (() -> Unit)?, onDismi
                 .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)),
             verticalArrangement = Arrangement.spacedBy(BtTheme.spacing.md),
         ) {
-            ChallengeCard(card, onClick = onDismiss, detail = true)
+            ChallengeCard(card, onClick = null, detail = true)
             if (onShowOnMap != null) PrimaryButton(stringResource(Res.string.play_show_on_map), onShowOnMap, Modifier.fillMaxWidth())
         }
     }

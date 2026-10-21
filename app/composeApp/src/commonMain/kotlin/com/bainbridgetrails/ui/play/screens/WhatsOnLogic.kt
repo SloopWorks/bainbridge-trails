@@ -125,6 +125,15 @@ object WhatsOnLogic {
         Gate.OPEN, Gate.VIEW -> WhatsOnGate.Chevron
     }
 
+    /** A riddle's difficulty as drawn ("★★"); never spoken: [spoken] uses `play_riddle_stars_a11y` instead. */
+    fun starsText(stars: Int): String = "★".repeat(stars.coerceAtLeast(0))
+
+    /**
+     * A row's merged sentence: title, then the window, or for a riddle the difficulty in words ([starsSpoken] =
+     * `play_riddle_stars_a11y`, "Difficulty 2 stars") so a screen reader never reads "black star, black star".
+     */
+    fun spoken(title: String, window: String?, starsSpoken: String?): String = listOfNotNull(title, starsSpoken ?: window).joinToString(", ")
+
     /** Island clock time ("6 am", "7:31 am"). */
     fun timeText(at: Instant): String = PlayFormat.time(at)
 

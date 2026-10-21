@@ -274,8 +274,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     },
                     onRanks = { nav.navigate(RanksRoute) },
                     onLogbook = { nav.navigate(LogbookRoute) },
-                    onStories = { nav.navigate(IslandStoriesRoute) },
-                    onReplayWake = { nav.selectTab(MapRoute) },
+                    // L2-10: onReplayWake = { select Map + replay PlayWake } (the row stays hidden until then).
                     onPlayClock = { nav.navigate(PlayClockDebugRoute) },
                 )
             }

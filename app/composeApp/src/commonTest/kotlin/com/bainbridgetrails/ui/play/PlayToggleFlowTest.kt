@@ -10,7 +10,7 @@ import com.bainbridgetrails.play.PlayFixtures
 import com.bainbridgetrails.play.PlayGate
 import com.bainbridgetrails.play.PlayRepository
 import com.bainbridgetrails.play.PlayStateStore
-import com.bainbridgetrails.play.SystemPlayClock
+import com.bainbridgetrails.play.DebugPlayClock
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
@@ -19,9 +19,11 @@ import com.bainbridgetrails.play.schedule.DerivedGoal
 import com.bainbridgetrails.ui.play.sheets.PlayOptInGraph
 import com.bainbridgetrails.ui.play.sheets.PlaySheet
 import com.bainbridgetrails.ui.play.sheets.PlayToggleFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -31,6 +33,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 /**
  * Settings › Play (ux.md §3.1; product §5.1, PF1): the toggle, the intro and the opt-in start balance, over the real
@@ -43,9 +46,11 @@ class PlayToggleFlowTest {
     private var created = 0
     private var gate: PlayGate? = null
     private var ids = 0
+    private var snapshotDelayMs = 0L
 
     /** Snapshot-derived marks of today's coverage (product §3.6.4 worked example: 1,296). */
     private val derived = WalkDerived(coverage = 1_000, complete = 200, squares = 96)
+    private val clock = DebugPlayClock(system = { Instant.parse("2026-10-29T21:00:00Z") })
 
     private fun TestScope.flow(): PlayToggleFlow {
         val d = StandardTestDispatcher(testScheduler)
@@ -58,18 +63,16 @@ class PlayToggleFlowTest {
                 now = { 10_000_000L }, io = d, compute = d,
             )
             PlayRepository(
-                scope = backgroundScope, goal = Goal.roads, clock = { SystemPlayClock }, content = content,
+                scope = backgroundScope, goal = Goal.roads, clock = { clock }, content = content,
                 places = { PlayFixtures.EmptyPlaces }, derived = { DerivedGoal.decode(PlayFixtures.read("derived-roads.json")) },
                 store = PlayStateStore("$dir/roads-state.json", d), track = MutableStateFlow<List<Fix>>(emptyList()), compute = d,
+                walkDerived = { delay(snapshotDelayMs); derived }, newId = { "id-${ids++}" },
             )
         }.also { gate = it }
         g.start()
         val optIn = PlayOptInGraph(
             updatePlay = { change -> settings.value = change(settings.value ?: PlaySettings()) },
             repo = { gate?.current },
-            walkDerived = { derived },
-            today = { LocalDate(2026, 10, 29) },
-            newId = { "id-${ids++}" },
         )
         return PlayToggleFlow(optIn, enabled = false)
     }
@@ -130,5 +133,25 @@ class PlayToggleFlowTest {
         assertEquals(1, logbook().count { it.kind == LogKind.start_balance })
         assertEquals(1_296, logbook().sumOf { it.marks })
         assertEquals(1, created, "the repository is kept across off/on")
+    }
+
+    /**
+     * PF1-1 (review L2-7): a snapshot slower than Start's spinner loses only the snackbar; the repository still credits
+     * the start balance on its own, Play is on and the switch is free again.
+     */
+    @Test
+    fun slowSnapshotStillCreditsStartBalance() = runTest {
+        snapshotDelayMs = 30_000L
+        val f = flow()
+        runCurrent()
+        f.onSwitch(true)
+        val marks = f.onStart()
+        assertNull(marks, "Start stopped waiting after 5 s: no snackbar")
+        assertTrue(settings.value!!.enabled)
+        assertFalse(f.state.value.starting)
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(listOf(LogKind.start_balance), logbook().map { it.kind })
+        assertEquals(1_296, logbook().single().marks)
     }
 }

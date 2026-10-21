@@ -4,7 +4,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.resources.Res
@@ -43,9 +46,11 @@ fun PlayIntroContent(starting: Boolean, onStart: () -> Unit, onDismiss: () -> Un
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayIntroSheet(starting: Boolean, onStart: () -> Unit, onDismiss: () -> Unit) {
+    // While Start runs the sheet must not hide (a swipe would leave an invisible sheet blocking input): refuse Hidden.
+    val busy by rememberUpdatedState(starting)
     ModalBottomSheet(
         onDismissRequest = { if (!starting) onDismiss() },
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { it != SheetValue.Hidden || !busy }),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) { PlayIntroContent(starting, onStart, onDismiss) }
 }
