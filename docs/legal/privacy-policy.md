@@ -68,6 +68,20 @@ that the new coverage is plausible on foot, and then discards them. When you sig
 sign-in token contains your email address and name; our server reads only the account identifier from it and
 does not store the rest.
 
+<!-- OD-19 owner sign-off pending: Play paragraph (docs/play/product.md § 3.10, decisions PD-3, PD-16;
+backend/migrations/0005_play.sql, backend/src/play/claims.ts). Wording must be signed off by the owner before Play ships. -->
+### Play (optional)
+
+Play is an optional game layer, off unless you turn it on. If you turn it on and are signed in, the app also sends,
+with each walk it syncs, which Play items that walk claimed (for example a weekly treasure or a riddle) and the
+week each claim belongs to, identified by the Monday's date. Our server stores, for each claim: the item and
+occurrence identifier, the week, the content version it was checked against and the marks it awarded. It also
+stores per week how many walking days you sent (up to 7) and the marks you earned, and your marks totals. It never
+stores the day, the time or the route of a claim. Because many Play items sit at a fixed place, a claim tells our
+server that you were near that place at some point during that week. Your Play claims and marks are not shown to
+other people; island-wide Play results (for example how many shore stretches islanders cleared this week) are
+counts only, with no names. Turning Play off stops sending claims; deleting your account deletes them.
+
 ## Data we do not collect
 
 - No GPS tracks, location points, routes, or times or dates of your walks.
@@ -123,8 +137,8 @@ required by law, and only what is required.
 ## Deleting your account and other choices
 
 - **Delete in the app:** Me > Account > Delete account. This immediately deletes, from our server, your account,
-  names, covered sections, trail progress and completions, walk ids, name reports by or about you, and sign-in
-  sessions, and revokes the Apple sign-in token if we hold one. You can also choose to delete your walks and
+  names, covered sections, trail progress and completions, walk ids, Play claims and marks, name reports by or
+  about you, and sign-in sessions, and revokes the Apple sign-in token if we hold one. You can also choose to delete your walks and
   progress from the phone.
 - **If you can no longer use the app**, follow the steps at our account-deletion page (`/delete-account` on our
   server) or email us. We delete the account within 30 days and confirm by email.

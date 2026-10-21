@@ -21,6 +21,9 @@ import {
   allowedGrowthM,
   limitsFrom,
 } from "../plausibility";
+import { type Evaluation, evaluatePlay, loadPlayState, parsePlay, playResponse, playStatements } from "../play/claims";
+import { packByVersion } from "../play/config";
+import { walkDerivedMarks } from "../play/marks";
 import { LIMITS, rateLimit } from "../ratelimit";
 import { type Dataset, METAS, type SegmentMeta, parseDataset } from "../segments";
 import { type MetricsRow, type UserRow, completedSet, getMetricsRow, islandPct, islandRank, loadCoverage, metricsFor } from "../users";
@@ -167,6 +170,8 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
   const meta = METAS[dataset];
   let m: MetricsRow = await metricsFor(env, user.id, dataset, deps.now());
   const upload: ParsedUpload = { ...parsed, walks: parseWalks(parsed.rawWalks, m.backfilled ? MAX_WALKS_PER_UPLOAD : MAX_WALKS_BACKFILL) };
+  // Play (schedule.md § 7.2): parsed after the coverage fields; absent = a pure upload with today's exact response
+  const play = parsePlay(body as Record<string, unknown>);
   const limits = limitsFrom(env);
   for (let attempt = 0; attempt <= CAS_RETRIES; attempt++) {
     if (attempt > 0) {
@@ -175,10 +180,11 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
       m = row;
     }
     const now = deps.now();
-    const [stored, sticky, fresh] = await Promise.all([
+    const [stored, sticky, fresh, playState] = await Promise.all([
       loadCoverage(env, user.id, dataset),
       completedSet(env, user.id, dataset),
       newWalks(env, user.id, dataset, upload.walks),
+      play ? loadPlayState(env, user.id, dataset, play) : null,
     ]);
     if (m.walk_count + fresh.length > MAX_STORED_WALKS) {
       throw new ApiError(422, "walk_limit", `at most ${MAX_STORED_WALKS} walks per account`);
@@ -225,8 +231,36 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
     }
     const completed = [...stickySet].sort();
 
+    // Claims are evaluated only once the coverage is plausible (a 422 above rejects them with it), against the
+    // merged coverage, and written in the same batch as the walk credits.
+    let playEval: Evaluation | null = null;
+    let playStmts: D1PreparedStatement[] = [];
+    if (play && playState) {
+      playEval = evaluatePlay(play, {
+        dataset,
+        now,
+        packFor: packByVersion,
+        freshWalkIds: new Set(fresh.map((w) => w.id)),
+        coverage: merged,
+        existing: playState.existing,
+        weeks: playState.weeks,
+      });
+      playStmts = playStatements(env, user.id, dataset, playEval, walkDerivedMarks(dataset, merged, completed));
+    }
+
     if (changed.length === 0 && fresh.length === 0 && newlyCompleted.length === 0) {
-      return json({ ...coverageBody(meta, merged, completed, m), accepted: true, newlyCoveredM: 0, ignoredSegments: upload.ignored });
+      if (!playEval) {
+        return json({ ...coverageBody(meta, merged, completed, m), accepted: true, newlyCoveredM: 0, ignoredSegments: upload.ignored });
+      }
+      // nothing new to credit: no claim can be accepted fresh (no new walk); keep the monotone totals current
+      await env.DB.batch(playStmts);
+      return json({
+        ...coverageBody(meta, merged, completed, m),
+        accepted: true,
+        newlyCoveredM: 0,
+        ignoredSegments: upload.ignored,
+        play: await playResponse(env, user.id, dataset, now, playEval),
+      });
     }
 
     const rank = islandRank(meta, after.islandM);
@@ -268,6 +302,7 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
     for (const t of newlyCompleted) stmts.push(insCompleted.bind(user.id, t, dataset));
     const insWalk = env.DB.prepare("INSERT INTO walks_v2 (user_id, dataset, walk_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING");
     for (const w of fresh) stmts.push(insWalk.bind(user.id, dataset, w.id));
+    stmts.push(...playStmts);
     try {
       await env.DB.batch(stmts);
     } catch (e) {
@@ -275,12 +310,13 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
       throw e;
     }
     const updated = { island_m: after.islandM, covered_m: after.coveredM, trails_completed: completed.length };
-    return json({
+    const res = {
       ...coverageBody(meta, merged, completed, updated),
       accepted: true,
       newlyCoveredM: round(newM, 1),
       ignoredSegments: upload.ignored,
-    });
+    };
+    return json(playEval ? { ...res, play: await playResponse(env, user.id, dataset, now, playEval) } : res);
   }
   // P2-9: too much contention
   throw new ApiError(503, "busy", "concurrent sync in progress; retry shortly", { retryAfterSeconds: 2 }, { "retry-after": "2" });

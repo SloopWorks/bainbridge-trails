@@ -1,6 +1,6 @@
 import { exchangeAppleCode } from "./apple";
 import { logout, optionalUser, parseIdTokenBody, requireUser, signIn, verifyIdToken } from "./auth";
-import { type Deps, defaultDeps } from "./deps";
+import { type Deps, defaultDeps, isDevRequest, withDevClock } from "./deps";
 import { ApiError, KB, badRequest, errorResponse, isObject, json, readJson } from "./http";
 import { LIMITS, clientIp, hashedIp, publicRateLimit, purgeHousekeeping, rateLimit } from "./ratelimit";
 import { adminMethod, adminRoute } from "./routes/admin";
@@ -8,7 +8,7 @@ import { leaderboard, reportName, trailStats } from "./routes/board";
 import { getCoverage, putCoverage } from "./routes/coverage";
 import { deleteUser, getMe, meBody, putMe } from "./routes/me";
 import { deleteAccountPage, legalPage } from "./routes/pages";
-import { playContent, playTides } from "./routes/play";
+import { playContent, playMe, playTides } from "./routes/play";
 import { DATASETS, type Dataset, META, METAS, parseDataset } from "./segments";
 import { rebuildSnapshots } from "./snapshot";
 import { METRICS_COLS, type MetricsRow, recomputeMetrics } from "./users";
@@ -31,13 +31,11 @@ const ROUTES: Record<string, string[]> = {
   "/v1/stats": ["GET"],
   "/v1/report-name": ["POST"],
   "/v1/play/content": ["GET"],
+  "/v1/play/me": ["GET"],
 };
 
 /** Path prefixes with a parameter: `/v1/play/tides/{year}`. */
 const PREFIX_ROUTES: [prefix: string, methods: string[]][] = [["/v1/play/tides/", ["GET"]]];
-
-/** Dev auth answers only on hosts a local emulator/simulator uses (P2-13), on top of ALLOW_DEV_AUTH. */
-const DEV_HOSTS = new Set(["localhost", "127.0.0.1", "10.0.2.2"]);
 
 async function authRateLimit(request: Request, env: Env, deps: Deps): Promise<void> {
   const ip = await hashedIp(env, deps.now(), clientIp(request));
@@ -94,7 +92,8 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
       return json(sessionBody(session));
     }
     case "/v1/auth/dev": {
-      if (env.ALLOW_DEV_AUTH !== "true" || !DEV_HOSTS.has(url.hostname)) throw new ApiError(404, "not_found", "no such endpoint");
+      // dev auth answers only on hosts a local emulator/simulator uses (P2-13), on top of ALLOW_DEV_AUTH
+      if (!isDevRequest(env, url)) throw new ApiError(404, "not_found", "no such endpoint");
       const body = await readJson(request, 1 * KB);
       if (!isObject(body) || typeof body.deviceId !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/.test(body.deviceId)) {
         throw badRequest("deviceId required (1-128 chars of A-Z a-z 0-9 . _ : -)");
@@ -129,6 +128,8 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
     case "/v1/play/content":
       publicRateLimit(clientIp(request), deps.now());
       return playContent(request, url);
+    case "/v1/play/me":
+      return playMe(url, env, deps, await requireUser(request, env, deps));
     default:
       if (path.startsWith("/v1/play/tides/")) {
         publicRateLimit(clientIp(request), deps.now());
@@ -140,7 +141,7 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
 
 export async function handle(request: Request, env: Env, _ctx: ExecutionContext, deps: Deps = defaultDeps): Promise<Response> {
   try {
-    return await route(request, env, deps);
+    return await route(request, env, withDevClock(deps, env, new URL(request.url)));
   } catch (e) {
     if (e instanceof ApiError) return errorResponse(e);
     console.error(JSON.stringify({ msg: "unhandled", path: new URL(request.url).pathname, error: String(e) }));

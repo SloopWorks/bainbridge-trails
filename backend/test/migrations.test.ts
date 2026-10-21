@@ -10,10 +10,21 @@ const db = env.MIGRATION_DB;
 const all = env.TEST_MIGRATIONS;
 const one = async <T>(sql: string, ...args: unknown[]) => (await db.prepare(sql).bind(...args).first<T>())!;
 const count = async (sql: string, ...args: unknown[]) => (await one<{ n: number }>(sql, ...args)).n;
+const upTo0003 = all.filter((m) => m.name < "0004");
+const play0005 = all.filter((m) => m.name.startsWith("0005_"));
+const PLAY_OBJECTS = ["play_attack_stretches", "play_claims", "play_claims_week", "play_totals", "play_weeks"];
+
+/** Every schema object (table, index) and its SQL, except D1/SQLite internals. */
+async function schemaOf(db: D1Database): Promise<Map<string, string>> {
+  const { results } = await db
+    .prepare("SELECT name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name != 'd1_migrations'")
+    .all<{ name: string; sql: string }>();
+  return new Map(results.map((r) => [r.name, r.sql]));
+}
 
 describe("migration 0003 (dataset scope) and 0004 cleanup", () => {
   it("backfills, stays compatible with the previous Worker, then cleans up", async () => {
-    expect(all.map((m) => m.name)).toEqual(["0001_init.sql", "0002_self_hidden.sql", "0003_dataset_scope.sql"]);
+    expect(all.map((m) => m.name)).toEqual(["0001_init.sql", "0002_self_hidden.sql", "0003_dataset_scope.sql", "0005_play.sql"]);
     await applyD1Migrations(db, all.slice(0, 2));
     await db.batch([
       db.prepare(
@@ -31,7 +42,7 @@ describe("migration 0003 (dataset scope) and 0004 cleanup", () => {
       db.prepare("INSERT INTO snapshot_meta VALUES (1, 'snap', 1, 'v-old', 1)"),
     ]);
 
-    await applyD1Migrations(db, all);
+    await applyD1Migrations(db, upTo0003);
 
     // backfill
     expect(await db.prepare("SELECT * FROM user_metrics ORDER BY user_id").all().then((r) => r.results)).toEqual([
@@ -114,5 +125,69 @@ describe("migration 0003 (dataset scope) and 0004 cleanup", () => {
       walk_count: 0,
     });
     expect(await one("SELECT island_m FROM user_metrics WHERE user_id = 'u1'")).toEqual({ island_m: 1234.5 });
+
+    // 0005 (Play) also applies when 0004 went first
+    await applyD1Migrations(db, all);
+    const after = (await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all<{ name: string }>()).results.map((r) => r.name);
+    for (const t of ["play_claims", "play_weeks", "play_totals", "play_attack_stretches"]) expect(after).toContain(t);
+  });
+});
+
+describe("migration 0005 (play)", () => {
+  // its own scratch database: storage is shared by the tests of this file, and the 0003 test above already ran 0004
+  const db = env.MIGRATION_DB_PLAY;
+  const one = async <T>(sql: string, ...args: unknown[]) => (await db.prepare(sql).bind(...args).first<T>())!;
+  const count = async (sql: string, ...args: unknown[]) => (await one<{ n: number }>(sql, ...args)).n;
+  const schema = () => schemaOf(db);
+
+  it("0005 applies after 0003 and is additive", async () => {
+    expect(play0005.map((m) => m.name)).toEqual(["0005_play.sql"]);
+    await applyD1Migrations(db, upTo0003);
+    await db.batch([
+      db.prepare("INSERT INTO users (id, provider, sub, anon_name) VALUES ('p1', 'dev', 'ps1', 'Calm Otter 21') ON CONFLICT DO NOTHING"),
+      db.prepare("INSERT INTO coverage VALUES ('p1', 'seg-000001', 'AQ==') ON CONFLICT DO NOTHING"),
+    ]);
+    const before = await schema();
+    const rowsBefore = await count("SELECT COUNT(*) AS n FROM coverage");
+    await applyD1Migrations(db, all);
+    const after = await schema();
+    // every object that existed is unchanged; the only new ones are Play's
+    for (const [name, sql] of before) expect(after.get(name)).toBe(sql);
+    const added = [...after.keys()].filter((n) => !before.has(n)).sort();
+    expect(added).toEqual(PLAY_OBJECTS.filter((n) => !before.has(n)));
+    expect(PLAY_OBJECTS.every((n) => after.has(n))).toBe(true);
+    // no Play statement names a table or column that 0004 drops or clears
+    const sql = play0005[0]!.queries.join("\n");
+    for (const t of ["walks ", "walks(", "leaderboard_snapshot ", "trail_stats_snapshot", "snapshot_meta ", "island_m", "coverage_rev", "walk_count"]) {
+      expect(sql).not.toContain(t);
+    }
+    expect(await count("SELECT COUNT(*) AS n FROM coverage")).toBe(rowsBefore);
+    // the tables take a claim / week / totals row and enforce the dataset check
+    await db.batch([
+      db.prepare("INSERT INTO play_claims VALUES ('p1', 'trails', 'egg-station-s@2026-10-26', 'egg', '2026-10-26', '2026.11.0', 20) ON CONFLICT DO NOTHING"),
+      db.prepare("INSERT INTO play_weeks (user_id, dataset, week, day_keys) VALUES ('p1', 'trails', '2026-10-26', 1) ON CONFLICT DO NOTHING"),
+      db.prepare("INSERT INTO play_totals (user_id, dataset, total) VALUES ('p1', 'trails', 35) ON CONFLICT DO NOTHING"),
+    ]);
+    await expect(
+      db.prepare("INSERT INTO play_claims VALUES ('p1', 'rivers', 'x@2026-10-26', 'egg', '2026-10-26', 'v', 0)").run(),
+    ).rejects.toThrow(/CHECK constraint failed/);
+  });
+
+  it("0004 cleanup still applies after 0005", async () => {
+    await applyD1Migrations(db, all);
+    const tables = async () => (await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all<{ name: string }>()).results.map((r) => r.name);
+    await db.batch([
+      db.prepare("INSERT INTO users (id, provider, sub, anon_name) VALUES ('p2', 'dev', 'ps2', 'Calm Otter 22') ON CONFLICT DO NOTHING"),
+      db.prepare("INSERT INTO walks VALUES ('p2', 'w9') ON CONFLICT DO NOTHING"),
+      db.prepare("INSERT INTO play_claims VALUES ('p2', 'roads', 'egg-madrone@2026-10-26', 'egg', '2026-10-26', '2026.11.0', 20) ON CONFLICT DO NOTHING"),
+      db.prepare("INSERT INTO play_totals (user_id, dataset, found_marks, total) VALUES ('p2', 'roads', 20, 20) ON CONFLICT DO NOTHING"),
+    ]);
+    await db.batch(env.CLEANUP_QUERIES.map((q) => db.prepare(q)));
+    const t = await tables();
+    for (const n of ["walks", "leaderboard_snapshot", "trail_stats_snapshot", "snapshot_meta"]) expect(t).not.toContain(n);
+    for (const n of ["play_claims", "play_weeks", "play_totals", "play_attack_stretches"]) expect(t).toContain(n);
+    expect(await one("SELECT marks FROM play_claims WHERE user_id = 'p2'")).toEqual({ marks: 20 });
+    expect(await one("SELECT total FROM play_totals WHERE user_id = 'p2'")).toEqual({ total: 20 });
+    expect(await one("SELECT walk_id FROM walks_v2 WHERE user_id = 'p2'")).toEqual({ walk_id: "w9" });
   });
 });

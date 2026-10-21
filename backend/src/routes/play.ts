@@ -1,5 +1,9 @@
-import { ApiError } from "../http";
+import type { UserRow } from "../auth";
+import type { Deps } from "../deps";
+import { ApiError, json } from "../http";
+import { CLAIM_KINDS, playSummary } from "../play/claims";
 import { CONTENT_BODY, CURRENT, contentEtag, tidesFor } from "../play/config";
+import { parseDataset } from "../segments";
 
 const CONTENT_CACHE = "public, max-age=300";
 const TIDES_CACHE = "public, max-age=31536000, immutable";
@@ -31,4 +35,30 @@ export function playTides(path: string): Response {
   const table = m ? tidesFor(Number(m[1])) : null;
   if (!table) throw new ApiError(404, "not_found", "no tide table for that year");
   return new Response(JSON.stringify(table), { status: 200, headers: { "content-type": JSON_TYPE, "cache-control": TIDES_CACHE } });
+}
+
+/**
+ * GET /v1/play/me?dataset=trails|roads (schedule.md § 7.2, product § 3.6.5): the Play chip summary and the Logbook
+ * restore after a reinstall. `total` = the server total, `week` = this week's finds + W-DAY marks (`weekId` = the
+ * server's current week), `perKind` = claim counts, `occ` = every claimed occurrence key (re-marked found, never
+ * claimed twice). No times, no days, no positions. No side effects.
+ */
+export async function playMe(url: URL, env: Env, deps: Deps, user: UserRow): Promise<Response> {
+  const dataset = parseDataset(url.searchParams.get("dataset") ?? undefined);
+  const [summary, claims] = await Promise.all([
+    playSummary(env, user.id, dataset, deps.now()),
+    env.DB.prepare("SELECT occ, kind FROM play_claims WHERE user_id = ? AND dataset = ? ORDER BY occ")
+      .bind(user.id, dataset)
+      .run<{ occ: string; kind: string }>(),
+  ]);
+  const perKind: Record<string, number> = Object.fromEntries(CLAIM_KINDS.map((k) => [k, 0]));
+  for (const c of claims.results) if (c.kind in perKind) perKind[c.kind]!++;
+  return json({
+    dataset,
+    weekId: summary.weekId,
+    total: summary.total,
+    week: summary.week,
+    perKind,
+    occ: claims.results.map((c) => c.occ),
+  });
 }

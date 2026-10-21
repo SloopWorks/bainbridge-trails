@@ -26,6 +26,8 @@ Follows `docs/mvp/decisions.md` (TL-*) over `product.md`.
 | 400 | `invalid_dataset` | `dataset` not `trails`/`roads`, or body and query disagree |
 | 400 | `invalid_coverage` | bad segment id (incl. the other dataset's prefix), bad base64, bits beyond tick count, `tickM != 5`, bad walk id/duration, too many segments |
 | 400 | `too_many_walks` | more walks than allowed in one upload (`maxWalks`: 2000 before the first accepted upload, then 200) |
+| 400 | `invalid_play` | malformed Play fields on `PUT /v1/coverage` (`play` not an array, bad `walkId`, two elements for one walk, claim without string `id`/`kind`/`weekId`, bad `hints`/`dayKey`/`playConfig`) |
+| 400 | `too_many_claims` | more than 50 Play claims in one upload (`maxClaims`: 50) |
 | 400 | `name_invalid` | display name breaks a format rule, or bad `anonName` |
 | 400 | `name_rejected` | display name hits the blocklist |
 | 401 | `unauthorized` | no/invalid/expired session token |
@@ -146,7 +148,7 @@ a name longer than 24 chars) → 47 adjectives × 47 nouns × NN 10–99. The cl
 ### `DELETE /v1/me`
 
 Deletes the account and **all** server data in every dataset (coverage, trail/road fractions, completions,
-metrics, walk ids, sessions, reports by/against, leaderboard rows); revokes the Apple token when configured. `204`. Local data is the
+metrics, walk ids, Play claims / week rows / totals, sessions, reports by/against, leaderboard rows); revokes the Apple token when configured. `204`. Local data is the
 client's decision (D12). Signing in again creates a fresh account.
 
 Public web page for store listings: `GET /delete-account` (HTML, no `/v1`).
@@ -209,6 +211,8 @@ keys sorted. Server responses are always normalized this way.
   `rseg-NNNNNN`) → `400`.
 - `429 rate_limited`: 30 uploads/hour per account and dataset. Upload per finished walk + once on
   sign-in, not continuously.
+- Play (optional fields `playConfig`, `play`; see [Claims on `PUT /v1/coverage`](#claims-on-put-v1coverage)): absent
+  = this exact request and response; present = the same `200` plus a trailing `play` object.
 
 ### `GET /v1/coverage?dataset=trails|roads`
 
@@ -309,9 +313,10 @@ RD-7 (`docs/roads/decisions.md`): one account, two goals. `dataset` = `trails` (
 
 ## Play (opt-in gamification)
 
-Specs: `docs/play/schedule.md` § 4.8, § 7 (endpoints § 7.5) and `docs/play/decisions.md` PD-10, PD-11. The Play
-endpoints below are public (no auth) and share the public per-IP limit (120 requests / 10 min, `429 rate_limited`).
-Claims on `PUT /v1/coverage`, `GET /v1/play/me` and `GET /v1/play/challenges` are added by later stages.
+Specs: `docs/play/schedule.md` § 4.8, § 7 (endpoints § 7.5), `docs/play/product.md` § 3.5, § 3.6, § 3.10 and
+`docs/play/decisions.md` PD-2, PD-3, PD-10, PD-11. `GET /v1/play/content` and `GET /v1/play/tides/{year}` are public
+(no auth) and share the public per-IP limit (120 requests / 10 min, `429 rate_limited`); claims ride
+`PUT /v1/coverage` and `GET /v1/play/me` needs the bearer token. `GET /v1/play/challenges` is added by a later stage.
 
 ### `GET /v1/play/content?v=<cachedVersion>`
 
@@ -347,6 +352,98 @@ the Monday's date (`2027-01-04`). An occurrence key is `<itemId>@<yyyy-mm-dd>[#n
 first island-local date (the Monday for weekly items, the Thursday for the kraken window Thu 06:00 → Sun 20:00).
 The server evaluates the date-level recurrence rules and `HH:MM` windows only; `data/play/golden/date-rules-2027.json`
 is the parity golden shared with the app.
+
+Placement index `#n` (multi-placement items only), zero-padded to the digits of the largest index:
+- weekly treasure: `#00`…`#11` (trails) / `#00`…`#19` (roads). Placement `n` takes the pack's `tiers` in order,
+  each repeated `count` times (trails `#00`–`#06` sea glass, `#07`–`#09` agate, `#10` glass float, `#11` ship's
+  bell); the `everyNthWeek: 4` tier pays as its `else` tier except in weeks whose index since the pack epoch's
+  week (2026-10-26 = week 0) is a multiple of 4.
+- kraken: `kraken-<goal>@<Thursday>#n` = stretch `n` of that week's coast (`rotate[weeks since epoch mod len]`), in
+  the order of the coast pool's `members` (= `derived-<goal>.json` `coasts.<pool>.stretches`).
+- every other item: no `#n`.
+
+### Claims on `PUT /v1/coverage`
+
+Only when signed in **and** Play is on. Two optional body fields next to the coverage fields:
+
+```json
+"playConfig": "2026.11.0",
+"play": [ { "walkId": "6f1c2a7e-9a43-4c1e-8f0b-2d1e5b7c9a10",
+            "claims": [ { "id": "treasure-weekly-roads@2026-10-26#07", "kind": "treasure", "weekId": "2026-10-26" },
+                        { "id": "kraken-roads@2026-10-29#0", "kind": "ink", "weekId": "2026-10-26", "band": 95 } ],
+            "dayKey": "2026-10-26",
+            "hints": { "riddle-madrone": 1 } } ]
+```
+
+- One element per walk, tied by `walkId` to a `walks[]` entry of the **same** upload; at most 50 claims per upload
+  (`400 too_many_claims`). Walks over the walk cap keep their element queued for the next upload.
+- `kind` ∈ `treasure`, `egg`, `riddle`, `ink` (kraken stretch), `lore`, `challenge`; `band` (60 / 80 / 95) only on
+  `ink`. `weekId` = the week id the claim belongs to. `dayKey` = the week id, sent once per island day on the walk
+  that earned W-DAY (server: ≤ 7 per week). `hints` = hints used per riddle item claimed on this walk (0–2 count).
+  `playConfig` = the pack version the phone evaluated the claims against.
+- No marks, times, days or coordinates: any other field (a client `marks`, `total`, `tier`) is ignored. The server
+  derives every mark from the pack named by `playConfig` and the accepted coverage.
+- Evaluated only after the coverage passes plausibility, in the same batch that credits the walks: a `422` rejects
+  the coverage **and** its claims (mark them `local_only`), and a retried upload never double counts.
+
+`200` = the usual coverage body plus, last:
+
+```json
+"play": {
+  "accepted": ["treasure-weekly-roads@2026-10-26#07"],
+  "rejected": [ { "id": "kraken-roads@2026-10-29#0", "code": "no_bits" } ],
+  "capped": [],
+  "total": 4180,
+  "week": 140
+}
+```
+
+- `accepted`: claim ids now stored, including re-sent ones (a repeat is a no-op that still reports `accepted`) and
+  `capped` ones. `rejected`: the others with a code; keep them `local_only`, do not resend. `capped`: accepted
+  with 0 marks because the week id's found marks reached 2,800 (`week_cap`).
+- `total`: the server's marks total for this goal (W-COV, W-DONE, W-SQUARE, finds, W-DAY; later W-WEEK and
+  challenges). `week`: this server week's finds + W-DAY marks. Show the server values; client totals are display only.
+- Rejection codes (per claim, checked in this order after a repeat check):
+
+| code | when |
+|---|---|
+| `stale_config` | `playConfig` missing or not one of the Worker's last 8 packs |
+| `unknown_item` | no enabled, non-killed item with that id for this goal, or `kind` does not match its type (a `challenge` claim also until the challenges stage lands) |
+| `bad_occurrence` | malformed key, no occurrence starts on that date, `#n` missing / out of range / not zero-padded, `#n` on a single item, `weekId` not a Monday or the occurrence not active in it, `band` the item does not pay |
+| `not_this_walk` | `walkId` is not a walk this upload credits (new in `walks[]`) |
+| `too_early` | occurrence starts more than 1 h after server now, or `weekId` is after the server's current week |
+| `too_late` | `weekId` before the server's previous week, or the occurrence ended before the server island date − 2 days |
+| `no_bits` | `ink`: less than `band` % of the stretch's length carries your coverage bits after the merge; feature riddle: less than 100 m of the answer feature does |
+
+- Walk-derived marks need no claim: whenever `play` is present (even `[]`), the server recomputes W-COV
+  (`floor(non-quiet covered m / 10)` trails, `/ 25` roads), W-DONE (+100 / +25 per completed non-quiet feature) and
+  W-SQUARE (+25 per chart square) from the merged coverage and credits `max(previous, new)` (this is also the
+  opt-in starting balance).
+
+### `GET /v1/play/me?dataset=trails|roads`
+
+Bearer required (`401` without). The Play chip summary and the Logbook restore after a reinstall (product § 3.6.5).
+No side effects.
+
+```json
+{
+  "dataset": "roads",
+  "weekId": "2026-10-26",
+  "total": 4180,
+  "week": 140,
+  "perKind": { "treasure": 3, "egg": 1, "riddle": 1, "ink": 1, "lore": 2, "challenge": 0 },
+  "occ": ["egg-madrone@2026-10-26", "kraken-roads@2026-10-29#0", "treasure-weekly-roads@2026-10-26#07"]
+}
+```
+
+`weekId` = the server's current week; `week` = that week's finds + W-DAY marks; `perKind` = claim counts;
+`occ` = every claimed occurrence key, sorted (re-mark them found; never claim them again).
+
+### Dev clock (local only)
+
+`DEV_CLOCK_OFFSET_MS` in `backend/.dev.vars` shifts the server clock by that many milliseconds so an e2e run at a
+debug build's Play clock passes the time rules. It is honoured only when `ALLOW_DEV_AUTH=true` **and** the request
+host is `localhost`, `127.0.0.1` or `10.0.2.2`; anywhere else it is ignored (tested).
 
 ## Other
 
