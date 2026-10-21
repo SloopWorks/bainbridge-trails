@@ -31,6 +31,19 @@ Build the APK first (from `app/`, with the plugin repository property below): `.
 goals are two packages of the one project, each with its own channel head; `publish <apk>` reads the application id from the APK.
 Every command takes `--json` and returns a single object; exit code 0 means it worked.
 
+### Credential for this project (owner-installed, 2026-10-21)
+
+The saved CLI login is scoped to another project and answers `E_NOT_FOUND` for Bainbridge. Run every command through the
+owner's launcher, which pins the server and loads the Bainbridge publisher token:
+
+```sh
+/Users/patrick/.local/bin/shipyard-deploy-bainbridge status --application-id com.bainbridgetrails.app.dev --json
+/Users/patrick/.local/bin/shipyard-deploy-bainbridge publish <apk> --dry-run --json
+```
+
+Two packages are configured, so `status` and `channels list` need `--application-id`; `publish` reads it from the APK.
+Never copy the token or the profile into the repo.
+
 ### Do not
 
 - Do not publish a build you did not just build from the current working tree.

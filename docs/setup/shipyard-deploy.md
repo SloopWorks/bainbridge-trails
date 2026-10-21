@@ -4,7 +4,7 @@ Config: [`app/.shipyard-deploy.yaml`](../../app/.shipyard-deploy.yaml) (project 
 `main` for `main`, `dev-{branch_slug}` otherwise). Agent rules: [`app/AGENTS.md`](../../app/AGENTS.md). Control plane:
 the one `shipyard-deploy login` recorded (today `shipyard-deploy-dev.patjackson52.workers.dev`).
 
-## One-time, admin token only (2026-10-21: not yet done)
+## One-time, admin token only (done 2026-10-21; kept for new servers)
 
 `shipyard-deploy onboard --dir app` reported the project does not exist and the publisher token cannot create it. With
 `SHIPYARD_DEPLOY_SERVER` and an admin `ADMIN_TOKEN` in the environment:
@@ -28,6 +28,10 @@ The fingerprint is this machine's `~/.android/debug.keystore`; another builder a
 creating channels by hand also belong to the owner.
 
 ## Every publish (agents may run this)
+
+Use the owner's launcher `/Users/patrick/.local/bin/shipyard-deploy-bainbridge` in place of `shipyard-deploy` (it pins the
+server and loads the Bainbridge publisher token; the plain CLI's saved login belongs to another project). First publish:
+2026-10-21, both apps on channel `main`, version 1.0 (1).
 
 ```sh
 cd app
