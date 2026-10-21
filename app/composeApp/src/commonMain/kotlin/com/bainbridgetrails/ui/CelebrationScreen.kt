@@ -35,7 +35,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -211,11 +213,16 @@ fun CelebrationScreen(
         // Play (ux.md §3.10): up to two lines (marks, rank-up) from this walk's Logbook entries; Play off: none.
         val play = if (settings?.play?.enabled == true) graph.playOrNull else null
         val playState = play?.store?.state?.collectAsStateWithLifecycle()?.value
-        // Frozen at appear (AC 9 P2): later Logbook updates never re-read the assertive text.
-        val playLines = remember(playState != null, sessionId, preview) {
-            if (playState == null || preview) emptyList()
-            else celebrationPlayLines(ResultsPlayLogic.section(sessionId, playState.logbook, null, { it }, summaryShown = false))
+        // Frozen on the first non-empty section (AC 9 P2/P3): this walk's entries may land after the screen appears;
+        // once shown, later Logbook updates never change the lines or re-read the assertive text.
+        val logbook = playState?.logbook
+        val freshLines = remember(logbook, sessionId, preview) {
+            if (logbook == null || preview) emptyList()
+            else celebrationPlayLines(ResultsPlayLogic.section(sessionId, logbook, null, { it }, summaryShown = false))
         }
+        val frozenLines = remember(sessionId, preview) { mutableStateOf(emptyList<CelebrationPlayLine>()) }
+        val playLines = frozenPlayLines(frozenLines.value, freshLines)
+        SideEffect { frozenLines.value = playLines }
         CelebrationContent(
             data, shown, trails.map { it.id to it.name }, if (preview) null else islandBefore, community, onContinue, onViewTrail,
             wholeIsland = whole,
@@ -451,6 +458,10 @@ internal fun celebrationPlayLines(section: ResultsPlaySection?): List<Celebratio
         section.rankUp?.let { CelebrationPlayLine.RankUp(it) },
     ).take(2)
 }
+
+/** The lines to show: [frozen] once it is non-empty, else [fresh] (the first non-empty section freezes them). */
+internal fun frozenPlayLines(frozen: List<CelebrationPlayLine>, fresh: List<CelebrationPlayLine>): List<CelebrationPlayLine> =
+    frozen.ifEmpty { fresh }
 
 /** The trails' segments as polylines in a unit-free local projection, chained so the draw runs along the trail. */
 private fun glyphLines(data: TrailData, trailIds: List<String>, origin: Pair<Double, Double>? = null): List<List<Offset>> {

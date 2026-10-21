@@ -11,10 +11,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
+import com.bainbridgetrails.data.PlaySettings
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.play.fx.FxGlyphImage
 import com.bainbridgetrails.resources.Res
@@ -23,26 +26,35 @@ import com.bainbridgetrails.resources.play_quiet_banner_action
 import com.bainbridgetrails.ui.theme.BtTheme
 import org.jetbrains.compose.resources.stringResource
 
-/** The quiet banner is announced (politely) once per island [day] per process (ux.md § 5.4). Pure. */
+/** The quiet banner is announced (politely) once per island day (ux.md § 5.4), persisted in [PlaySettings]. Pure. */
 internal object QuietBannerAnnounce {
-    private var lastDay: String? = null
+    fun due(day: String, announcedOn: String?): Boolean = day.isNotEmpty() && day != announcedOn
 
-    fun first(day: String): Boolean {
-        if (day == lastDay) return false
-        lastDay = day
-        return true
-    }
+    fun announced(play: PlaySettings, day: String): PlaySettings = play.copy(quietAnnouncedOn = day)
 }
 
 /**
  * Quiet day (Mar 30) banner (ux.md §3.5.6): replaces the Play row; quiet glyph, no sea glass, no motion. Its line is
- * said politely through [announce] (Play's one announcer) once per [day].
+ * said politely through [announce] (Play's one announcer) once per island [day]: only when [announcedOn] (the
+ * persisted last announced day) differs, then [onAnnounced] records [day] so a restart that day stays silent.
  */
 @Composable
-fun QuietBanner(onRead: () -> Unit, modifier: Modifier = Modifier, day: String = "", announce: ((String) -> Unit)? = null) {
+fun QuietBanner(
+    onRead: () -> Unit,
+    modifier: Modifier = Modifier,
+    day: String = "",
+    announcedOn: String? = null,
+    onAnnounced: (String) -> Unit = {},
+    announce: ((String) -> Unit)? = null,
+) {
     val line = stringResource(Res.string.play_quiet_banner)
+    val announcedNow by rememberUpdatedState(announcedOn)
+    val onAnnouncedNow by rememberUpdatedState(onAnnounced)
     LaunchedEffect(day, announce != null) {
-        if (announce != null && QuietBannerAnnounce.first(day)) announce(line)
+        if (announce != null && QuietBannerAnnounce.due(day, announcedNow)) {
+            onAnnouncedNow(day)
+            announce(line)
+        }
     }
     Row(
         modifier.fillMaxWidth().heightIn(min = 56.dp).shadow(3.dp, MaterialTheme.shapes.large)

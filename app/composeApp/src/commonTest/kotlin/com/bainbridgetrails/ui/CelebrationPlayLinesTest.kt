@@ -21,4 +21,16 @@ class CelebrationPlayLinesTest {
         assertEquals(emptyList(), celebrationPlayLines(ResultsPlaySection(emptyList(), total = 0, rankUp = null, unclaimed = emptyList())))
         assertEquals(1, celebrationPlayLines(ResultsPlaySection(emptyList(), total = 40, rankUp = null, unclaimed = emptyList())).size)
     }
+
+    @Test
+    fun freezesOnTheFirstNonEmptySection() {
+        val marks = listOf(CelebrationPlayLine.Marks(300))
+        val later = listOf(CelebrationPlayLine.Marks(340), CelebrationPlayLine.RankUp(rank))
+        // The walk's entries arrive after the screen appears: empty → lines.
+        assertEquals(emptyList(), frozenPlayLines(emptyList(), emptyList()))
+        assertEquals(marks, frozenPlayLines(emptyList(), marks))
+        // Once shown, later Logbook updates never change (or re-announce) them.
+        assertEquals(marks, frozenPlayLines(marks, later))
+        assertEquals(marks, frozenPlayLines(marks, emptyList()))
+    }
 }

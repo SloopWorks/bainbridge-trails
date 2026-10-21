@@ -48,7 +48,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import com.bainbridgetrails.play.fx.FxPoliteness
-import com.bainbridgetrails.ui.play.map.PlayChipRow
+import com.bainbridgetrails.ui.play.map.PlayChipRowLayout
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -178,6 +178,7 @@ import com.bainbridgetrails.ui.play.map.PlayMapSync
 import com.bainbridgetrails.ui.play.map.PlayMarkerLogic
 import com.bainbridgetrails.ui.play.map.PlayMarkers
 import com.bainbridgetrails.ui.play.map.QuietBanner
+import com.bainbridgetrails.ui.play.map.QuietBannerAnnounce
 import com.bainbridgetrails.ui.play.map.RiddleAnswerPicker
 import com.bainbridgetrails.ui.play.map.RiddleBlock
 import com.bainbridgetrails.ui.play.map.RiddleLogic
@@ -717,29 +718,40 @@ fun MapTab(
                     QuietBanner(
                         onRead = { playSelected = playMarkers.firstOrNull { it.kind == MarkerKind.REMEMBRANCE }?.key },
                         day = agenda.day.date.toString(),
+                        announcedOn = settings.play.quietAnnouncedOn,
+                        onAnnounced = { day -> graph.settings.update { it.copy(play = QuietBannerAnnounce.announced(it.play, day)) } },
                         announce = remember(fx) { fx?.announcer?.let { a -> { text: String -> a.say(text, FxPoliteness.POLITE) } } },
                     )
                 } else {
                     val total = playState?.logbook?.total
-                    // § 5.3: at font scale ≥ 1.5 both chips go compact and the row wraps.
-                    val compact = PlayChipRow.compact(density.fontScale)
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    val count = agenda?.let { PlayMarkerLogic.challengesThisWeek(it) } ?: 0
+                    val shownTotal = total?.takeIf { agenda != null }
+                    val rankTitle = stringResource(Ranks.of(shownTotal ?: 0).titleRes)
+                    // §2.1 / §5.3: compact by measurement (Challenges chip first, then the rank title); both compact
+                    // at font scale ≥ 1.3; the Challenges chip wraps under the Play chip at ≥ 1.5.
+                    PlayChipRowLayout(
+                        fontScale = density.fontScale,
+                        playChip = { c -> PlayHud(shownTotal, rankTitle, {}, compact = c) },
+                        challengesChip = if (count > 0) { c -> ChallengesChip(count, {}, compact = c) } else null,
                         modifier = Modifier.padding(end = 56.dp),
-                    ) {
-                        val chipModifier = Modifier.focusRequester(playChipFocus)
-                        if (total != null && agenda != null) {
-                            val pop = remember { ClaimPopState(total) }
-                            SideEffect { claimPop = pop }
-                            // claim_pop (effects § 3.12): claimed marks fly into the chip; the first value is the baseline.
-                            LaunchedEffect(total) { if (total > pop.total) pop.pop(total - pop.total, null, reduced) }
-                            LivePlayHud(pop, stringResource(Ranks.of(total).titleRes), onPlayLogbook, compact, chipModifier)
-                        } else {
-                            PlayHud(null, stringResource(Ranks.of(0).titleRes), onPlayLogbook, chipModifier, compact = compact)
+                    ) { step ->
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            maxItemsInEachRow = if (step.wrap) 1 else Int.MAX_VALUE,
+                        ) {
+                            val chipModifier = Modifier.focusRequester(playChipFocus)
+                            if (total != null && agenda != null) {
+                                val pop = remember { ClaimPopState(total) }
+                                SideEffect { claimPop = pop }
+                                // claim_pop (effects § 3.12): claimed marks fly into the chip; the first value is the baseline.
+                                LaunchedEffect(total) { if (total > pop.total) pop.pop(total - pop.total, null, reduced) }
+                                LivePlayHud(pop, rankTitle, onPlayLogbook, step.playCompact, chipModifier)
+                            } else {
+                                PlayHud(null, rankTitle, onPlayLogbook, chipModifier, compact = step.playCompact)
+                            }
+                            if (count > 0) ChallengesChip(count, onPlayChallenges, compact = step.challengesCompact)
                         }
-                        val count = agenda?.let { PlayMarkerLogic.challengesThisWeek(it) } ?: 0
-                        if (count > 0) ChallengesChip(count, onPlayChallenges, compact = compact)
                     }
                 }
             }
