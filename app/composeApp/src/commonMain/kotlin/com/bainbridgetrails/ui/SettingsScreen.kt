@@ -90,6 +90,44 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.bainbridgetrails.data.PlaySettings
+import com.bainbridgetrails.play.DebugPlayClock
+import com.bainbridgetrails.play.time.IslandTime
+import com.bainbridgetrails.resources.play_me_stories
+import com.bainbridgetrails.resources.play_settings_about
+import com.bainbridgetrails.resources.play_settings_ambient
+import com.bainbridgetrails.resources.play_settings_ambient_body
+import com.bainbridgetrails.resources.play_settings_clock_debug
+import com.bainbridgetrails.resources.play_settings_logbook
+import com.bainbridgetrails.resources.play_settings_ranks
+import com.bainbridgetrails.resources.play_settings_replay
+import com.bainbridgetrails.resources.play_settings_section
+import com.bainbridgetrails.resources.play_settings_sounds
+import com.bainbridgetrails.resources.play_settings_sounds_body
+import com.bainbridgetrails.resources.play_settings_toggle
+import com.bainbridgetrails.resources.play_settings_toggle_body
+import com.bainbridgetrails.ui.components.SettingSwitchRow
+import com.bainbridgetrails.ui.play.sheets.PlayAboutSheet
+import com.bainbridgetrails.ui.play.sheets.PlayIntroSheet
+import com.bainbridgetrails.ui.play.sheets.PlayOffSheet
+import com.bainbridgetrails.ui.play.sheets.PlayOptInGraph
+import com.bainbridgetrails.ui.play.sheets.PlaySheet
+import com.bainbridgetrails.ui.play.sheets.PlayToggleFlow
+import com.bainbridgetrails.ui.play.sheets.SnapshotWalkDerived
+import com.bainbridgetrails.ui.theme.BtDuration
+import com.bainbridgetrails.ui.theme.BtEasing
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Map style choice (decisions.md TL-4): Auto = Topo in light mode, Dark in dark mode. Stored as the existing
@@ -121,6 +159,13 @@ fun SettingsScreen(
     onAccount: () -> Unit,
     onAttribution: () -> Unit,
     onPrivacy: () -> Unit,
+    /** Settings › Play rows (ux.md § 3.1). [onPlayStarted]: Start landed (marks of a new start balance, else null). */
+    onPlayStarted: (Int?) -> Unit = {},
+    onRanks: () -> Unit = {},
+    onLogbook: () -> Unit = {},
+    onStories: () -> Unit = {},
+    onReplayWake: () -> Unit = {},
+    onPlayClock: () -> Unit = {},
 ) {
     val auth by graph.auth.state.collectAsStateWithLifecycle()
     val profile by graph.profile.profile.collectAsStateWithLifecycle()
@@ -130,6 +175,19 @@ fun SettingsScreen(
     val uri = LocalUriHandler.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    val toggle = rememberPlayToggle(graph, settings.play.enabled)
+    val toggleState by toggle.state.collectAsStateWithLifecycle()
+    var aboutOpen by remember { mutableStateOf(false) }
+    when (toggleState.sheet) {
+        PlaySheet.Intro -> PlayIntroSheet(
+            starting = toggleState.starting,
+            onStart = { scope.launch { onPlayStarted(toggle.onStart()) } },
+            onDismiss = toggle::onIntroDismissed,
+        )
+        PlaySheet.Off -> PlayOffSheet(onConfirm = { scope.launch { toggle.onOffConfirmed() } }, onCancel = toggle::onOffCancelled)
+        null -> Unit
+    }
+    if (aboutOpen) PlayAboutSheet { aboutOpen = false }
     ListScreen(stringResource(Res.string.settings_title), onBack = onBack, snackbar = snackbar) {
         item { Group(stringResource(Res.string.settings_map)) }
         item {
@@ -171,6 +229,13 @@ fun SettingsScreen(
                 }
             }
         }
+        playSection(
+            settings.play, toggle,
+            onSounds = { on -> graph.settings.update { it.copy(play = it.play.copy(sounds = on)) } },
+            onAmbient = { on -> graph.settings.update { it.copy(play = it.play.copy(ambient = on)) } },
+            onRanks = onRanks, onLogbook = onLogbook, onStories = onStories, onAbout = { aboutOpen = true },
+            onReplayWake = onReplayWake, onPlayClock = onPlayClock.takeIf { AppGraph.playClock is DebugPlayClock },
+        )
         item { Group(stringResource(Res.string.settings_account)) }
         item {
             val signedIn = auth is AuthState.SignedIn
@@ -207,6 +272,74 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** The Play toggle flow over this graph (production [PlayOptInGraph]); follows settings changed elsewhere. */
+@OptIn(ExperimentalUuidApi::class)
+@Composable
+private fun rememberPlayToggle(graph: AppGraph.Installed, enabled: Boolean): PlayToggleFlow {
+    val flow = remember(graph) {
+        PlayToggleFlow(
+            PlayOptInGraph(
+                updatePlay = { change -> graph.settings.updateNow { it.copy(play = change(it.play)) } },
+                repo = { graph.playOrNull },
+                walkDerived = { repo ->
+                    val snapshot = graph.progress.refreshNow()
+                    val data = AppGraph.datasets.await()
+                    SnapshotWalkDerived.of(repo.goal, data.dataset, snapshot, repo.config.value?.config)
+                },
+                today = { IslandTime.dateOf(AppGraph.playClock.now()) },
+                newId = { Uuid.random().toString() },
+            ),
+            enabled,
+        )
+    }
+    LaunchedEffect(enabled) { flow.sync(enabled) }
+    return flow
+}
+
+/** Settings › Play (ux.md § 3.1; product § 5.1): the switch, and when on the Play rows (revealed medium2, reduced: instant). */
+private fun LazyListScope.playSection(
+    play: PlaySettings,
+    toggle: PlayToggleFlow,
+    onSounds: (Boolean) -> Unit,
+    onAmbient: (Boolean) -> Unit,
+    onRanks: () -> Unit,
+    onLogbook: () -> Unit,
+    onStories: () -> Unit,
+    onAbout: () -> Unit,
+    onReplayWake: () -> Unit,
+    onPlayClock: (() -> Unit)?,
+) {
+    item(key = "play-h") { Group(stringResource(Res.string.play_settings_section)) }
+    item(key = "play-toggle") {
+        val st by toggle.state.collectAsStateWithLifecycle()
+        SettingSwitchRow(
+            stringResource(Res.string.play_settings_toggle),
+            checked = st.switchOn,
+            onCheckedChange = toggle::onSwitch,
+            description = stringResource(Res.string.play_settings_toggle_body),
+        )
+    }
+    item(key = "play-rows") {
+        val reduced = BtTheme.motion.reduced
+        AnimatedVisibility(
+            play.enabled,
+            enter = if (reduced) EnterTransition.None else expandVertically(tween(BtDuration.medium2, easing = BtEasing.emphasizedDecelerate)),
+            exit = if (reduced) ExitTransition.None else shrinkVertically(tween(BtDuration.short4)),
+        ) {
+            Column {
+                SettingSwitchRow(stringResource(Res.string.play_settings_sounds), play.sounds, onSounds, description = stringResource(Res.string.play_settings_sounds_body))
+                SettingSwitchRow(stringResource(Res.string.play_settings_ambient), play.ambient, onAmbient, description = stringResource(Res.string.play_settings_ambient_body))
+                NavRow(stringResource(Res.string.play_settings_ranks), onRanks)
+                NavRow(stringResource(Res.string.play_settings_logbook), onLogbook)
+                NavRow(stringResource(Res.string.play_me_stories), onStories)
+                NavRow(stringResource(Res.string.play_settings_about), onAbout)
+                NavRow(stringResource(Res.string.play_settings_replay), onReplayWake, trailingIcon = null)
+                if (onPlayClock != null) NavRow(stringResource(Res.string.play_settings_clock_debug), onPlayClock)
+            }
         }
     }
 }

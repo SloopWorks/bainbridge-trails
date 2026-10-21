@@ -10,7 +10,7 @@ import kotlin.time.Instant
  * Debug-binary launch options for simulator screenshots (iOS: `-btScreen me -btScroll 4 -btPage 2 -btDevSignIn 1`,
  * read in MainViewController). Release never sets them. [screen]: trails, me, leaderboard, profile, settings,
  * attribution, privacy, onboarding, trail:<trailId> (Trail detail), walk (newest walk) / walk:<sessionId>
- * (Walk detail), celebrate-island (island 100% celebration preview), fx (MapFx spike). [scroll]: first visible list item on that screen. [page]: onboarding page.
+ * (Walk detail), celebrate-island (island 100% celebration preview), logbook / whats-on / challenges / ranks / stories (Play screens, Play on), fx (MapFx spike). [scroll]: first visible list item on that screen. [page]: onboarding page.
  *
  * Play (schedule.md § 4.1, plan.md L2-3; iOS `-btPlayClock 2026-10-29T14:00 -btPlayTide low -btPlayConfig bundled`,
  * Android debug `--es playClock … --es playTide … --es playConfig bundled`): [playClock] = island wall time the Play

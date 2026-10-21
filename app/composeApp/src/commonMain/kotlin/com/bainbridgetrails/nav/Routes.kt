@@ -32,8 +32,18 @@ sealed interface Route
 /** Debug spike: the map style comparison screen (`screen=style` launch option). */
 @Serializable data object StyleSpikeRoute : Route
 
-/** Debug spike: MapFx Stage 0 spikes (`screen=fx` launch option / `-btScreen fx`; docs/play/spikes/fx.md). */
-@Serializable data object FxSpikeRoute : Route
+/** Debug: the Play FX showcase (`screen=fx` launch option / `-btScreen fx`; docs/play/effects.md §7). */
+@Serializable data object FxShowcaseRoute : Route
 
 /** Debug: design-system showcase (`screen=showcase` launch option). */
 @Serializable data object ShowcaseRoute : Route
+
+// --- Play (docs/play/ux.md § 3.12–3.17, § 3.19; pushed in the current tab's stack, Play on only)
+@Serializable data object LogbookRoute : Route
+@Serializable data object RanksRoute : Route
+@Serializable data object WhatsOnRoute : Route
+@Serializable data object ChallengesRoute : Route
+@Serializable data object IslandStoriesRoute : Route
+@Serializable data class LoreCardRoute(val itemId: String) : Route
+/** Debug builds only (Settings › Play clock). */
+@Serializable data object PlayClockDebugRoute : Route

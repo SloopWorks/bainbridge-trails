@@ -41,7 +41,7 @@ import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.auth.isSignedIn
 import com.bainbridgetrails.map.SpikeLaunch
 import com.bainbridgetrails.map.StyleSpikeScreen
-import com.bainbridgetrails.play.spike.FxSpikeScreen
+import com.bainbridgetrails.play.fx.showcase.FxShowcaseScreen
 import com.bainbridgetrails.record.RecordScreen
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.nav_map
@@ -49,6 +49,7 @@ import com.bainbridgetrails.resources.nav_me
 import com.bainbridgetrails.resources.nav_record
 import com.bainbridgetrails.resources.nav_recording
 import com.bainbridgetrails.resources.nav_trails
+import com.bainbridgetrails.resources.play_start_balance
 import com.bainbridgetrails.tracking.RecordingController
 import com.bainbridgetrails.tracking.RecordingState
 import com.bainbridgetrails.ui.AttributionScreen
@@ -76,6 +77,7 @@ import com.bainbridgetrails.ui.theme.BtDuration
 import com.bainbridgetrails.ui.theme.BtEasing
 import com.bainbridgetrails.ui.theme.BtTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
@@ -101,7 +103,7 @@ internal fun startRouteFor(launch: SpikeLaunch?): Route = when (launch?.screen) 
     SpikeLaunch.Screen.RECORD -> RecordRoute
     SpikeLaunch.Screen.STYLE -> StyleSpikeRoute
     SpikeLaunch.Screen.SHOWCASE -> ShowcaseRoute
-    SpikeLaunch.Screen.FX -> FxSpikeRoute
+    SpikeLaunch.Screen.FX -> FxShowcaseRoute
 }
 
 /** Opens the Record flow as a full-screen layer over the current screen (ux.md §2.5); never a tab of its own. */
@@ -193,6 +195,8 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
     // Content stops at the bar's top edge (80dp + nav inset); the Record disc rises over it.
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val barPadding = if (showBar) BtTheme.spacing.bottomBarHeight + navInset else 0.dp
+    val playSnackbar = remember { androidx.compose.material3.SnackbarHostState() }
+    val playScope = androidx.compose.runtime.rememberCoroutineScope()
     Box(Modifier.fillMaxSize()) {
         NavHost(
             nav,
@@ -242,6 +246,9 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                         com.bainbridgetrails.ui.RoadsListState.query = com.bainbridgetrails.ui.RoadListQuery(groups = setOf(group))
                         nav.selectTab(TrailsRoute)
                     },
+                    onPlayLogbook = { nav.navigate(LogbookRoute) },
+                    onPlayWhatsOn = { nav.navigate(WhatsOnRoute) },
+                    onPlayStories = { nav.navigate(IslandStoriesRoute) },
                 )
             }
             composable<TrailDetailRoute> { entry ->
@@ -260,6 +267,16 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     onAccount = { nav.navigate(ProfileRoute) },
                     onAttribution = { nav.navigate(AttributionRoute) },
                     onPrivacy = { nav.navigate(PrivacyRoute) },
+                    // Play (ux.md § 3.1): Start lands on the Map (Settings stays in the Me stack); L2-10 adds the wake.
+                    onPlayStarted = { marks ->
+                        nav.selectTab(MapRoute)
+                        if (marks != null) playScope.launch { playSnackbar.showSnackbar(org.jetbrains.compose.resources.getString(Res.string.play_start_balance, com.bainbridgetrails.ui.play.components.PlayFormat.marks(marks))) }
+                    },
+                    onRanks = { nav.navigate(RanksRoute) },
+                    onLogbook = { nav.navigate(LogbookRoute) },
+                    onStories = { nav.navigate(IslandStoriesRoute) },
+                    onReplayWake = { nav.selectTab(MapRoute) },
+                    onPlayClock = { nav.navigate(PlayClockDebugRoute) },
                 )
             }
             composable<AttributionRoute> { AttributionScreen(onBack = { nav.popBackStack() }) }
@@ -285,9 +302,23 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                 )
             }
             composable<StyleSpikeRoute> { StyleSpikeScreen(launch ?: SpikeLaunch(), Modifier.fillMaxSize()) }
-            composable<FxSpikeRoute> { FxSpikeScreen(launch ?: SpikeLaunch(), Modifier.fillMaxSize()) }
+            composable<FxShowcaseRoute> { FxShowcaseScreen(launch ?: SpikeLaunch(screen = SpikeLaunch.Screen.FX), Modifier.fillMaxSize()) }
             composable<ShowcaseRoute> { ShowcaseScreen(section = launch?.section) }
+            // Play screens (docs/play/ux.md § 3.12–3.17, § 3.19)
+            composable<LogbookRoute> { com.bainbridgetrails.ui.play.screens.LogbookScreen(graph, settings, onBack = { nav.popBackStack() }, onWalk = { nav.navigate(WalkDetailRoute(it)) }) }
+            composable<RanksRoute> { com.bainbridgetrails.ui.play.screens.RanksScreen(graph, settings, onBack = { nav.popBackStack() }) }
+            composable<WhatsOnRoute> {
+                com.bainbridgetrails.ui.play.screens.WhatsOnScreen(
+                    graph, settings, onBack = { nav.popBackStack() }, onChallenges = { nav.navigate(ChallengesRoute) },
+                    onLore = { nav.navigate(LoreCardRoute(it)) }, onShowOnMap = { nav.selectTab(MapRoute) },
+                )
+            }
+            composable<ChallengesRoute> { com.bainbridgetrails.ui.play.screens.ChallengesScreen(graph, settings, onBack = { nav.popBackStack() }, onShowOnMap = { nav.selectTab(MapRoute) }) }
+            composable<IslandStoriesRoute> { com.bainbridgetrails.ui.play.screens.IslandStoriesScreen(graph, settings, onBack = { nav.popBackStack() }, onLore = { nav.navigate(LoreCardRoute(it)) }) }
+            composable<LoreCardRoute> { entry -> com.bainbridgetrails.ui.play.screens.LoreCardScreen(graph, settings, entry.toRoute<LoreCardRoute>().itemId, onBack = { nav.popBackStack() }) }
+            composable<PlayClockDebugRoute> { com.bainbridgetrails.ui.play.screens.PlayClockDebugScreen(graph, settings, onBack = { nav.popBackStack() }) }
         }
+        androidx.compose.material3.SnackbarHost(playSnackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = barPadding + 24.dp))
         if (showBar) {
             // Roads (ux.md 1.3): the list tab shows a road, not a hiker.
             val roads = LocalGoal.current.isRoads
@@ -361,10 +392,16 @@ private suspend fun openDebugScreen(nav: NavController, graph: AppGraph.Installe
         "leaderboard" -> nav.navigate(LeaderboardRoute)
         "profile" -> nav.navigate(ProfileRoute)
         "settings" -> nav.navigate(SettingsRoute)
+        // Play (plan.md L2-7): `-btScreen logbook|whats-on|challenges|ranks|stories` (Play must be on)
+        "logbook" -> nav.navigate(LogbookRoute)
+        "whats-on" -> nav.navigate(WhatsOnRoute)
+        "challenges" -> nav.navigate(ChallengesRoute)
+        "ranks" -> nav.navigate(RanksRoute)
+        "stories" -> nav.navigate(IslandStoriesRoute)
         "attribution" -> nav.navigate(AttributionRoute)
         "privacy" -> nav.navigate(PrivacyRoute)
         "onboarding" -> nav.navigate(OnboardingRoute)
-        "fx" -> nav.navigate(FxSpikeRoute) // MapFx Stage 0 spike (docs/play/spikes/fx.md)
+        "fx" -> nav.navigate(FxShowcaseRoute) // Play FX showcase (docs/play/effects.md §7)
         "celebrate-island" -> AppGraph.requestCelebration(AppGraph.Celebration("debug-island-${nowMs()}", emptyList(), island = true, preview = true))
         "walk" -> graph.walks.refreshNow().walks.firstOrNull()?.let { nav.navigate(WalkDetailRoute(it.sessionId)) } // newest walk
         else -> when {
