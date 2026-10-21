@@ -1,16 +1,22 @@
 # Play — AI for effects and content (brainstorm, graded)
 
-Date: 2026-10-20 · Stage: design (brainstorm; input to the Play spec, not itself a spec) · Brief: [`brief.md`](brief.md)
-(owner: *"brainstorm use of AI for novel and creative effects"*).
+Date: 2026-10-20 · Stage: design (brainstorm; input to the Play spec, not itself a spec) · Status: ACCEPTED 2026-10-20
+(see decisions.md) · Brief: [`brief.md`](brief.md) (owner: *"brainstorm use of AI for novel and creative effects"*).
+
+**v1 scope (cut line, product.md "v1 scope").** v1 uses AI **only for offline authoring**: the AI-12 content-pack
+workflow, with AI-1 riddles and AI-4 sprites as its jobs, all producing reviewed data in `play-content.json` and SVG
+in the repo. Everything else here is **(v2)**; race write-ups (AI-6) and ink-wash weather (N-1) are **(cut)**. Pack
+fields follow `schedule.md` § 4 (the normative schema) and rules follow `product.md`; vocabulary per
+`docs/play/README.md` (marks, challenge, quiet zone).
 
 **Verdict up front.** AI earns its place in Play mostly at **authoring time**: an agent writes riddles, narrator
 notes, sprites and whole seasonal packs into `play-content.json` during a PR, people review it, and the phone
 plays it back with **no model at runtime**. That keeps the hosting bill at $0, keeps raw GPS on the phone, and makes
-sure a 9-year-old never reads made-up history. Most of the "alive island" feeling (creatures that turn up at dusk,
-a kraken that sulks when nobody walks the shore roads, weather inked onto the chart) needs **no model at all**:
-seeded schedules, server aggregates and procedural drawing. A runtime model call survives in exactly two v2
-places (race write-ups and an optional "ask the island"), both on Cloudflare Workers AI's free daily allocation,
-both with a template fallback, both capped. **Calling the Claude API at runtime is on the "never" list**: it is a
+sure a 9-year-old never reads made-up history. Most of the "alive island" feeling (creatures that turn up in the morning,
+a kraken that sulks when nobody walks the shore roads) needs **no model at all**: seeded schedules, server
+aggregates and procedural drawing. A runtime model call survives in at most one v2 place (an optional "ask the
+island", retrieval first, on Cloudflare Workers AI's free daily allocation, with a fallback and a cap); race
+write-ups are cut. **Calling the Claude API at runtime is on the "never" list**: it is a
 bill and a new third-party processor, which the brief's non-goals rule out.
 
 ---
@@ -31,9 +37,8 @@ Preference order is P > D > S > W. A W idea has to beat the same idea built as P
 ### 0.2 Privacy (non-negotiable, from the brief and `backend/README.md` §Privacy)
 
 - **No location goes to any model, ever.** Not at runtime, not in a log. At most a model sees coarse context:
-  `{park: "Grand Forest", timeBand: "dusk", season: "autumn", goal: "trails"}`, and only at authoring time or in W.
-- No player-identifying data in prompts. Public anon names may appear in race write-ups, since they are already
-  public on the leaderboard. Rule of thumb: don't send it unless a public snapshot already exposes it.
+  `{park: "Grand Forest", timeBand: "day", season: "kraken", goal: "trails"}`, and only at authoring time or in W.
+- No player-identifying data in prompts. No names of any kind: named standings and write-ups are cut (review P0-2).
 - A runtime model provider other than Cloudflare means a new processor in `docs/legal/privacy-policy.md`, and the
   brief forbids "new third-party services with a bill". That is why runtime Claude is rejected (§5.3).
 - No photos, audio or free text from players go to a server (§AI-9, §N-5).
@@ -48,12 +53,13 @@ Preference order is P > D > S > W. A W idea has to beat the same idea built as P
   `fiction` (our invention: the kraken, the owl's moods). The UI marks `legend` and `fiction` with a chip ("Legend",
   "Chart fancy") and an icon, not a status hue.
 - **Places that are not a game.** The Bainbridge Island Japanese American Exclusion Memorial (and its trail,
-  `trail-bainbridge-island-japanese-american-memorial-trail`) gets no treasures, creatures, kraken, riddles or
-  points: content validators hard-exclude it. Suquamish history and place names (e.g. T'Chookwop Park) are used
+  `trail-bainbridge-island-japanese-american-memorial-trail`), the cemetery and Pritchard Park get no treasures,
+  creatures, kraken, riddles or marks: they are quiet zones built from dataset geometry (product § 4.6.3), and the
+  schedule validator hard-excludes them. Suquamish history and place names (e.g. T'Chookwop Park) are used
   only as the Tribe publishes them, never generated or "mythologised" by a model (§5.3).
 - Placement rules come from data and are enforced by validators, not by trusting a prompt: no private land, no
-  beach spots that need low tide (checked against the tide table), no road spots on roads without shoulders, no
-  roadside lures for kids (Frog Rock sits at a road junction; §AI-9).
+  beach spots, road spots only on `roadSafety` roads (product § 4.0.2), daylight-only windows, no roadside lures for
+  kids (Frog Rock's trigger is snapped onto a 25 mph loop road, never the 35 mph junction; §AI-9).
 - No conversational AI characters for kids (no "chat with the kraken"; §5.3).
 
 ### 0.4 Grades
@@ -116,9 +122,9 @@ it runs on the dev side, not in the product.
 | **Ask the island: RAG generation, Workers AI Llama 3.1 8B** (2.5k in ≈ 34.4 + 200 out ≈ 5.2 ≈ 40 neurons) | 3 q/MAU | 12k neurons/mo (400/day) | 120k/mo (4k/day avg, Saturday ≈ cap) | 1.2M/mo (40k/day) → Paid ≈ **$10 + $5 plan** | Up to ~1k, with a cap |
 | Same with **Claude Haiku 5.5** ($0.00035/q) | | $0.11/mo | $1.05/mo | $10.50/mo | **No** (any bill + new processor) |
 | Same with **Claude Opus 5.5** (1.5k cached system, ≈ $0.0083/q) | | $2.50/mo | $25/mo | $250/mo | **No** |
-| **Race write-ups**, Workers AI 8B (one per race, not per player; ~8 races/mo × 40 neurons) | per race | 320 neurons/mo | same | same | **Yes, flat** |
+| (cut) Race write-ups | — | — | — | — | Cut (review P0-2) |
 | **Kraken mood / adaptive difficulty** (D1 aggregate in the existing cron) | per day | a few hundred row reads | same | ~10k row reads/day of 5M | **Yes** |
-| **Ink-wash weather** (NWS forecast, hourly cron) | 24 subrequests/day | flat | flat | flat | **Yes** |
+| (cut) Ink-wash weather | — | — | — | — | Cut (review P1-18) |
 | **Runtime image generation** (flux-schnell 512², 4 steps ≈ 43 neurons) | per image | — | — | — | Possible, pointless (§AI-4) |
 
 **Takeaway.** Anything priced per player per day runs out of the free allocation somewhere between 1,000 and 10,000
@@ -131,20 +137,20 @@ feature to be the second kind.
 
 | # | Idea | AI job | Runs | Grade | Release |
 |---|---|---|---|---|---|
-| AI-12 | Seasonal content packs as an agent workflow | generation + validation | P | **A** | v1 |
-| AI-1 | Place riddles, fact-anchored, blind-solver validated | generation + classification | P | **A** | v1 |
-| AI-2 | Chart-room narrator, 365-day packs | generation | P | **A** | v1 |
-| AI-4 | Agent-authored SVG line-art sprites | generation (code, not pixels) | P | **A−** | v1 |
-| AI-3 | Seeded creature behaviour | none (behaviour trees) | D | **A** | v1 |
-| AI-5 | Personal quest suggestions | ranking (rules) + precomputed phrasing | D + P | **A** | v1 |
-| AI-8 | Read-aloud via platform TTS | none (platform speech) | D | **A** | v1 (a11y) |
+| AI-12 | Seasonal content packs as an agent workflow | generation + validation | P | **A** | v1 (offline authoring) |
+| AI-1 | Place riddles, fact-anchored, blind-solver validated | generation + classification | P | **A** | v1 (offline authoring) |
+| AI-4 | Agent-authored SVG line-art sprites | generation (code, not pixels) | P | **A−** | v1 (offline authoring) |
+| AI-2 | Chart-room narrator, 365-day packs | generation | P | **A** | v2 (needs a narrator surface) |
+| AI-3 | Seeded creature behaviour | none (behaviour trees) | D | **A** | v2 (creatures are v2) |
+| AI-5 | Personal quest suggestions | ranking (rules) + precomputed phrasing | D + P | **A** | v2 |
+| AI-8 | Read-aloud via platform TTS | none (platform speech) | D | **A** | v2 (a11y) |
 | AI-7 | Kraken mood from community activity | aggregation | S | **A** | v2 |
-| N-1 | Ink-wash weather from real forecasts | procedural + precomputed lines | S + D | **B+** | v2 |
+| N-1 | Ink-wash weather from real forecasts | — | — | — | **cut** |
 | N-2 | Ferry wakes from the schedule (Kelvin wake) | procedural | P + D | **B+** | v2 |
 | N-3 | Trap streets: forged chart entries to spot | generation | P | **A−** | v2 |
 | N-4 | Survey plate: a walk engraved as a chart | procedural + precomputed titles | D + P | **B** | v2 |
 | AI-10 | Adaptive riddle difficulty | aggregation | S | **B** | v2 (needs volume) |
-| AI-6 | Race write-ups | templating; optional small-model rephrase | S (+W) | **B** | v2 |
+| AI-6 | Race write-ups | — | — | — | **cut** |
 | N-5 | Sightings almanac (crowd, enum only) | aggregation | S | **B−** | v2 |
 | N-6 | Tide-aware lore and safety | none (prediction tables) | P + D | **A** | v2 (with kraken) |
 | N-7 | Marginalia: hand-lettered chart margins | generation | P | **B** | v2 |
@@ -158,17 +164,18 @@ feature to be the second kind.
 Each entry: idea · player experience · AI job · where it runs · cost · privacy · safety · latency/offline · a11y ·
 grade + 1-day spike.
 
-### AI-12 · Seasonal content packs as a repeatable agent workflow (the big win)
+### AI-12 · Seasonal content packs as a repeatable agent workflow (the big win) (v1: offline authoring)
 
 **Idea.** Content stops being a code change and becomes a reviewed data release. Each season (and for special
-events: the first frost, the Fourth of July parade weekend, the island's fall harvest season), one agent run
-produces a **pack**: riddles, narrator notes, creature windows, quest phrasings, sprite updates, race definitions.
+events (v2): the first frost, the Fourth of July parade weekend, the island's fall harvest season), one agent run
+produces a **pack**: riddles, lore copy drafts and sprite updates in v1; (v2) narrator notes, creature windows,
+quest phrasings, challenge definitions.
 Every item cites curated facts and passes machine gates plus human review. The Worker serves it, and the owner can
 edit it without an app release (brief acceptance criterion 5).
 
-**Player experience.** On 1 December the chart "changes season": the paper tint cools, the narrator's first winter note
-appears ("Short days. The heron keeps the same hours as the ferry."), a new riddle set unlocks in Grand Forest and
-Fort Ward, and the owl's dusk window moves earlier. Nothing ships through the app store.
+**Player experience.** When a new pack lands, new permanent riddles unlock in Grand Forest and Fort Ward and the
+treasure art gains a winter variant; (v2) the narrator's first winter note appears ("Short days. The heron keeps the
+same hours as the ferry."). Nothing ships through the app store.
 
 **AI job.** Generation (copy, riddles, SVG), classification (self-checks against the fact card), adversarial review
 (a separate agent context hunting for unsupported claims).
@@ -188,8 +195,9 @@ G3 machine gates scripts/validate-play-content.mjs (runs in CI, which has no map
                 - JSON schema; ids unique; dates inside the pack window
                 - every `fact`/`legend` string lists factIds that exist; `fiction` strings carry no factIds
                   and contain no proper nouns except allow-listed place names + our fictional cast
-                - placement: no excluded places (memorial list), no private-land polygons, beach slots need a
-                  tide window ≥ 2 h below the threshold, road slots only on roads with a shoulder/low-speed class
+                - placement: the schedule validator's rules (quiet zones from geometry, no pool member touching
+                  one, no private land, no beach slots, road slots only on `roadSafety` roads, daylight-only
+                  windows, creature hours)
                 - reading level: Flesch-Kincaid ≤ grade 5 for `audience: all`, ≤ 8 for `audience: adult`
                 - blocklist (reuses backend/src/moderation/blocklist.json) + a scary-word list for kids tier
                 - riddle checks (§AI-1): answer not in the text, blind solver hits ≥ 2/3, ambiguity check
@@ -204,7 +212,8 @@ G7 publish      merge → `npm run build:play` bundles into the Worker (static i
                 owner deploys. Clients fetch GET /v1/play/content (ETag); app also bundles the last pack for offline.
 ```
 
-**JSON the pack emits** (aligns with the config in `docs/play/schedule.md`; field names to be reconciled there):
+**JSON the authoring workflow emits** (a working file; `scripts/build-play-content.mjs` turns accepted candidates into
+`schedule.md` § 4 items, which are normative; `facts` and `solverScore` stay in the authoring folder):
 
 ```json
 {
@@ -215,7 +224,7 @@ G7 publish      merge → `npm run build:play` bundles into the Worker (static i
   "validTo": "2027-02-28",
   "generatedBy": "claude-opus-5-5 via Claude Code",
   "reviewedBy": "owner",
-  "excludedPlaces": ["trail-bainbridge-island-japanese-american-memorial-trail"],
+  "quietZones": "from play-content.json (dataset geometry), never re-declared here",
   "facts": [
     { "id": "F-ferry-001", "kind": "fact", "text": "Ferries cross between Winslow and Seattle.", "source": "wsdot.wa.gov/ferries" }
   ],
@@ -224,22 +233,22 @@ G7 publish      merge → `npm run build:play` bundles into the Worker (static i
       "id": "R-gf-07", "placeId": "trail-grand-forest-…", "goal": "trails", "audience": "all",
       "kind": "fiction", "factIds": [], "text": "…", "answer": { "type": "mapTap", "placeId": "…" },
       "aliases": [], "hints": ["…", "…"], "difficulty": 2, "solverScore": 1.0,
-      "window": { "months": [12, 1, 2], "timeBands": ["day"] }, "tts": true
+      "window": { "months": [12, 1, 2], "timeBands": ["day"] }, "tts": false
     }
   ],
   "narrator": [
     { "date": "2026-12-21", "kind": "fact", "factIds": ["F-solstice-001"], "text": "…", "season": "winter", "tags": ["solstice"] }
   ],
-  "creatures": [
+  "creatures (v2)": [
     { "id": "owl", "sprite": "sprite-owl@2", "behaviour": "bt-owl@1",
-      "windows": [{ "placeIds": ["park:grand-forest"], "timeBands": ["dusk"], "months": [11,12,1,2], "weight": 0.6 }] }
+      "windows": [{ "placeIds": ["park:grand-forest"], "timeBands": ["creature-hours"], "months": [11,12,1,2], "weight": 0.6 }] }
   ],
   "phrases": {
     "quest.trailsLeftInPark": ["{n} {goal.unitPlural} left in {park}.", "…"],
     "quest.creatureWindow": ["The {creature} is out at {timeBand}.", "…"]
   },
-  "races": [ { "id": "race-2026-12-solstice", "kind": "window", "from": "2026-12-20", "to": "2026-12-22", "rule": "mostNewMetres" } ],
-  "kraken": { "moodFrom": "server", "shoreRoadIds": ["road-…"], "lowTideRetreat": true }
+  "challenges (v2)": [ { "id": "ch-solstice", "scope": "solo", "window": { "from": "2026-12-20", "to": "2026-12-22" }, "metric": "new_metres", "target": 2000 } ],
+  "kraken (v2)": { "moodFrom": "server" }
 }
 ```
 
@@ -253,7 +262,7 @@ punctuation). **Grade A.** **Spike (1 day):** hand-write 10 facts for Grand Fore
 factId and memorial checks. Pass condition: zero unsupported claims survive G3+G4 on a planted-error test (seed 3
 candidates with invented facts and check all 3 get caught).
 
-### AI-1 · Riddles and puzzles per place, with answer validation
+### AI-1 · Riddles and puzzles per place, with answer validation (v1: offline authoring)
 
 **Idea.** Each place (trail, park, landmark, shore road) gets 2–4 riddles whose answer is a **place**, an
 **observable thing at the place**, or a **curated fact**. They are generated per content release from the place's
@@ -264,7 +273,8 @@ pack style guide serve as few-shot anchors for voice.
 
 **Player experience.** Marcus's kids, at the Sakai Park trailhead, open a riddle card in Fraunces type on chart
 paper: *"I hold still water and keep a dead tree's reflection. Find me before the lily pads close."* They walk,
-tap the pond on the map, and get the stamp. Hint 1 costs nothing, hint 2 costs half the points. (The example is
+tap the pond on the map (a stamp), then walk there to claim it. Each hint lowers the reward by 25 % (floor 50 %,
+product § 4.4). (The example is
 illustrative; shipped text cites real fact ids.)
 
 **Answer validation.**
@@ -289,7 +299,7 @@ hints readable by TTS (AI-8); no colour-only clues ("the red gate" needs a secon
 **Spike (1 day):** 40 riddles for Gazzam Lake Preserve + Grand Forest + Frog Rock, run the blind solver, read all 40
 by hand. Measure: % passing, % a human judges good, % with any unsupported claim (must be 0 after gates).
 
-### AI-2 · The Chart-room narrator (daily island notes)
+### AI-2 · The Chart-room narrator (daily island notes) (v2)
 
 **Idea.** One short note per day (≤ 220 chars) in one voice: a patient harbourmaster-cartographer, dry and warm,
 never cute, a little archaic in diction ("hereabouts", "the chart shows") but clear. They are precomputed as
@@ -309,17 +319,18 @@ safety advice disguised as flavour ("the tide's out, go explore" is banned, sinc
 **Spike (1 day):** write the voice guide + 20 gold notes, generate 90 winter days, blind-shuffle 10 gold and 10
 generated notes, and have the owner pick out the generated ones. If they score ≤ 70%, the voice holds.
 
-### AI-3 · Procedural creature behaviour (no LLM)
+### AI-3 · Procedural creature behaviour (no LLM) (v2)
 
 **Idea.** Grand Forest creatures (owl, heron, a fox, a banana slug for the kids), the kraken, the gulls on the
 ferry each run a **tiny behaviour tree on device**: `Selector(Sleep if outside window, Sequence(Approach waypoint,
 Idle anim, Maybe-call), Flee if player close)`. Trees are data (`bt-owl@1` in the pack). Randomness is **seeded
-by the schedule**: `seed = hash(packId, creatureId, date, timeBand)`. Everyone on the island sees the owl in the
-same grove tonight, and it is still a surprise from night to night. Fair and deterministic (brief AC 5), and
+by the schedule** (schedule.md § 2.2 per-item fnv1a64 seeds). Everyone on the island sees the owl in the same grove
+today, and it is still a surprise from day to day. Windows lie inside creature hours only (sunrise + 30 min → sunset
+− 30 min). Fair and deterministic (brief AC 5), and
 testable in unit tests by pinning the date.
 
-**Player experience.** At dusk Marcus's map shows a small inked owl gliding between two snags on the Grand
-Forest trails. It lands, turns its head, then flies off as he gets close (the "Flee" node fires on proximity,
+**Player experience.** On a Saturday morning Marcus's map shows a small inked owl gliding between two snags on the
+Grand Forest trails. It lands, turns its head, then flies off as he gets close (the "Flee" node fires on proximity,
 computed on device). His daughter's phone shows the same owl in the same grove.
 
 **AI job.** None; this is game AI, not ML. **Runs** D, as a MapFx entity, driven by the single MapFx clock, budget
@@ -330,7 +341,7 @@ TalkBack announcement ("An owl is perched in Grand Forest, near the Upper Trail"
 creature. **Grade A.** **Spike (1 day):** BT interpreter (≈ 150 lines of KMP common code) + one owl tree +
 deterministic tests (same seed → same path), rendered in the MapFx showcase with a time scrubber.
 
-### AI-4 · Line-art sprites in the chart style
+### AI-4 · Line-art sprites in the chart style (v1: offline authoring)
 
 **Options compared.**
 
@@ -363,11 +374,11 @@ themes; reduced-motion pose. **Grade A−** (the agent's drawing quality varies;
 mitigation). **Spike (1 day):** pen.md + lint + converter; agent draws owl, frog, ferry, and a kraken tentacle in
 3 iterations each from showcase screenshots. Pass = owner calls 3 of 4 "on-style" without edits.
 
-### AI-5 · Personal quest suggestions
+### AI-5 · Personal quest suggestions (v2)
 
-**Idea.** A one-line nudge on the map sheet: *"3 trails left in Grand Forest. The owl is out at dusk."* It is
+**Idea.** A one-line nudge on the map sheet: *"3 trails left in Grand Forest. The owl is about this morning."* It is
 **computed on device** from the player's coverage (already local in the coverage store), the pack schedule (AI-3
-windows, N-6 tides, races) and simple ranking: `score = unfinishedInPark × proximityBand × windowOpenSoon ×
+windows, N-6 tides, challenges) and simple ranking: `score = unfinishedInPark × proximityBand × windowOpenSoon ×
 novelty`. Proximity comes from the device's last known location, used **only locally**, banded (near/far), and never
 stored in Play state.
 
@@ -384,30 +395,16 @@ near Lynwood; best walked at low tide after 2."* (slots: count, area, kraken moo
 **Offline** yes. **A11y** plain sentence; actionable ("Show on map" button). **Grade A.** **Spike (1 day):** ranking
 function + 30 templates + unit tests over 5 synthetic coverage states × 2 goals.
 
-### AI-6 · Race commentary and results write-ups
+### AI-6 · Race commentary and results write-ups (cut)
 
-**Idea.** After a window race closes (e.g. "Solstice: most new metres, Dec 20–22"), the Worker's existing daily
-cron writes a 3–4 sentence results note for the race card: winners by **public anon name**, community totals,
-one notable thing ("the north end saw more ink than the south for the first time this season").
+Cut entirely (review P0-2): no named standings or write-ups; challenges report `{band, count}` only.
 
-**Recommendation.** It is a **template with slots, plus a precomputed phrase bank** (P), filled by the cron from
-aggregates (S). Optionally, **one Workers AI call per race** (Llama 3.1 8B: ≈ 40 neurons) can rephrase the filled
-template for variety. Its output is checked: numbers and names must match the slot values exactly, or the
-template text is used. Batched (one call per race, not per player), cached in D1 (`race_results.text`), and
-rate-limited by design (≤ 1 call per race id, ever).
-
-**Cost** flat ≈ 320 neurons/month at any scale. **Privacy** aggregates + public anon names only; k-anonymity: no
-per-area stat shown below 5 contributors, rounded to 5 (same rule as `snapshot.ts`). **Safety** no names of hidden
-users (respect hide-me and admin hide); the blocklist runs on the output. **Latency** produced at cron time, read
-like any snapshot; offline shows the last cached copy. **A11y** plain text, TTS. **Grade B** (fine, but the template
-alone is ~90% as good). **Spike (1 day):** the template bank + an 8B rephrase with an exact-slot verifier over 50
-synthetic results; measure the verifier rejection rate.
-
-### AI-7 · Kraken mood from community activity
+### AI-7 · Kraken mood from community activity (v2)
 
 **Idea.** The kraken's temperament (`dozing` → `restless` → `rampaging` → `sated`) comes from **community
-shore-road coverage**: how many distinct walkers covered shore roads this week vs a 4-week baseline. Few walkers
-means the kraken grows bolder (more shore roads get "tentacles", an obstacle with bonus points for clearing it).
+shore-road coverage**: how many distinct walkers covered shore roads this week vs a 4-week baseline. Mood changes
+only the art and the copy; which coast and stretches are attacked stays product's fixed rotation and rewards stay
+product's (no extra stretches, no bonus marks).
 A busy week puts it to sleep. The server aggregate is computed in the existing daily cron
 (`rebuildSnapshots`) and written to `play_state.kraken_mood`, served in `/v1/play/content`.
 
@@ -417,15 +414,15 @@ narrator note changes to *"Sated. It has gone back under the ferry lanes."*
 
 **AI job.** None, just aggregation and a state machine. **Runs** S + D. **Cost** a few hundred D1 reads/day. **Privacy**
 count of distinct users per week over the whole shore-road set, never per road with < 5 contributors, a daily
-snapshot (diff-resistant as in the README). **Safety** tentacles only on shore roads with a shoulder/low-speed class;
-low tide sends the kraken back (N-6). The kraken never "attacks" a player, only roads. **Offline** last mood
+snapshot (diff-resistant as in the README). **Safety** stretches only on `roadSafety` roads; inactive above the tide
+threshold (product T-2). The kraken never "attacks" a player, only roads. **Offline** last mood
 cached, decays to `dozing` if > 3 days stale. **A11y** mood is a word + icon pose, not just animation; announced once
 per day. **Grade A.** **Spike (1 day):** SQL over `user_trails` for the roads dataset + mood state machine +
 vitest with fixtures for hysteresis (no flapping between states).
 
-### AI-8 · Voice: platform TTS for riddles and lore
+### AI-8 · Voice: platform TTS for riddles and lore (v2)
 
-**Idea.** A "Read aloud" control on riddle, narrator, lore and race cards uses **Android `TextToSpeech` / iOS
+**Idea.** A "Read aloud" control on riddle, narrator, lore and challenge cards uses **Android `TextToSpeech` / iOS
 `AVSpeechSynthesizer`**. It is free, on device and offline (with the system voice installed), and it respects the
 user's chosen voice and rate. It does double duty: it's a delight for kids who can't read yet (Marcus's
 youngest) and an accessibility feature for low-vision users. It also complements, but doesn't replace, screen
@@ -444,7 +441,7 @@ to megabytes, can't follow the user's voice/rate settings, and a branded "narrat
 reduced motion (no karaoke highlight animation), with captions always visible. **Grade A.** **Spike (1 day):**
 KMP `expect/actual` `Speaker`, the lexicon for 15 local names, test on both platforms with 10 riddles.
 
-### AI-9 · Image-to-place easter eggs (photograph Frog Rock)
+### AI-9 · Image-to-place easter eggs (photograph Frog Rock) (v2: the no-photo alternative only)
 
 **The ask.** The player photographs Frog Rock (the painted boulder) and gets an easter egg.
 
@@ -461,17 +458,17 @@ KMP `expect/actual` `Speaker`, the lexicon for 15 local names, test on both plat
   against road class), an `observe` riddle appears: *"The frog has company this month. What's painted beside it?"*
   It's answered from a 4-choice list that a human field-checked for the pack's season. It rewards being there
   and looking, needs no camera, and a parent can answer by reading it out. It also ships with an "I'm not there"
-  path (the stamp is just a lore card, with fewer points) so nobody is pushed to go.
+  path (the stamp is just a lore card, with no marks) so nobody is pushed to go.
 
 **Runs** D + P. **Cost** $0. **Privacy** geofence check on device; nothing uploaded. **A11y** list answers, TTS.
 **Spike (1 day)** for the alternative: geofence + observe-riddle flow at 3 curated viewpoints, with emulator route
 replay (`scripts/emu-route.sh`).
 
-### AI-10 · Adaptive riddle difficulty from solve rates
+### AI-10 · Adaptive riddle difficulty from solve rates (v2)
 
 **Idea.** Clients sync tiny counters per riddle id (`shown`, `solved`, `hintsUsed`, bucketed to 0/1/2), with no
 time and no place, in the existing summary sync. The nightly cron computes the solve rate per riddle, and the pack
-config gains `difficultyObserved`, which re-tiers riddles (points, which hint is free) and suggests easier riddles
+config gains `difficultyObserved`, which re-tiers riddles (marks, which hint is free) and suggests easier riddles
 first to players with low personal solve rates (the personal rate is computed on device, never sent).
 
 **AI job.** Aggregation (a Bayesian solve rate with a prior from the blind-solver score). **Runs** S + D. **Cost**
@@ -480,7 +477,7 @@ counters only, k ≥ 5 before a riddle's observed rate is used. **Safety** n/a. 
 **A11y** n/a. **Grade B**: real value only at roughly ≥ 30 attempts per riddle, so v2. **Spike (1 day):** schema +
 endpoint + Beta-binomial estimate + vitest; simulate 1,000 players to check convergence.
 
-### AI-11 · "Ask the island" (Q&A about trails and history)
+### AI-11 · "Ask the island" (Q&A about trails and history) (v2)
 
 **Idea.** A text box on the Lore sheet: "Is Fort Ward dog-friendly?", "Why is it called Frog Rock?", "How long is
 the Grand Forest loop?"
@@ -506,34 +503,11 @@ top-3 hit rate (target ≥ 80%).
 
 ### Ideas of our own (novel for a map app)
 
-### N-1 · Ink-wash weather from real forecasts (most novel)
+### N-1 · Ink-wash weather from real forecasts (cut)
 
-**Idea.** The chart gets **weather drawn the way an 18th-century engraver would have**: drizzle as fine diagonal
-hatching drifting across the Sound, fog as stippled grain filling Eagle Harbor, wind as small curved hachures on the
-water lines pointing downwind, a pale ink-wash sun disc on clear mornings, frost as a crisp white rim on the
-coastline. It's driven by **real forecasts**: an hourly Worker cron fetches the National Weather Service gridpoint
-forecast for the island (`api.weather.gov`, free, no key, User-Agent required;
-[API docs](https://www.weather.gov/documentation/services-web-api)) and reduces it to 6 coarse fields for one
-island cell: `{sky, precipProb, precipKind, windDirDeg, windBand, fog, tempBand}` → `play_state.weather`, served
-with the content.
+Cut entirely (review P1-18): no weather feed, no weather visuals, no third-party call.
 
-**Where the "AI" is.** Procedural generation on device: the MapFx engine turns 6 numbers into a seeded stroke
-field (Poisson-disc stipple, flow-field hatching following wind), plus a precomputed narrator line per weather
-state (P), so the narrator remarks on the actual fog. No model at runtime.
-
-**Player experience.** It's raining on Bainbridge; the app's chart is raining too, in ink. On Dana's 6am walk the
-fog stipple thins as the forecast clears, and the narrator notes *"Fog in the harbour. The ferries are honking at
-it."*
-
-**Cost** 24 subrequests/day, flat. **Privacy** the Worker asks NWS about the island, never about a player; the
-phone doesn't contact NWS. **Safety** never "gamifies" storms (no bonus for walking in wind warnings; a `severe`
-flag suppresses races and shows the safety banner). **Offline** last weather (≤ 6 h) or none. **A11y** reduced motion
-= static hatch overlay at 50% density; one TalkBack summary ("Light rain on the chart"); can be turned off on its
-own. **Battery** ≤ 1 effect layer, 30 fps cap, paused when the map is idle. **Grade B+** (the hard part is
-rendering cost on low-end Android). **Spike (1 day):** cron + reducer + a MapFx hatch/stipple layer in the showcase
-with 6 weather presets; profile frame time on the emulator and an older device.
-
-### N-2 · Ferry wakes from the schedule (generative wake patterns)
+### N-2 · Ferry wakes from the schedule (generative wake patterns) (v2)
 
 **Idea.** The ferries crossing the Sound on the chart, positioned from the **published WSF sailing schedule**
 (precomputed into the pack as sailing times; interpolated along a fixed route line on device; no live AIS), each
@@ -550,7 +524,7 @@ later for delays: [WSDOT Traveler Info API](https://wsdot.wa.gov/traffic/api/)).
 "Ferry to Seattle departs 7:05". **Grade B+.** **Spike (1 day):** Kelvin-wake path generator (common Kotlin, unit
 tested for the angle) + one ferry on a fixed line in the MapFx showcase.
 
-### N-3 · Trap streets: forged chart entries to spot
+### N-3 · Trap streets: forged chart entries to spot (v2)
 
 **Idea.** Real cartographers planted fictitious "trap streets" and "paper towns" to catch copiers. Each month the
 Play chart hides **one forgery**: a trail name that doesn't exist, a slightly wrong park outline, a phantom
@@ -566,7 +540,7 @@ unchanged, brief AC 1). **A11y** the list view includes "Chart oddities" with fo
 **Grade A−.** **Spike (1 day):** 12 forged names + 3 phantom shapes, validator for collision with real names and
 for placement (in water or on public parkland, never walkable).
 
-### N-4 · Survey plate: your walk engraved as a chart
+### N-4 · Survey plate: your walk engraved as a chart (v2)
 
 **Idea.** After a walk that finished a trail, the celebration offers a **survey plate**: a generated engraving in
 the chart style with a cartouche title, a compass rose, soundings (elevation numbers along the trail), hachured
@@ -582,7 +556,7 @@ bank (P). **Runs** D. **Cost** $0. **Privacy** public geometry + anon name only;
 **Spike (1 day):** render one plate to a bitmap from `trails.json` geometry with Fraunces cartouche; screenshot both
 themes.
 
-### N-5 · Sightings almanac (crowd-sourced, enum-only, moderation by design)
+### N-5 · Sightings almanac (crowd-sourced, enum-only, moderation by design) (v2)
 
 **Idea.** Players log what they saw: **pick from a closed list** (species/thing × park × time band: "Heron ·
 Blakely Harbor · morning"). No free text, no photos, no coordinates, so nothing needs moderating. Logs are
@@ -597,18 +571,18 @@ sites; the list avoids exact locations of sensitive species). **A11y** list pick
 abuse = spamming a species, mitigated by 1 report per species per park per day per user). **Spike (1 day):**
 schema + aggregate + almanac card in the showcase.
 
-### N-6 · Tide-aware lore and safety
+### N-6 · Tide-aware lore and safety (v2)
 
 **Idea.** NOAA tide predictions are deterministic, so the authoring step bakes a year of high/low tides for the
-nearest reference station into the pack ([NOAA CO-OPS API](https://api.tidesandcurrents.noaa.gov/api/prod/); Seattle
-station 9447130 as the reference, with a local offset if the owner picks a closer subordinate station). Uses: the
-kraken retreats at low tide and surges at king tides; beach slots only open inside safe tide windows; the narrator
-remarks on king tides; the quest line (AI-5) says "best at low tide after 2". It's safety and story from one table.
+nearest station into the pack ([NOAA CO-OPS API](https://api.tidesandcurrents.noaa.gov/api/prod/); Eagle Harbor
+9445882, subordinate to Seattle 9447130, schedule.md § 1.6). v1 already uses it for one rule: kraken stretches are
+inactive above the tide threshold. (v2) Uses: shore slots open only inside safe low-water windows; the narrator
+remarks on the tide; the quest line (AI-5) says "best at low tide after 2". There is no king-tide kraken (cut).
 
 **Cost** $0 runtime. **Offline** yes. **Grade A.** **Spike (1 day):** fetch + compress a year of predictions (~1.4k
 events), a `tideAt(t)` interpolator in common code, and validator checks for beach slots.
 
-### N-7 · Marginalia: hand-lettered notes in the chart margins
+### N-7 · Marginalia: hand-lettered notes in the chart margins (v2)
 
 **Idea.** Old charts carry notes in the margins: "Good anchorage", "Here the current runs strong". In Play mode,
 the map's **screen edges** (Compose overlay, outside the coastline) carry 1–2 small italic marginalia for the
@@ -626,8 +600,8 @@ Bay.
 
 1. **Model ids.** Authoring default `claude-opus-5-5` (adaptive thinking; effort `high` for riddles/sprites,
    `medium` for narrator). Validation/solver: `claude-haiku-5-5`. Use the Batches API for bulk, non-interactive
-   generation. Use exact ids only (no date suffixes). Runtime: Workers AI only, `@cf/meta/llama-3.1-8b-instruct-fp8`
-   for the race rephrase, `@cf/baai/bge-small-en-v1.5` if embeddings are ever used.
+   generation. Use exact ids only (no date suffixes). Runtime (v2 only): Workers AI only,
+   `@cf/baai/bge-small-en-v1.5` if embeddings are ever used.
 2. **Everything generated is data in git**, with `generatedBy`, `reviewedBy` and cited `factIds`. Re-runs diff
    cleanly. Nothing generated at runtime is shown without an exact-slot check and a template fallback.
 3. **Budget guard in the Worker** for any W feature: a D1 counter `ai_neurons:<yyyy-mm-dd>` with a hard ceiling of
@@ -640,32 +614,29 @@ Bay.
 
 ## 5. Recommendations
 
-### 5.1 v1 (≤ 5; all zero runtime model)
+### 5.1 v1 (offline authoring only; zero runtime model)
 
-1. **AI-12 Content-pack workflow** (agent + gates G0–G7 + `validate-play-content.mjs` + `/v1/play/content`). This is
-   the engine every other item rides on.
-2. **AI-1 Fact-anchored riddles** with `mapTap` answers and the blind-solver gate.
-3. **AI-2 Chart-room narrator** (365-day pack, voice guide), read aloud via **AI-8 platform TTS** (an a11y feature,
-   not a model).
-4. **AI-4 Agent-written SVG sprites** under the pen grammar, reviewed as showcase screenshots.
-5. **Seeded island brain (AI-3 + AI-5):** on-device behaviour trees seeded by the schedule, plus quest suggestions
-   ranked on device and phrased from precomputed templates.
+1. **AI-12 Content-pack workflow** (agent + gates G0–G7 + `validate-play-content.mjs`, feeding
+   `scripts/build-play-content.mjs` and `/v1/play/content`). This is the engine every other item rides on.
+2. **AI-1 Fact-anchored permanent riddles** (place and feature answers) with the blind-solver gate.
+3. **AI-4 Agent-written SVG sprites** under the pen grammar, reviewed as showcase screenshots (brief AC 7).
 
-v1 runtime AI spend: **$0 at 100, 1,000 and 10,000 players.** Authoring: ≈ $12–17/season through the API, or $0
-marginal in Claude Code.
+v1 runtime AI spend: **$0 at every scale.** Authoring: ≈ $12–17/season through the API, or $0 marginal in Claude Code.
 
 ### 5.2 v2
 
-AI-7 kraken mood (with N-6 tides) · N-1 ink-wash weather · N-2 ferry wakes · N-3 trap streets · N-4 survey plate ·
-AI-10 adaptive difficulty (once riddles have ≥ 30 attempts each) · AI-6 race write-ups (template first, an optional
-8B rephrase under the budget guard) · N-5 sightings almanac · N-7 marginalia · AI-11 "ask the island" as **curated
-answers retrieved on device** · AI-9 as **"look up" observe riddles** (no camera).
+AI-2 narrator (with AI-8 platform TTS) · AI-3 + AI-5 seeded island brain (creatures and quest suggestions) · AI-7
+kraken mood (art and copy only) · N-6 tide-aware shore lore · N-2 ferry wakes · N-3 trap streets · N-4 survey plate ·
+AI-10 adaptive difficulty (once riddles have ≥ 30 attempts each) · N-5 sightings almanac · N-7 marginalia · AI-11
+"ask the island" as **curated answers retrieved on device** · AI-9 as **"look up" observe riddles** (no camera).
+
+**Cut:** AI-6 race write-ups (named standings), N-1 ink-wash weather.
 
 ### 5.3 Never (with reasons)
 
 | Never | Why |
 |---|---|
-| **Runtime Claude API calls** (Q&A, narration, commentary) | A bill at every scale ($0.11–$250/mo, §1.4), a new third-party processor (privacy policy change), and kids' free text going to a third party. The brief's non-goal: no new services with a bill. Authoring-time use in PRs is fine. |
+| **Runtime Claude API calls** (Q&A, narration) | A bill at every scale ($0.11–$250/mo, §1.4), a new third-party processor (privacy policy change), and kids' free text going to a third party. The brief's non-goal: no new services with a bill. Authoring-time use in PRs is fine. |
 | **Generated history, facts or local "myths"** | Hallucinated history is unacceptable; facts are human-curated (G1), and models only rephrase. Inventing a "legend" and passing it off as local folklore misleads the island about itself. |
 | **AI content about the Japanese American Exclusion Memorial or Suquamish history/culture** | Not game material. The memorial is hard-excluded from Play. Tribal history is used only as the Tribe publishes it, never generated, gamified or "mythologised". |
 | **Uploading photos (or audio) to any server or model** | Faces of kids, plates, house numbers, EXIF GPS. It breaks the stance and needs moderation. |
@@ -697,7 +668,7 @@ answers retrieved on device** · AI-9 as **"look up" observe riddles** (no camer
 - Workers AI pricing (free 10,000 neurons/day; per-model neuron rates): https://developers.cloudflare.com/workers-ai/platform/pricing/
 - Workers AI limits (300 req/min text gen, 3,000 embeddings): https://developers.cloudflare.com/workers-ai/platform/limits/
 - Vectorize pricing (Free: 30M queried dims/month, 5M stored): https://developers.cloudflare.com/vectorize/platform/pricing/
-- NWS API: https://www.weather.gov/documentation/services-web-api
+- NWS API (N-1, cut): https://www.weather.gov/documentation/services-web-api
 - NOAA CO-OPS tides API: https://api.tidesandcurrents.noaa.gov/api/prod/
 - WSDOT Traveler Information API: https://wsdot.wa.gov/traffic/api/
 - Repo: `docs/play/brief.md`, `docs/mvp/product.md` §1, `docs/mvp/ux.md` §0, `backend/README.md`, `backend/src/index.ts`,

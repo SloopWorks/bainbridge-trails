@@ -1,9 +1,11 @@
 # MapFx — map effects engine (ADR + API design + plan)
 
-Date: 2026-10-20 · Status: **PROPOSED** (needs ACCEPT per `gates.design_before_build`) · Work item: `docs/play/brief.md`
+Date: 2026-10-20 · Status: ACCEPTED 2026-10-20 (see decisions.md) · Work item: `docs/play/brief.md`
 acceptance criterion 6 (and the engine half of 3, 7, 9). Author role: plan-author (architecture).
 
-Proposed decision ids **PF-1 … PF-9** (copy into `docs/play/decisions.md` on ACCEPT; that file does not exist yet).
+Decision ids **PF-1 … PF-9** are indexed in `docs/play/decisions.md` (PD-13). **This file is normative for
+rendering**: tiers, clock, bands, arbitration, projection, budgets. `effects.md` conforms to it; rules and triggers
+come from `product.md`, timing from `schedule.md`. Vocabulary: `docs/play/README.md` glossary.
 
 Everything marked **[verified]** was read from the maplibre-compose 0.20.0 Android AAR in the Gradle cache
 (`~/.gradle/caches/modules-2/files-2.1/org.maplibre.compose/maplibre-compose-android/0.20.0/…/maplibre-compose.aar`,
@@ -87,12 +89,17 @@ Decision:
 
 | Tier | Renders in | Use for | Animated by | Cost model |
 |---|---|---|---|---|
-| **Layer** | `TrailMap` `content` (MapLibre style composition) | Many, persistent, geo-anchored items: treasure/egg markers, obstacle tints, puzzle pins, race corridors, far-zoom LOD of every overlay effect | (1) native paint `…Transition` (one-shots, ping-pong pulses), (2) `globalState` expressions written ≤30 Hz by the FxClock, (3) `feature.state` for per-instance state changes (found/armed), (4) GeoJSON `setData` ≤ 4 Hz for moving things (ferry position) | Any animated layer makes MapLibre re-render the **whole map frame**; budget it (§3). Static layers cost nothing per frame. |
-| **Overlay** | `TrailMap` `overlay` slot (`MapOverlayScope`, Compose Canvas) | Few (≤3) rich 2D effects at near zoom: kraken tentacles, treasure burst, ferry wake, forest creature peeking | FxClock frame + `FxTimeline`; anchor placed with `placedAt` (frame-synced), geometry in anchor-local dp | Compose draw only; the map does **not** re-render for overlay animation. |
-| **Moment** | Full-screen Compose scene above the shell (like `CelebrationScreen`) | Hero beats: "The kraken rises", riddle solved, race finish | Own clock (same `FxTimeline`), map scene paused | Map hidden/paused; full budget available. |
+| **Layer** | `TrailMap` `content` (MapLibre style composition) | Many, persistent, geo-anchored items: treasure/egg markers, the kraken's ink casing, exploration fog, riddle pins, far-zoom LOD of every overlay effect | (1) native paint `…Transition` (one-shots, ping-pong pulses), (2) `globalState` expressions written ≤30 Hz by the FxClock, (3) `feature.state` for per-instance state changes (found/armed), (4) GeoJSON `setData` ≤ 4 Hz for moving things (ferry position) | Any animated layer makes MapLibre re-render the **whole map frame**; budget it (§3). Static layers cost nothing per frame. |
+| **Overlay** | `TrailMap` `overlay` slot (`MapOverlayScope`, Compose Canvas) | Few (≤3) short rich 2D effects at near zoom: kraken tentacles, treasure burst, frog hop, riddle lantern lighting; (v2) creature glimpses | FxClock frame + `FxTimeline`; anchor placed with `placedAt` (frame-synced), geometry in anchor-local dp | Compose draw only; the map does **not** re-render for overlay animation. |
+| **Moment** | Full-screen Compose scene above the shell (like `CelebrationScreen`) | The opt-in moment `play_wake` (v1's only Moment) | Own clock (same `FxTimeline`), map scene paused | Map hidden/paused; full budget available. |
 
 Rule: an effect may declare a Layer part and an Overlay part and a zoom hand-off between them (kraken: Symbol marker
 below z13.5, tentacles at ≥z13.5). Moments are separate effects triggered by the scene, never drawn on the map.
+
+**Overlay hand-off bound (normative).** An Overlay-tier part lives at most `overlayMaxMs = 3_000` ms from its spawn,
+including SETTLE and DESPAWN; then it is DONE and the effect continues as its Layer-tier part (marker, casing,
+stamp). RUN may loop **only in the Layer tier**; an Overlay-tier RUN never loops. Overlay parts therefore never sit
+above map labels for more than 3 s, which is why persistent things are Layer tier.
 
 ### PF-2 (B) One frame clock
 
@@ -104,12 +111,15 @@ Decision: `FxClock` — a single `LaunchedEffect` in `FxHost` running `withFrame
 `MutableLongState` that is **read only in draw/layout phases** (never in composition). Policy (pure, in `:play`):
 
 - runs only while: Play on ∧ lifecycle ≥ RESUMED ∧ map composed ∧ scene has ≥1 effect whose current phase animates;
-- **reduced motion** ⇒ never runs; every effect renders its `reducedFrame` (a fixed, authored frame — not t=0);
+- **reduced motion** ⇒ never runs; every effect renders its **final frame** (`reducedAtMs`, normative: for a one-shot
+  the last frame, for an effect with a Layer hand-off the hand-off state, for a Layer-tier loop the rest pose the
+  loop returns to — never t=0 and never a mid-motion pose);
 - **idle**: when the scene holds only AMBIENT effects and there was no touch/camera move for 20 s, ambient loops settle to
   their rest frame and the clock stops until the next `CameraMoveStarted` or tap;
 - ambient-only scenes tick at 30 Hz (`delay` to the next 33 ms boundary before `withFrameNanos`); HERO/NOTICE at
-  display rate;
-- ambient off while a walk is recording (battery first; heroes still play);
+  display rate; Layer-tier `globalState` writes are capped at 30 Hz in every mode;
+- ambient off while a walk is recording (battery first; heroes still play): AMBIENT effects rest on their final
+  frame in both tiers (no reduced-rate ambient while recording); static layers stay;
 - time is the clock's own monotonic ms since scene start (pauses don't jump timelines forward); wall time is only for
   scheduling (other spec).
 
@@ -123,23 +133,30 @@ Decision: `FxClock` — a single `LaunchedEffect` in `FxHost` running `withFrame
   `Screen(xFrac, yFrac)`.
 - **Lifecycle** `Spawn → Run → Settle → Despawn → Done`, each a timeline phase range; `Run` may loop; `dismiss()` jumps
   to `Settle` (never cuts).
-- **Priority** `AMBIENT < NOTICE < HERO`. Caps: 1 HERO live (others queue FIFO, expire after 10 s in queue), global HERO
-  cooldown 8 s after a HERO's `Done`, ≤4 NOTICE, ≤12 animated AMBIENT, ≤3 Overlay-tier live in total (lowest priority
-  oldest-first demoted to its Layer LOD or reduced frame). A spawn returns `Spawned | Queued | Rejected(reason)`.
+- **Priority** `AMBIENT < NOTICE < HERO` (the only arbitration classes; effects.md maps its effects onto them). Caps:
+  1 HERO live (others queue FIFO, expire after 10 s in queue), global HERO cooldown 8 s after a HERO's `Done`,
+  ≤4 NOTICE, ≤12 animated AMBIENT, ≤3 Overlay-tier live in total (lowest priority oldest-first demoted to its Layer LOD
+  or final frame). A HERO spawned while its anchor is out of view is not queued: it jumps to its final frame (the
+  announcement still speaks). A spawn returns `Spawned | Queued | Rejected(reason)`.
 - **Deterministic ordering**: draw order = `(band, priority, spawnSeq)`; `spawnSeq` is a scene counter, never a hash
   or wall clock. Same input sequence ⇒ same frames (unit-tested).
 - **Bands** (z-order), relative to StatusLayers (all of which live in `Anchor.Below("trail-label")`):
 
 | Band | Placement | Example |
 |---|---|---|
-| `UNDER_STATUS` | composed **before** `StatusLayers` inside `Anchor.Below("trail-label")` | water churn fill, area tint, race corridor |
-| `OVER_STATUS` | composed **after** `StatusLayers`, same anchor (above `app-selected-*`, below labels) | treasure halos, glint sweep along a trail |
-| `OVER_LABELS` | `Anchor.Top`, composed **before** `LocationIndicatorLayer` in MapTab | treasure icons, kraken far-zoom marker |
+| `UNDER_STATUS` | composed **before** `StatusLayers` inside `Anchor.Below("trail-label")` | exploration fog, kraken ink pool, lurk ripples, ferry wake |
+| `CASING` | composed **inside** `StatusLayers` through its new `casingFx` slot, after the halos and before the status lines (like the existing nearly-done casing) | the kraken's ink casing beside an attacked stretch (status line stays on top, full width and colour) |
+| `OVER_STATUS` | composed **after** `StatusLayers`, same anchor (above `app-selected-*`, below labels) | treasure halos, riddle pins, lore and egg stamps, the ferry sprite |
+| `OVER_LABELS` | `Anchor.Top`, composed **before** `LocationIndicatorLayer` in MapTab | treasure icons (must stay readable), kraken far-zoom marker |
 | `OVERLAY` | Compose overlay slot, under TrailMap chrome (scale bar, logo, credit) | tentacles, bursts |
 | `MOMENT` | full screen | hero scenes |
 
 Composition-order = z-order inside one anchor is assumed **[spike S3]**. FX layer ids: `fx-<kind>-<part>` (one layer
 set per *kind*, instances are features) — never `app-…`, so `TappableTrailLayerIds`/StatusLayerSpec are untouched.
+`StatusLayers` gains one optional parameter, `casingFx: (@Composable @MaplibreComposable () -> Unit)? = null`; pure
+mode passes null and its composition is identical to today. Labels and symbols place top-down: a symbol in
+`OVER_STATUS` (under the labels) loses collisions to labels, so anything that must always show uses `OVER_LABELS`
+with `iconAllowOverlap` and `iconIgnorePlacement`.
 
 ### PF-4 (D) Projection — geo → overlay px
 
@@ -201,15 +218,18 @@ New KMP module **`:play`** (pure Kotlin; jvm + android + iosArm64 + iosSimulator
 kotlinx-serialization, kotlinx-coroutines-core; **no Compose, no MapLibre, no `:composeApp`**). FX lives in
 `com.bainbridgetrails.play.fx`: `FxTimeline`, `FxEasing` (pure cubic-bezier solver with the `BtEasing` control
 points), `FxScene`, `FxClockPolicy`, `FxProjection`, rigs (`TentacleRig`), `FxSpec` model, `FxStatsWindow`
-(percentiles). Rules/points/scheduling/content from the other Play specs share the module.
+(percentiles). Rules, marks, scheduling and content from the other Play specs share the module. Find sensing is not
+an engine concern: `PlaySensing` (an `AppGraph` observer of the recording's fixes, product § 3.6.1) feeds the scene.
 
 `composeApp/src/commonMain/kotlin/com/bainbridgetrails/play/fx/` holds Compose + MapLibre rendering: `FxClock`,
 `FxHost` (+ `FxLayers`, `FxOverlay`), `FxShaderBrush` (expect; actuals in `androidMain`/`iosMain`), `FxArt`, effects
 under `play/fx/effects/`, `FxShowcaseScreen`, `FxHud`.
 
 Dependency rules: `:composeApp → :play`; `:play` never depends on `:composeApp`, Compose or MapLibre (enforced by its
-build file having no Compose plugin); nothing under `map/` or `ui/` imports `play.*` except the three gated call sites
-(MapTab, TrailMap's new slot param, AppShell for moments/showcase).
+build file having no Compose plugin); nothing under `map/` or `ui/` imports `play.*` except the gated call sites:
+MapTab, **RecordScreen** (it owns its own `TrailMap`; find moments and the fog/ink live effects show there while
+recording, product § 5.3), TrailMap's new slot param, StatusLayers' `casingFx` slot, and AppShell for
+moments/showcase.
 
 Tests: timelines, scene, clock policy, projection, rigs → `:play:jvmTest` (no emulator). GeoJSON builders, layer-id
 guards, palette guard → `:composeApp:testAndroidHostTest`. Visuals → FX showcase screenshots on both platforms in
@@ -219,8 +239,9 @@ guards, palette guard → `:composeApp:testAndroidHostTest`. Visuals → FX show
 
 - `TrailMap` gains `fxOverlay: (@Composable MapOverlayScope.() -> Unit)? = null` drawn **before** the chrome; `null`
   ⇒ identical composition to today.
-- MapTab composes `FxHost` parts only `if (play.enabled)`; when off no `FxClock`, no `FxScene`, no sources, no layers,
-  no state objects are created (the gate is a plain `if`, not a `remember` that survives).
+- MapTab and RecordScreen compose `FxHost` parts only `if (play.enabled)`; when off no `FxClock`, no `FxScene`, no
+  sources, no layers, no state objects are created (the gate is a plain `if`, not a `remember` that survives).
+  `StatusLayers(casingFx = null)` is today's composition.
 - Guards: host test asserts every FX layer id starts with `fx-` and is not in `TappableTrailLayerIds`; host test that
   `FxPalette` colors are ≥ ΔE 20 from every status color in both palettes (brief: status hues reserved); a debug-build
   assertion in the showcase lists `state.style.layers` and fails if any `fx-` layer exists with Play off.
@@ -235,7 +256,8 @@ guards, palette guard → `:composeApp:testAndroidHostTest`. Visuals → FX show
   persistent markers must be Layer tier.
 - (−) Relies on `globalState` and feature-state working through MapLibre Native FFI (spikes S1/S2 before Stage 5),
   with a documented fallback.
-- (−) `TrailMap` gets one new optional parameter; `MapTab` gets one gated block.
+- (−) `TrailMap` and `StatusLayers` each get one new optional parameter; `MapTab` and `RecordScreen` each get one
+  gated block.
 
 ---
 
@@ -255,7 +277,7 @@ sealed interface FxAnchor {
     data class Screen(val xFrac: Float, val yFrac: Float) : FxAnchor
 }
 
-enum class FxBand { UNDER_STATUS, OVER_STATUS, OVER_LABELS, OVERLAY, MOMENT }
+enum class FxBand { UNDER_STATUS, CASING, OVER_STATUS, OVER_LABELS, OVERLAY, MOMENT }
 enum class FxPriority { AMBIENT, NOTICE, HERO }
 enum class FxStage { SPAWN, RUN, SETTLE, DESPAWN, DONE }
 
@@ -273,8 +295,8 @@ class FxEasing(val x1: Float, val y1: Float, val x2: Float, val y2: Float) {
 /** Lifecycle stage boundaries in ms from spawn; RUN may loop with [runLoopMs]. */
 data class FxTimeline(
     val spawnMs: Int, val runMs: Int, val settleMs: Int, val despawnMs: Int,
-    val runLoopMs: Int? = null,
-    /** The authored frame shown under reduced motion (and as the idle rest frame). */
+    val runLoopMs: Int? = null,          // Layer tier only; an Overlay part never loops (overlayMaxMs = 3_000)
+    /** The final frame, shown under reduced motion and as the idle rest frame (PF-2). */
     val reducedAtMs: Int,
 ) {
     val totalMs: Int get() = spawnMs + runMs + settleMs + despawnMs
@@ -287,8 +309,8 @@ data class FxTimeline(
 }
 
 data class FxSpec(
-    val id: String,                    // stable content id, e.g. "kraken:rolling-bay-rd"
-    val kind: String,                  // renderer key, e.g. "kraken", "treasure-glint"
+    val id: String,                    // occurrence key + part, e.g. "kraken-roads@2026-10-29#0"
+    val kind: String,                  // renderer key = snake_case effect id (effects.md § 3), e.g. "kraken_attack"
     val anchor: FxAnchor,
     val zoom: ClosedFloatingPointRange<Double>,
     val band: FxBand,
@@ -296,7 +318,7 @@ data class FxSpec(
     val timeline: FxTimeline,
     val loop: Boolean,
     val cooldownMs: Long = 0,
-    val seed: Long = id.hashCode().toLong(),  // per-instance variation, deterministic
+    val seed: Long = Fnv1a.hash64(id).toLong(),  // per-instance variation, deterministic; never String.hashCode()
     val announceKey: String? = null,          // string resource key, resolved through GoalVocabulary
 )
 
@@ -320,7 +342,8 @@ class FxScene(private val caps: FxCaps = FxCaps()) {
 }
 
 data class FxCaps(val hero: Int = 1, val notice: Int = 4, val ambientAnimated: Int = 12, val overlay: Int = 3,
-                  val heroCooldownMs: Long = 8_000, val heroQueueTtlMs: Long = 10_000)
+                  val heroCooldownMs: Long = 8_000, val heroQueueTtlMs: Long = 10_000, val overlayMaxMs: Long = 3_000,
+                  val idleStopMs: Long = 20_000, val globalStateMaxHz: Int = 30)
 
 data class FxFrame(val nowMs: Long, val live: List<FxLive>)              // sorted by (band, priority, seq)
 data class FxLive(val instance: FxInstance, val stage: FxStage, val t: Int, val reduced: Boolean)
@@ -422,11 +445,14 @@ TrailMap(..., fxOverlay = fx?.let { h -> { FxOverlay(h, h.overlayContext()) } })
     Anchor.Below("trail-label") {          // StatusLayers re-enters the same anchor itself; nesting is a no-op order-wise [S3]
         fx?.let { FxLayers(it, FxBand.UNDER_STATUS, it.layerContext()) }
     }
-    StatusLayers(...)
+    StatusLayers(..., casingFx = fx?.let { h -> { FxLayers(h, FxBand.CASING, h.layerContext()) } })  // null = today
     fx?.let { h -> Anchor.Below("trail-label") { FxLayers(h, FxBand.OVER_STATUS, h.layerContext()) } }
     fx?.let { h -> Anchor.Top { FxLayers(h, FxBand.OVER_LABELS, h.layerContext()) } }
     if (locating && locationGranted) LocationIndicatorLayer(...)   // stays above every FX layer
 }
+
+// record/RecordScreen.kt — the same gate around its own TrailMap (find moments, fog/ink live effects while recording)
+val fx = if (play.enabled) rememberFxHost(graph.play, reduced, recording = true) else null
 ```
 
 `rememberFxHost` also: subscribes to `LifecycleResumeEffect` (resumed flag), `state.events` (`CameraMoveStarted`
@@ -437,7 +463,7 @@ declared global keys.
 
 ```kotlin
 object TreasureGlint : FxRenderer {
-    override val kind = "treasure-glint"
+    override val kind = "treasure_glint"
     const val KEY_T = "fx.treasure.t"          // 0..1 sawtooth, 1.6 s period, written by FxHost at ≤30 Hz
     val timeline = FxTimeline(spawnMs = 400, runMs = 1_600, settleMs = 400, despawnMs = 300,
                               runLoopMs = 1_600, reducedAtMs = 900)
@@ -510,8 +536,10 @@ Per-frame work while any glint is live and in view: one `globalState.setProperty
 kind non-animating), so the map goes back to idle rendering. Fallback if S1 fails: halo radius/sparkle opacity become
 `const(v)` fed from `clock.frameMs` through `FxLayerDriver` (recomposing 2 layers at 30 Hz, per-feature phase dropped).
 
-Taps: MapTab's `onTap` first queries `setOf("fx-treasure-icon")` within 24 dp; a hit goes to Play (`PlayActions.tap`)
-instead of trail selection. Reduced motion: static icon + static halo, found = instant hide. A11y: the live region
+Taps (product PF3-5 wins): MapTab's `onTap` first runs today's `TappableTrailLayerIds` query unchanged; only when it
+has **no** hit does it query `setOf("fx-treasure-icon", …)` within 24 dp, and a hit there goes to Play
+(`PlayActions.tap`, which opens the content sheet and never claims). Reduced motion: static icon + static halo (the
+final frame), found = instant hide. A11y: the live region
 announces "Treasure found near <trail>" on resolution; treasures are also listed in the Play sheet (other spec), so
 nothing is map-only.
 
@@ -527,10 +555,11 @@ class TentacleRig(val count: Int, val segments: Int, seed: Long) {
 }
 
 object KrakenTentacles : FxRenderer {
-    override val kind = "kraken"
-    // Spawn: ripples + tentacles rise · Run: sway + grip (loops 2.4 s) · Settle: retract · Despawn: last ripple fades
-    val timeline = FxTimeline(spawnMs = 700, runMs = 4_000, settleMs = 800, despawnMs = 500,
-                              runLoopMs = 2_400, reducedAtMs = 1_500)     // reduced = mid-grip pose, no motion
+    override val kind = "kraken_attack"
+    // Spawn: ripples + tentacles rise · Run: one sway + grip (no loop) · Settle: retract · Despawn: last ripple fades
+    // Total 3_000 ms = overlayMaxMs; then DONE and the Layer tier (ink casing + far marker) carries the attack.
+    val timeline = FxTimeline(spawnMs = 700, runMs = 1_300, settleMs = 600, despawnMs = 400,
+                              runLoopMs = null, reducedAtMs = 3_000)      // reduced = final frame (hand-off state)
     val zoom = 13.5..18.0                                                 // below: OVER_LABELS marker (Layers())
 
     @Composable @MaplibreComposable
@@ -580,7 +609,7 @@ object KrakenTentacles : FxRenderer {
                             drawPath(sucker, ctx.palette.krakenSucker)
                         }
                         // 3 grip: the road under attack darkens + shakes (Run only, not reduced)
-                        val grip = timeline.phase(t, 700, 1_100) * (1f - timeline.phase(t, 4_700, 5_200))
+                        val grip = timeline.phase(t, 700, 1_100) * (1f - timeline.phase(t, 2_000, 2_400))
                         val shake = if (item.reduced) 0f else kotlin.math.sin(now / 45.0).toFloat() * 1.5.dp.toPx() * grip
                         drawRoadStroke(roadDp, c + Offset(shake, 0f), ctx.palette.krakenGrip.copy(alpha = 0.6f * grip))
                     }
@@ -595,16 +624,18 @@ object KrakenTentacles : FxRenderer {
 Frame loop for this effect: `FxClock` advances `frameMs` → only the `drawWithCache` draw block is invalidated (it
 read `frameMs` and `viewport`) → no recomposition, no relayout; `GeographicLayout` re-places the anchor box on every
 presented map frame → tentacles stay glued to the road during pans/flings. Phases: Spawn 0–700 (ripples +
-tentacles rise, emphasizedDecelerate), Run 700–4 700 (2.4 s sway loop while live, grip + shake), Settle 4 700–5 500
-(retract, emphasizedAccelerate), Despawn 5 500–6 000 (ripple fades) → `DONE` → scene retires it and the far-zoom
-marker goes too. Reduced motion: clock never runs for it; `t = reducedAtMs` gives a still mid-grip pose; the live
-region says "The kraken is gripping <road>". Quality LOW: 3 tentacles × 10 segments, no suckers, no shader.
+tentacles rise, emphasizedDecelerate), Run 700–2 000 (one sway, grip + shake), Settle 2 000–2 600 (retract,
+emphasizedAccelerate), Despawn 2 600–3 000 (ripple fades) → `DONE` → the overlay part retires and the Layer-tier
+parts (ink casing in `CASING`, far-zoom marker in `OVER_LABELS`, lurk ripples in `UNDER_STATUS`) carry the attack
+until its window closes. Reduced motion: clock never runs for it; the overlay part is skipped and the effect shows its
+final frame, the Layer-tier hand-off state; the live region says "The kraken is attacking <road>". Quality LOW:
+3 tentacles × 10 segments, no suckers, no shader.
 
 ---
 
 ## 3. Performance plan
 
-### Budgets (per frame, release build, mid device ≈ Pixel 6a / iPhone 12)
+### Budgets (per frame, release build, budget device Pixel 6a / iPhone 12 — normative for effects.md too)
 
 | Item | Budget |
 |---|---|
@@ -635,7 +666,7 @@ scripted camera path (pan + pinch, 20 s) and 3 overlay + 12 layer effects; plus 
 
 ### Over budget — in this order
 
-1. Ambient overlay → 30 Hz; idle settle sooner (20 s → 8 s).
+1. Ambient → 30 Hz (already the cap); idle settle sooner (20 s → 8 s).
 2. `FxQuality` step-down (fewer tentacles/segments, no suckers, no shader, no blur).
 3. Demote overlay effects to their Layer-tier LOD (static symbol) beyond the overlay cap.
 4. Stop layer-tier `globalState` animation (static halos); keep transitions only.
@@ -673,7 +704,7 @@ screenshots in `docs/play/spikes/fx.md`.
 
 **STAGE 2 — `FxScene` + caps + `FxClockPolicy`**
 - files: `play/fx/{FxScene,FxCaps,FxClockPolicy}.kt`
-- test-first: `FxSceneTest` (`second HERO queues`, `hero cooldown 8s`, `queued hero expires after 10s`,
+- test-first: `FxSceneTest` (`second HERO queues`, `hero cooldown 8s`, `queued hero expires after 10s`, `overlay part retires at overlayMaxMs`, `out-of-view HERO jumps to final frame`,
   `overlay cap demotes oldest ambient`, `same inputs same frames` (determinism), `reduced marks every live item reduced
   and isAnimating=false`); `FxClockPolicyTest` (`stopped when paused/reduced/play off`, `ambient-only idle 20s stops`,
   `recording disables ambient but not hero`, `30Hz when ambient only`)
@@ -709,7 +740,7 @@ screenshots in `docs/play/spikes/fx.md`.
 
 **STAGE 6 — Overlay tier + `KrakenTentacles`** (needs S4)
 - files: `play/fx/effects/KrakenTentacles.kt`, `play/fx/FxOverlay.kt`, `FxTapTarget.kt`, `FxArt` glyph
-- test-first: `KrakenTimelineTest` (`:play`: `reducedAtMs inside RUN`, `grip envelope 0 at spawn and after settle`),
+- test-first: `KrakenTimelineTest` (`:play`: `reducedAtMs is the final frame`, `total ≤ overlayMaxMs`, `RUN never loops`, `grip envelope 0 at spawn and after settle`),
   `TentacleRig` already covered; host `KrakenAnchorTest` (`anchor is the road midpoint vertex`, `extent covers rig at z18`)
 - verify: `cd app && ./gradlew :play:jvmTest :composeApp:testAndroidHostTest :androidApp:assembleRoadsDebug :composeApp:linkDebugFrameworkIosSimulatorArm64`
 - rollback: remove renderer from registry or revert
@@ -718,12 +749,15 @@ screenshots in `docs/play/spikes/fx.md`.
 - files: `map/StyleSpikeScreen.kt` (`Screen.FX`, option `fx=<kind|all>`), `nav/AppShell.kt`, `nav/DebugLaunch.kt`
   (`-btScreen fx:<kind>`), `play/fx/{FxShowcaseScreen,FxHud,FxStats}.kt`, debug-drawer panel registration
   (`androidMain` debug), `docs/play/screens/fx-{treasure,kraken,kraken-reduced}-{android,ios}.png`
+- AC 7: the showcase is the host for **every v1 effect** (effects.md § 7 list); this stage ships it with the two
+  reference effects, and each remaining v1 effect's renderer adds its preset and both-platform screenshots in the
+  plan stage that builds it (`docs/play/README.md` matrix). A host test fails if a v1 effect id has no preset.
 - test-first: `SpikeLaunchTest` (`screen=fx parses with fx option`), `FxStatsWindowTest` (`:play`: percentiles over a
   ring buffer, no allocation on add)
 - verify: `cd app && ./gradlew :play:jvmTest :composeApp:testAndroidHostTest :androidApp:assembleTrailsDebug :composeApp:linkDebugFrameworkIosSimulatorArm64` + screenshots committed
 - rollback: revert (debug-only surface)
 
-**STAGE 8 — Shader seam** (needs S5)
+**STAGE 8 — Shader seam (v2)** (needs S5)
 - files: `composeApp/src/commonMain/.../play/fx/FxShaderBrush.kt` (expect), `androidMain/.../FxShaderBrush.android.kt`
   (`Build.VERSION.SDK_INT >= 33` → `RuntimeShader`), `iosMain/.../FxShaderBrush.ios.kt` (Skia `RuntimeEffect`),
   `FxShaders.kt` (sources)
@@ -746,8 +780,9 @@ CROSS-CUTTING: swip n/a (factory.swip false) | debugdrawer yes: "Play FX" panel 
 REACHABILITY: FxHost is reachable from MapTab behind the Play flag (Stage 4) and from the FX showcase (Stage 7); the
   effects become reachable in production when the Play content/scheduling plan spawns them (other spec) — until then
   only through the showcase/debug drawer, which is acceptable for an engine plan but must be closed by that plan.
-REVIEW: adversarial-reviewer (this doc) → compose-ui-reviewer + mobile expert (Stages 4–8) → kmp-verifier (Stage 9 full
-  set) → simplification-reviewer (branch) → adversarial-reviewer (branch, pre-PR)
+REVIEW: adversarial-reviewer (this doc) → compose-ui-reviewer + mobile expert (Stages 4–8; brief AC 9, the mobile-expert
+  pass covering Compose correctness, perf, battery and a11y) → kmp-verifier (Stage 9 full set) →
+  simplification-reviewer (branch) → adversarial-reviewer (branch, pre-PR)
 ```
 
 ---
