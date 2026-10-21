@@ -51,20 +51,21 @@ data class SpikeLaunch(
     val switchAfterMs: Long = 4000,
     /** Showcase page (`section=tokens|components|states`). */
     val section: String? = null,
-    /** FX spike (`screen=fx`): run the scripted MapFx Stage 0 sequence once (`fxAuto=1`). */
-    val fxAuto: Boolean = false,
-    /** FX spike, Android: `fxTexture=1` uses AndroidRenderMode.Texture. */
-    val fxTexture: Boolean = false,
-    /** FX spike: `fxNoTween=1` sets a zero paint transition on the animated S1/R8 properties. */
-    val fxNoTween: Boolean = false,
-    /** FX spike: `fxMaxFps=30` caps MapLibre rendering (RenderOptions.maximumFps). */
-    val fxMaxFps: Int? = null,
+    /** FX showcase (`screen=fx`): effect id (`fx=treasure_glint`), preset id, state, pause at `t` ms. */
+    val fx: String? = null,
+    val preset: String? = null,
+    val state: String? = null,
+    val t: Long? = null,
+    /** FX showcase: `theme=dark|light` (default light), `reduced=1`, `warp=60` (time-warp; default the preset's). */
+    val theme: String? = null,
+    val reduced: Boolean = false,
+    val warp: Double? = null,
 ) {
     enum class Screen { RECORD, STYLE, SHOWCASE, FX }
 
     companion object {
         /**
-         * Parses `key=value` options: screen=record|style|showcase|fx, fxAuto, section, style=TOPO|MINIMAL_LIGHT|DARK, lat, lon, zoom, switchTo,
+         * Parses `key=value` options: screen=record|style|showcase|fx, section, fx, preset, state, t, theme, reduced, warp, style=TOPO|MINIMAL_LIGHT|DARK, lat, lon, zoom, switchTo,
          * switchAfterMs. Without `screen`, a `style` or `switchTo` option still opens the style spike (older scripts).
          */
         fun parse(options: Map<String, String>): SpikeLaunch {
@@ -89,10 +90,13 @@ data class SpikeLaunch(
                 switchTo = style(options["switchTo"]),
                 switchAfterMs = options["switchAfterMs"]?.toLongOrNull() ?: 4000,
                 section = options["section"],
-                fxAuto = options["fxAuto"] == "1",
-                fxTexture = options["fxTexture"] == "1",
-                fxNoTween = options["fxNoTween"] == "1",
-                fxMaxFps = options["fxMaxFps"]?.toIntOrNull(),
+                fx = options["fx"],
+                preset = options["preset"],
+                state = options["state"],
+                t = options["t"]?.toLongOrNull(),
+                theme = options["theme"]?.lowercase(),
+                reduced = options["reduced"] == "1" || options["reduced"].equals("true", ignoreCase = true),
+                warp = options["warp"]?.toDoubleOrNull()?.takeIf { it > 0 },
             )
         }
     }
