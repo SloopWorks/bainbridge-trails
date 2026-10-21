@@ -1,8 +1,8 @@
 <!-- shipyard-deploy:begin -->
 ## Shipyard Deploy
 
-This repository publishes development builds of `com.bainbridgetrails.app.dev` (Gradle variant `trailsDebug`)
-to the Shipyard Deploy project `bainbridge-trails`. Configuration lives in `.shipyard-deploy.yaml`;
+This repository publishes development builds of `com.bainbridgetrails.app.dev` (Gradle variant `trailsDebug`, the trails
+goal) and `com.bainbridgetrails.roads.dev` (`roadsDebug`, the roads goal) to the Shipyard Deploy project `bainbridge-trails`. Configuration lives in `.shipyard-deploy.yaml`;
 read it rather than hard-coding a project or a channel name.
 
 Which channel a build goes to is decided by the current git branch
@@ -26,7 +26,9 @@ shipyard-deploy publish <apk>                 # publish; the channel is created 
 That is the whole list. `login`, `logout`, `rollback`, `enroll-code`,
 `devices`, `channels create` and `resume` belong to a human.
 
-Build the APK first with `./gradlew :androidApp:assembleTrailsDebug` (from `app/`).
+Build the APK first (from `app/`, with the plugin repository property below): `./gradlew :androidApp:assembleTrailsDebug` for
+`com.bainbridgetrails.app.dev` or `./gradlew :androidApp:assembleRoadsDebug` for `com.bainbridgetrails.roads.dev` — the two
+goals are two packages of the one project, each with its own channel head; `publish <apk>` reads the application id from the APK.
 Every command takes `--json` and returns a single object; exit code 0 means it worked.
 
 ### Do not
