@@ -2,6 +2,7 @@ package com.bainbridgetrails.play
 
 import com.bainbridgetrails.log.AppLog
 import com.bainbridgetrails.net.ApiClient
+import com.bainbridgetrails.net.ApiError
 import com.bainbridgetrails.net.ApiResult
 import com.bainbridgetrails.net.JsonFile
 import com.bainbridgetrails.net.PlayContentResponse
@@ -148,7 +149,13 @@ class PlayContentRepository(
         mutex.withLock {
             val t = now()
             when (r) {
-                is ApiResult.Failure -> AppLog.w(TAG, "content check failed: ${r.error}")
+                // A 200 that cannot be accepted (body over ApiClient.MAX_PLAY_BODY_BYTES): refused like an invalid pack.
+                is ApiResult.Failure -> if (r.error is ApiError.Decode) {
+                    AppLog.w(TAG, "content pack refused, keeping ${_state.value?.config?.version}: ${r.error.message}")
+                    _state.value = _state.value?.copy(rejected = r.error.message, checkedAt = t)
+                } else {
+                    AppLog.w(TAG, "content check failed: ${r.error}")
+                }
                 is ApiResult.Ok -> when (val body = r.value) {
                     is PlayContentResponse.NotModified -> {
                         cached?.let { c -> cached = c.copy(checkedAt = t).also { writeCache(it) } }

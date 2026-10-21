@@ -10,7 +10,11 @@ import io.ktor.client.request.header
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
+import io.ktor.utils.io.cancel
+import io.ktor.utils.io.readRemaining
+import kotlinx.io.readByteArray
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -106,10 +110,11 @@ class ApiClient(
     /**
      * `GET /v1/play/content?v=` (public). [version] = the pack the app runs (lets the Worker answer 304 without an
      * ETag); [etag] is sent as `If-None-Match`. `304` → [PlayContentResponse.NotModified]; `200` → the raw pack text.
+     * A body over [MAX_PLAY_BODY_BYTES] is not read further: [ApiError.Decode].
      */
     suspend fun playContent(version: String?, etag: String?): ApiResult<PlayContentResponse> {
         val path = "/v1/play/content" + (version?.let { "?v=" + it.encodeURLQueryComponent() } ?: "")
-        return when (val r = exchange(path, etag)) {
+        return when (val r = exchange(path, etag, maxBytes = MAX_PLAY_BODY_BYTES)) {
             is ApiResult.Failure -> r
             is ApiResult.Ok -> ApiResult.Ok(
                 if (r.value.status == HttpStatusCode.NotModified.value) {
@@ -121,8 +126,9 @@ class ApiClient(
         }
     }
 
-    /** `GET /v1/play/tides/{year}` (public, immutable): the year's raw table for `TideTable.parse`. */
-    suspend fun playTides(year: Int): ApiResult<String> = call(HttpMethod.Get, "/v1/play/tides/$year", RawText, auth = false)
+    /** `GET /v1/play/tides/{year}` (public, immutable): the year's raw table for `TideTable.parse` (≤ [MAX_PLAY_BODY_BYTES]). */
+    suspend fun playTides(year: Int): ApiResult<String> =
+        call(HttpMethod.Get, "/v1/play/tides/$year", RawText, auth = false, maxBytes = MAX_PLAY_BODY_BYTES)
 
     /** `GET /v1/play/me?dataset=` (bearer). */
     suspend fun playMe(): ApiResult<PlayMeDto> =
@@ -144,6 +150,8 @@ class ApiClient(
         jsonBody: String? = null,
         auth: Boolean = true,
         explicitBearer: String? = null,
+        /** Successful bodies larger than this are refused unread ([ApiError.Decode]); null = no cap. */
+        maxBytes: Int? = null,
     ): ApiResult<T> {
         val bearer = explicitBearer ?: if (auth) token() else null
         val response: HttpResponse
@@ -155,7 +163,8 @@ class ApiClient(
                 header(HttpHeaders.Accept, "application/json")
                 jsonBody?.let { setJson(it) }
             }
-            text = response.bodyAsText()
+            text = (if (maxBytes != null && response.status.isSuccess()) response.textCapped(maxBytes) else response.bodyAsText())
+                ?: return tooLarge(method, path, maxBytes)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -190,7 +199,7 @@ class ApiClient(
      * A public GET that may answer `304` ([ifNoneMatch] sent as `If-None-Match`): 2xx and 304 are [ApiResult.Ok]
      * with the status, `ETag` and body; anything else maps like [call].
      */
-    private suspend fun exchange(path: String, ifNoneMatch: String?): ApiResult<Exchange> {
+    private suspend fun exchange(path: String, ifNoneMatch: String?, maxBytes: Int? = null): ApiResult<Exchange> {
         val response: HttpResponse
         val text: String
         try {
@@ -199,7 +208,8 @@ class ApiClient(
                 header(HttpHeaders.Accept, "application/json")
                 ifNoneMatch?.let { header(HttpHeaders.IfNoneMatch, it) }
             }
-            text = response.bodyAsText()
+            text = (if (maxBytes != null && response.status.isSuccess()) response.textCapped(maxBytes) else response.bodyAsText())
+                ?: return tooLarge(HttpMethod.Get, path, maxBytes)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -215,6 +225,26 @@ class ApiClient(
         return ApiResult.Failure(apiErrorFrom(status, body, retryAfter))
     }
 
+    /**
+     * The body as UTF-8 text, or null when it is over [max] bytes: a declared `Content-Length` over the cap is refused
+     * before reading; otherwise at most [max] + 1 bytes are read and the rest is cancelled.
+     */
+    private suspend fun HttpResponse.textCapped(max: Int): String? {
+        headers[HttpHeaders.ContentLength]?.trim()?.toLongOrNull()?.let { if (it > max) return null }
+        val channel = bodyAsChannel()
+        val bytes = channel.readRemaining(max.toLong() + 1).readByteArray()
+        if (bytes.size > max) {
+            channel.cancel(null)
+            return null
+        }
+        return bytes.decodeToString()
+    }
+
+    private fun tooLarge(method: HttpMethod, path: String, max: Int?): ApiResult.Failure {
+        AppLog.w(TAG, "${method.value} ${path.substringBefore('?')} -> body over $max bytes, refused")
+        return ApiResult.Failure(ApiError.Decode("body too large (over $max bytes)"))
+    }
+
     private fun HttpRequestBuilder.setJson(s: String) {
         setBody(TextContent(s, ContentType.Application.Json))
     }
@@ -224,6 +254,9 @@ class ApiClient(
 
     companion object {
         private const val TAG = "api"
+
+        /** Cap on a Play content pack or tide year body (privacy review 2026-10-21 P2-4): over it = refused. */
+        const val MAX_PLAY_BODY_BYTES = 2 * 1024 * 1024
 
         /** The server's default dataset (api.md "Datasets"). */
         const val TRAILS = "trails"

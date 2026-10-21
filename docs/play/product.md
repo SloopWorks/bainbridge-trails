@@ -495,14 +495,22 @@ add the barred owl, +15, and "new park Battle Point Park", +50.)
   One element per walk that has Play content, each tied to a `walks[]` entry of the same upload. `kind` ∈ `treasure`,
   `egg`, `riddle`, `ink`, `lore`, `challenge`; `band` (60 / 80 / 95) only on `ink`. `dayKey` = the week id when this
   walk earned W-DAY, else absent (server: ≤ 7 per week id). `hints` = hints used per riddle item claimed on this walk.
-  `playConfig` = the content-pack version the phone evaluated the claims against. No marks, no timestamps, no days,
-  no coordinates, no segment ids beyond what coverage already sends, no `what`/`why` text.
+  `playConfig` = the content-pack version the phone evaluated the claims against. No marks, no timestamps, no
+  coordinates, no segment ids beyond what coverage already sends, no `what`/`why` text, and no days beyond the
+  occurrence keys themselves: a claim `id` names its occurrence's day or window (`kraken-roads@2026-10-29#0`,
+  `egg-ferry-rail@2026-01-05`) and `weekId` / `dayKey` name the week; never a time of day. How long the server keeps
+  those place-and-week keys is OD-21 (PD-22).
 - W-WEEK has no request of its own: the server derives it from `dayKey`s at week close.
 - The coverage response gains `play: { accepted: [id], rejected: [{ id, code }], total, week }` only when the request
   carried `play`; the client marks rejected entries `local_only`. `GET /v1/play/me?dataset=` returns the summary
   used for restore (§ 3.6.5).
 - Board consent (v2): `PUT /v1/play/board-consent { visible: bool }`.
-- Account deletion deletes Play rows; "Also delete … on this phone" clears the local logbook too.
+- Account deletion deletes Play rows; "Also delete … on this phone" clears the local logbook too: both goals' Play
+  state (Logbook, finds, solves, hints), both goals' claim queues and the walk-id map, whether Play is on or off
+  (PD-22).
+- On the phone, Play state lives in the no-backup directory (Android `noBackupFilesDir`, iOS excluded from backup)
+  and is never in a device or cloud backup; Logbook entries name their walk by an opaque per-walk id, never the local
+  session id (PD-22).
 - Pure sync contract unchanged: the coverage body gains the optional `playConfig` and `play` fields, ignored by
   older servers; with Play off both are absent (byte-identical request) and the response has no `play` field.
 

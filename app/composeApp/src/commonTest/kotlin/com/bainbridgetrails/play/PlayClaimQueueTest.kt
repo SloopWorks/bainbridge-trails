@@ -108,6 +108,38 @@ class PlayClaimQueueTest {
     }
 
     @Test
+    fun `walk-less elements expire after 30 days`() = runTest {
+        var t = 1_000_000_000_000L
+        val q = PlayClaimQueue(path, now = { t })
+        q.add(element("s-old", claim("o@2026-10-26#0"), dayKey = week)) // its walk never got an id (signed out, tiny walk)
+        t += 31 * DAY
+        q.add(element("s-new", claim("n@2026-10-26#0")))
+        q.add(element("s1", claim("a@2026-10-26#0")))
+        val settled = mutableListOf<PlaySettled>()
+
+        val part = assertNotNull(q.part(mapOf("s1" to "W1"), setOf("W1")) { settled += it })
+        part.settle(PlayOutcome.Answered(PlayUploadResultDto(accepted = listOf("a@2026-10-26#0")), emptySet()))
+
+        val old = settled.single { it.sessionId == "s-old" }
+        assertEquals(mapOf("o@2026-10-26#0" to PlayClaimQueue.EXPIRED), old.localOnly, "its pending entries turn local_only")
+        assertEquals(BoardState.local_only, old.day)
+        assertEquals(listOf("s-new"), q.queued().map { it.sessionId }, "a recent walk-less element stays")
+    }
+
+    @Test
+    fun `the queue keeps at most 500 elements`() = runTest {
+        var t = 1_000_000_000_000L
+        val q = PlayClaimQueue(path, now = { t++ })
+        val dropped = mutableListOf<PlaySettled>()
+        repeat(PlayClaimQueue.MAX_QUEUED + 3) { i -> dropped += q.add(element("s$i", claim("c$i@2026-10-26#0"))) }
+        val left = q.queued()
+        assertEquals(PlayClaimQueue.MAX_QUEUED, left.size)
+        assertEquals("s3", left.first().sessionId, "the oldest go first")
+        assertEquals(listOf("s0", "s1", "s2"), dropped.map { it.sessionId })
+        assertEquals(mapOf("c0@2026-10-26#0" to PlayClaimQueue.EXPIRED), dropped.first().localOnly)
+    }
+
+    @Test
     fun `at most 50 claims per upload`() = runTest {
         val q = PlayClaimQueue(path)
         q.add(element("s1", *Array(30) { claim("a$it@2026-10-26#0") }))
@@ -150,6 +182,10 @@ class PlayClaimQueueTest {
         assertTrue(t.capped)
         assertEquals(BoardState.local_only to 80, k.board to k.marks, "local_only marks stay on the phone")
         assertEquals(BoardState.accepted, d.board)
+    }
+
+    private companion object {
+        const val DAY = 86_400_000L
     }
 
     private object IslandTimeWeek {

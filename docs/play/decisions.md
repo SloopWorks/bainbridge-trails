@@ -290,6 +290,34 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
   non-retained fix, which would need its own privacy decision).
 - **Resolves:** privacy review P2-4 (record), with P2-3/P2-5/P2-6 fixed in `backend/src/play/claims.ts`.
 
+## PD-22 On-device Play state: no backup, wiped with the phone (privacy review of the client sync/state)
+- **Context.** `reviews/2026-10-21-privacy-client.md` (FIX-FIRST): P0-1 "Also delete … on this phone" cleared the
+  claim queue only, so the Logbook (`play/<goal>-state.json`) survived a wipe; P1-2 that file sat in the backed-up
+  app dir (Android `filesDir`, iOS Application Support/app) and held every `LogEntry.walkId` = the local session id
+  (`s<epochMs>-hex`, a walk's exact start time), island dates with memorial/cemetery stamps, and restored `occ` keys;
+  P2-3 occurrence keys carry the occurrence day/window; P2-4 no body cap on pack/tide fetches, and walk-less claim
+  queue elements were kept forever.
+- **Decision.** (1) Play user state lives under the no-backup dir: `<privateNoBackupDir>/play/<goal>-state.json`;
+  an existing file in the old dir moves there once on first load. The pack and tide caches stay in the app dir's
+  `play/`, which Android backup now excludes as well (`files/play/`, both rule files). (2) On disk a Logbook walk is an
+  opaque random id (`w-<hex>`); the session ↔ walk map sits beside the state in the no-backup dir and holds only walks
+  the Logbook still names, so in memory the results sheet and Logbook links keep using the session id. (3) "Also
+  delete … on this phone" clears Play for **both goals** whether Play is on, off or never built in this process:
+  state (in memory and on disk, including any pre-move file), the walk-id map, both dataset profiles' claim queues,
+  and this process's claim results. (4) Occurrence keys (claim ids, `found`, restored `occ`) encode the occurrence's
+  day or window and the week id by contract; "no days" in product § 3.10 means no day beyond those keys and never a
+  time of day. Server retention of these place-and-week keys is **OD-21** (open, owner decides). (5) A content pack
+  or tide year body over 2 MB is refused unread (pack: `rejected`, last good kept; tide year: not used, not cached).
+  The claim queue holds ≤ 500 elements, and an element whose walk has no walk id 30 days after it was queued settles
+  `local_only` (`expired`).
+- **Consequence.** A restore from device/cloud backup never brings Play state back; Play's Logbook on a new device
+  comes only from the account (§ 3.6.5 restore). A Logbook whose map is lost shows its walks without the walk link.
+  Posture for the hub: on-device Logbook retention (until wipe or uninstall) incl. memorial stamps; backup exclusion;
+  occurrence-key wording qualified by OD-21.
+- **Resolves:** privacy review 2026-10-21 P0-1, P1-2, P2-3 (wording), P2-4. Proof: `PlayWipeTest`,
+  `PlayStatePrivacyTest`, `PlayBackupRulesTest`, `PlayContentRepositoryTest` (oversize), `PlayClaimQueueTest`
+  (retention).
+
 ## Status
 
 | doc | status |

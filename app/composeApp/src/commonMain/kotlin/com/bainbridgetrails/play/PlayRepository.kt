@@ -207,9 +207,9 @@ class PlayRepository(
         fun next(st: PlayState) = WalkMarks.apply(st, goal, sessionId, date, after, completed, { ctx.names[it] ?: it }, visited, newId)
         val before = store.load()
         // Queue first (as the claim pass does): a crash before the Logbook write leaves the walk carried, not lost.
-        if (WalkMarks.hasPending(next(before).logbook, sessionId)) queue.add(QueuedPlay(sessionId, version, walkMarks = true))
+        val expired = if (WalkMarks.hasPending(next(before).logbook, sessionId)) queue.add(QueuedPlay(sessionId, version, walkMarks = true)) else emptyList()
         var wrote = false
-        store.update { st -> next(st).also { wrote = it.logbook != st.logbook } }
+        store.update { st -> next(st).let { n -> n.copy(logbook = PlayClaims.settle(n.logbook, expired)) }.also { wrote = it.logbook != st.logbook } }
         return wrote
     }
 
@@ -220,6 +220,12 @@ class PlayRepository(
 
     /** This process's claim passes by session id (claims, unclaimed reasons, stretch shares) for the results sheet. */
     val claimResults: StateFlow<Map<String, ClaimResult>> = _claimResults.asStateFlow()
+
+    /** "Also delete … on this phone" ([PlayFiles.wipe]): forget this process's claim passes and live senses. */
+    fun forgetClaimResults() {
+        _claimResults.value = emptyMap()
+        _sensed.value = emptySet()
+    }
 
     /** Starts the ticker, the pack check and live sensing. Idempotent. */
     fun start() {
@@ -373,10 +379,11 @@ class PlayRepository(
         if (claimed.isNotEmpty() || pass.day != null) {
             val hints = claimed.filter { it.kind == ClaimKind.riddle }.mapNotNull { c -> pass.hints[c.itemId]?.takeIf { it > 0 }?.let { c.itemId to it } }.toMap()
             // Queue first: a crash before the Logbook write re-runs the pass, which merges into the same element.
-            queue.add(PlayClaims.element(sessionId, pass.config.version, claimed, pass.day?.let { IslandTime.weekId(it) }, hints))
+            val expired = queue.add(PlayClaims.element(sessionId, pass.config.version, claimed, pass.day?.let { IslandTime.weekId(it) }, hints))
             val items = pass.config.items.associateBy { it.id }
             store.update { st ->
-                PlayClaims.record(st, sessionId, claimed, pass.day, pass.config.caps.foundPerDay, { items[it]?.copy?.title ?: it }, newId)
+                val next = PlayClaims.record(st, sessionId, claimed, pass.day, pass.config.caps.foundPerDay, { items[it]?.copy?.title ?: it }, newId)
+                next.copy(logbook = PlayClaims.settle(next.logbook, expired))
             }
             AppLog.i(TAG, "walk claimed ${claimed.size} items${if (pass.day != null) " + walking day" else ""} (pending)")
         }
@@ -615,6 +622,9 @@ class PlayGate(
 
     /** The running repository, or null while Play is off. */
     val current: PlayRepository? get() = repo.takeIf { on }
+
+    /** The repository if one was ever created in this process (Play on or off): the phone wipe clears its state. */
+    val created: PlayRepository? get() = repo
 
     fun start() {
         if (job != null) return

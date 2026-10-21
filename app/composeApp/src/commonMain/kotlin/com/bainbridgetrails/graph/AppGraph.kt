@@ -55,10 +55,10 @@ import com.bainbridgetrails.play.PlayClaimQueue
 import com.bainbridgetrails.play.PlayClock
 import com.bainbridgetrails.play.PlayContentRepository
 import com.bainbridgetrails.play.PlayDerived
+import com.bainbridgetrails.play.PlayFiles
 import com.bainbridgetrails.play.WalkContext
 import com.bainbridgetrails.play.PlayGate
 import com.bainbridgetrails.play.PlayRepository
-import com.bainbridgetrails.play.PlayStateStore
 import com.bainbridgetrails.play.SnapshotMarks
 import com.bainbridgetrails.play.SystemPlayClock
 import com.bainbridgetrails.play.playGoal
@@ -235,10 +235,9 @@ object AppGraph {
 
         private fun createPlay(): PlayRepository {
             val goal = DatasetProfile.current.playGoal
-            val dir = appDataDir(context) + "/play"
             val content = PlayContentRepository(
                 api = api,
-                dir = dir,
+                dir = playCacheDir,
                 bundled = { withContext(Dispatchers.IO) { Res.readBytes("files/play/play-content.json").decodeToString() } },
                 bundledTides = { year -> readResourceOrNull("files/play/tides/${PlayContentRepository.STATION}-$year.json") },
                 playOn = { settings.settings.value?.play?.enabled == true },
@@ -254,7 +253,8 @@ object AppGraph {
                 content = content,
                 places = { DatasetPlaceIndex(goal, datasets.await().dataset, derived()) },
                 derived = { derived()?.let { DerivedGoal.decode(it) } },
-                store = PlayStateStore("$dir/${goal.name}-state.json", Dispatchers.IO),
+                // No-backup dir (privacy review 2026-10-21 P1-2); an older file in the app dir moves on first load.
+                store = PlayFiles.store(privateDir, playCacheDir, goal, Dispatchers.IO),
                 track = flow {
                     val controller = runCatching { controller().await() }.getOrNull() ?: return@flow
                     emitAll(controller.track)
@@ -273,8 +273,11 @@ object AppGraph {
 
         /** Play's claim queue: beside the sync queue, per goal, per install, not backed up. A file handle only (PD-1). */
         private val playClaims: PlayClaimQueue by lazy {
-            PlayClaimQueue("$privateDir/${DatasetProfile.current.storeName("play-claims.json")}", Dispatchers.IO)
+            PlayClaimQueue(PlayFiles.claimsPath(privateDir, DatasetProfile.current), Dispatchers.IO)
         }
+
+        /** The pack and tide caches (re-downloadable; excluded from Android backup) and the pre-move state files. */
+        private val playCacheDir: String get() = appDataDir(context) + "/play"
 
         /** The opt-in starting balance's input: walk-derived marks of the current local coverage (product § 3.6.4). */
         private suspend fun snapshotMarks(goal: com.bainbridgetrails.play.config.Goal): com.bainbridgetrails.play.rules.WalkDerived? {
@@ -300,12 +303,13 @@ object AppGraph {
         /**
          * F9e "also clear this phone": raw tracks of every walk not being recorded (so nothing is re-finalized on the
          * next launch), coverage, sticky completions, finalized ids, walk history and the live-coverage cache. The
-         * sync queue/baseline/walk ids were already deleted by `sync.onSignedOut(wipe = true)`.
+         * sync queue/baseline/walk ids were already deleted by `sync.onSignedOut(wipe = true)`. Play (product § 3.10,
+         * privacy review 2026-10-21 P0-1): the Logbook / state of both goals, both goals' claim queues (never sent to
+         * this or the next account) and this process's claim results, whether Play is on, off or was never built.
          */
         internal suspend fun wipeLocalProgress() {
             RecordingGraph.wipeLocal(context)
-            // The account is gone: queued Play claims of its walks must never be sent (to it or the next account).
-            playClaims.clear()
+            PlayFiles.wipe(privateDir, playCacheDir, repo = playGate.created, currentClaims = playClaims, io = Dispatchers.IO)
             coverageChanged()
         }
 

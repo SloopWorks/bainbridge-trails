@@ -1,6 +1,7 @@
 package com.bainbridgetrails.play
 
 import com.bainbridgetrails.data.DataFixtures
+import com.bainbridgetrails.net.ApiClient
 import com.bainbridgetrails.net.FakeServer
 import com.bainbridgetrails.net.Reply
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -98,6 +99,32 @@ class PlayContentRepositoryTest {
 
         // A rejected pack is never cached.
         assertEquals(PlayConfigSource.BUNDLED, repo().load()!!.source)
+    }
+
+    @Test
+    fun oversizeFreshIsRejectedAndLastGoodKept() = runTest {
+        // A valid pack padded past the 2 MB cap (privacy review 2026-10-21 P2-4).
+        val pad = "x".repeat(ApiClient.MAX_PLAY_BODY_BYTES)
+        val huge = PlayFixtures.packWith(PlayFixtures.version("2026.12.0"), "padding" to JsonPrimitive(pad))
+        server.on("GET /v1/play/content", Reply(200, huge, mapOf("ETag" to "\"pc-huge\"")))
+        val r = repo()
+        r.load()
+        assertTrue(r.refreshIfDue())
+        val s = r.state.value!!
+        assertEquals(PlayConfigSource.BUNDLED, s.source)
+        assertEquals(PlayFixtures.bundledVersion, s.config.version)
+        assertTrue(s.rejected!!.contains("too large"), s.rejected)
+        assertNotNull(s.checkedAt, "checked: no retry before the hour")
+        assertEquals(PlayConfigSource.BUNDLED, repo().load()!!.source, "never cached")
+    }
+
+    @Test
+    fun oversizeTideYearIsNotUsedOrCached() = runTest {
+        server.on("GET /v1/play/tides/2031", Reply(200, "[" + "0,".repeat(ApiClient.MAX_PLAY_BODY_BYTES / 2) + "0]"))
+        val r = repo()
+        assertNull(r.tides(kotlinx.datetime.LocalDate(2031, 6, 1)))
+        assertEquals(1, server.count("GET /v1/play/tides/2031"))
+        assertFalse(kotlinx.io.files.SystemFileSystem.exists(kotlinx.io.files.Path("$dir/tides/${PlayContentRepository.STATION}-2031.json")))
     }
 
     @Test

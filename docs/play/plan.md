@@ -301,7 +301,7 @@ commands are given where they are the real gate for the stage. `verify.kmp` = `c
 
 **L2-3 — PlayRepository, content repo, play clock, place index, debug tools** (schedule st.8) [L2]
 - files: `play/{PlayRepository,PlayContentRepository,PlayClock,DatasetPlaceIndex,PlayStateStore}.kt` (composeApp;
-  state file `<appData>/play/<goal>-state.json`: found occurrences, solved riddles, hints, logbook entries, start-balance
+  state file `<privateNoBackupDir>/play/<goal>-state.json (PD-22)`: found occurrences, solved riddles, hints, logbook entries, start-balance
   flag), `net/PlayDtos.kt`, `net/ApiClient.kt` (`playContent(v, etag)`, `playTides(year)`, `playMe()`,
   `playChallenges()`), `graph/AppGraph.kt` (`Installed.playOrNull: PlayRepository?` — created lazily the first time
   `settings.play.enabled` is true; never constructed while off; `PlayClock` binding), `nav/DebugLaunch.kt`
