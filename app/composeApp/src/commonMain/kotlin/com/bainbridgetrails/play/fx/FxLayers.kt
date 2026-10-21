@@ -2,6 +2,9 @@ package com.bainbridgetrails.play.fx
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import com.bainbridgetrails.map.LABEL_LAYER
+import org.maplibre.compose.layers.Anchor
 import org.maplibre.compose.util.MaplibreComposable
 
 /**
@@ -48,6 +51,43 @@ fun mapContentOrder(play: Boolean, location: Boolean): List<MapContentPart> = bu
         add(MapContentPart.Fx(FxBand.OVER_LABELS))
     }
     if (location) add(MapContentPart.Location)
+}
+
+/**
+ * The map's style content at a Play call site (MapTab, RecordScreen), composed in [mapContentOrder] (PF-3, spike S3):
+ * UNDER_STATUS and OVER_STATUS under the trail labels, [status] (handed the CASING band slot, null when Play is off),
+ * OVER_LABELS on top, then [location] (puck / live track) above every FX layer. [fx] null = Play off = today's map.
+ * Each part is keyed, so a Play toggle adds / removes the FX parts without recreating the status layers.
+ */
+@Composable
+@MaplibreComposable
+fun PlayMapContent(
+    fx: FxHostState?,
+    status: @Composable @MaplibreComposable (casingFx: (@Composable @MaplibreComposable () -> Unit)?) -> Unit,
+    location: (@Composable @MaplibreComposable () -> Unit)? = null,
+) {
+    val casingFx: (@Composable @MaplibreComposable () -> Unit)? =
+        remember(fx) { if (fx != null) ({ FxLayers(fx, FxBand.CASING) }) else null }
+    for (part in mapContentOrder(play = fx != null, location = location != null)) {
+        key(part) {
+            when (part) {
+                is MapContentPart.Fx -> if (fx != null) FxBandLayers(fx, part.band)
+                MapContentPart.Status -> status(casingFx)
+                MapContentPart.Location -> location?.invoke()
+            }
+        }
+    }
+}
+
+/** One Layer-tier band at its anchor: OVER_LABELS on top of the style, the others below the trail labels. */
+@Composable
+@MaplibreComposable
+private fun FxBandLayers(fx: FxHostState, band: FxBand) {
+    if (band == FxBand.OVER_LABELS) {
+        Anchor.Top { FxLayers(fx, band) }
+    } else {
+        Anchor.Below(LABEL_LAYER) { FxLayers(fx, band) }
+    }
 }
 
 /**

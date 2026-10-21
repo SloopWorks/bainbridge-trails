@@ -52,9 +52,9 @@ fun fxHostInputs(
 /**
  * Hosts one map's effect scene (engine §2.2, PF-2, PD-19): owns the [FxScene] and the one frame clock, publishes the
  * overlay frame per display frame (or 30 Hz ambient) and Layer-tier `globalState` values at ≤ 30 Hz, pauses per
- * [FxClockPolicy] (map not attached, app not resumed, reduced motion, idle, ambient off), re-writes every live `fx.*`
- * global-state key on `StyleLoaded`, exposes the `maximumFps` cap for TrailMap's `renderOptions`, and tracks gesture
- * camera moves for [FxOverlayContext.gestureAlpha]. Main thread only.
+ * [FxClockPolicy] (map not attached, app not resumed, reduced motion, Battery Saver / Low Power, idle, ambient off),
+ * re-writes every live `fx.*` global-state key on `StyleLoaded`, exposes the `maximumFps` cap for TrailMap's
+ * `renderOptions`, and tracks gesture camera moves for [FxOverlayContext.gestureAlpha]. Main thread only.
  */
 @Stable
 class FxHostState internal constructor(val renderers: FxRendererRegistry) {
@@ -65,6 +65,9 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
 
     // Inputs (written from composition via SideEffect, or from the run loop).
     internal var reduced by mutableStateOf(false)
+
+    /** Battery Saver / Low Power: the map half of reduced motion (effects.md § 5). */
+    internal var powerSave by mutableStateOf(false)
     internal var ambientOff by mutableStateOf(false)
     internal var palette by mutableStateOf(FxPalette.of(PlayLight))
     private var map by mutableStateOf<MapState?>(null)
@@ -73,10 +76,16 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
     private var interactions by mutableIntStateOf(0)
     private var gestureEndedAtMs by mutableStateOf<Long?>(null)
 
+    /** Reduced motion or power save: every map effect draws its final frame (chrome motion follows [reduced] only). */
+    private val mapReduced: Boolean by derivedStateOf { reduced || powerSave }
+
     // Scene outputs: change only when the instance set (scene.version) or the reduced flag changes, never per frame.
     private var seenVersion = -1L
     private var seenReduced = false
     private var summary by mutableStateOf(FxSceneSummary(false, false, false, false))
+
+    /** Scene ms of the last [FxScene.summary] (re-read on an instance-set change, else at most every 33 ms). */
+    private var summaryAtMs = Long.MIN_VALUE / 2
 
     /** Live instances per kind (all bands), for [FxLayers]. */
     internal var liveByKind by mutableStateOf<Map<String, List<FxLive>>>(emptyMap())
@@ -86,10 +95,10 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
     internal var overlayItems by mutableStateOf<List<FxLive>>(emptyList())
         private set
 
-    internal val layerContext: FxLayerContext by derivedStateOf { FxLayerContext(palette, reduced) }
+    internal val layerContext: FxLayerContext by derivedStateOf { FxLayerContext(palette, mapReduced) }
 
     internal val overlayContext: FxOverlayContext? by derivedStateOf {
-        map?.let { m -> FxOverlayContext(m, clock, palette, reduced) { gestureEndedAtMs } }
+        map?.let { m -> FxOverlayContext(m, clock, palette, mapReduced) { gestureEndedAtMs } }
     }
 
     private val mode: FxClockPolicy.Mode by derivedStateOf {
@@ -100,6 +109,7 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
             scene = summary,
             msSinceInteraction = if (idle) Long.MAX_VALUE else 0L,
             recording = ambientOff,
+            powerSave = powerSave,
         )
     }
 
@@ -136,12 +146,18 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
         interactions++
     }
 
-    /** Re-tick the scene; publish the live lists only when the instance set or the reduced flag changed. */
+    /**
+     * Re-tick the scene; publish the live lists only when the instance set or the reduced flag changed, and re-read the
+     * summary then or at most every 33 ms of scene time (an animation ending stops the clock ≤ 33 ms later).
+     */
     private fun refresh() {
-        val frame = scene.tick(clock.frameMs, reduced)
-        if (scene.version != seenVersion || reduced != seenReduced) {
+        val still = mapReduced
+        val nowMs = clock.frameMs
+        val frame = scene.tick(nowMs, still)
+        val changed = scene.version != seenVersion || still != seenReduced
+        if (changed) {
             seenVersion = scene.version
-            seenReduced = reduced
+            seenReduced = still
             val byKind = LinkedHashMap<String, MutableList<FxLive>>()
             val overlay = ArrayList<FxLive>()
             for (l in frame.live) {
@@ -151,7 +167,10 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
             liveByKind = byKind
             overlayItems = overlay
         }
-        summary = scene.summary()
+        if (changed || nowMs - summaryAtMs >= SUMMARY_INTERVAL_MS) {
+            summaryAtMs = nowMs
+            summary = scene.summary()
+        }
     }
 
     private fun writeGlobals() {
@@ -168,7 +187,7 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
         try {
             launch { lifecycle.currentStateFlow.collect { resumed = it.isAtLeast(Lifecycle.State.RESUMED); announcer.active = resumed } }
             launch { snapshotFlow { controller.mapState }.collect { map = it } }
-            launch { snapshotFlow { reduced }.collect { refresh() } }
+            launch { snapshotFlow { mapReduced }.collect { refresh() } }
             // Ambient idle stop: 20 s after the last tap / camera move (PF-2).
             launch {
                 snapshotFlow { interactions }.collectLatest {
@@ -181,6 +200,8 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
             launch {
                 snapshotFlow { map }.collectLatest { m ->
                     if (m == null) return@collectLatest
+                    // The first StyleLoaded can land before this collector subscribes: write the globals now too.
+                    rewriteGlobals(m)
                     var gestureMove = false
                     m.events.collect { e ->
                         when (e) {
@@ -222,6 +243,10 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
             AppLog.i(TAG, "host stop")
         }
     }
+
+    private companion object {
+        const val SUMMARY_INTERVAL_MS = 33L
+    }
 }
 
 /**
@@ -232,13 +257,24 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
 fun rememberFxHost(inputs: FxHostInputs, controller: TrailMapController): FxHostState {
     val host = remember(inputs.renderers) { FxHostState(inputs.renderers) }
     val reduced = BtTheme.motion.reduced
+    val powerSave = rememberPowerSaveMode()
     val palette = rememberFxPalette()
     SideEffect {
         host.reduced = reduced
+        host.powerSave = powerSave
         host.ambientOff = inputs.ambientOff
         host.palette = palette
     }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(host, controller, lifecycle) { host.run(lifecycle, controller) }
     return host
+}
+
+/**
+ * Calls [content] with [host]'s `renderOptions` (Standard when Play is off). The read happens in this scope, so a
+ * `maximumFps` toggle re-runs only the map call inside [content], not the screen around it.
+ */
+@Composable
+fun WithFxRenderOptions(host: FxHostState?, content: @Composable (RenderOptions) -> Unit) {
+    content(host?.renderOptions ?: RenderOptions.Standard)
 }

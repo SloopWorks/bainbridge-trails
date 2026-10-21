@@ -51,8 +51,10 @@ fun PlayBar(
     val fill = BtTheme.colors.play.seaGlass
     val tickColor = MaterialTheme.colorScheme.outline
     val barHeight = BtTheme.spacing.playBar
+    // With a tick the row is md (12dp) tall so the 10dp tick clears the 6dp bar.
+    val rowHeight = if (tick != null) BtTheme.spacing.md else barHeight
     Canvas(
-        modifier.fillMaxWidth().height(if (tick != null) 12.dp else barHeight).clearAndSetSemantics {
+        modifier.fillMaxWidth().height(rowHeight).clearAndSetSemantics {
             this.contentDescription = contentDescription
             progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f)
         },

@@ -18,7 +18,8 @@ class FxClockPolicyTest {
         reduced: Boolean = false,
         idleMs: Long = 0,
         recording: Boolean = false,
-    ) = FxClockPolicy.mode(playOn, resumed, reduced, scene, idleMs, recording)
+        powerSave: Boolean = false,
+    ) = FxClockPolicy.mode(playOn, resumed, reduced, scene, idleMs, recording, powerSave = powerSave)
 
     @Test
     fun `stopped when paused or reduced or play off`() {
@@ -27,6 +28,16 @@ class FxClockPolicyTest {
         assertEquals(Mode.STOPPED, mode(hero, reduced = true))
         assertEquals(Mode.STOPPED, mode(hero, playOn = false))
         assertEquals(Mode.STOPPED, mode(none))
+    }
+
+    @Test
+    fun `battery saver stops the clock like reduced motion`() {
+        // Low Power (iOS) / Battery Saver (Android), effects.md section 5: ambient off, heroes on their final frames.
+        assertEquals(Mode.STOPPED, mode(hero, powerSave = true))
+        assertEquals(Mode.STOPPED, mode(none.copy(animatingNotice = true), powerSave = true))
+        assertEquals(Mode.STOPPED, mode(ambient, powerSave = true))
+        assertNull(FxClockPolicy.mapMaxFps(mode(ambient, powerSave = true), ambient)) // map uncapped while stopped
+        assertEquals(Mode.FULL, mode(hero, powerSave = false))
     }
 
     @Test

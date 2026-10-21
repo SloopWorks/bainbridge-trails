@@ -143,8 +143,11 @@ Decision: `FxClock` — a single `LaunchedEffect` in `FxHost` running `withFrame
   loop returns to — never t=0 and never a mid-motion pose);
 - **idle**: when the scene holds only AMBIENT effects and there was no touch/camera move for 20 s, ambient loops settle to
   their rest frame and the clock stops until the next `CameraMoveStarted` or tap;
-- ambient-only scenes tick at 30 Hz (`delay` to the next 33 ms boundary before `withFrameNanos`); HERO/NOTICE at
-  display rate; Layer-tier `globalState` writes are capped at 30 Hz in every mode;
+- ambient-only scenes publish at 30 Hz; HERO/NOTICE at display rate; Layer-tier `globalState` writes are capped at
+  30 Hz in every mode. *Amended (PD-19, spike S1 correction #7):* the loop calls `withFrameNanos` every display frame
+  while not stopped and gates each publish on **elapsed frame time** (≥ 33 ms since the last ambient / Layer publish),
+  never `delay(33)` (a `delay` before `withFrameNanos` drifts against 60/120 Hz vsync); MapLibre `maximumFps` is capped
+  at 30 while a Layer-tier part animates (correction #6);
 - ambient off while a walk is recording (battery first; heroes still play): AMBIENT effects rest on their final
   frame in both tiers (no reduced-rate ambient while recording); static layers stay;
 - time is the clock's own monotonic ms since scene start (pauses don't jump timelines forward); wall time is only for

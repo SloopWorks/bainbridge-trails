@@ -79,7 +79,6 @@ import com.bainbridgetrails.map.AttributionMode
 import com.bainbridgetrails.map.FOLLOW_MIN_ZOOM
 import com.bainbridgetrails.map.IslandBounds
 import com.bainbridgetrails.map.IslandCamera
-import com.bainbridgetrails.map.LABEL_LAYER
 import com.bainbridgetrails.map.MapFocus
 import com.bainbridgetrails.map.ScreenPoint
 import com.bainbridgetrails.map.SegmentHit
@@ -142,9 +141,9 @@ import com.bainbridgetrails.ui.components.TrailChooserSheet
 import com.bainbridgetrails.ui.components.TrailPeekSheet
 import com.bainbridgetrails.ui.components.TrailSummary
 import com.bainbridgetrails.ui.components.rememberRoadTexts
-import com.bainbridgetrails.play.fx.FxBand
-import com.bainbridgetrails.play.fx.FxLayers
 import com.bainbridgetrails.play.fx.FxOverlay
+import com.bainbridgetrails.play.fx.PlayMapContent
+import com.bainbridgetrails.play.fx.WithFxRenderOptions
 import com.bainbridgetrails.play.fx.fxHostInputs
 import com.bainbridgetrails.play.fx.rememberFxHost
 import com.bainbridgetrails.ui.theme.BtTheme
@@ -161,11 +160,10 @@ import org.jetbrains.compose.resources.stringResource
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.interaction.ClickEvent
-import org.maplibre.compose.layers.Anchor
 import org.maplibre.compose.layers.LocationIndicatorLayer
 import org.maplibre.compose.location.rememberLocationState
 import org.maplibre.compose.map.MapState
-import org.maplibre.compose.map.RenderOptions
+import org.maplibre.compose.overlay.MapOverlayScope
 import org.maplibre.compose.util.DpPadding
 import org.maplibre.spatialk.geojson.LineString
 import org.maplibre.spatialk.geojson.MultiLineString
@@ -219,6 +217,7 @@ fun MapTab(
     // Play gate (engine PF-9, plan L2-2): Play off → no FX host, scene, clock, sources or layers are created.
     val fxInputs = fxHostInputs(settings.play, recording)
     val fx = if (fxInputs != null) rememberFxHost(fxInputs, controller) else null
+    val fxOverlay: (@Composable MapOverlayScope.() -> Unit)? = remember(fx) { if (fx != null) ({ FxOverlay(fx) }) else null }
 
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var choices by rememberSaveable { mutableStateOf<List<String>?>(null) }
@@ -418,39 +417,44 @@ fun MapTab(
     val animatedStack by animateDpAsState(stackHeight, tween(if (reduced) 0 else 200))
 
     Box(modifier.fillMaxSize().onSizeChanged { mapHeight = with(density) { it.height.toDp() } }) {
-        TrailMap(
-            style,
-            Modifier.fillMaxSize().semantics {
-                contentDescription = mapA11y
-                customActions = listOf(CustomAccessibilityAction(trailsLabel) { onSearch(); true })
-            },
-            initialCamera = camera ?: IslandCamera,
-            controlsTopPadding = 64.dp,
-            controller = controller,
-            interactions = interactions,
-            attribution = AttributionMode.Timed,
-            chromePadding = PaddingValues(bottom = animatedStack),
-            fxOverlay = if (fx != null) ({ FxOverlay(fx) }) else null,
-            renderOptions = fx?.renderOptions ?: RenderOptions.Standard,
-        ) {
-            // Composition order = z-order (mapContentOrder): UNDER_STATUS, StatusLayers (+ CASING), OVER_STATUS,
-            // OVER_LABELS, then the location puck above every FX layer.
-            if (fx != null) Anchor.Below(LABEL_LAYER) { FxLayers(fx, FxBand.UNDER_STATUS) }
-            StatusLayers(
-                snapshot?.segmentBuckets.orEmpty(), style, selected, reduced, spec = spec, roadEnds = roadEnds,
-                casingFx = if (fx != null) ({ FxLayers(fx, FxBand.CASING) }) else null,
-            )
-            if (fx != null) {
-                Anchor.Below(LABEL_LAYER) { FxLayers(fx, FxBand.OVER_STATUS) }
-                Anchor.Top { FxLayers(fx, FxBand.OVER_LABELS) }
-            }
-            if (locating && locationGranted) {
-                LocationIndicatorLayer(
-                    id = "app-user-location",
-                    locationState = locationState,
-                    accuracyRadiusColor = BtTheme.colors.userTrack.copy(alpha = 0.12f),
-                    accuracyRadiusBorderColor = BtTheme.colors.userTrack.copy(alpha = 0.5f),
-                    bearingAccuracyColor = const(BtTheme.colors.userTrack.copy(alpha = 0.3f)),
+        WithFxRenderOptions(fx) { renderOptions ->
+            TrailMap(
+                style,
+                Modifier.fillMaxSize().semantics {
+                    contentDescription = mapA11y
+                    customActions = listOf(CustomAccessibilityAction(trailsLabel) { onSearch(); true })
+                },
+                initialCamera = camera ?: IslandCamera,
+                controlsTopPadding = 64.dp,
+                controller = controller,
+                interactions = interactions,
+                attribution = AttributionMode.Timed,
+                chromePadding = PaddingValues(bottom = animatedStack),
+                fxOverlay = fxOverlay,
+                renderOptions = renderOptions,
+            ) {
+                // Composition order = z-order (mapContentOrder): FX bands around StatusLayers, the puck above them all.
+                PlayMapContent(
+                    fx,
+                    status = { casingFx ->
+                        StatusLayers(
+                            snapshot?.segmentBuckets.orEmpty(), style, selected, reduced, spec = spec, roadEnds = roadEnds,
+                            casingFx = casingFx,
+                        )
+                    },
+                    location = if (locating && locationGranted) {
+                        {
+                            LocationIndicatorLayer(
+                                id = "app-user-location",
+                                locationState = locationState,
+                                accuracyRadiusColor = BtTheme.colors.userTrack.copy(alpha = 0.12f),
+                                accuracyRadiusBorderColor = BtTheme.colors.userTrack.copy(alpha = 0.5f),
+                                bearingAccuracyColor = const(BtTheme.colors.userTrack.copy(alpha = 0.3f)),
+                            )
+                        }
+                    } else {
+                        null
+                    },
                 )
             }
         }

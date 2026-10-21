@@ -65,11 +65,10 @@ import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.data.AppSettings
 import com.bainbridgetrails.data.Loadable
 import com.bainbridgetrails.graph.AppGraph
-import com.bainbridgetrails.map.LABEL_LAYER
-import com.bainbridgetrails.play.fx.FxBand
 import com.bainbridgetrails.play.fx.FxHostInputs
-import com.bainbridgetrails.play.fx.FxLayers
 import com.bainbridgetrails.play.fx.FxOverlay
+import com.bainbridgetrails.play.fx.PlayMapContent
+import com.bainbridgetrails.play.fx.WithFxRenderOptions
 import com.bainbridgetrails.play.fx.fxHostInputs
 import com.bainbridgetrails.play.fx.rememberFxHost
 import com.bainbridgetrails.map.MapStyle
@@ -155,10 +154,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import com.bainbridgetrails.map.boundsOf
+import com.bainbridgetrails.map.chartInteractions
 import com.bainbridgetrails.map.fitTo
 import com.bainbridgetrails.map.rememberTrailMapController
-import org.maplibre.compose.layers.Anchor
-import org.maplibre.compose.map.RenderOptions
+import org.maplibre.compose.overlay.MapOverlayScope
 import org.maplibre.compose.util.DpPadding
 
 private sealed interface Load {
@@ -621,19 +620,23 @@ private fun RecordMap(
     // Track colours follow the map style (a dark map in a light app still gets the dark-map track).
     val extra = if (style.isDark) BtExtraDark else BtExtraLight
     val fx = if (fxInputs != null) rememberFxHost(fxInputs, mapController) else null
-    TrailMap(
-        style, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 56.dp, follow = at, controller = mapController,
-        fxOverlay = if (fx != null) ({ FxOverlay(fx) }) else null,
-        renderOptions = fx?.renderOptions ?: RenderOptions.Standard,
-    ) {
-        // Composition order = z-order (mapContentOrder); the live track stays above every FX layer.
-        if (fx != null) Anchor.Below(LABEL_LAYER) { FxLayers(fx, FxBand.UNDER_STATUS) }
-        StatusLayers(buckets, dark = style.isDark, casingFx = if (fx != null) ({ FxLayers(fx, FxBand.CASING) }) else null)
-        if (fx != null) {
-            Anchor.Below(LABEL_LAYER) { FxLayers(fx, FxBand.OVER_STATUS) }
-            Anchor.Top { FxLayers(fx, FxBand.OVER_LABELS) }
+    val fxOverlay: (@Composable MapOverlayScope.() -> Unit)? = remember(fx) { if (fx != null) ({ FxOverlay(fx) }) else null }
+    // Taps reset FX's 20 s ambient idle stop (PF-2) like camera moves do; no Play = today's interactions.
+    val interactions = remember(fx) { if (fx != null) chartInteractions(onTap = { fx.noteInteraction() }) else chartInteractions() }
+    WithFxRenderOptions(fx) { renderOptions ->
+        TrailMap(
+            style, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 56.dp, follow = at, controller = mapController,
+            interactions = interactions,
+            fxOverlay = fxOverlay,
+            renderOptions = renderOptions,
+        ) {
+            // Composition order = z-order (mapContentOrder); the live track stays above every FX layer.
+            PlayMapContent(
+                fx,
+                status = { casingFx -> StatusLayers(buckets, dark = style.isDark, casingFx = casingFx) },
+                location = { TrackLayer(drawn, extra.userTrack, extra.userTrackCasing) },
+            )
         }
-        TrackLayer(drawn, extra.userTrack, extra.userTrackCasing)
     }
 }
 

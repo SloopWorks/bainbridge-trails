@@ -22,8 +22,11 @@ import kotlin.time.TimeSource
 
 enum class FxPoliteness { POLITE, ASSERTIVE }
 
-/** One spoken line; [seq] makes a repeat of the same text after the dedupe window a new announcement. */
-data class FxAnnouncement(val text: String, val politeness: FxPoliteness, val seq: Long)
+/** One spoken line, set at [atMs] (announcer ms); [seq] counts every line the live region has said. */
+data class FxAnnouncement(val text: String, val politeness: FxPoliteness, val seq: Long, val atMs: Long = 0)
+
+/** What the always-composed live-region node says: the current line, or "" (so the next line is a change). */
+internal fun liveRegionText(a: FxAnnouncement?): String = a?.text ?: ""
 
 /**
  * The queue rules (ux.md § 5.4, effects § 1.10): assertive speaks at once (only the opt-in moment and Finish claims
@@ -69,60 +72,92 @@ internal class FxAnnounceQueue(private val politeGapMs: Long = 4_000, private va
 
 /**
  * Play's one announcer (engine PF-5, effects § 1.10; ux.md calls it PlayAnnouncer): map effects never post their own
- * live regions, they call [say]. [FxLiveRegion] (composed by [FxOverlay]) is the single live-region node. While the
- * app is not resumed nothing is announced or queued.
+ * live regions, they call [say]. [FxLiveRegion] (composed by [FxOverlay]) is the single live-region node; it is always
+ * composed and says [liveRegionText]. A line clears [CLEAR_AFTER_MS] after it is set (no stale focusable text, and a
+ * repeat of the same line later is a fresh "" → text change that TalkBack / VoiceOver speak again). While the app is
+ * not resumed nothing is announced or queued, and the current line clears. [nowMs] is monotonic ms (tests inject it).
  */
 @Stable
-class FxAnnouncer internal constructor() {
-    private val mark = TimeSource.Monotonic.markNow()
+class FxAnnouncer internal constructor(private val nowMs: () -> Long = monotonicMs()) {
     private val queue = FxAnnounceQueue()
     private var seq = 0L
-    internal var pendingVersion by mutableIntStateOf(0)
+
+    /** Bumped whenever the live region's wake-up schedule changes (a line set or queued); [FxLiveRegion] re-pumps. */
+    internal var version by mutableIntStateOf(0)
         private set
 
-    /** What the live region currently says. */
+    /** What the live region currently says (null = ""). */
     var current: FxAnnouncement? by mutableStateOf(null)
         private set
 
     internal var active: Boolean = false
         set(value) {
             field = value
-            if (!value) queue.clearPending()
+            if (!value) {
+                queue.clearPending()
+                current = null
+            }
         }
-
-    internal fun nowMs(): Long = mark.elapsedNow().inWholeMilliseconds
 
     fun say(text: String, politeness: FxPoliteness = FxPoliteness.POLITE) {
         if (!active || text.isBlank()) return
-        val now = queue.offer(text, politeness, nowMs())
-        if (now != null) current = FxAnnouncement(now, politeness, ++seq)
-        if (queue.hasPending) pendingVersion++
+        val now = nowMs()
+        val spoken = queue.offer(text, politeness, now)
+        if (spoken != null) show(spoken, politeness, now)
+        if (spoken != null || queue.hasPending) version++
     }
 
-    /** Releases queued polite lines on their 4 s gap; returns ms until the next, or null when none waits. */
+    /**
+     * Clears the current line once [CLEAR_AFTER_MS] old and releases queued polite lines on their 4 s gap; returns ms
+     * until the next of those, or null when nothing is due.
+     */
     internal fun pump(): Long? {
         val now = nowMs()
-        queue.poll(now)?.let { current = FxAnnouncement(it, FxPoliteness.POLITE, ++seq) }
-        return queue.msUntilNext(now)
+        current?.let { if (now - it.atMs >= CLEAR_AFTER_MS) current = null }
+        queue.poll(now)?.let { show(it, FxPoliteness.POLITE, now) }
+        val clearIn = current?.let { (it.atMs + CLEAR_AFTER_MS - now).coerceAtLeast(0) }
+        val nextIn = queue.msUntilNext(now)
+        return when {
+            clearIn == null -> nextIn
+            nextIn == null -> clearIn
+            else -> minOf(clearIn, nextIn)
+        }
+    }
+
+    private fun show(text: String, politeness: FxPoliteness, now: Long) {
+        current = FxAnnouncement(text, politeness, ++seq, now)
+    }
+
+    companion object {
+        /** A line stays on the live-region node this long, then the node says "" again. */
+        const val CLEAR_AFTER_MS = 5_000L
+
+        private fun monotonicMs(): () -> Long {
+            val mark = TimeSource.Monotonic.markNow()
+            return { mark.elapsedNow().inWholeMilliseconds }
+        }
     }
 }
 
-/** The single invisible live-region node for [announcer]. */
+/**
+ * The single invisible live-region node for [announcer]: always composed (a node that appears together with its first
+ * text is not announced on Android), saying [liveRegionText]. Its loop wakes for queued lines and the 5 s clear.
+ */
 @Composable
 internal fun FxLiveRegion(announcer: FxAnnouncer, modifier: Modifier = Modifier) {
     LaunchedEffect(announcer) {
-        snapshotFlow { announcer.pendingVersion }.collectLatest {
+        snapshotFlow { announcer.version }.collectLatest {
             while (true) {
                 val wait = announcer.pump() ?: break
                 delay(wait.coerceAtLeast(1))
             }
         }
     }
-    val a = announcer.current ?: return
+    val a = announcer.current
     Box(
         modifier.size(1.dp).semantics {
-            liveRegion = if (a.politeness == FxPoliteness.ASSERTIVE) LiveRegionMode.Assertive else LiveRegionMode.Polite
-            contentDescription = a.text
+            liveRegion = if (a?.politeness == FxPoliteness.ASSERTIVE) LiveRegionMode.Assertive else LiveRegionMode.Polite
+            contentDescription = liveRegionText(a)
         },
     )
 }

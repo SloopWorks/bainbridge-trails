@@ -20,6 +20,10 @@ object FxClockPolicy {
     const val AMBIENT_MIN_INTERVAL_NANOS: Long = 33_000_000L
     const val MAP_MAX_FPS_WHILE_LAYER_ANIMATES: Int = 30
 
+    /**
+     * [powerSave]: Battery Saver (Android) / Low Power (iOS) — the map half of reduced motion (effects.md § 5: ambient
+     * off, heroes on their final frames, fog static), so the clock stops whatever the scene holds.
+     */
     fun mode(
         playOn: Boolean,
         resumed: Boolean,
@@ -28,8 +32,9 @@ object FxClockPolicy {
         msSinceInteraction: Long,
         recording: Boolean,
         idleStopMs: Long = FxCaps().idleStopMs,
+        powerSave: Boolean = false,
     ): Mode = when {
-        !playOn || !resumed || reduced -> Mode.STOPPED
+        !playOn || !resumed || reduced || powerSave -> Mode.STOPPED
         scene.animatingHero || scene.animatingNotice -> Mode.FULL
         // Ambient rests on its final frame while recording (battery first) and after 20 s idle.
         scene.animatingAmbient && !recording && msSinceInteraction < idleStopMs -> Mode.AMBIENT_30HZ

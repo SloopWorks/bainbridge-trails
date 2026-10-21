@@ -259,6 +259,20 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
   Android device in engine stage 9.
 - **Resolves:** engine §5 S4; ux.md §7.2 #3.
 
+## PD-20 L2-1/L2-2 UI review deviations: kraken ink casing color rule
+- **Context.** The compose-ui review of L2-1/L2-2 (`reviews/2026-10-20-ui-l2-1-l2-2.md`, FIX-FIRST) recorded spec
+  deviations: (1) `FxPalette` has no ink-casing role, and effects §3.1's casing "`playInk` at α .85" lands ΔE 14–17
+  from the not-started trail color over the map land (the guard needs ΔE ≥ 20); (2) `seaGlassWash` is a stored field,
+  not a derived value (harmless); (3) the clock gates on elapsed frame time, which engine PF-2's text did not say;
+  (4) Battery Saver / Low Power was not wired. (4) is fixed in the review fix-up (FxHost stops the clock and draws
+  final frames under power save, `FxClockPolicy.mode(powerSave)`); (3) is amended in engine PF-2.
+- **Decision.** (1) The kraken casing color keeps **ΔE ≥ 20 from not-started over map land, in both themes**. Rule:
+  casing = `play.ink` blended **35 % toward `secondary`** (Sound teal), opaque; the final hex per theme is measured
+  and pinned by L2-4's guard test (alongside `FxPaletteGuardTest`), which adds the `FxPalette` ink-casing role.
+  (2) stays as is. (3) PF-2 amended (PD-19, spike S1 correction #7).
+- **Consequence.** effects §3.1's "α .85" casing is superseded by this rule; the kraken stage (L2-4) may not ship the
+  casing until the guard passes in light and dark.
+
 ## Status
 
 | doc | status |
@@ -269,4 +283,4 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
 | `effects.md` | ACCEPTED (round 1 findings resolved) |
 | `ai.md` | ACCEPTED (round 1 findings resolved) |
 | `ux.md` | ACCEPTED 2026-10-20 after the conformance pass (PD-18) |
-| `plan.md` | written 2026-10-20 (PD-17); PD-19 recorded |
+| `plan.md` | written 2026-10-20 (PD-17); PD-19, PD-20 recorded |
