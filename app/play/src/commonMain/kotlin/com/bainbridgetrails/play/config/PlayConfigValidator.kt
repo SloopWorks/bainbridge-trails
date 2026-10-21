@@ -20,11 +20,8 @@ import com.bainbridgetrails.play.time.IslandTime
 import com.bainbridgetrails.play.time.Season
 import com.bainbridgetrails.play.time.Sun
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
-import kotlinx.datetime.daysUntil
-import kotlinx.datetime.number
 import kotlinx.datetime.plus
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -76,8 +73,9 @@ data class PlayConfigError(val rule: Rule, val path: String, val message: String
  * against the pack itself. The coastline buffer is the build script's (it owns `coastline.json`).
  *
  * Calendar rules (daylight, creature hours, ambient hours, `from < to`, hero conflicts) simulate [simDays] island days
- * from [simStart] with a date-level reading of the recurrence (`every`, `on`, `in`, `dates`, `fallback`, `days`);
- * `season`, `except` and anchors only narrow a day set, so ignoring them here is conservative.
+ * from [simStart] with the date-level recurrence ([Recurrences.startsOn]: `every`, `on`, `in`, `dates`, `fallback`,
+ * `season`, `except`) and the authored `[from, to]` across `days`; anchors only narrow a window, so ignoring them here
+ * is conservative.
  */
 object PlayConfigValidator {
     /** effects.md §7 v1 effect ids (plan §2 inventory). */
@@ -566,34 +564,8 @@ object PlayConfigValidator {
 
         // --- calendar simulation ----------------------------------------------------------------------------------
 
-        /** Date-level: does an occurrence of [r] start on [d]? (`season` and `except` ignored: superset.) */
-        fun startsOn(r: Recurrence, d: LocalDate): Boolean {
-            if (r.inMonths.isNotEmpty() && r.inMonths.none { it.number == d.month.number }) return false
-            val rules = r.dayRules()
-            return when (r.every) {
-                null, Every.always -> false
-                Every.day -> true
-                Every.week -> if (rules.isEmpty()) d.dayOfWeek == DayOfWeek.MONDAY else rules.any { it is DayRule.Weekday && it.day == d.dayOfWeek }
-                Every.month, Every.year -> if (rules.isEmpty()) d.day == 1 else rules.any { matchesMonthRule(it, d) }
-                Every.dates -> if (r.dates.isNotEmpty() && r.dates.any { it.year == d.year }) d in r.dates
-                else r.fallback?.let { startsOn(it, d) } ?: false
-            }
-        }
-
-        fun matchesMonthRule(rule: DayRule, d: LocalDate): Boolean {
-            val len = monthLength(d)
-            return when (rule) {
-                is DayRule.MonthDay -> if (rule.day == -1) d.day == len else d.day == rule.day
-                is DayRule.NthWeekday -> d.dayOfWeek == rule.day &&
-                    (if (rule.n == -1) d.day + 7 > len else (d.day - 1) / 7 + 1 == rule.n)
-                is DayRule.Weekday -> false
-            }
-        }
-
-        fun monthLength(d: LocalDate): Int {
-            val first = LocalDate(d.year, d.month, 1)
-            return first.daysUntil(first.plus(1, DateTimeUnit.MONTH))
-        }
+        /** Date level, the scheduler's and the Worker's rule ([Recurrences.startsOn]). */
+        fun startsOn(r: Recurrence, d: LocalDate): Boolean = Recurrences.startsOn(c, r, d)
 
         /** [from, to] of an occurrence starting [d] spanning [days] days, or null when a sun event is missing. */
         fun window(d: LocalDate, f: TimeExpr, t: TimeExpr, days: Int): Pair<Instant, Instant>? {

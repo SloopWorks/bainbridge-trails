@@ -23,6 +23,11 @@ import kotlinx.serialization.json.intOrNull
 data class PlayConfig(
     val schema: Int,
     val version: String,
+    /**
+     * The pack epoch: the start date of `every: "always"` items without `notBefore` (schedule.md §4.4), and week 0 of
+     * the treasure set's `everyNthWeek` count. Null in packs that predate it.
+     */
+    val epoch: LocalDate? = null,
     val minAppBuild: Int = 0,
     val tz: String,
     val islandSeed: String,
