@@ -1,6 +1,10 @@
 package com.bainbridgetrails.play
 
 import com.bainbridgetrails.coverage.Fix
+import com.bainbridgetrails.play.claim.ClaimEvaluator
+import com.bainbridgetrails.play.claim.GatedFix
+import com.bainbridgetrails.play.claim.GatedSummary
+import com.bainbridgetrails.play.claim.SensingTracker
 import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.fx.FxAnchor
 import com.bainbridgetrails.play.fx.FxBand
@@ -8,19 +12,22 @@ import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.FxTimeline
 import com.bainbridgetrails.play.schedule.ActiveItem
+import com.bainbridgetrails.play.schedule.DayPlan
 import com.bainbridgetrails.play.schedule.Occurrence
 import com.bainbridgetrails.play.schedule.ResolvedPlacement
 import com.bainbridgetrails.tracking.SessionSummary
 import kotlinx.coroutines.flow.Flow
+import kotlin.concurrent.Volatile
 import kotlin.time.Instant
 
 /** A live (provisional) find: [key] is the claim id (the placement key, else the occurrence key). */
 data class SensedFind(val key: String, val occurrence: Occurrence, val placement: ResolvedPlacement?)
 
 /**
- * The seam between live sensing / Finish claiming and the claim rules (product § 3.6.1–3.6.2). L1-6's
- * `SensingTracker` / `ClaimEvaluator` plug in here (L2-9 wires them); until then [None] senses and claims nothing.
- * Implementations own accuracy, radius, the trailing-60 s speed rule, mock filtering and quiet zones.
+ * The seam between live sensing / Finish and the claim rules (product § 3.6.1–3.6.2). Production uses
+ * [TrackerSensingSink] (L1-6's `SensingTracker`); the Finish claim pass itself is `PlayRepository`'s (it needs the
+ * scheduler's day plans and the claim queue). [None] senses nothing. Implementations own accuracy, radius, the
+ * trailing-60 s speed rule, mock filtering and quiet zones.
  */
 interface SensingSink {
     /** One new recording fix; [targets] = what may be sensed now (active, gate OPEN, sensable, not yet found). */
@@ -40,6 +47,62 @@ interface SensingSink {
         }
     }
 }
+
+/**
+ * Live sensing over `:play`'s [SensingTracker] (product § 3.6.1, PF5): one tracker per walk, fed every recording fix with
+ * the current island day's plan ([plan]); its new claims are reported only when they are among [onFix]'s targets (gate
+ * OPEN, sensable, not found, not killed). [evaluator] is the repository's live instance (rebuilt with the pack); a new
+ * pack, a new session ([reset]) or Finish ([onGated]) starts a new tracker. Single-threaded use: the sensing collector.
+ */
+class TrackerSensingSink(
+    private val evaluator: () -> ClaimEvaluator?,
+    private val plan: () -> DayPlan?,
+    private val found: () -> Set<String>,
+    private val hints: () -> Map<String, Int>,
+) : SensingSink {
+    @Volatile private var tracker: SensingTracker? = null
+    private var trackerFor: ClaimEvaluator? = null
+
+    override fun onFix(fix: Fix, targets: List<ActiveItem>, now: Instant): List<SensedFind> {
+        val ev = evaluator() ?: return emptyList()
+        val day = plan() ?: return emptyList()
+        val t = tracker?.takeIf { trackerFor === ev } ?: SensingTracker(ev, found(), hints()).also {
+            tracker = it
+            trackerFor = ev
+        }
+        val claims = t.onFix(fix.toGated(), day) // fed every fix: the speed rule needs the trailing 60 s
+        if (claims.isEmpty() || targets.isEmpty()) return emptyList()
+        val byKey = HashMap<String, Pair<ActiveItem, ResolvedPlacement?>>()
+        for (a in targets) {
+            byKey[a.occurrence.key] = a to null
+            for (p in a.occurrence.placements) byKey[p.key] = a to p
+        }
+        return claims.mapNotNull { c -> byKey[c.key]?.let { (a, p) -> SensedFind(c.key, a.occurrence, p) } }
+    }
+
+    override fun reset() {
+        tracker = null
+    }
+
+    override suspend fun onGated(sessionId: String, kept: List<Fix>, summary: SessionSummary) {
+        tracker = null // the walk is over; the Finish pass is the truth (PD-12)
+    }
+}
+
+/** A recording fix as `:play` sees it (no `:coverage` dependency there). */
+fun Fix.toGated(): GatedFix = GatedFix(timeMs, lat, lon, accuracyM, isMock)
+
+/** The Finalizer's walk summary as `:play` sees it. */
+fun SessionSummary.toGated(): GatedSummary = GatedSummary(
+    sessionId = sessionId,
+    startedAtMs = startedAt,
+    endedAtMs = endedAt,
+    distanceM = distanceM,
+    matchedM = matchedM,
+    newlyCompleted = newlyCompleted,
+    verified = verified,
+    droppedVehicle = droppedVehicle,
+)
 
 /**
  * The graph-level live sensing observer (product § 3.6.1, PD-12): follows the recording's fixes

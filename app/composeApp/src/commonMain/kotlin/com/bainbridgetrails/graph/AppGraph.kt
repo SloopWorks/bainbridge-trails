@@ -51,11 +51,13 @@ import com.bainbridgetrails.net.ApiClient
 import com.bainbridgetrails.net.AuthResponse
 import com.bainbridgetrails.net.platformHttpEngine
 import com.bainbridgetrails.play.DatasetPlaceIndex
+import com.bainbridgetrails.play.PlayClaimQueue
 import com.bainbridgetrails.play.PlayClock
 import com.bainbridgetrails.play.PlayContentRepository
 import com.bainbridgetrails.play.PlayGate
 import com.bainbridgetrails.play.PlayRepository
 import com.bainbridgetrails.play.PlayStateStore
+import com.bainbridgetrails.play.SnapshotMarks
 import com.bainbridgetrails.play.SystemPlayClock
 import com.bainbridgetrails.play.playGoal
 import com.bainbridgetrails.play.schedule.DerivedGoal
@@ -190,6 +192,8 @@ object AppGraph {
                 onCoverageChanged = { coverageChanged() },
                 now = clock,
                 io = Dispatchers.IO,
+                // Play claims ride the upload only while Play is on (PF0-2: off = null = the pure body).
+                playPart = { walkIdBySession, walks -> playOrNull?.claimPart(walkIdBySession, walks) },
             )
         }
 
@@ -251,7 +255,23 @@ object AppGraph {
                     emitAll(controller.track)
                 },
                 api = api,
+                // Beside the sync queue: per goal, per install, not backed up.
+                claims = PlayClaimQueue("$privateDir/${DatasetProfile.current.storeName("play-claims.json")}", Dispatchers.IO),
+                signedIn = { auth.state.value is AuthState.SignedIn },
+                walkDerived = { snapshotMarks(goal) },
             )
+        }
+
+        /** The opt-in starting balance's input: walk-derived marks of the current local coverage (product § 3.6.4). */
+        private suspend fun snapshotMarks(goal: com.bainbridgetrails.play.config.Goal): com.bainbridgetrails.play.rules.WalkDerived? {
+            val derived = readResourceOrNull("files/play/derived-${goal.name}.json") ?: return null
+            val data = datasets.await()
+            return withContext(Dispatchers.Default) {
+                val (state, sticky) = withContext(Dispatchers.IO) {
+                    CoverageStore.writeLock.withLock { CoverageStore(trackingDir).let { it.load() to it.completedIds() } }
+                }
+                SnapshotMarks.of(goal, data.dataset, data.index, state, sticky, derived)
+            }
         }
 
         private suspend fun readResourceOrNull(path: String): String? = withContext(Dispatchers.IO) {
@@ -275,6 +295,12 @@ object AppGraph {
 
         internal fun startRemote() {
             auth.addListener(SessionListener(sync, profile, onAuthChanged = { leaderboard.onAuthChanged() }, clearPhone = { wipeLocalProgress() }))
+            // Play on while signing in: restore the Logbook from the account (product § 3.6.5). Off: nothing.
+            auth.addListener(object : AuthListener {
+                override suspend fun onSignedIn(response: AuthResponse) {
+                    playOrNull?.restore()
+                }
+            })
             scope.launch {
                 profile.load()
                 if (auth.load().isSignedIn) {

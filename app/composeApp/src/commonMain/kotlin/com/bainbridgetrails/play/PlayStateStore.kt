@@ -1,6 +1,7 @@
 package com.bainbridgetrails.play
 
 import com.bainbridgetrails.net.JsonFile
+import com.bainbridgetrails.play.rules.Logbook
 import com.bainbridgetrails.play.schedule.PlayUserState
 import com.bainbridgetrails.play.time.IslandTime
 import kotlinx.coroutines.CoroutineDispatcher
@@ -16,41 +17,19 @@ import kotlinx.datetime.LocalTime
 import kotlinx.serialization.Serializable
 
 /**
- * One Logbook row as stored on this phone (product § 3.8). [kind] / [board] are the product's enum words
- * (`treasure`, `ink`, `start_balance`, …; `pending` | `accepted` | `local_only`) kept as strings so the rules model
- * (`:play` rules, L1-6) owns the vocabulary. [date] is the island date only: no time of day is ever stored.
- */
-@Serializable
-data class LogbookRecord(
-    val id: String,
-    val kind: String,
-    val what: String,
-    val why: String,
-    /** Island date `yyyy-MM-dd`. */
-    val date: String,
-    val marks: Int,
-    val walkId: String? = null,
-    /** Occurrence key (debug drawer only). */
-    val contentId: String? = null,
-    /** The Monday of its week. */
-    val weekId: String,
-    val board: String = "pending",
-)
-
-/**
  * Play's per-goal user state (`<appData>/play/<goal>-state.json`): [found] occurrence / placement keys (claimed or
- * restored), [solved] riddle item id → island date of the armchair solve, [hints] riddle item id → hints used,
- * the [logbook] and [startBalanceCredited] (the opt-in starting balance is credited once ever, PF1-2). Kept when Play
- * is turned off (product § 5.5: nothing is deleted).
+ * restored), [solved] riddle item id → island date of the armchair solve, [hints] riddle item id → hints used, and
+ * the [logbook] — `:play`'s rules model ([Logbook] of `LogEntry`, product § 3.8), the one Logbook model: island dates
+ * only, never a time of day. The opt-in starting balance is credited once ever (`Logbook.hasStartBalance`, PF1-2).
+ * Kept when Play is turned off (product § 5.5: nothing is deleted).
  */
 @Serializable
 data class PlayState(
-    val schema: Int = 1,
+    val schema: Int = 2,
     val found: Set<String> = emptySet(),
     val solved: Map<String, String> = emptyMap(),
     val hints: Map<String, Int> = emptyMap(),
-    val logbook: List<LogbookRecord> = emptyList(),
-    val startBalanceCredited: Boolean = false,
+    val logbook: Logbook = Logbook(),
 ) {
     /** The scheduler's view (salt is v2). A solve counts from the start of its island day. */
     fun userState(): PlayUserState = PlayUserState(

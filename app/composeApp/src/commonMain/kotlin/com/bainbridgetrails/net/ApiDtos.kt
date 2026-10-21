@@ -65,6 +65,13 @@ data class CoverageUpload(
     val walks: List<WalkDto> = emptyList(),
     /** RD-7: "roads" for the roads goal; null (omitted) = the server default, trails. [ApiClient] sets it. */
     val dataset: String? = null,
+    /**
+     * Play (docs/play/product.md §3.10, PD-3): the content-pack version the claims below were evaluated against.
+     * Null (omitted) whenever [play] is: with Play off the body is byte-identical to the pure upload (PF0-2).
+     */
+    val playConfig: String? = null,
+    /** One element per walk of [walks] that has Play claims; null (omitted) with Play off or nothing to claim. */
+    val play: List<PlayWalkClaimsDto>? = null,
 )
 
 /** `PUT|GET /v1/coverage` 200. */
@@ -78,6 +85,8 @@ data class CoverageResponse(
     val accepted: Boolean? = null,
     val newlyCoveredM: Double? = null,
     val ignoredSegments: List<String> = emptyList(),
+    /** Present only when the request carried `play` (product §3.10). */
+    val play: PlayUploadResultDto? = null,
 )
 
 @Serializable

@@ -6,9 +6,21 @@ import com.bainbridgetrails.net.ApiClient
 import com.bainbridgetrails.net.ApiResult
 import com.bainbridgetrails.net.PlayChallengesDto
 import com.bainbridgetrails.net.PlayMeDto
+import com.bainbridgetrails.play.claim.ClaimEvaluator
+import com.bainbridgetrails.play.claim.ClaimKind
+import com.bainbridgetrails.play.claim.ClaimResult
+import com.bainbridgetrails.play.claim.GatedFix
+import com.bainbridgetrails.play.claim.GatedSummary
+import com.bainbridgetrails.play.claim.PlayGatedHook
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.fx.FxSpec
+import com.bainbridgetrails.play.rules.BoardState
+import com.bainbridgetrails.play.rules.LogEntry
+import com.bainbridgetrails.play.rules.LogKind
+import com.bainbridgetrails.play.rules.Marks
+import com.bainbridgetrails.play.rules.StartBalance
+import com.bainbridgetrails.play.rules.WalkDerived
 import com.bainbridgetrails.play.schedule.ActiveItem
 import com.bainbridgetrails.play.schedule.DayPlan
 import com.bainbridgetrails.play.schedule.DerivedGoal
@@ -20,7 +32,9 @@ import com.bainbridgetrails.play.schedule.PlayScheduler
 import com.bainbridgetrails.play.time.FerryTimetable
 import com.bainbridgetrails.play.time.IslandTime
 import com.bainbridgetrails.play.time.TideTable
+import com.bainbridgetrails.sync.PlayPart
 import com.bainbridgetrails.tracking.SessionSummary
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,8 +59,11 @@ import kotlinx.datetime.plus
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Play while it is on (schedule.md § 5.3, product § 3.6.1, PD-1): the running pack ([content]), the scheduler over
@@ -54,10 +71,16 @@ import kotlin.time.Instant
  * or tide change, on a pack change and on user-state changes, so an island-day rollover rebuilds the plan), the user
  * state ([store]), live sensing ([PlaySensing] over the recording's fixes) and the Finalizer's [gatedHook].
  *
+ * Claims (docs/play/plan.md L2-9, product § 3.6, § 3.10, PD-3, PD-12): [gatedHook] → the claim pass over the walk's
+ * kept fixes ([ClaimEvaluator]) → `pending` Logbook entries + one element in [claims] → [claimPart] on the next coverage
+ * upload → confirmed / capped / `local_only`. On every turn-on: [restore] from `GET /v1/play/me` when signed in (a
+ * reinstall gets one "Restored from your account" entry), then the opt-in starting balance ([StartBalance], once ever).
+ *
  * Constructed only through [PlayGate] (AppGraph `playOrNull`), the first time Play is on; [start] / [stop] follow the
  * toggle. Nothing here runs, observes or requests while stopped. All scheduler work runs on one background worker
  * (the scheduler is not thread-safe).
  */
+@OptIn(ExperimentalUuidApi::class)
 class PlayRepository(
     private val scope: CoroutineScope,
     val goal: Goal,
@@ -69,12 +92,33 @@ class PlayRepository(
     val store: PlayStateStore,
     /** The recording's fixes (`RecordingController.track`): empty when not recording, restarts per session. */
     private val track: Flow<List<Fix>>,
-    private val sink: SensingSink = SensingSink.None,
+    /** Live sensing; null = [TrackerSensingSink] over this repository's pack and day plan (production). */
+    sink: SensingSink? = null,
     compute: CoroutineDispatcher = Dispatchers.Default,
     private val api: ApiClient? = null,
     private val tickMs: Long = 60_000L,
+    /** The walks' Play elements waiting for their coverage upload; null = no claim pipeline (screens-only tests). */
+    val claims: PlayClaimQueue? = null,
+    /** Signed in now (restore needs the account). */
+    private val signedIn: () -> Boolean = { false },
+    /** W-COV + W-DONE + W-SQUARE of the current coverage snapshot (the opt-in starting balance); null = unknown. */
+    private val walkDerived: suspend () -> WalkDerived? = { null },
+    private val newId: () -> String = { Uuid.random().toString() },
 ) {
     private val worker = compute.limitedParallelism(1)
+
+    /** The live claim rules (rebuilt with the pack on the worker); read by [TrackerSensingSink] on the sensing collector. */
+    @Volatile private var liveEvaluator: ClaimEvaluator? = null
+
+    /** Finish's own instance (worker only: [ClaimEvaluator] is not thread-safe). */
+    private var finishEvaluator: ClaimEvaluator? = null
+
+    private val liveSink: SensingSink = sink ?: TrackerSensingSink(
+        evaluator = { liveEvaluator },
+        plan = { _today.value },
+        found = { store.state.value.found },
+        hints = { store.state.value.hints },
+    )
 
     private val _agenda = MutableStateFlow<PlayAgenda?>(null)
 
@@ -118,12 +162,23 @@ class PlayRepository(
     private var tideTable: TideTable? = null
 
     /**
-     * The Finalizer's `onGated` provider target (plan.md L2-3; wired in `RecordingGraph` by L2-9): the gated, kept
-     * fixes of a finished walk go to the claim logic. Does nothing while stopped or under `kill.all`.
+     * The Finalizer's `onGated` provider target (PD-12; wired in `RecordingGraph`): the gated, kept fixes of a finished
+     * walk go to the claim pass ([playHook], in `:play`'s types). Does nothing while stopped or under `kill.all`.
      */
     val gatedHook: suspend (sessionId: String, kept: List<Fix>, summary: SessionSummary) -> Unit = { id, kept, summary ->
-        if (running && content.state.value?.config?.kill?.all != true) sink.onGated(id, kept, summary)
+        if (running && content.state.value?.config?.kill?.all != true) {
+            liveSink.onGated(id, kept, summary)
+            playHook.onGated(id, kept.map { it.toGated() }, summary.toGated())
+        }
     }
+
+    /** L1-6's hook shape: the claim pass of one finalized walk. */
+    val playHook: PlayGatedHook = PlayGatedHook { id, kept, summary -> claimWalk(id, kept, summary) }
+
+    private val _claimResults = MutableStateFlow<Map<String, ClaimResult>>(emptyMap())
+
+    /** This process's claim passes by session id (claims, unclaimed reasons, stretch shares) for the results sheet. */
+    val claimResults: StateFlow<Map<String, ClaimResult>> = _claimResults.asStateFlow()
 
     /** Starts the ticker, the pack check and live sensing. Idempotent. */
     fun start() {
@@ -131,8 +186,9 @@ class PlayRepository(
         job = scope.launch {
             content.load()
             store.load()
+            launch { onTurnedOn() }
             launch { content.refreshIfDue() }
-            launch { PlaySensing(track, ::sensingTargets, sink, { clock().now() }, ::onFind).run() }
+            launch { PlaySensing(track, ::sensingTargets, liveSink, { clock().now() }, ::onFind).run() }
             launch {
                 merge(content.state, clock().overrides, store.state).distinctUntilChanged().conflate().collect { refresh() }
             }
@@ -172,6 +228,7 @@ class PlayRepository(
         val date = IslandTime.dateOf(now)
         val sched = schedulerFor(state.config, tidesFor(date, c.overrides.value.tide))
         val user = store.state.value.userState()
+        if (liveEvaluator?.config !== state.config) liveEvaluator = ClaimEvaluator(state.config, ensurePlaces())
         val agenda = sched.agenda(now, PlayContext(goal), user)
         _today.value = sched.dayPlan(date, goal, user.salt ?: 0uL)
         _agenda.value = agenda
@@ -219,6 +276,108 @@ class PlayRepository(
 
     /** `GET /v1/play/challenges`; null while stopped or without a client. */
     suspend fun challenges(): ApiResult<PlayChallengesDto>? = if (running) api?.playChallenges() else null
+
+    // --- claims, restore, starting balance (L2-9) --------------------------------------------------------------------
+
+    /**
+     * The claim pass at Finish (product § 3.6.2): every item active during the walk is re-checked against the [kept]
+     * fixes over the day plans of each island date the walk touched. Claims become `pending` Logbook entries (daily
+     * found cap applied), their keys are found, and one element is queued for the walk's coverage upload, with the
+     * week id as `dayKey` when the walk earned W-DAY. Idempotent per (session, content): found keys never claim again.
+     */
+    suspend fun claimWalk(sessionId: String, kept: List<GatedFix>, summary: GatedSummary): ClaimResult? {
+        val queue = claims ?: return null
+        val pass = withContext(worker) {
+            val state = content.load() ?: return@withContext null
+            val config = state.config
+            if (config.kill.all) return@withContext null
+            val from = summary.startedAtMs.takeIf { it > 0 } ?: kept.minOfOrNull { it.timeMs } ?: return@withContext null
+            val to = maxOf(from, summary.endedAtMs.takeIf { it > 0 } ?: kept.maxOfOrNull { it.timeMs } ?: from)
+            val dates = ClaimEvaluator.islandDates(from, to).takeLast(MAX_WALK_DAYS)
+            val user = store.load()
+            val sched = schedulerFor(config, tidesFor(dates.first(), clock().overrides.value.tide))
+            val salt = user.userState().salt ?: 0uL
+            val plans = dates.map { sched.dayPlan(it, goal, salt) }
+            val ev = finishEvaluator?.takeIf { it.config === config } ?: ClaimEvaluator(config, ensurePlaces()).also { finishEvaluator = it }
+            val result = ev.evaluate(kept, plans, user.found, user.hints, _sensed.value, summary.droppedVehicle)
+            val endDate = IslandTime.dateOf(Instant.fromEpochMilliseconds(to))
+            val day = endDate.takeIf { Marks.isWalkingDay(to - from, summary.matchedM) && !user.logbook.hasDay(it) }
+            Pass(config, result, day, user.hints)
+        } ?: return null
+        val claimed = pass.result.claims
+        if (claimed.isNotEmpty() || pass.day != null) {
+            val hints = claimed.filter { it.kind == ClaimKind.riddle }.mapNotNull { c -> pass.hints[c.itemId]?.takeIf { it > 0 }?.let { c.itemId to it } }.toMap()
+            // Queue first: a crash before the Logbook write re-runs the pass, which merges into the same element.
+            queue.add(PlayClaims.element(sessionId, pass.config.version, claimed, pass.day?.let { IslandTime.weekId(it) }, hints))
+            val items = pass.config.items.associateBy { it.id }
+            store.update { st ->
+                PlayClaims.record(st, sessionId, claimed, pass.day, pass.config.caps.foundPerDay, { items[it]?.copy?.title ?: it }, newId)
+            }
+            AppLog.i(TAG, "walk claimed ${claimed.size} items${if (pass.day != null) " + walking day" else ""} (pending)")
+        }
+        _claimResults.update { it + (sessionId to pass.result) }
+        return pass.result
+    }
+
+    private class Pass(val config: PlayConfig, val result: ClaimResult, val day: LocalDate?, val hints: Map<String, Int>)
+
+    /**
+     * This upload's Play part (SyncRepository `playPart`): the queued elements of the walks it carries; the outcome
+     * confirms, caps or turns `local_only` their Logbook entries.
+     */
+    suspend fun claimPart(walkIdBySession: Map<String, String>, walksInThisUpload: Set<String>): PlayPart? =
+        claims?.part(walkIdBySession, walksInThisUpload) { settled ->
+            store.update { it.copy(logbook = PlayClaims.settle(it.logbook, settled)) }
+        }
+
+    /**
+     * Logbook restore (product § 3.6.5, PF15-7), on turn-on and on sign-in while on: `GET /v1/play/me` re-marks every
+     * claimed occurrence key found and, when this phone's Logbook holds nothing but (at most) the starting balance —
+     * a reinstall, a new device, or an opt-in made while signed out — writes one "Restored from your account" entry
+     * that brings the Logbook total to the server total. Never twice. True when it wrote the entry.
+     */
+    suspend fun restore(): Boolean {
+        if (!running || !signedIn()) return false
+        val client = api ?: return false
+        val me = (client.playMe() as? ApiResult.Ok)?.value ?: return false
+        val today = IslandTime.dateOf(clock().now())
+        var wrote = false
+        store.update { st ->
+            val lb = st.logbook
+            val owed = me.total - lb.total
+            val restorable = !lb.hasRestore && owed > 0 && lb.entries.all { it.kind == LogKind.start_balance }
+            wrote = restorable
+            st.copy(
+                found = st.found + me.occ,
+                logbook = if (!restorable) lb else lb.add(LogEntry(newId(), LogKind.restored, RESTORED_WHAT, RESTORED_WHY, today, owed, board = BoardState.accepted)),
+            )
+        }
+        if (wrote) AppLog.i(TAG, "Logbook restored from the account")
+        return wrote
+    }
+
+    /**
+     * The opt-in starting balance (product § 3.6.4, PF1-2): "Your walks so far" once ever, from the current snapshot;
+     * later turn-ons add only walk-derived marks earned while Play was off; nothing after a restore ([StartBalance]).
+     */
+    suspend fun creditStartBalance() {
+        val derived = try {
+            walkDerived()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.e(TAG, "start balance unavailable: ${e.message}")
+            null
+        } ?: return
+        val today = IslandTime.dateOf(clock().now())
+        store.update { st -> st.copy(logbook = StartBalance.onEnable(st.logbook, derived, today, newId)) }
+    }
+
+    /** Every turn-on: restore first (so a reinstall never gets a start balance on top), then the starting balance. */
+    private suspend fun onTurnedOn() {
+        restore()
+        creditStartBalance()
+    }
 
     // --- debug drawer --------------------------------------------------------------------------------------------------
 
@@ -322,6 +481,12 @@ class PlayRepository(
     companion object {
         private const val TAG = "play"
 
+        /** A walk is claimed over at most this many island days (a recording left running for days stays bounded). */
+        private const val MAX_WALK_DAYS = 3
+
+        const val RESTORED_WHAT = "Restored from your account"
+        const val RESTORED_WHY = "Your marks so far; earlier detail is not on this phone"
+
         /**
          * A debug tide table at a constant [heightCm] (events every 6 h) over [years]: LOW (0.5 m) opens and HIGH
          * (4 m) shuts the kraken's gate at every instant (`-btPlayTide`, drawer).
@@ -368,5 +533,46 @@ class PlayGate(
                 }
             }
         }
+    }
+}
+
+/**
+ * Walk-derived marks of a whole coverage snapshot (product § 3.2, § 3.6.4; mirrors `backend/src/play/marks.ts`
+ * `walkDerivedMarks`): W-COV over counted, non-quiet metres (each segment clamped to its length), W-DONE per completed
+ * counted, non-quiet feature (coverage or sticky, TL-7), W-SQUARE per chart square of a covered counted, non-quiet
+ * segment. [derivedJson] is the goal's `derived-<goal>.json` (`segmentSquares` = the counted segments, `quietSegments`,
+ * `quietFeatures`).
+ */
+object SnapshotMarks {
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+    fun of(
+        goal: Goal,
+        dataset: com.bainbridgetrails.coverage.Dataset,
+        index: com.bainbridgetrails.coverage.SegmentIndex,
+        state: com.bainbridgetrails.coverage.CoverageState,
+        sticky: Set<String>,
+        derivedJson: String,
+    ): WalkDerived {
+        val root = json.parseToJsonElement(derivedJson) as JsonObject
+        fun strings(key: String): Set<String> =
+            (root[key] as? JsonArray)?.mapNotNullTo(HashSet()) { (it as? JsonPrimitive)?.content }.orEmpty()
+        val quietSegments = strings("quietSegments")
+        val quietFeatures = strings("quietFeatures")
+        val squaresBySegment = (root["segmentSquares"] as? JsonObject).orEmpty()
+        var metres = 0.0
+        val squares = HashSet<String>()
+        for ((id, sq) in squaresBySegment) {
+            if (id in quietSegments) continue
+            val len = index.segments[id]?.lengthM ?: continue
+            val c = state.coveredM(index, id).coerceIn(0.0, len)
+            if (c <= 0.0) continue
+            metres += c
+            (sq as? JsonArray)?.forEach { (it as? JsonPrimitive)?.content?.let(squares::add) }
+        }
+        val progress = com.bainbridgetrails.coverage.Progress(dataset, index, com.bainbridgetrails.coverage.CoverageParams())
+        val completed = progress.snapshot(state, sticky).trails
+            .count { it.status == com.bainbridgetrails.coverage.TrailStatus.COMPLETE && progress.counts(it.trailId) && it.trailId !in quietFeatures }
+        return Marks.walkDerived(goal, metres, completed, squares.size)
     }
 }
