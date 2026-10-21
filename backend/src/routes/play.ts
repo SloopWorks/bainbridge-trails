@@ -1,6 +1,7 @@
 import type { UserRow } from "../auth";
 import type { Deps } from "../deps";
 import { ApiError, json } from "../http";
+import { challengesBody } from "../play/challenges";
 import { CLAIM_KINDS, playSummary } from "../play/claims";
 import { CONTENT_BODY, CURRENT, contentEtag, tidesFor } from "../play/config";
 import { parseDataset } from "../segments";
@@ -61,4 +62,16 @@ export async function playMe(url: URL, env: Env, deps: Deps, user: UserRow): Pro
     perKind,
     occ: claims.results.map((c) => c.occ),
   });
+}
+
+/**
+ * GET /v1/play/challenges?dataset=trails|roads (schedule.md § 7.3, product § 4.5, PD-4): every current challenge
+ * occurrence of the goal (window started, contributions still accepted) with `{band, count}` results only: no names,
+ * scores, ranks or per-user times; a count below 5 is null, larger ones rounded to 5. Public; with a bearer token the
+ * caller's own `progress` and `you.band` are filled (and the response is private). No side effects.
+ */
+export async function playChallenges(url: URL, env: Env, deps: Deps, user: UserRow | null): Promise<Response> {
+  const dataset = parseDataset(url.searchParams.get("dataset") ?? undefined);
+  const body = await challengesBody(env, dataset, deps.now(), user?.id ?? null);
+  return json(body, 200, { "cache-control": user ? "private, no-store" : "public, max-age=300" });
 }

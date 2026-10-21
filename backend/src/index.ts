@@ -8,7 +8,8 @@ import { leaderboard, reportName, trailStats } from "./routes/board";
 import { getCoverage, putCoverage } from "./routes/coverage";
 import { deleteUser, getMe, meBody, putMe } from "./routes/me";
 import { deleteAccountPage, legalPage } from "./routes/pages";
-import { playContent, playMe, playTides } from "./routes/play";
+import { type PlayDailyResult, playDaily } from "./play/challenges";
+import { playChallenges, playContent, playMe, playTides } from "./routes/play";
 import { DATASETS, type Dataset, META, METAS, parseDataset } from "./segments";
 import { rebuildSnapshots } from "./snapshot";
 import { METRICS_COLS, type MetricsRow, recomputeMetrics } from "./users";
@@ -32,6 +33,7 @@ const ROUTES: Record<string, string[]> = {
   "/v1/report-name": ["POST"],
   "/v1/play/content": ["GET"],
   "/v1/play/me": ["GET"],
+  "/v1/play/challenges": ["GET"],
 };
 
 /** Path prefixes with a parameter: `/v1/play/tides/{year}`. */
@@ -130,6 +132,9 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
       return playContent(request, url);
     case "/v1/play/me":
       return playMe(url, env, deps, await requireUser(request, env, deps));
+    case "/v1/play/challenges":
+      publicRateLimit(clientIp(request), deps.now());
+      return playChallenges(url, env, deps, await optionalUser(request, env, deps));
     default:
       if (path.startsWith("/v1/play/tides/")) {
         publicRateLimit(clientIp(request), deps.now());
@@ -149,8 +154,14 @@ export async function handle(request: Request, env: Env, _ctx: ExecutionContext,
   }
 }
 
-/** Daily cron: housekeeping, metrics for a dataset update (P1-7), then the snapshots (TL-11). */
-export async function daily(env: Env, now: number): Promise<{ recomputed: number; ranked: Record<Dataset, number> }> {
+/**
+ * Daily cron: housekeeping, metrics for a dataset update (P1-7), the snapshots (TL-11), then Play (schedule.md § 7.4:
+ * W-WEEK, kraken attack results, purge; idempotent, no new trigger).
+ */
+export async function daily(
+  env: Env,
+  now: number,
+): Promise<{ recomputed: number; ranked: Record<Dataset, number>; play: PlayDailyResult }> {
   await purgeHousekeeping(env, now);
   let recomputed = 0;
   for (const dataset of DATASETS) {
@@ -163,7 +174,8 @@ export async function daily(env: Env, now: number): Promise<{ recomputed: number
     }
   }
   const built = await rebuildSnapshots(env, now);
-  return { recomputed, ranked: { trails: built.trails.ranked, roads: built.roads.ranked } };
+  const play = await playDaily(env, now);
+  return { recomputed, ranked: { trails: built.trails.ranked, roads: built.roads.ranked }, play };
 }
 
 export default {

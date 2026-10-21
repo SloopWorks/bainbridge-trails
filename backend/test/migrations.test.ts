@@ -12,7 +12,8 @@ const one = async <T>(sql: string, ...args: unknown[]) => (await db.prepare(sql)
 const count = async (sql: string, ...args: unknown[]) => (await one<{ n: number }>(sql, ...args)).n;
 const upTo0003 = all.filter((m) => m.name < "0004");
 const play0005 = all.filter((m) => m.name.startsWith("0005_"));
-const PLAY_OBJECTS = ["play_attack_stretches", "play_claims", "play_claims_week", "play_totals", "play_weeks"];
+const play0006 = all.filter((m) => m.name.startsWith("0006_"));
+const PLAY_OBJECTS = ["play_attack_stretches", "play_claims", "play_claims_week", "play_progress", "play_progress_occ", "play_totals", "play_weeks"];
 
 /** Every schema object (table, index) and its SQL, except D1/SQLite internals. */
 async function schemaOf(db: D1Database): Promise<Map<string, string>> {
@@ -24,7 +25,13 @@ async function schemaOf(db: D1Database): Promise<Map<string, string>> {
 
 describe("migration 0003 (dataset scope) and 0004 cleanup", () => {
   it("backfills, stays compatible with the previous Worker, then cleans up", async () => {
-    expect(all.map((m) => m.name)).toEqual(["0001_init.sql", "0002_self_hidden.sql", "0003_dataset_scope.sql", "0005_play.sql"]);
+    expect(all.map((m) => m.name)).toEqual([
+      "0001_init.sql",
+      "0002_self_hidden.sql",
+      "0003_dataset_scope.sql",
+      "0005_play.sql",
+      "0006_play_challenges.sql",
+    ]);
     await applyD1Migrations(db, all.slice(0, 2));
     await db.batch([
       db.prepare(
@@ -157,7 +164,8 @@ describe("migration 0005 (play)", () => {
     expect(added).toEqual(PLAY_OBJECTS.filter((n) => !before.has(n)));
     expect(PLAY_OBJECTS.every((n) => after.has(n))).toBe(true);
     // no Play statement names a table or column that 0004 drops or clears
-    const sql = play0005[0]!.queries.join("\n");
+    expect(play0006.map((m) => m.name)).toEqual(["0006_play_challenges.sql"]);
+    const sql = [...play0005, ...play0006].flatMap((m) => m.queries).join("\n");
     for (const t of ["walks ", "walks(", "leaderboard_snapshot ", "trail_stats_snapshot", "snapshot_meta ", "island_m", "coverage_rev", "walk_count"]) {
       expect(sql).not.toContain(t);
     }
@@ -171,6 +179,11 @@ describe("migration 0005 (play)", () => {
     await expect(
       db.prepare("INSERT INTO play_claims VALUES ('p1', 'rivers', 'x@2026-10-26', 'egg', '2026-10-26', 'v', 0)").run(),
     ).rejects.toThrow(/CHECK constraint failed/);
+    // 0006: a contribution count per user and challenge occurrence
+    await db.prepare("INSERT INTO play_progress VALUES ('p1', 'trails', 'ch-sweep@2026-10-31', 2) ON CONFLICT DO NOTHING").run();
+    await expect(db.prepare("INSERT INTO play_progress VALUES ('p1', 'rivers', 'ch-sweep@2026-10-31', 1)").run()).rejects.toThrow(
+      /CHECK constraint failed/,
+    );
   });
 
   it("0004 cleanup still applies after 0005", async () => {

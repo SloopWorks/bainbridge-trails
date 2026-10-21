@@ -105,6 +105,7 @@ export async function deleteUser(env: Env, deps: Deps, user: UserRow): Promise<v
     env.DB.prepare("DELETE FROM play_claims WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM play_weeks WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM play_totals WHERE user_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM play_progress WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM name_reports WHERE reporter_id = ?1 OR target_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id),
     ...snapshotRemove(env, id),

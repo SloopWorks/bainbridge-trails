@@ -244,6 +244,8 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
         coverage: merged,
         existing: playState.existing,
         weeks: playState.weeks,
+        newlyCompleted,
+        progress: playState.progress,
       });
       playStmts = playStatements(env, user.id, dataset, playEval, walkDerivedMarks(dataset, merged, completed));
     }

@@ -1,6 +1,7 @@
 import type { CoverageMap } from "../coverage";
 import { ApiError, isObject } from "../http";
 import type { Dataset } from "../segments";
+import { challengeClaimMarks, completionProgress, islandOccFor } from "./challenges";
 import { DERIVED, featureSegments } from "./derived";
 import { DAY_MARKS, type WalkDerived, coveredShare, inkMarks, itemMarks, riddleMarks, treasureMarks } from "./marks";
 import {
@@ -40,7 +41,14 @@ import {
  *      has less than `minM` covered (after the merge);
  *   7. marks from the pack (tier / band / stars and hints / item marks); over the weekly found cap the claim is
  *      accepted with 0 marks and listed in `capped`.
- * Challenge claims are checked like any other, then left to L3-3 (`challenges.ts`), which owns their acceptance.
+ * Challenge claims (L3-3, `challenges.ts`): only solo challenges are claimable (`ch-sweep`); the island challenge
+ * is credited by the daily cron, so a client claim for it is `unknown_item`. A solo claim is accepted until the week's
+ * end + 7 days when the user's contributions (stored + this upload's) reach the target, else `no_bits`.
+ * Side effects of an upload on challenges, written in the same batch (`playStatements`):
+ *   - an accepted new `ink` claim adds 1 to the stretch's `play_attack_stretches.repelled_by` (distinct users per
+ *     stretch per attack) and 1 to the user's `ch-krakenweek@<Thursday>` contribution;
+ *   - the trails / roads this upload newly completed add to the user's contribution of every solo `completed`
+ *     challenge occurrence that takes contributions now (window start → window end + 2 days).
  */
 
 export const MAX_CLAIMS_PER_UPLOAD = 50;
@@ -170,6 +178,10 @@ export interface ClaimContext {
   existing: ReadonlySet<string>;
   /** Stored week rows (only the weeks the upload names). */
   weeks: ReadonlyMap<string, WeekState>;
+  /** Trails / roads this upload newly completed (sticky set), for solo `completed` challenges. */
+  newlyCompleted?: readonly string[];
+  /** Stored challenge contributions of this user (only the occurrences the upload claims). */
+  progress?: ReadonlyMap<string, number>;
 }
 
 export interface ClaimInsert {
@@ -190,24 +202,28 @@ export interface Evaluation {
   weekDelta: Map<string, WeekState>;
   foundMarks: number;
   dayMarks: number;
+  /** Challenge contributions to add: occurrence key → count (solo `completed` challenges). */
+  progress: Map<string, number>;
+  /** Accepted new `ink` claims: the stretch occurrence and the island challenge occurrence it contributes to. */
+  stretches: { occ: string; island: string | null }[];
 }
 
 const isMonday = (d: string): boolean => !Number.isNaN(epochDay(d)) && weekId(d) === d;
 const addDays = (d: string, n: number): string => dateOfEpochDay(epochDay(d) + n);
 
-function killed(pack: PlayPack, item: PlayItem): boolean {
+export function killed(pack: PlayPack, item: PlayItem): boolean {
   const k = pack.kill as { all?: boolean; types?: string[]; items?: string[] } | undefined;
   return !!k && (k.all === true || (k.types ?? []).includes(item.type) || (k.items ?? []).includes(item.id));
 }
 
-function inGoal(item: PlayItem, dataset: Dataset): boolean {
+export function inGoal(item: PlayItem, dataset: Dataset): boolean {
   if (Array.isArray(item.goals)) return item.goals.includes(dataset);
   const where = item.where as Record<string, unknown> | undefined;
   return where === undefined || Object.keys(where).length === 0 || dataset in where;
 }
 
 /** The kraken coast's stretch ids for an attack starting on `date`, or null when the item has no rotation. */
-function rotationStretches(item: PlayItem, dataset: Dataset, date: string): string[] | null {
+export function rotationStretches(item: PlayItem, dataset: Dataset, date: string): string[] | null {
   const where = (item.where as Record<string, { rotate?: string[]; epoch?: string }> | undefined)?.[dataset];
   if (!where?.rotate?.length || !where.epoch) return null;
   const weeks = (epochDay(date) - epochDay(where.epoch)) / 7;
@@ -271,7 +287,7 @@ function checkTime(c: PlayClaim, ch: Checked, ctx: ClaimContext): ClaimCode | nu
 }
 
 /** Check 4 (coverage bits of line and stretch items) and the band; returns the marks, or a code. */
-function marksOf(c: PlayClaim, ch: Checked, el: PlayElement, ctx: ClaimContext): number | ClaimCode {
+function marksOf(c: PlayClaim, ch: Checked, el: PlayElement, ctx: ClaimContext, ev: Evaluation): number | ClaimCode {
   const { item, pack } = ch;
   switch (item.type) {
     case "treasure":
@@ -297,9 +313,10 @@ function marksOf(c: PlayClaim, ch: Checked, el: PlayElement, ctx: ClaimContext):
       }
       return riddleMarks(item, el.hints[item.id] ?? 0);
     }
-    case "challenge":
-      // L3-3 (challenges.ts) owns ch-sweep / ch-krakenweek acceptance; until it lands, no challenge claim is paid.
-      return "unknown_item";
+    case "challenge": {
+      const progress = (ctx.progress?.get(c.id) ?? 0) + (ev.progress.get(c.id) ?? 0);
+      return challengeClaimMarks(item, c.weekId, ctx.dataset, ctx.now, pack, progress);
+    }
     default:
       return itemMarks(item);
   }
@@ -319,6 +336,8 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
     weekDelta: new Map(),
     foundMarks: 0,
     dayMarks: 0,
+    progress: completionProgress(ctx.dataset, ctx.now, ctx.newlyCompleted ?? []),
+    stretches: [],
   };
   const week = (w: string): WeekState => {
     let d = ev.weekDelta.get(w);
@@ -349,7 +368,7 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
         ev.rejected.push({ id: c.id, code: late });
         continue;
       }
-      let marks = marksOf(c, ch, el, ctx);
+      let marks = marksOf(c, ch, el, ctx, ev);
       if (typeof marks === "string") {
         ev.rejected.push({ id: c.id, code: marks });
         continue;
@@ -362,6 +381,7 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
       claimed.add(c.id);
       ev.accepted.push(c.id);
       ev.inserts.push({ occ: c.id, kind: c.kind as ClaimKind, week: c.weekId, marks });
+      if (ch.item.type === "obstacle") ev.stretches.push({ occ: c.id, island: islandOccFor(ch.pack, ctx.dataset, ch.occ.date) });
       if (marks > 0) {
         week(c.weekId).found += marks;
         ev.foundMarks += marks;
@@ -389,9 +409,10 @@ export async function loadPlayState(
   userId: string,
   dataset: Dataset,
   play: PlayUpload,
-): Promise<{ existing: Set<string>; weeks: Map<string, WeekState> }> {
+): Promise<{ existing: Set<string>; weeks: Map<string, WeekState>; progress: Map<string, number> }> {
   const { occs, weeks } = playKeys(play);
-  const [claims, weekRows] = await Promise.all([
+  const challengeOccs = [...new Set(play.elements.flatMap((e) => e.claims.filter((c) => c.kind === "challenge").map((c) => c.id)))];
+  const [claims, weekRows, progressRows] = await Promise.all([
     occs.length === 0
       ? { results: [] as { occ: string }[] }
       : env.DB.prepare("SELECT occ FROM play_claims WHERE user_id = ?1 AND dataset = ?2 AND occ IN (SELECT value FROM json_each(?3))")
@@ -404,19 +425,45 @@ export async function loadPlayState(
         )
           .bind(userId, dataset, JSON.stringify(weeks))
           .run<{ week: string; day_keys: number; found_marks: number }>(),
+    challengeOccs.length === 0
+      ? { results: [] as { occ: string; progress: number }[] }
+      : env.DB.prepare("SELECT occ, progress FROM play_progress WHERE user_id = ?1 AND dataset = ?2 AND occ IN (SELECT value FROM json_each(?3))")
+          .bind(userId, dataset, JSON.stringify(challengeOccs))
+          .run<{ occ: string; progress: number }>(),
   ]);
   return {
     existing: new Set(claims.results.map((r) => r.occ)),
     weeks: new Map(weekRows.results.map((r) => [r.week, { dayKeys: r.day_keys, found: r.found_marks }])),
+    progress: new Map(progressRows.results.map((r) => [r.occ, r.progress])),
   };
 }
 
 /**
  * Statements appended to the coverage batch: new claims (`INSERT … ON CONFLICT DO NOTHING`), week rows, and the
- * totals row (W-COV and W-DONE + W-SQUARE as `max(previous, new)`, found and week marks added).
+ * totals row (W-COV and W-DONE + W-SQUARE as `max(previous, new)`, found and week marks added). Before the claims:
+ * the island counts of new `ink` claims, each guarded by the absence of the claim row it precedes (a distinct user
+ * per stretch per attack, even under a concurrent upload), and the challenge contributions.
  */
 export function playStatements(env: Env, userId: string, dataset: Dataset, ev: Evaluation, walk: WalkDerived): D1PreparedStatement[] {
   const stmts: D1PreparedStatement[] = [];
+  const notClaimed = "NOT EXISTS (SELECT 1 FROM play_claims WHERE user_id = ?1 AND dataset = ?2 AND occ = ?3)";
+  const incStretch = env.DB.prepare(
+    `INSERT INTO play_attack_stretches (dataset, occ, repelled_by) SELECT ?2, ?3, 1 WHERE ${notClaimed}
+     ON CONFLICT (dataset, occ) DO UPDATE SET repelled_by = repelled_by + 1`,
+  );
+  const incIsland = env.DB.prepare(
+    `INSERT INTO play_progress (user_id, dataset, occ, progress) SELECT ?1, ?2, ?4, 1 WHERE ${notClaimed}
+     ON CONFLICT (user_id, dataset, occ) DO UPDATE SET progress = progress + 1`,
+  );
+  for (const s of ev.stretches) {
+    stmts.push(incStretch.bind(userId, dataset, s.occ));
+    if (s.island) stmts.push(incIsland.bind(userId, dataset, s.occ, s.island));
+  }
+  const addProgress = env.DB.prepare(
+    `INSERT INTO play_progress (user_id, dataset, occ, progress) VALUES (?1, ?2, ?3, ?4)
+     ON CONFLICT (user_id, dataset, occ) DO UPDATE SET progress = progress + excluded.progress`,
+  );
+  for (const [occ, n] of ev.progress) if (n > 0) stmts.push(addProgress.bind(userId, dataset, occ, n));
   const insClaim = env.DB.prepare(
     "INSERT INTO play_claims (user_id, dataset, occ, kind, week, config, marks) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
   );

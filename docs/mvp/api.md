@@ -316,7 +316,8 @@ RD-7 (`docs/roads/decisions.md`): one account, two goals. `dataset` = `trails` (
 Specs: `docs/play/schedule.md` § 4.8, § 7 (endpoints § 7.5), `docs/play/product.md` § 3.5, § 3.6, § 3.10 and
 `docs/play/decisions.md` PD-2, PD-3, PD-10, PD-11. `GET /v1/play/content` and `GET /v1/play/tides/{year}` are public
 (no auth) and share the public per-IP limit (120 requests / 10 min, `429 rate_limited`); claims ride
-`PUT /v1/coverage` and `GET /v1/play/me` needs the bearer token. `GET /v1/play/challenges` is added by a later stage.
+`PUT /v1/coverage` and `GET /v1/play/me` needs the bearer token. `GET /v1/play/challenges` is public and fills the
+caller's own progress when a bearer token is sent.
 
 ### `GET /v1/play/content?v=<cachedVersion>`
 
@@ -401,19 +402,19 @@ Only when signed in **and** Play is on. Two optional body fields next to the cov
 - `accepted`: claim ids now stored, including re-sent ones (a repeat is a no-op that still reports `accepted`) and
   `capped` ones. `rejected`: the others with a code; keep them `local_only`, do not resend. `capped`: accepted
   with 0 marks because the week id's found marks reached 2,800 (`week_cap`).
-- `total`: the server's marks total for this goal (W-COV, W-DONE, W-SQUARE, finds, W-DAY; later W-WEEK and
-  challenges). `week`: this server week's finds + W-DAY marks. Show the server values; client totals are display only.
+- `total`: the server's marks total for this goal (W-COV, W-DONE, W-SQUARE, finds, W-DAY, W-WEEK, challenges,
+  F-RETREAT). `week`: this server week's finds + W-DAY marks. Show the server values; client totals are display only.
 - Rejection codes (per claim, checked in this order after a repeat check):
 
 | code | when |
 |---|---|
 | `stale_config` | `playConfig` missing or not one of the Worker's last 8 packs |
-| `unknown_item` | no enabled, non-killed item with that id for this goal, or `kind` does not match its type (a `challenge` claim also until the challenges stage lands) |
+| `unknown_item` | no enabled, non-killed item with that id for this goal, or `kind` does not match its type; a `challenge` claim for an island challenge (`ch-krakenweek`: credited by the server, never claimed) |
 | `bad_occurrence` | malformed key, no occurrence starts on that date, `#n` missing / out of range / not zero-padded, `#n` on a single item, `weekId` not a Monday or the occurrence not active in it, `band` the item does not pay |
 | `not_this_walk` | `walkId` is not a walk this upload credits (new in `walks[]`) |
 | `too_early` | occurrence starts more than 1 h after server now, or `weekId` is after the server's current week |
-| `too_late` | `weekId` before the server's previous week, or the occurrence ended before the server island date − 2 days |
-| `no_bits` | `ink`: less than `band` % of the stretch's length carries your coverage bits after the merge; feature riddle: less than 100 m of the answer feature does |
+| `too_late` | `weekId` before the server's previous week, or the occurrence ended before the server island date − 2 days; `challenge`: after the week's end + 7 days |
+| `no_bits` | `ink`: less than `band` % of the stretch's length carries your coverage bits after the merge; feature riddle: less than 100 m of the answer feature does; `challenge` (`ch-sweep`): your contributions (below) have not reached the target |
 
 - Walk-derived marks need no claim: whenever `play` is present (even `[]`), the server recomputes W-COV
   (`floor(non-quiet covered m / 10)` trails, `/ 25` roads), W-DONE (+100 / +25 per completed non-quiet feature) and
@@ -437,7 +438,82 @@ No side effects.
 ```
 
 `weekId` = the server's current week; `week` = that week's finds + W-DAY marks; `perKind` = claim counts;
-`occ` = every claimed occurrence key, sorted (re-mark them found; never claim them again).
+`occ` = every claimed occurrence key, sorted (re-mark them found; never claim them again). It includes the rows the
+daily cron credits: `kraken-<goal>@<Thursday>` (kind `ink`, no `#n`) = F-RETREAT for that attack and
+`ch-krakenweek@<Thursday>` (kind `challenge`) = C-ISLAND.
+
+### Challenges (`challenge` claims, contributions, cron)
+
+Nothing is timed (PD-4): a challenge has a server-authoritative window (the Worker's current pack, island time),
+your progress, and `{band, count}` island results. Two kinds in v1 (product § 4.5):
+
+- **`ch-sweep`** (solo, weekly Sat 00:00 → Mon 00:00, target 3 trails / 5 roads, 100 marks). Your contribution =
+  trails / roads (never quiet trails) newly completed by **Play uploads** (the body carried `play`, even `[]`)
+  received from the window start until the server island date is more than 2 days past the window end. Claim it on
+  the walk that reaches the target: `{ "id": "ch-sweep@<Saturday>", "kind": "challenge", "weekId": "<its Monday>" }`;
+  accepted when the stored contributions plus this upload's reach the target (else `no_bits`), until the week's
+  end + 7 days.
+- **`ch-krakenweek`** (island, the kraken window Thu 06:00 → Sun 20:00). Never claimed by the client. Each accepted
+  new `ink` claim counts its stretch once per user (`repelled_by`) and adds 1 to your contribution.
+
+Daily cron (the existing `17 9 * * *` trigger; idempotent, running twice credits once):
+- **W-WEEK**: a week with ≥ 2 accepted `dayKey`s is kept once it ended: +40, +10 for each consecutive kept week
+  before it, max +100 (a week without 2 walking days resets the run). A week below 2 closes as not kept only after
+  its `dayKey` grace (week end + 7 days).
+- **Kraken attacks**, once their claims can no longer arrive (server island date > Sunday + 2 days): if every
+  stretch was repelled by ≥ 3 players, every contributor gets F-RETREAT +50 and C-ISLAND +75 in the attack's week
+  (weekly found cap applies). Otherwise the kraken slipped away; nothing is paid or lost.
+- Stretch aggregates and contributions older than 180 days are deleted.
+
+### `GET /v1/play/challenges?dataset=trails|roads`
+
+Public (per-IP limit as above); with a bearer token `progress` and `you` are the caller's. Every challenge
+occurrence of the goal whose window has started and still takes contributions (window end + 2 days), sorted by
+`occ`. `Cache-Control: public, max-age=300` without a token, `private, no-store` with one. No side effects.
+
+```json
+{
+  "dataset": "trails",
+  "minCount": 5,
+  "current": [
+    {
+      "id": "ch-krakenweek",
+      "occ": "ch-krakenweek@2026-10-29",
+      "scope": "island",
+      "windowStart": "2026-10-29T06:00-07:00",
+      "windowEnd": "2026-11-01T20:00-08:00",
+      "open": true,
+      "progress": 1,
+      "target": 2,
+      "you": { "band": "middle" },
+      "bands": [ { "band": "top", "count": 10 }, { "band": "middle", "count": null }, { "band": "starting", "count": null } ],
+      "island": { "stretches": 2, "repelled": 1 }
+    },
+    {
+      "id": "ch-sweep",
+      "occ": "ch-sweep@2026-10-31",
+      "scope": "solo",
+      "windowStart": "2026-10-31T00:00-07:00",
+      "windowEnd": "2026-11-02T00:00-08:00",
+      "open": true,
+      "progress": 1,
+      "target": 3,
+      "you": { "band": "starting" },
+      "bands": [ { "band": "top", "count": 5 }, { "band": "middle", "count": 15 }, { "band": "starting", "count": 20 } ]
+    }
+  ]
+}
+```
+
+- `windowStart` / `windowEnd`: the schedule's window in island wall time with its offset (the same for everyone; no
+  per-user time is ever returned). `open`: false after the window end while late contributions are still accepted.
+- `progress`: your contributions (ch-sweep: completions counted as above; ch-krakenweek: stretches of this attack
+  you repelled); `null` without a token. `target`: the goal's target / the attack's stretch count.
+- Bands by contribution against `target`: `top` = reached, `middle` = at least half, `starting` = any. `you` = your
+  band, `null` without a contribution or a token. `bands[].count` = participants in the band (admin-hidden users
+  excluded); **below `minCount` (5) it is `null`** ("fewer than 5"), larger counts are rounded to the nearest 5.
+  No names, user ids, scores, marks, ranks or timestamps.
+- `island` (island challenges only): the attack's stretches and how many have been repelled by ≥ 3 players.
 
 ### Dev clock (local only)
 
