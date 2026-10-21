@@ -59,8 +59,9 @@ Every command takes `--json` and returns a single object; exit code 0 means it w
 ## Building and testing (Gradle root is `app/`)
 
 Modules: `:composeApp` (shared KMP UI + platform glue), `:androidApp` (Android shell; the module is
-`:androidApp`, there is no `:app`), `:coverage` and `:tracking` (pure KMP logic), `iosApp/` (hand-maintained
-Xcode project), plus `:debugdrawer-shim` (in-repo no-op drawer).
+`:androidApp`, there is no `:app`), `:coverage` and `:tracking` (pure KMP logic), `:play` (pure KMP Play logic:
+RNG, effects scene/timelines, island time, tides, ferry, scheduling — no Compose, no `:coverage`; docs/play/),
+`iosApp/` (hand-maintained Xcode project), plus `:debugdrawer-shim` (in-repo no-op drawer).
 
 Before the first build, copy the map data and dataset (built by `pipeline/` into `data/dist/`, gitignored):
 
@@ -78,7 +79,7 @@ Full verification set (run all before handing back work):
 
 ```sh
 cd app
-./gradlew :coverage:jvmTest :tracking:jvmTest :composeApp:testAndroidHostTest \
+./gradlew :coverage:jvmTest :tracking:jvmTest :play:jvmTest :composeApp:testAndroidHostTest \
   :androidApp:assembleTrailsDebug :androidApp:assembleRoadsDebug :androidApp:assembleTrailsRelease \
   :androidApp:assembleRoadsRelease :composeApp:linkDebugFrameworkIosSimulatorArm64
 cd .. && xcodebuild -project app/iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator \

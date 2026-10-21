@@ -34,6 +34,7 @@ include(":androidApp")
 include(":coverage")
 include(":coverage-eval")
 include(":tracking")
+include(":play")
 
 // SloopWorks debug drawer (debug builds only), built from a source checkout: -PdebugDrawerPath=<dir>, else
 // ../../debugdrawer (a sibling of this repo). The published AARs are minSdk 33 and need GitHub Packages credentials,

@@ -43,7 +43,7 @@ jobs:
         # No signing secrets in CI: release builds androidApp-release-unsigned.apk, which still runs R8/shrinking.
         run: >-
           ./gradlew --stacktrace -PdebugDrawer=off
-          :coverage:jvmTest :tracking:jvmTest :composeApp:testAndroidHostTest
+          :coverage:jvmTest :tracking:jvmTest :play:jvmTest :composeApp:testAndroidHostTest
           :androidApp:assembleTrailsDebug :androidApp:assembleRoadsDebug
           :androidApp:assembleTrailsRelease :androidApp:assembleRoadsRelease
       - name: Upload test reports

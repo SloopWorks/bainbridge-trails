@@ -44,6 +44,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime) // local dates in walk history
             implementation(project(":tracking"))
+            implementation(project(":play"))
             // Already on the classpath via Compose; explicit because RecordScreen uses LifecycleResumeEffect.
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.androidx.navigation.compose)
