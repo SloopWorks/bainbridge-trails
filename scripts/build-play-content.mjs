@@ -70,6 +70,15 @@ export const SIM_DAYS = 400;
 export const ISLAND = { lat: 47.63, lon: -122.52, tz: "America/Los_Angeles" };
 
 const TYPES = ["treasure", "egg", "obstacle", "riddle", "challenge", "lore", "creature", "ambient"];
+/** Item types the Worker takes claims for (backend/src/play/claims.ts KIND_TYPE). */
+const CLAIMABLE_TYPES = ["treasure", "egg", "obstacle", "riddle", "challenge", "lore"];
+/**
+ * Privacy review 2026-10-20 P2-7: the policy says the server never stores the day of a claim, and an occurrence key
+ * (`<item>@<start date>`) names its start date, so a claimable occurrence must span at least 4 island days.
+ */
+export const MIN_CLAIM_SPAN_DAYS = 4;
+/** Privacy review P3-8: per-square player counts below this never reach the public pack (k-anonymity, ai.md § S). */
+export const MIN_SQUARE_PLAYERS = 5;
 const GOALS = ["trails", "roads"];
 const REPEATS = ["once", "weekly_set", "per_attack", "per_season"];
 const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -773,6 +782,13 @@ export function validatePack(pack, ctx = {}) {
   if (!isObj(ag)) err("aggregates: object");
   else {
     unknownKeys(ag, ["asOf", "lowTrafficSquares"], "aggregates", err);
+    // P3-8: any per-square player count (a number under aggregates, whatever field carries it) is k-anonymous
+    const counts = (v, path) => {
+      if (typeof v === "number") {
+        if (v < MIN_SQUARE_PLAYERS) err(`${path}: a player count under ${MIN_SQUARE_PLAYERS} must be suppressed (suppressSmallCounts, privacy P3-8)`);
+      } else if (isObj(v) || Array.isArray(v)) for (const [k, x] of Object.entries(v)) counts(x, `${path}.${k}`);
+    };
+    for (const [k, v] of Object.entries(ag)) if (!k.startsWith("_")) counts(v, `aggregates.${k}`);
     if (ag.asOf !== undefined && !validDate(ag.asOf)) err("aggregates.asOf: date");
     for (const g of GOALS) {
       const l = ag.lowTrafficSquares?.[g] ?? [];
@@ -949,6 +965,36 @@ export function ferryDrift(pack, file) {
 
 const RESOLVE_KEYS = { proximity: ["by", "radiusM"], segments: ["by", "minShare", "minM"], riddle: ["by", "answer", "radiusM", "minM"], challenge: ["by"], none: ["by"] };
 
+/**
+ * Island days one occurrence of a claimable item can stand for: `days` (or a relative `to` rounded up to days); an
+ * "always" item from its start date to `expires` (unbounded without); a challenge adds `findGraceDays`, because
+ * contributions count until its window end + grace (claims.ts). null when not computable (other rules report it).
+ */
+export function claimSpanDays(it, rec, pack) {
+  if (!isObj(rec)) return null;
+  if (rec.every === "always") {
+    if (it.expires === undefined) return Infinity;
+    const from = it.notBefore ?? pack.epoch;
+    return validDate(from) && validDate(it.expires) ? epochDay(it.expires) - epochDay(from) + 1 : null;
+  }
+  let days = rec.days ?? 1;
+  if (typeof rec.to === "string" && rec.to.startsWith("+")) {
+    const m = durMin(rec.to.slice(1));
+    if (m == null) return null;
+    days = Math.max(1, Math.ceil(m / 1440));
+  }
+  return it.type === "challenge" ? days + (pack.caps?.findGraceDays ?? CAPS.findGraceDays) : days;
+}
+
+/** Drops per-square player counts below `min` (P3-8): `{ goal: { "row:col": n } }` → same shape, k-anonymous. */
+export function suppressSmallCounts(counts, min = MIN_SQUARE_PLAYERS) {
+  const out = {};
+  for (const [g, squares] of Object.entries(counts ?? {})) {
+    out[g] = Object.fromEntries(Object.entries(squares ?? {}).filter(([, n]) => Number.isInteger(n) && n >= min));
+  }
+  return out;
+}
+
 function checkItem(it, { pack, windows, places, pools, refErr, err }) {
   const w = `items.${it.id}`;
   unknownKeys(it, ITEM_KEYS, w, err);
@@ -981,6 +1027,11 @@ function checkItem(it, { pack, windows, places, pools, refErr, err }) {
   if (rec) checkRecurrence(rec, `${w}.when`, err, { windows });
   else if (!isWindowRef) err(`${w}.when: required`);
   if (rec?.anchor?.at?.startsWith("tide.") && it.type === "obstacle") err(`${w}: tide-anchored obstacles are not allowed (the kraken is never anchored to high water)`);
+  if (enabled && CLAIMABLE_TYPES.includes(it.type)) {
+    const span = claimSpanDays(it, rec, pack);
+    if (span !== null && span < MIN_CLAIM_SPAN_DAYS)
+      err(`${w}.when: a claimable item's occurrence spans ${span} day(s); at least ${MIN_CLAIM_SPAN_DAYS} so a claim never names the day (privacy P2-7)`);
+  }
 
   // resolve
   const r = it.resolve;

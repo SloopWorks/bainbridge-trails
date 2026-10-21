@@ -43,11 +43,12 @@ beforeEach(async () => {
 async function syncPlay(
   segments: Record<string, string>,
   build: (walkId: string) => Element[],
-  opts: { config?: string | null; extra?: Record<string, unknown>; walkId?: string; advance?: boolean } = {},
+  opts: { config?: string | null; extra?: Record<string, unknown>; walkId?: string; advance?: boolean; durationS?: number } = {},
 ): Promise<Response> {
   if (opts.advance !== false) h.clock.advanceHours(1);
   const walkId = opts.walkId ?? crypto.randomUUID();
-  const body: Record<string, unknown> = { ...upload(segments, [{ id: walkId, durationS: 3600 }]), play: build(walkId), ...opts.extra };
+  const walks = [{ id: walkId, durationS: opts.durationS ?? 3600 }];
+  const body: Record<string, unknown> = { ...upload(segments, walks), play: build(walkId), ...opts.extra };
   if (opts.config !== null) body.playConfig = opts.config ?? PACK;
   return h.call("PUT", "/v1/coverage", { token, body });
 }
@@ -288,7 +289,7 @@ describe("claims on PUT /v1/coverage", () => {
         dataset: "trails",
         now: THU,
         packFor: (v) => (v === PACK ? pack : null),
-        freshWalkIds: new Set([walkId]),
+        freshWalks: new Map([[walkId, 3600]]),
         coverage: new Map(),
         existing: new Set(),
         weeks: new Map(),
@@ -297,6 +298,82 @@ describe("claims on PUT /v1/coverage", () => {
     expect(run(killed({ items: ["egg-station-s"] })).rejected).toEqual([{ id: EGG, code: "unknown_item" }]);
     expect(run(killed({ types: ["treasure"] })).rejected).toEqual([{ id: TREASURE0, code: "unknown_item" }]);
     expect(run(killed({ all: true })).rejected.map((r) => r.code)).toEqual(["unknown_item", "unknown_item"]);
+  });
+
+  // privacy review 2026-10-20 P2-3: W-DAY needs a walk of at least 10 minutes
+  it("dayKey on a walk under 10 min ignored", async () => {
+    const p = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [], dayKey: WEEK }], { durationS: 599 }));
+    expect(p.week).toBe(0);
+    expect(p.total).toBe(0);
+    expect(await rows("SELECT day_keys FROM play_weeks WHERE user_id = ?", userId)).toEqual([]);
+    const p2 = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [], dayKey: WEEK }], { durationS: 600 }));
+    expect(p2.week).toBe(15);
+    expect(await rows("SELECT day_keys FROM play_weeks WHERE user_id = ?", userId)).toEqual([{ day_keys: 1 }]);
+  });
+
+  // P2-4: a claim-bearing walk must have walked at all (honest-client limit beyond that: PD-21)
+  it("claim on a 0 s walk → not_this_walk", async () => {
+    const p = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [claim(EGG, "egg")], dayKey: WEEK }], { durationS: 0 }));
+    expect(codes(p)).toEqual({ [EGG]: "not_this_walk" });
+    expect(p.total).toBe(0);
+    expect(await rows("SELECT occ FROM play_claims WHERE user_id = ?", userId)).toEqual([]);
+    const p2 = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [claim(EGG, "egg")] }], { durationS: 1 }));
+    expect(p2.accepted).toEqual([EGG]);
+  });
+
+  // P2-5: the client does not pick the week of an "always" item (no 2 × weekly cap at a week boundary)
+  it("always item with previous weekId is booked to current week", async () => {
+    const NEXT = "2026-11-02";
+    h.clock.t = Date.UTC(2026, 10, 2, 18, 0, 0); // Mon 2026-11-02 10:00 PST: week 2026-11-02, previous 2026-10-26
+    ({ token, userId } = await devLogin(h));
+    const p = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [claim(EGG, "egg", WEEK)] }]));
+    expect(p.accepted).toEqual([EGG]);
+    expect(p.week).toBe(20);
+    expect(await rows("SELECT occ, week, marks FROM play_claims WHERE user_id = ?", userId)).toEqual([{ occ: EGG, week: NEXT, marks: 20 }]);
+    expect(await rows("SELECT week, found_marks FROM play_weeks WHERE user_id = ?", userId)).toEqual([{ week: NEXT, found_marks: 20 }]);
+    // the current week is full: naming the (empty) previous week does not reach around the cap
+    await env.DB.prepare("UPDATE play_weeks SET found_marks = 2790 WHERE user_id = ? AND week = ?").bind(userId, NEXT).run();
+    const LADYBUG = `egg-ladybug@${WEEK}`;
+    const p2 = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [claim(LADYBUG, "egg", WEEK)] }]));
+    expect(p2.accepted).toEqual([LADYBUG]);
+    expect(p2.capped).toEqual([LADYBUG]);
+    expect(await rows("SELECT week, marks FROM play_claims WHERE user_id = ? AND occ = ?", userId, LADYBUG)).toEqual([{ week: NEXT, marks: 0 }]);
+    expect(await rows("SELECT week FROM play_weeks WHERE user_id = ?", userId)).toEqual([{ week: NEXT }]);
+    // a weekly item keeps the week the client named (it is checked against the occurrence)
+    const prev = "treasure-weekly-trails@2026-10-26#00";
+    const p3 = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [claim(prev, "treasure", WEEK)] }]));
+    expect(p3.accepted).toEqual([prev]);
+    expect(await rows("SELECT week, marks FROM play_claims WHERE user_id = ? AND occ = ?", userId, prev)).toEqual([{ week: WEEK, marks: 25 }]);
+  });
+
+  // P2-6: caps come from the current pack, never from the version the client names
+  it("old pack with foundPerWeek 9999 still capped at 2,800", () => {
+    const OLD = "2026.10.9";
+    const old: PlayPack = {
+      ...CURRENT,
+      version: OLD,
+      caps: { ...(CURRENT.caps as object), foundPerWeek: 9999, findGraceDays: 99, clockAheadMin: 99999 },
+    };
+    const walkId = crypto.randomUUID();
+    const run = (claims: Claim[], weeks = new Map([[WEEK, { dayKeys: 0, found: 2790 }]]), now = THU) =>
+      evaluatePlay(parsePlay({ playConfig: OLD, play: [{ walkId, claims }] })!, {
+        dataset: "trails",
+        now,
+        packFor: (v) => (v === OLD ? old : v === PACK ? CURRENT : null),
+        freshWalks: new Map([[walkId, 3600]]),
+        coverage: new Map(),
+        existing: new Set(),
+        weeks,
+      });
+    const ev = run([claim(TREASURE0, "treasure")]);
+    expect(ev.accepted).toEqual([TREASURE0]);
+    expect(ev.capped).toEqual([TREASURE0]);
+    expect(ev.foundMarks).toBe(0);
+    // marks still come from the named pack's tables (sea glass 25 when under the cap)
+    expect(run([claim(TREASURE0, "treasure")], new Map()).inserts).toEqual([{ occ: TREASURE0, kind: "treasure", week: WEEK, marks: 25 }]);
+    // the time caps too: the old pack's 99-day grace does not reopen an ended set
+    const late = run([claim(TREASURE0, "treasure")], new Map(), Date.UTC(2026, 10, 5, 20, 0, 0));
+    expect(late.rejected).toEqual([{ id: TREASURE0, code: "too_late" }]);
   });
 
   it("422 implausible rejects claims too", async () => {

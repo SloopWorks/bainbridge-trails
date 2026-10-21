@@ -22,6 +22,7 @@ import com.bainbridgetrails.play.time.Sun
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
+import kotlinx.datetime.daysUntil
 import kotlinx.datetime.plus
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -58,6 +59,7 @@ enum class Rule(val id: String) {
     QUIET_ZONE_TOUCH("quiet-zone-touch"),
     EXCLUDED_PARK("excluded-park"),
     HERO_CONFLICT("hero-conflict"),
+    CLAIM_SPAN("claim-span"),
 }
 
 /** One reason a pack is rejected. [path] is a JSON-ish locator (`items[kraken-roads].where.roads`). */
@@ -100,6 +102,38 @@ object PlayConfigValidator {
     const val ISLAND_CHALLENGE_MARKS = 75
     const val RETREAT_MARKS = 50
     const val MAX_LABEL = 140
+
+    /** Item types the Worker takes claims for (backend `claims.ts` KIND_TYPE). */
+    val CLAIMABLE_TYPES: Set<ItemType> =
+        setOf(ItemType.treasure, ItemType.egg, ItemType.obstacle, ItemType.riddle, ItemType.challenge, ItemType.lore)
+
+    /**
+     * Privacy review 2026-10-20 P2-7: the policy says the server never stores the day of a claim, and an occurrence key
+     * (`<item>@<start date>`) names its start date, so a claimable occurrence spans at least this many island days.
+     * Mirrors `MIN_CLAIM_SPAN_DAYS` in scripts/build-play-content.mjs.
+     */
+    const val MIN_CLAIM_SPAN_DAYS = 4
+
+    /**
+     * Island days one occurrence of a claimable item can stand for: `days` (or a relative `to` rounded up to days); an
+     * "always" item from its start date to `expires` ([Int.MAX_VALUE] without); a challenge adds `findGraceDays`
+     * (contributions count until its window end + grace). Null when not computable (other rules report it).
+     */
+    fun claimSpanDays(config: PlayConfig, item: Item, r: Recurrence): Int? {
+        if (r.every == Every.always) {
+            val expires = item.expires ?: return Int.MAX_VALUE
+            val from = item.notBefore ?: config.epoch ?: return null
+            return from.daysUntil(expires) + 1
+        }
+        val to = r.to
+        val days = if (to != null && to.startsWith("+")) {
+            val m = Dur.minutesOrNull(to.drop(1)) ?: return null
+            maxOf(1, (m + 1439) / 1440)
+        } else {
+            r.days ?: 1
+        }
+        return if (item.type == ItemType.challenge) days + config.caps.findGraceDays else days
+    }
 
     private val ID = Regex("^[a-z0-9-]{3,48}$")
     private val BANNED = Regex("\\b(race|run|fast|speed|points)\\b", RegexOption.IGNORE_CASE)
@@ -311,6 +345,12 @@ object PlayConfigValidator {
                 if (item.type == ItemType.challenge || (item.type == ItemType.obstacle && item.hero)) serverSubset("$p.when", rec)
                 if (item.type == ItemType.obstacle && rec.anchor?.at?.isTide == true) {
                     err(Rule.TIDE_ANCHORED_OBSTACLE, "$p.when.anchor", "obstacles are never anchored to the tide (PD-8)")
+                }
+                if (item.enabled && item.type in CLAIMABLE_TYPES) {
+                    val span = claimSpanDays(c, item, rec)
+                    if (span != null && span < MIN_CLAIM_SPAN_DAYS) {
+                        err(Rule.CLAIM_SPAN, "$p.when", "a claimable occurrence spans $span day(s); at least $MIN_CLAIM_SPAN_DAYS so a claim never names the day (privacy P2-7)")
+                    }
                 }
             }
             if (item.goals.isEmpty()) err(Rule.MISSING_WHERE, "$p.goals", "no goals")

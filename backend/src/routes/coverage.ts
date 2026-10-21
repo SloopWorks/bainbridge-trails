@@ -184,7 +184,7 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
       loadCoverage(env, user.id, dataset),
       completedSet(env, user.id, dataset),
       newWalks(env, user.id, dataset, upload.walks),
-      play ? loadPlayState(env, user.id, dataset, play) : null,
+      play ? loadPlayState(env, user.id, dataset, play, now) : null,
     ]);
     if (m.walk_count + fresh.length > MAX_STORED_WALKS) {
       throw new ApiError(422, "walk_limit", `at most ${MAX_STORED_WALKS} walks per account`);
@@ -240,7 +240,7 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
         dataset,
         now,
         packFor: packByVersion,
-        freshWalkIds: new Set(fresh.map((w) => w.id)),
+        freshWalks: new Map(fresh.map((w) => [w.id, w.durationS])),
         coverage: merged,
         existing: playState.existing,
         weeks: playState.weeks,

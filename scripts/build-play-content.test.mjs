@@ -6,7 +6,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import {
-  ROOT, PATHS, chartSquare, derive, epochDay, formatJson, hhmm, loadCoastline, loadMapData, makeIndex, readPublished, run, sunDay, validatePack,
+  MIN_SQUARE_PLAYERS, ROOT, PATHS, chartSquare, derive, epochDay, formatJson, hhmm, loadCoastline, loadMapData, makeIndex, readPublished, run,
+  suppressSmallCounts, sunDay, validatePack,
 } from "./build-play-content.mjs";
 
 const realPack = () => JSON.parse(readFileSync(join(ROOT, PATHS.pack), "utf8"));
@@ -163,12 +164,13 @@ test("rejects caps drift", () => {
 });
 
 test("daylight rule rejects a window outside civil dawn–dusk", () => {
+  // drafts (enabled:false): an enabled single-day find also fails the claim-span rule (P2-7), which would mask this one
   const p = realPack();
   const lore = p.items.find((it) => it.id === "lore-frog");
-  p.items.push({ ...structuredClone(lore), id: "lore-evening", when: { every: "day", from: "sunset", to: "dusk+30m" } });
+  p.items.push({ ...structuredClone(lore), id: "lore-evening", enabled: false, when: { every: "day", from: "sunset", to: "dusk+30m" } });
   hasError(errorsOf(p), /items\.lore-evening: window .* leaves daylight/);
   const q = realPack();
-  q.items.push({ ...structuredClone(lore), id: "lore-morning", when: { every: "week", on: ["sat"], from: "06:00", to: "12:00" } });
+  q.items.push({ ...structuredClone(lore), id: "lore-morning", enabled: false, when: { every: "week", on: ["sat"], from: "06:00", to: "12:00" } });
   hasError(errorsOf(q), /items\.lore-morning: window 06:00–12:00 on 2026-1[12]-\d\d leaves daylight/); // winter dawn ≈ 07:20
 });
 
@@ -179,6 +181,46 @@ test("hero conflict needs yields on the loser", () => {
   hasError(errorsOf(p), /items\.kraken-extra: hero conflict with kraken-roads .*"yields": true/);
   p.items[p.items.length - 1].yields = true;
   assert.deepEqual(errorsOf(p).filter((e) => /hero conflict/.test(e)), []);
+});
+
+// privacy review 2026-10-20 P2-7: an occurrence key must never name the day (policy: "never stores the day")
+test("validator rejects a claimable daily item", () => {
+  const p = realPack();
+  const lore = p.items.find((it) => it.id === "lore-frog");
+  p.items.push({ ...structuredClone(lore), id: "lore-daily", when: { every: "day", from: "10:00", to: "14:00" } });
+  hasError(errorsOf(p), /items\.lore-daily\.when: a claimable item's occurrence spans 1 day\(s\); at least 4/);
+  // a 3-day treasure set and a short-lived "always" egg are refused too; a 1-day challenge (+ 2 grace days) as well
+  const q = realPack();
+  q.items.find((it) => it.id === "treasure-weekly-trails").when.days = 3;
+  hasError(errorsOf(q), /items\.treasure-weekly-trails\.when: a claimable item's occurrence spans 3 day/);
+  const r = realPack();
+  r.items.push({ ...structuredClone(r.items.find((it) => it.id === "egg-ladybug")), id: "egg-brief", notBefore: "2026-11-02", expires: "2026-11-04" });
+  hasError(errorsOf(r), /items\.egg-brief\.when: a claimable item's occurrence spans 3 day/);
+  const c = realPack();
+  c.items.find((it) => it.id === "ch-sweep").when.days = 1;
+  hasError(errorsOf(c), /items\.ch-sweep\.when: a claimable item's occurrence spans 3 day/);
+  // not claimable: a draft, and ambient items
+  const d = realPack();
+  d.items.push({ ...structuredClone(lore), id: "lore-daily", enabled: false, when: { every: "day", from: "10:00", to: "14:00" } });
+  assert.deepEqual(errorsOf(d).filter((e) => /claimable/.test(e)), []);
+  // the committed pack: weekly sets (7 d), kraken (4 d), ch-sweep (2 d + 2 grace), "always" items
+  assert.deepEqual(errorsOf(realPack()).filter((e) => /claimable/.test(e)), []);
+});
+
+// P3-8: per-square player counts never reach the public pack below 5
+test("per-square player counts under 5 are suppressed and refused", () => {
+  assert.equal(MIN_SQUARE_PLAYERS, 5);
+  assert.deepEqual(suppressSmallCounts({ trails: { "1:1": 4, "1:2": 5, "2:2": 0, "3:3": 12 }, roads: { "4:4": 1 } }), {
+    trails: { "1:2": 5, "3:3": 12 },
+    roads: {},
+  });
+  const p = realPack();
+  p.aggregates = { ...p.aggregates, squarePlayers: { trails: { "1:1": 3, "1:2": 7 }, roads: {} } };
+  hasError(errorsOf(p), /aggregates\.squarePlayers\.trails\.1:1: a player count under 5 must be suppressed/);
+  assert.deepEqual(errorsOf(p).filter((e) => /1:2/.test(e)), []);
+  const q = realPack();
+  q.aggregates = { ...q.aggregates, squarePlayers: suppressSmallCounts({ trails: { "1:1": 3, "1:2": 7 }, roads: {} }) };
+  assert.deepEqual(errorsOf(q).filter((e) => /player count/.test(e)), []);
 });
 
 test("committed pack is valid without map data and canonical", () => {

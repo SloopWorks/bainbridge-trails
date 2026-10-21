@@ -77,13 +77,13 @@ class PlayConfigValidatorTest {
     @Test
     fun duskOnlyFind() = assertOnly(
         Rule.DAYLIGHT,
-        base.replace(TestPack.lore.copy(`when` = Recurrence(every = Every.day, from = "dusk", to = "dusk+30m"))),
+        base.replace(TestPack.lore.copy(enabled = false, `when` = Recurrence(every = Every.day, from = "dusk", to = "dusk+30m"))),
     )
 
     @Test
     fun clockFindOutsideWinterDaylight() = assertOnly(
         Rule.DAYLIGHT,
-        base.replace(TestPack.lore.copy(`when` = Recurrence(every = Every.day, from = "07:00", to = "18:00"))),
+        base.replace(TestPack.lore.copy(enabled = false, `when` = Recurrence(every = Every.day, from = "07:00", to = "18:00"))),
     )
 
     @Test
@@ -143,12 +143,29 @@ class PlayConfigValidatorTest {
 
     @Test
     fun heroConflict() {
-        val second = TestPack.kraken.copy(id = "kraken-roads-halloween", priority = 50, `when` = TestPack.weekly("sat", "10:00", "15:00", 1))
+        val second = TestPack.kraken.copy(id = "kraken-roads-halloween", priority = 50, `when` = TestPack.weekly("sat", "10:00", "15:00", 4))
         assertOnly(Rule.HERO_CONFLICT, base.plus(second))
         assertTrue(errors(base.plus(second.copy(yields = true))).isEmpty(), "a loser that yields is not a conflict")
         val otherGoal = TestPack.kraken.copy(id = "kraken-trails", goals = listOf(Goal.trails),
             where = mapOf(Goal.trails to Placement(rotate = listOf("pool:west"), epoch = TestPack.kraken.where[Goal.roads]!!.epoch)))
         assertTrue(errors(base.plus(otherGoal)).isEmpty(), "heroes of different goals never conflict")
+    }
+
+    @Test
+    fun claimableDailyItemRejected() {
+        // privacy review 2026-10-20 P2-7: an occurrence key names its start date; the policy says "never the day"
+        assertOnly(Rule.CLAIM_SPAN, base.replace(TestPack.lore.copy(`when` = Recurrence(every = Every.day, from = "10:00", to = "14:00"))))
+        assertOnly(Rule.CLAIM_SPAN, base.replace(TestPack.treasure.copy(`when` = TestPack.weekly("mon", "05:00", "24:00", 3))))
+        assertOnly(Rule.CLAIM_SPAN, base.replace(TestPack.challenge.copy(`when` = TestPack.weekly("sat", "10:00", "15:00", 1))))
+        assertOnly(
+            Rule.CLAIM_SPAN,
+            base.replace(TestPack.egg.copy(notBefore = kotlinx.datetime.LocalDate(2027, 1, 4), expires = kotlinx.datetime.LocalDate(2027, 1, 6))),
+        )
+        assertEquals(4, PlayConfigValidator.claimSpanDays(base, TestPack.kraken, TestPack.kraken.`when`))
+        assertEquals(4, PlayConfigValidator.claimSpanDays(base, TestPack.challenge, TestPack.challenge.`when`), "2 days + 2 grace days")
+        // a draft is not claimable
+        val draft = TestPack.lore.copy(enabled = false, `when` = Recurrence(every = Every.day, from = "10:00", to = "14:00"))
+        assertTrue(errors(base.replace(draft)).none { it.rule == Rule.CLAIM_SPAN })
     }
 
     // --- the rest of §4.3 --------------------------------------------------------------------------------------
@@ -193,14 +210,14 @@ class PlayConfigValidatorTest {
 
     @Test
     fun badTimeExprAndRecurrence() {
-        assertOnly(Rule.TIME_EXPR, base.replace(TestPack.lore.copy(`when` = Recurrence(every = Every.day, from = "9am", to = "15:00"))))
+        assertOnly(Rule.TIME_EXPR, base.replace(TestPack.lore.copy(enabled = false, `when` = Recurrence(every = Every.day, from = "9am", to = "15:00"))))
         assertOnly(Rule.RECURRENCE, base.replace(TestPack.challenge.copy(`when` = TestPack.weekly("someday", "00:00", "24:00", 2))))
     }
 
     @Test
     fun emptyWindow() = assertOnly(
         Rule.EMPTY_WINDOW,
-        base.replace(TestPack.lore.copy(`when` = Recurrence(every = Every.day, from = "12:00", to = "11:00"))),
+        base.replace(TestPack.lore.copy(enabled = false, `when` = Recurrence(every = Every.day, from = "12:00", to = "11:00"))),
     )
 
     @Test

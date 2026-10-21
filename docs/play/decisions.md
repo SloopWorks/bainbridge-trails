@@ -52,6 +52,7 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
 - **Consequence.** `PUT /v1/play/finds`, `PUT /v1/play/week` and the race tables are gone. Pure requests and
   responses are byte-identical when `play` is absent. Migration `0005_play.sql` (PD-11).
 - **Resolves:** 6, 9 (payload part), 10, 11, 35.
+- **Limit:** what the server cannot verify about a claim is recorded in PD-21.
 
 ## PD-4 Safety rules: nothing timed, nothing at the water, no third parties
 - **Context.** Timed races with countdown, ghost pace and finish times on roads with no shoulder data (2); a
@@ -272,6 +273,22 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
   (2) stays as is. (3) PF-2 amended (PD-19, spike S1 correction #7).
 - **Consequence.** effects §3.1's "α .85" casing is superseded by this rule; the kraken stage (L2-4) may not ship the
   casing until the guard passes in light and dark.
+
+## PD-21 Honest-client limit of claims (privacy review of L3-1/L3-2)
+- **Context.** `reviews/2026-10-20-privacy-l3-1-l3-2.md` P2-3/P2-4: a claim needed no walking in its upload (a
+  `durationS: 0` walk credited a W-DAY and unlocked point items), the kraken `no_bits` check reads cumulative coverage
+  (a stretch walked once passes every week), and point items (treasures, eggs, lore, place riddles) carry no position
+  by design (PD-3: the server never sees fixes).
+- **Decision.** The server checks what it can and states the rest: a claim-bearing walk must be credited by the same
+  upload **and** have `durationS > 0` (else `not_this_walk`); a W-DAY `dayKey` needs `durationS ≥ 600`; line and
+  stretch items need the user's coverage bits. **Beyond walk binding + duration, point items are not
+  server-verifiable**: an edited client can claim any open point occurrence once per walk it uploads. The caps bound
+  the damage: 2,800 found marks per week id from the CURRENT pack whatever version the client names, "always" items
+  booked to the server's current week, ≤ 50 claims per upload, 30 uploads/hour, idempotent per occurrence.
+- **Consequence.** Marks are a personal logbook, not a contest: the Play board (any ranking or comparison of marks
+  between people) stays v2 until a stronger check exists (for example, server-side proximity on a coarse,
+  non-retained fix, which would need its own privacy decision).
+- **Resolves:** privacy review P2-4 (record), with P2-3/P2-5/P2-6 fixed in `backend/src/play/claims.ts`.
 
 ## Status
 

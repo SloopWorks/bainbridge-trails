@@ -2,6 +2,7 @@ import type { CoverageMap } from "../coverage";
 import { ApiError, isObject } from "../http";
 import type { Dataset } from "../segments";
 import { challengeClaimMarks, completionProgress, islandOccFor } from "./challenges";
+import { CURRENT } from "./config";
 import { DERIVED, featureSegments } from "./derived";
 import { DAY_MARKS, type WalkDerived, coveredShare, inkMarks, itemMarks, riddleMarks, treasureMarks } from "./marks";
 import {
@@ -34,13 +35,18 @@ import {
  *   2. `unknown_item`: no enabled, non-killed item of this goal with that id and a type matching `kind`;
  *      `bad_occurrence`: malformed key, no occurrence starting on that date, placement index out of range or not
  *      canonical, `weekId` not a Monday or the occurrence not active in it, a band the item does not pay;
- *   3. `not_this_walk`: `walkId` is not credited by this upload;
+ *   3. `not_this_walk`: `walkId` is not credited by this upload, or that walk has `durationS` 0 (privacy review P2-4;
+ *      beyond walk binding + duration a point item is not server-verifiable: PD-21);
  *   5. `too_early` / `too_late`: occurrence start > now + 1 h, `weekId` after the current week / before the previous
  *      one, or the occurrence ended before the server island date − 2 days;
  *   4. `no_bits`: a kraken stretch with less than `band` % of its length covered, or a feature riddle whose answer
  *      has less than `minM` covered (after the merge);
  *   7. marks from the pack (tier / band / stars and hints / item marks); over the weekly found cap the claim is
  *      accepted with 0 marks and listed in `capped`.
+ * Caps (weekly found cap, grace days, clock tolerance) always come from the CURRENT pack, never from the version the
+ * client names (P2-6); marks stay per named version. An open-ended ("always") occurrence is booked to the server's
+ * current week whatever `weekId` the client sent (P2-5), so a week boundary never doubles the weekly cap.
+ * W-DAY: a `dayKey` counts only on a credited walk of at least 10 minutes (P2-3).
  * Challenge claims (L3-3, `challenges.ts`): only solo challenges are claimable (`ch-sweep`); the island challenge
  * is credited by the daily cron, so a client claim for it is `unknown_item`. A solo claim is accepted until the week's
  * end + 7 days when the user's contributions (stored + this upload's) reach the target, else `no_bits`.
@@ -74,6 +80,8 @@ export type ClaimCode = "stale_config" | "unknown_item" | "bad_occurrence" | "no
 /** product § 3.5 (the one caps table), mirrored in every pack's `caps`. */
 const DEFAULT_CAPS = { foundPerWeek: 2800, weekLateDays: 7, findGraceDays: 2, clockAheadMin: 60 };
 const MAX_DAY_KEYS_PER_WEEK = 7;
+/** W-DAY needs a walk of at least 10 minutes (privacy review P2-3). */
+export const MIN_DAY_WALK_S = 600;
 const DAY_MS = 86_400_000;
 
 export interface PlayClaim {
@@ -145,10 +153,14 @@ export function parsePlay(body: Record<string, unknown>): PlayUpload | null {
   return { config: typeof cfg === "string" ? cfg : null, elements };
 }
 
-/** Occurrence keys and week ids an upload reads (for the pre-read of existing claims and week rows). */
-export function playKeys(play: PlayUpload): { occs: string[]; weeks: string[] } {
+/**
+ * Occurrence keys and week ids an upload reads (for the pre-read of existing claims and week rows). With claims, the
+ * server's current week too: "always" occurrences are booked to it (P2-5).
+ */
+export function playKeys(play: PlayUpload, now?: number): { occs: string[]; weeks: string[] } {
   const occs = new Set<string>();
   const weeks = new Set<string>();
+  if (now !== undefined && play.elements.some((e) => e.claims.length > 0)) weeks.add(weekIdAt(now));
   for (const e of play.elements) {
     for (const c of e.claims) {
       occs.add(c.id);
@@ -170,8 +182,8 @@ export interface ClaimContext {
   now: number;
   /** Kept packs by version (`config.packByVersion`). */
   packFor(version: string): PlayPack | null;
-  /** Walk ids this upload credits (new for this user and dataset). */
-  freshWalkIds: ReadonlySet<string>;
+  /** Walks this upload credits (new for this user and dataset): walk id → `durationS`. */
+  freshWalks: ReadonlyMap<string, number>;
   /** The user's coverage after the merge. */
   coverage: CoverageMap;
   /** Occurrence keys this user already claimed in this dataset. */
@@ -272,9 +284,12 @@ function checkOccurrence(c: PlayClaim, config: string | null, ctx: ClaimContext)
   return { item, occ, n: key.n, pack };
 }
 
+/** The caps in force: the CURRENT pack's (P2-6), never the named version's. */
+const capsNow = (): typeof DEFAULT_CAPS => ({ ...DEFAULT_CAPS, ...((CURRENT.caps as Partial<typeof DEFAULT_CAPS> | undefined) ?? {}) });
+
 /** Check 5 (product § 3.5 clock tolerance and replay guard). */
 function checkTime(c: PlayClaim, ch: Checked, ctx: ClaimContext): ClaimCode | null {
-  const caps = { ...DEFAULT_CAPS, ...((ch.pack.caps as Partial<typeof DEFAULT_CAPS> | undefined) ?? {}) };
+  const caps = capsNow();
   const current = weekIdAt(ctx.now);
   const previous = addDays(current, -7);
   if (c.weekId > current || ch.occ.start > ctx.now + caps.clockAheadMin * 60_000) return "too_early";
@@ -315,7 +330,8 @@ function marksOf(c: PlayClaim, ch: Checked, el: PlayElement, ctx: ClaimContext, 
     }
     case "challenge": {
       const progress = (ctx.progress?.get(c.id) ?? 0) + (ev.progress.get(c.id) ?? 0);
-      return challengeClaimMarks(item, c.weekId, ctx.dataset, ctx.now, pack, progress);
+      // the late window is a cap: from the CURRENT pack (P2-6)
+      return challengeClaimMarks(item, c.weekId, ctx.dataset, ctx.now, CURRENT, progress);
     }
     default:
       return itemMarks(item);
@@ -345,8 +361,8 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
     return d;
   };
   const claimed = new Set(ctx.existing);
-  const pack = play.config === null ? null : ctx.packFor(play.config);
-  const capPerWeek = (pack?.caps as { foundPerWeek?: number } | undefined)?.foundPerWeek ?? DEFAULT_CAPS.foundPerWeek;
+  const capPerWeek = capsNow().foundPerWeek;
+  const current = weekIdAt(ctx.now);
 
   for (const el of play.elements) {
     for (const c of el.claims) {
@@ -359,7 +375,7 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
         ev.rejected.push({ id: c.id, code: ch });
         continue;
       }
-      if (!ctx.freshWalkIds.has(el.walkId)) {
+      if (!((ctx.freshWalks.get(el.walkId) ?? 0) > 0)) {
         ev.rejected.push({ id: c.id, code: "not_this_walk" });
         continue;
       }
@@ -373,28 +389,30 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
         ev.rejected.push({ id: c.id, code: marks });
         continue;
       }
-      const found = (ctx.weeks.get(c.weekId)?.found ?? 0) + (ev.weekDelta.get(c.weekId)?.found ?? 0);
+      // an open-ended occurrence is active in every week: the server picks the week (P2-5)
+      const wk = ch.occ.end === null ? current : c.weekId;
+      const found = (ctx.weeks.get(wk)?.found ?? 0) + (ev.weekDelta.get(wk)?.found ?? 0);
       if (marks > 0 && found + marks > capPerWeek) {
         marks = 0;
         ev.capped.push(c.id);
       }
       claimed.add(c.id);
       ev.accepted.push(c.id);
-      ev.inserts.push({ occ: c.id, kind: c.kind as ClaimKind, week: c.weekId, marks });
+      ev.inserts.push({ occ: c.id, kind: c.kind as ClaimKind, week: wk, marks });
       if (ch.item.type === "obstacle") ev.stretches.push({ occ: c.id, island: islandOccFor(ch.pack, ctx.dataset, ch.occ.date) });
       if (marks > 0) {
-        week(c.weekId).found += marks;
+        week(wk).found += marks;
         ev.foundMarks += marks;
       }
     }
   }
 
-  // W-DAY: one per dayKey (a week id), only for walks this upload credits, ≤ 7 per week, accepted until week end + 7 d
-  const current = weekIdAt(ctx.now);
+  // W-DAY: one per dayKey (a week id), only for walks of ≥ 10 min this upload credits, ≤ 7 per week, accepted until
+  // week end + weekLateDays
   for (const el of play.elements) {
     const k = el.dayKey;
-    if (k === null || !ctx.freshWalkIds.has(el.walkId) || !isMonday(k) || k > current) continue;
-    if (ctx.now >= islandInstant(addDays(k, 7), 0) + DEFAULT_CAPS.weekLateDays * DAY_MS) continue;
+    if (k === null || (ctx.freshWalks.get(el.walkId) ?? 0) < MIN_DAY_WALK_S || !isMonday(k) || k > current) continue;
+    if (ctx.now >= islandInstant(addDays(k, 7), 0) + capsNow().weekLateDays * DAY_MS) continue;
     const have = (ctx.weeks.get(k)?.dayKeys ?? 0) + (ev.weekDelta.get(k)?.dayKeys ?? 0);
     if (have >= MAX_DAY_KEYS_PER_WEEK) continue;
     week(k).dayKeys += 1;
@@ -409,8 +427,9 @@ export async function loadPlayState(
   userId: string,
   dataset: Dataset,
   play: PlayUpload,
+  now: number,
 ): Promise<{ existing: Set<string>; weeks: Map<string, WeekState>; progress: Map<string, number> }> {
-  const { occs, weeks } = playKeys(play);
+  const { occs, weeks } = playKeys(play, now);
   const challengeOccs = [...new Set(play.elements.flatMap((e) => e.claims.filter((c) => c.kind === "challenge").map((c) => c.id)))];
   const [claims, weekRows, progressRows] = await Promise.all([
     occs.length === 0
