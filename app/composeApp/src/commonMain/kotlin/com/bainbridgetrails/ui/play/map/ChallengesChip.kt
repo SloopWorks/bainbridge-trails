@@ -2,6 +2,11 @@ package com.bainbridgetrails.ui.play.map
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
@@ -30,14 +35,18 @@ import org.jetbrains.compose.resources.pluralStringResource
 @Composable
 fun ChallengesChip(count: Int, onClick: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
     val label = pluralStringResource(Res.plurals.play_challenges_chip, count, count)
+    val interaction = remember { MutableInteractionSource() }
     Row(
         modifier
             .heightIn(min = 48.dp)
+            // Clickable before the visual inset: the 48dp touch target is also the semantic bounds (ux.md §2.1).
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .clearAndSetSemantics { contentDescription = label; role = Role.Button; onClick { onClick(); true } }
             .padding(vertical = 4.dp)
             .shadow(3.dp, PillShape)
             .background(BtTheme.colors.mapChrome, PillShape)
-            .clickable(onClick = onClick)
-            .clearAndSetSemantics { contentDescription = label; role = Role.Button; onClick { onClick(); true } }
+            .clip(PillShape)
+            .indication(interaction, ripple())
             .heightIn(min = 40.dp)
             .padding(start = 12.dp, end = 14.dp),
         verticalAlignment = Alignment.CenterVertically,

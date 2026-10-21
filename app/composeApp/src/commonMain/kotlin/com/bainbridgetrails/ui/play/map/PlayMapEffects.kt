@@ -74,8 +74,15 @@ object PlayMapEffects {
     /** The water point: the stretches' middle pushed [WATER_OFFSET_M] away from [ISLAND_CENTRE]. */
     fun water(stretches: List<KrakenInk.Stretch>): GeoPoint {
         val pts = stretches.flatMap { s -> s.lines.flatten() }
-        val lon = pts.sumOf { it.lon } / pts.size
-        val lat = pts.sumOf { it.lat } / pts.size
+        return offshore(pts.sumOf { it.lon } / pts.size, pts.sumOf { it.lat } / pts.size)
+    }
+
+    /** Each active attack's water point by occurrence key (the kraken marker's anchor, ux.md §2.2). */
+    fun waterPoints(agenda: PlayAgenda?, lines: (String) -> List<GeoPoint>?): Map<String, GeoPoint> =
+        attacks(agenda, lines).associate { it.key to it.water }
+
+    /** [lon]/[lat] pushed [WATER_OFFSET_M] away from [ISLAND_CENTRE] (the shore's seaward side). */
+    fun offshore(lon: Double, lat: Double): GeoPoint {
         val kx = M_PER_DEG * cos(lat * PI / 180.0)
         val dx = (lon - ISLAND_CENTRE.lon) * kx
         val dy = (lat - ISLAND_CENTRE.lat) * M_PER_DEG

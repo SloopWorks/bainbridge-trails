@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.resources.Res
+import com.bainbridgetrails.resources.play_kraken_stretch_progress_a11y
 import com.bainbridgetrails.resources.play_walk_there
 import com.bainbridgetrails.ui.components.BtIcon
 import com.bainbridgetrails.ui.components.BtIcons
@@ -31,7 +32,13 @@ import org.jetbrains.compose.resources.stringResource
  */
 @Composable
 fun KrakenStretchRow(row: StretchRow, minShare: Double, onFocus: () -> Unit, onWalk: () -> Unit, modifier: Modifier = Modifier) {
-    val spoken = "${row.name}, ${row.text.replace("%", " percent")}"
+    val share = row.share
+    val state = if (!row.repelled && share != null && share > 0.0) {
+        stringResource(Res.string.play_kraken_stretch_progress_a11y, EncounterLogic.pct(share), EncounterLogic.pct(minShare))
+    } else {
+        row.text
+    }
+    val spoken = "${row.name}, $state"
     Row(
         modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(onClick = onFocus),
         verticalAlignment = Alignment.CenterVertically,

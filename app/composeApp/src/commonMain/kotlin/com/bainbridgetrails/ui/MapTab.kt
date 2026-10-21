@@ -277,9 +277,17 @@ fun MapTab(
     val ferry = rememberFerryTimetable(play)
     // One renderer per kind (KrakenAttack carries the ink casing, FrogRock the stamp + hop); rebuilt only with the timetable.
     val playRegistry = remember(playMarkerArt, ferry) { playLiveRegistry(playMarkerArt, ferry) { AppGraph.playClock.now() } }
-    val playMarkers = remember(playAgenda, playState?.solved, playConfig) {
+    val playMarkers = remember(playAgenda, playState?.solved, playConfig, data) {
         if (playAgenda == null || playConfig == null) emptyList()
-        else PlayMarkerLogic.markers(playAgenda, playConfig.items.associate { it.id to it.lore }, playState?.solved?.keys.orEmpty())
+        else PlayMarkerLogic.markers(
+            playAgenda, playConfig.items.associate { it.id to it.lore }, playState?.solved?.keys.orEmpty(),
+            // The kraken marker sits on its attack's water point (the lurk / pool anchor, ux.md §2.2).
+            water = data?.let { d ->
+                com.bainbridgetrails.ui.play.map.PlayMapEffects.waterPoints(playAgenda) { id ->
+                    d.dataset.segmentsById[id]?.coords?.map { com.bainbridgetrails.play.fx.GeoPoint(lon = it[0], lat = it[1]) }
+                }
+            }.orEmpty(),
+        )
     }
     var playSelected by rememberSaveable { mutableStateOf<String?>(null) }
     var riddlePickFor by remember { mutableStateOf<String?>(null) }

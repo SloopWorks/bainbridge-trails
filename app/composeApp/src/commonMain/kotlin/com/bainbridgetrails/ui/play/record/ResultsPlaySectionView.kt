@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.play.claim.UnclaimedReason
 import com.bainbridgetrails.play.fx.FxGlyph
@@ -55,7 +56,7 @@ fun ResultsPlaySectionView(section: ResultsPlaySection, modifier: Modifier = Mod
             is ResultsPlayItem.Row -> LogbookRow(item.row)
             ResultsPlayItem.None -> Text(stringResource(Res.string.play_results_none), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             is ResultsPlayItem.RankUp -> RankUpLine(item.rank)
-            ResultsPlayItem.UnclaimedHeader -> Text(stringResource(Res.string.play_unclaimed_header), Modifier.clearAndSetSemantics { heading(); contentDescription = "" }, style = MaterialTheme.typography.titleSmall)
+            ResultsPlayItem.UnclaimedHeader -> Text(stringResource(Res.string.play_unclaimed_header), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)
             is ResultsPlayItem.Unclaimed -> {
                 val reason = stringResource(item.row.reason.res())
                 Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {

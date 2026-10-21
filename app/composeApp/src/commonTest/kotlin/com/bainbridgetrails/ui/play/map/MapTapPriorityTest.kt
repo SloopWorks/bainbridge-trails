@@ -107,6 +107,64 @@ class MapTapPriorityTest {
     }
 
     @Test
+    fun `kraken marker is offshore`() {
+        val now = Instant.parse("2026-10-29T21:00:00Z")
+        // Two stretches along Manitou Beach Drive NE (the east shore): their points sit on the road, ashore.
+        fun stretch(key: String, lat: Double, lon: Double) = ResolvedPlacement(key, 0, "stretch:$key", "road-$key", listOf("s-$key"), GeoPoint(lat, lon), null)
+        val occ = Occurrence(
+            "kraken-roads@2026-10-29", "kraken-roads", ItemType.obstacle, Scope.island, now, null, false,
+            listOf(stretch("a", 47.6612, -122.5052), stretch("b", 47.6590, -122.5046)), 0, null, true, emptyList(), emptyList(), false,
+        )
+        val agenda = PlayAgenda(
+            active = listOf(ActiveItem(occ, Gate.OPEN)),
+            upcoming = emptyList(),
+            day = DayInfo(LocalDate(2026, 10, 29), SunDay(null, null, now, null, null), null, null, quietDay = false),
+        )
+        val kraken = PlayMarkerLogic.markers(agenda, emptyMap(), emptySet()).single { it.kind == MarkerKind.KRAKEN }
+        val c = PlayMapEffects.ISLAND_CENTRE
+        fun fromCentreM(lon: Double, lat: Double) = kotlin.math.hypot((lon - c.lon) * 111_195.0 * kotlin.math.cos(lat * kotlin.math.PI / 180), (lat - c.lat) * 111_195.0)
+        val ashore = fromCentreM(-122.5049, 47.6601)
+        assertTrue(fromCentreM(kraken.lon, kraken.lat) - ashore > 150.0, "the label sits on the water, ≥ 150 m seaward of its stretches' middle")
+        // With the attack's own water point (the lurk / pool anchor), the marker is exactly there.
+        val water = com.bainbridgetrails.play.fx.GeoPoint(lon = -122.4990, lat = 47.6620)
+        val anchored = PlayMarkerLogic.markers(agenda, emptyMap(), emptySet(), water = mapOf(occ.key to water)).single { it.kind == MarkerKind.KRAKEN }
+        assertEquals(water.lon to water.lat, anchored.lon to anchored.lat)
+    }
+
+    @Test
+    fun `kraken hit rect sits on its label`() {
+        // The coast label is drawn at the point (no pin lift): its hit rect is not lifted either. Pins are lifted.
+        assertEquals(0f, PlayMarkerLogic.hitLiftDp(MarkerKind.KRAKEN, cluster = false))
+        assertEquals(0f, PlayMarkerLogic.hitLiftDp(MarkerKind.TREASURE, cluster = true))
+        assertTrue(PlayMarkerLogic.hitLiftDp(MarkerKind.TREASURE, cluster = false) < 0f)
+        assertTrue(PlayMarkerLogic.hitLiftDp(MarkerKind.RIDDLE, cluster = false) < 0f)
+        val kraken = marker("kraken-roads@2026-10-29", MarkerKind.KRAKEN, 47.662, -122.499)
+        val json = PlayMarkerLogic.hitGeoJson(listOf(kraken), emptyList())
+        assertTrue("\"lift\":0" in json, json)
+    }
+
+    @Test
+    fun `single-item cluster hit rect at the item point`() {
+        val lone = marker("t@w#3", MarkerKind.TREASURE, 47.7005, -122.5005)
+        val c = PlayMarkerLogic.clusters(listOf(lone)).single()
+        assertEquals(1, c.count)
+        assertEquals(lone.lon to lone.lat, c.lon to c.lat, "the island-zoom dot is drawn at the item, so its target is there too")
+    }
+
+    @Test
+    fun `pins declutter by priority and the selected pin dims the rest`() {
+        val t = marker("t@w#1", MarkerKind.TREASURE, 47.65, -122.55)
+        val r = marker("r@always", MarkerKind.REMEMBRANCE, 47.651, -122.551)
+        val json = PlayMarkerLogic.hitGeoJson(listOf(r, t), emptyList(), selected = "t@w#1")
+        // symbol-sort-key: lower places first; the selected pin sorts before everything.
+        assertTrue("\"p\":-1" in json, json)
+        assertTrue("\"p\":0" in json, json)
+        assertTrue("\"dim\":1" in json && "\"dim\":0" in json, json)
+        val none = PlayMarkerLogic.hitGeoJson(listOf(r, t), emptyList(), selected = null)
+        assertTrue("\"dim\":1" !in none, "nothing selected: nothing dims")
+    }
+
+    @Test
     fun `play chip text`() {
         assertEquals("1,240", PlayMarkerLogic.chipMarks(1_240))
         assertEquals("9,999", PlayMarkerLogic.chipMarks(9_999))

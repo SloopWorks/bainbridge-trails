@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -57,7 +58,7 @@ fun RiddleAnswerPicker(options: List<RiddleOption>, onPick: (RiddlePick) -> Unit
                 items(shown, key = { it.name }) { o ->
                     Text(
                         o.name,
-                        Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onPick(o.pick) }.padding(horizontal = BtTheme.spacing.screenH, vertical = 16.dp),
+                        Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button) { onPick(o.pick) }.padding(horizontal = BtTheme.spacing.screenH, vertical = 16.dp),
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }

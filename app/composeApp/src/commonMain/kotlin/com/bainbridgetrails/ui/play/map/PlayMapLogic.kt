@@ -4,6 +4,7 @@ import com.bainbridgetrails.map.TapResult
 import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.TierName
 import com.bainbridgetrails.play.fx.FxGlyph
+import com.bainbridgetrails.play.fx.effects.PIN_FIGURE_CY
 import com.bainbridgetrails.play.geo.ChartSquare
 import com.bainbridgetrails.play.schedule.ActiveItem
 import com.bainbridgetrails.play.schedule.Gate
@@ -130,18 +131,24 @@ object PlayMarkerLogic {
 
     /**
      * Markers for [agenda]: treasures (each placement; found ones keep their pin as a shell), riddles (lit when
-     * [solved]), lore pins (remembrance from the item's [lore] family), the kraken (one marker per attack, at the
-     * centre of its stretches), found eggs only. Challenges and ambient items have none. A quiet day keeps only the
+     * [solved]), lore pins (remembrance from the item's [lore] family), the kraken (one marker per attack, on the
+     * water: the attack's own [water] point by occurrence key — the lurk / pool anchor, [PlayMapEffects.attacks] — else
+     * its stretches' middle pushed offshore the same way, [PlayMapEffects.offshore]), found eggs only. Challenges and ambient items have none. A quiet day keeps only the
      * remembrance pin (PF7-6, product § 4.6.3). Sorted by declutter priority, unfound first; capped at [MAX_MARKERS].
      */
-    fun markers(agenda: PlayAgenda, lore: Map<String, String?>, solved: Set<String>): List<PlayMarker> {
+    fun markers(
+        agenda: PlayAgenda,
+        lore: Map<String, String?>,
+        solved: Set<String>,
+        water: Map<String, com.bainbridgetrails.play.fx.GeoPoint> = emptyMap(),
+    ): List<PlayMarker> {
         val out = ArrayList<PlayMarker>()
-        for (a in agenda.active) out += markersOf(a, lore[a.occurrence.itemId], a.occurrence.itemId in solved)
+        for (a in agenda.active) out += markersOf(a, lore[a.occurrence.itemId], a.occurrence.itemId in solved, water[a.occurrence.key])
         val shown = if (agenda.day.quietDay) out.filter { it.kind == MarkerKind.REMEMBRANCE } else out
         return shown.sortedWith(compareBy({ it.found }, { it.kind.ordinal }, { it.key })).take(MAX_MARKERS)
     }
 
-    private fun markersOf(a: ActiveItem, lore: String?, solved: Boolean): List<PlayMarker> {
+    private fun markersOf(a: ActiveItem, lore: String?, solved: Boolean, water: com.bainbridgetrails.play.fx.GeoPoint?): List<PlayMarker> {
         val o = a.occurrence
         fun found(key: String) = key in a.found || o.key in a.found
         val points = o.placements.filter { it.point != null }
@@ -162,22 +169,23 @@ object PlayMarkerLogic {
             ItemType.obstacle -> if (points.isEmpty()) {
                 emptyList()
             } else {
-                listOf(
-                    PlayMarker(
-                        o.key, o.key, o.itemId, MarkerKind.KRAKEN, points.map { it.point!!.lon }.average(), points.map { it.point!!.lat }.average(),
-                        null, points.all { found(it.key) }, a.gate,
-                    ),
-                )
+                // The coast label sits on the water (ux.md §2.2), never inland over the stretches it inks.
+                val at = water ?: PlayMapEffects.offshore(points.map { it.point!!.lon }.average(), points.map { it.point!!.lat }.average())
+                listOf(PlayMarker(o.key, o.key, o.itemId, MarkerKind.KRAKEN, at.lon, at.lat, null, points.all { found(it.key) }, a.gate))
             }
             else -> emptyList()
         }
     }
 
-    /** Per chart square, the treasure and riddle markers drawn as island-zoom dots: one zoom target per square. */
+    /**
+     * Per chart square, the treasure and riddle markers drawn as island-zoom dots: one zoom target per square. A group
+     * of ≥ 2 is a disc at the square's centre; a single item stays its own dot, so its target is the item's point.
+     */
     fun clusters(markers: List<PlayMarker>): List<PlayCluster> =
         markers.filter { it.kind == MarkerKind.TREASURE || it.kind == MarkerKind.RIDDLE }
             .groupBy { it.square ?: ChartSquare.of(it.lat, it.lon).id }
             .map { (sq, ms) ->
+                if (ms.size == 1) return@map PlayCluster(sq, 1, ms[0].lon, ms[0].lat)
                 val centre = ChartSquare.parse(sq)?.southWest
                 val lat = centre?.let { it.lat + ChartSquare.D_LAT / 2 } ?: ms.map { it.lat }.average()
                 val lon = centre?.let { it.lon + ChartSquare.D_LON / 2 } ?: ms.map { it.lon }.average()
@@ -185,9 +193,22 @@ object PlayMarkerLogic {
             }
             .sortedBy { it.square }
 
+    /** Pin figures are lifted this far above their ground dot (the hit rect is centred on the figure). */
+    const val PIN_LIFT_DP = -PIN_FIGURE_CY
+
     /**
-     * The `fx-marker-hit` source: one Point per pin (`k` key, `t` kind, `z` min zoom, `sel` 1 for [selected]) and one
-     * per island-zoom group (`c` 1, `n` count, `lon`/`lat` its zoom target). Numeric ids are the list index.
+     * Where the 48dp hit rect sits relative to the point: on the lifted figure for pins, at the point for a cluster
+     * disc / island-zoom dot and for the kraken, whose coast label is drawn at the point (no pin).
+     */
+    fun hitLiftDp(kind: MarkerKind, cluster: Boolean): Float = if (cluster || kind == MarkerKind.KRAKEN) 0f else PIN_LIFT_DP
+
+    /** `symbol-sort-key` of a pin (lower places first, ux.md §2.2): the selected pin first, then [MarkerKind] order, found last. */
+    fun sortKey(m: PlayMarker, selected: String?): Int = if (m.key == selected) -1 else m.kind.ordinal + if (m.found) MarkerKind.entries.size else 0
+
+    /**
+     * The `fx-marker-hit` source: one Point per pin (`k` key, `t` kind, `z` min zoom, `p` sort key, `sel` 1 for
+     * [selected], `dim` 1 for every other pin while one is selected (50 %, PD-19), `lift` the hit rect's lift) and one
+     * per island-zoom group (`c` 1, `n` count, `m` 1 for a disc, `lon`/`lat` its zoom target). Ids are the list index.
      */
     fun hitGeoJson(markers: List<PlayMarker>, clusters: List<PlayCluster>, selected: String? = null): String = buildString {
         append("""{"type":"FeatureCollection","features":[""")
@@ -203,8 +224,11 @@ object PlayMarkerLogic {
             append(",\"t\":\"").append(m.kind.name).append('"')
             append(",\"z\":").append(m.minZoom)
             append(",\"f\":").append(if (m.found) 1 else 0)
-            append(",\"p\":").append(m.kind.ordinal + if (m.found) MarkerKind.entries.size else 0)
+            append(",\"p\":").append(sortKey(m, selected))
             append(",\"sel\":").append(if (m.key == selected) 1 else 0)
+            append(",\"own\":").append(if (PlayMarkers.ownsPin(m)) 1 else 0)
+            append(",\"dim\":").append(if (selected != null && m.key != selected) 1 else 0)
+            append(",\"lift\":").append(hitLiftDp(m.kind, cluster = false).toInt())
             append(",\"g\":\"").append(m.glyph.name).append('"')
         }
         for (c in clusters) feature(c.lon, c.lat) {

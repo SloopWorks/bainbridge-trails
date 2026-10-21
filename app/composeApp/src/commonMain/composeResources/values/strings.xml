@@ -187,6 +187,7 @@
 
     <!-- Play: content sheets -->
     <string name="play_walk_there">Walk there</string>
+    <string name="play_more">More</string>
     <string name="play_reward">%1$s marks</string>
     <string name="play_reward_none">Nothing to earn here. Just a place to visit.</string>
     <string name="play_tier_sea_glass">Sea glass</string>
@@ -221,6 +222,7 @@
     <string name="play_kraken_body">It’s inking %1$s. Walk most of an inked stretch to send it back.</string>
     <string name="play_kraken_rule">Walk %1$d% of a stretch in one walk</string>
     <string name="play_kraken_stretch_progress">%1$d% walked. %2$d% sends it back.</string>
+    <string name="play_kraken_stretch_progress_a11y">%1$d percent walked, %2$d percent sends it back</string>
     <string name="play_kraken_repelled_you">You sent it back</string>
     <string name="play_kraken_island_progress">%1$d of %2$d stretches sent back by islanders</string>
     <string name="play_kraken_until">Until Sunday, 8 pm</string>
