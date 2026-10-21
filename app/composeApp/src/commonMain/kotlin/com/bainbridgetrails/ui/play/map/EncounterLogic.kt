@@ -142,8 +142,8 @@ object EncounterLogic {
         val placement = o.placements.firstOrNull { it.key == key } ?: o.placements.firstOrNull()
         val found = key in active.found || o.key in active.found
         val place = placement?.featureId?.let(names)
-        val meta = listOfNotNull(place, distance?.let { PlayText.fmt(copy.distanceAway, it) }).joinToString(" · ").ifEmpty { null }
-        val stamp = foundOn?.let { PlayText.fmt(copy.foundOn, PlayFormat.monthDay(it)) }
+        val meta = listOfNotNull(place, distance?.let { PlayFormat.fill(copy.distanceAway, it) }).joinToString(" · ").ifEmpty { null }
+        val stamp = foundOn?.let { PlayFormat.fill(copy.foundOn, PlayFormat.monthDay(it)) }
         return when {
             o.type == ItemType.obstacle -> kraken(item, active, now, sun, copy, names, shares, coast)
             o.type == ItemType.lore && item.lore == "remembrance" -> EncounterModel(
@@ -157,15 +157,15 @@ object EncounterLogic {
                 val base = EncounterModel(key, item.id, EncounterVariant.TREASURE_LIVE, tierGlyph(tier), copy.tiers[tier] ?: tier.name, meta = meta)
                 when {
                     found -> base.copy(
-                        variant = EncounterVariant.TREASURE_FOUND, stamp = stamp, reward = PlayText.fmt(copy.logLine, PlayFormat.marks(marks)),
+                        variant = EncounterVariant.TREASURE_FOUND, stamp = stamp, reward = PlayFormat.fill(copy.logLine, PlayFormat.marks(marks)),
                         rewardClaimed = true, chips = listOf(EncounterChip(copy.collected, check = true)), body = item.copy.found, washArt = true, motion = false,
                     )
                     active.gate == Gate.OPEN -> base.copy(
-                        reward = PlayText.fmt(copy.reward, PlayFormat.marks(marks)), chips = listOf(EncounterChip(copy.expires)),
+                        reward = PlayFormat.fill(copy.reward, PlayFormat.marks(marks)), chips = listOf(EncounterChip(copy.expires)),
                         body = item.copy.body, walkThere = walkTarget(placement?.featureId, placement?.point),
                     )
                     else -> base.copy(
-                        variant = EncounterVariant.TREASURE_ASLEEP, reward = PlayText.fmt(copy.reward, PlayFormat.marks(marks)),
+                        variant = EncounterVariant.TREASURE_ASLEEP, reward = PlayFormat.fill(copy.reward, PlayFormat.marks(marks)),
                         chips = listOf(EncounterChip(copy.expires)), body = item.copy.body, dimArt = true, motion = false,
                         gate = gateLine(active, now, sun, copy),
                     )
@@ -173,12 +173,12 @@ object EncounterLogic {
             }
             o.type == ItemType.egg -> EncounterModel(
                 key, item.id, EncounterVariant.EGG, FxGlyph.EggStamp, copy.findTitleEgg, meta = meta, stamp = stamp,
-                reward = if (found && o.marks > 0) PlayText.fmt(copy.logLine, PlayFormat.marks(o.marks)) else null, rewardClaimed = found,
+                reward = if (found && o.marks > 0) PlayFormat.fill(copy.logLine, PlayFormat.marks(o.marks)) else null, rewardClaimed = found,
                 body = item.copy.found ?: item.copy.body,
             )
             o.type == ItemType.riddle -> EncounterModel(
                 key, item.id, EncounterVariant.RIDDLE, FxGlyph.LanternUnlit, item.copy.title, meta = meta,
-                reward = PlayText.fmt(copy.reward, PlayFormat.marks(item.marks.takeIf { it > 0 } ?: o.marks)), body = item.copy.body,
+                reward = PlayFormat.fill(copy.reward, PlayFormat.marks(item.marks.takeIf { it > 0 } ?: o.marks)), body = item.copy.body,
                 sources = item.sources,
             )
             else -> {
@@ -190,8 +190,8 @@ object EncounterLogic {
                     item.copy.title, meta = meta, stamp = if (found) stamp else null,
                     reward = when {
                         marks <= 0 -> null
-                        found -> PlayText.fmt(copy.logLine, PlayFormat.marks(marks))
-                        else -> PlayText.fmt(copy.reward, PlayFormat.marks(marks))
+                        found -> PlayFormat.fill(copy.logLine, PlayFormat.marks(marks))
+                        else -> PlayFormat.fill(copy.reward, PlayFormat.marks(marks))
                     },
                     rewardClaimed = found,
                     chips = listOf(EncounterChip(if (item.lore == "kraken") copy.tagTallTale else copy.tagHistory)),
@@ -223,10 +223,10 @@ object EncounterLogic {
         val bands = item.bands.map { it.marks }
         return EncounterModel(
             o.key, item.id, EncounterVariant.KRAKEN, FxGlyph.KrakenEye, copy.krakenTitle, meta = copy.krakenUntil,
-            reward = if (bands.isEmpty()) null else PlayText.fmt(copy.krakenReward, bands.min(), bands.max()),
+            reward = if (bands.isEmpty()) null else PlayFormat.fill(copy.krakenReward, bands.min(), bands.max()),
             chips = listOf(EncounterChip(copy.tagTallTale)),
-            body = PlayText.fmt(copy.krakenBody, coast ?: rows.joinToString(", ") { it.name }),
-            rule = PlayText.fmt(copy.krakenRule, pct(minShare)),
+            body = PlayFormat.fill(copy.krakenBody, coast ?: rows.joinToString(", ") { it.name }),
+            rule = PlayFormat.fill(copy.krakenRule, pct(minShare)),
             gate = if (open) null else gateLine(active, now, sun, copy),
             stretches = rows,
         )
@@ -245,7 +245,7 @@ object EncounterLogic {
     ): StretchRow {
         val text = when {
             repelled -> copy.repelledYou
-            share != null && share > 0.0 -> PlayText.fmt(copy.stretchProgress, pct(share), pct(minShare))
+            share != null && share > 0.0 -> PlayFormat.fill(copy.stretchProgress, pct(share), pct(minShare))
             else -> "—"
         }
         return StretchRow(key, featureId, name, share, text, repelled, walkable = open && !repelled && featureId != null)
@@ -255,8 +255,8 @@ object EncounterLogic {
     fun gateLine(active: ActiveItem, now: Instant, sun: SunDay, copy: EncounterCopy): GateLine? = when (active.gate) {
         Gate.OPEN, Gate.VIEW -> null
         Gate.TIDE_UNKNOWN -> GateLine(GateKind.Tide, copy.gateTideUnknown)
-        Gate.TIDE_HIGH -> GateLine(GateKind.Tide, PlayText.fmt(copy.gateTide, nextOpen(active.occurrence, now, sun)?.let(PlayFormat::time) ?: ""))
-        Gate.SLEEPING -> GateLine(GateKind.Dark, PlayText.fmt(copy.gateDark, nextOpen(active.occurrence, now, sun)?.let(PlayFormat::time) ?: ""))
+        Gate.TIDE_HIGH -> GateLine(GateKind.Tide, PlayFormat.fill(copy.gateTide, nextOpen(active.occurrence, now, sun)?.let(PlayFormat::time) ?: ""))
+        Gate.SLEEPING -> GateLine(GateKind.Dark, PlayFormat.fill(copy.gateDark, nextOpen(active.occurrence, now, sun)?.let(PlayFormat::time) ?: ""))
     }
 
     /** The next instant the occurrence can be sensed: its next resolvable span today, else tomorrow's civil dawn (≈). */

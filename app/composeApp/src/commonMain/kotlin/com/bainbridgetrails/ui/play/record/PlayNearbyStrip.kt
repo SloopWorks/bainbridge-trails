@@ -1,5 +1,7 @@
 package com.bainbridgetrails.ui.play.record
 
+import com.bainbridgetrails.ui.play.components.PlayFormat
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,7 +68,7 @@ object PlayRecordLogic {
         return when (o.type) {
             ItemType.treasure -> {
                 val tier = p?.tier ?: com.bainbridgetrails.play.config.TierName.sea_glass
-                FindMomentModel(find.key, EncounterLogic.tierGlyph(tier), titles.treasure.replace("%1\$s", tierName(tier)), tierName(tier), marks)
+                FindMomentModel(find.key, EncounterLogic.tierGlyph(tier), PlayFormat.fill(titles.treasure, tierName(tier)), tierName(tier), marks)
             }
             ItemType.egg -> FindMomentModel(find.key, FxGlyph.EggStamp, titles.egg, titles.egg, marks)
             ItemType.obstacle -> FindMomentModel(find.key, FxGlyph.KrakenEye, titles.kraken, titles.kraken, marks)

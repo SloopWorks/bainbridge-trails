@@ -328,14 +328,15 @@ private fun RecordContent(
 
     // The record map draws the same live Play scene (fog, ink, finds) as the Map tab (product § 5.3 Record row).
     val recordFerry = com.bainbridgetrails.ui.play.map.rememberFerryTimetable(play)
-    val recordRegistry = remember(recordFerry) { com.bainbridgetrails.ui.play.map.playLiveRegistry(null, recordFerry) { AppGraph.playClock.now() } }
+    // Play gate (AC 9 P2): no registry while Play is off.
+    val recordRegistry = remember(settings.play.enabled, recordFerry) { com.bainbridgetrails.ui.PlayMapAlloc.recordRegistryOrNull(settings.play.enabled, recordFerry) }
     Box(modifier.fillMaxSize()) {
         RecordMap(
             controller, style, launch,
             follow = follow && state !is RecordingState.Done,
             fitWalkAbove = if (state is RecordingState.Done) resultsSheetH else null,
             // Play gate (engine PF-8/PF-9): null when Play is off; ambient effects rest while a walk records.
-            fxInputs = fxHostInputs(settings.play, recording = recording != null, renderers = recordRegistry),
+            fxInputs = recordRegistry?.let { fxHostInputs(settings.play, recording = recording != null, renderers = it) },
             play = play,
         )
 

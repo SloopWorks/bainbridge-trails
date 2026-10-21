@@ -8,6 +8,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.focus.FocusRequester
 import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.resources.Res
@@ -21,7 +22,7 @@ import org.jetbrains.compose.resources.stringResource
 
 /** The intro content (ux.md § 3.2): title, three bullets (pebble, △, chart), Start. Shared with the offer's morph. */
 @Composable
-fun PlayIntroContent(starting: Boolean, onStart: () -> Unit, onDismiss: () -> Unit) {
+fun PlayIntroContent(starting: Boolean, onStart: () -> Unit, onDismiss: () -> Unit, titleFocus: FocusRequester? = null) {
     val goal = LocalGoal.current
     OptInCard(
         title = stringResource(Res.string.play_intro_title),
@@ -36,6 +37,7 @@ fun PlayIntroContent(starting: Boolean, onStart: () -> Unit, onDismiss: () -> Un
         secondary = stringResource(Res.string.common_not_now),
         onSecondary = onDismiss,
         loading = starting,
+        titleFocus = titleFocus,
     )
 }
 

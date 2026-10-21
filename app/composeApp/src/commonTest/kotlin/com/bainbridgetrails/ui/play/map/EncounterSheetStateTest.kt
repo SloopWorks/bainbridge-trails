@@ -1,5 +1,7 @@
 package com.bainbridgetrails.ui.play.map
 
+import com.bainbridgetrails.ui.play.PlayStringsXml
+
 import com.bainbridgetrails.play.PlayFixtures
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.ItemType
@@ -27,7 +29,7 @@ import kotlin.time.Duration.Companion.hours
 class EncounterSheetStateTest {
     private val config: PlayConfig = (PlayConfig.decode(PlayFixtures.pack) as PlayConfigResult.Ok).config
     private val items = config.items.associateBy { it.id }
-    private val copy = EncounterCopy.english { EnglishPlayStrings[it] }
+    private val copy = EncounterCopy.english { PlayStringsXml[it] }
 
     /** Thu Oct 29, 2026 at 20:00 island time: after civil dusk. */
     private val night = PlayFixtures.island("2026-10-29T20:00")

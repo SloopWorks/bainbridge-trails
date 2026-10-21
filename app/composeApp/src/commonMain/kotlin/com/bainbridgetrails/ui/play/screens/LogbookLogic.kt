@@ -125,5 +125,5 @@ object LogbookLogic {
 
     /** Walk subheader: `play_log_walk_group` ([template]) with the walk's distance, or "Walk" when it is unknown. */
     fun walkLabel(template: String, distanceM: Double?, units: Units): String =
-        if (distanceM == null) template.substringBefore(" ·").substringBefore("%1\$s").trim() else template.replace("%1\$s", Format.distance(distanceM, units))
+        if (distanceM == null) template.substringBefore(" ·").substringBefore("%1\$s").trim() else PlayFormat.fill(template, Format.distance(distanceM, units))
 }

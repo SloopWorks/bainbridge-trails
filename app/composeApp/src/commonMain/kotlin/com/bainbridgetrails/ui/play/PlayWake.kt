@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui.play
 
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,8 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -46,17 +49,17 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.play.fx.FxArt
 import com.bainbridgetrails.play.fx.FxEasing
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.play.fx.FxProjection
+import com.bainbridgetrails.play.fx.rememberPowerSaveMode
 import com.bainbridgetrails.play.fx.KrakenTimeline
 import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.resources.Res
@@ -138,6 +141,26 @@ class PlayWakeClock(val reduced: Boolean) {
 
     fun done(elapsed: Long): Boolean =
         if (reduced) elapsed + skipMs >= PlayWakeTimeline.REDUCED_TOTAL_MS else elapsed + skipMs >= PlayWakeTimeline.TOTAL_MS
+
+    companion object {
+        /** Reduced motion or power save (Battery Saver / Low Power Mode) both get the static card (ux.md § 1.4). */
+        fun forMotion(reduced: Boolean, powerSave: Boolean): PlayWakeClock = PlayWakeClock(reduced || powerSave)
+    }
+}
+
+/**
+ * The wake's one assertive line (ux.md § 5.4: the opt-in moment) goes through Play's one announcer, never a live
+ * region of its own (a node that appears with its text is not announced on Android). Said once per wake. Pure.
+ */
+class PlayWakeAnnouncement {
+    private var said = false
+
+    /** Says [text] through [announce] the first time only; later calls (recomposition, a clock change) do nothing. */
+    fun appear(text: String, announce: (String) -> Unit) {
+        if (said || text.isBlank()) return
+        said = true
+        announce(text)
+    }
 }
 
 /**
@@ -204,13 +227,21 @@ class PlayWakeArt(
  * converging onto the coast, the kraken's eye surfacing, every present item's glyph popping in a wave from Winslow,
  * the ferry's horn, then (2200–2700) the paper lifts in a radial dissolve from Winslow onto the live map. Any tap
  * before 2200 jumps to the lift; input passes to the map after it. `confirm` at 1900; the assertive line speaks on
- * appear, with a Skip custom action. Reduced: the pre-lift art as a static card for 1.2 s with short3 crossfades.
- * [frozenAtMs] (showcase only) pins the elapsed time and never calls [onDone].
+ * appear through [announce] (Play's one announcer, assertive) and focus moves to the wake heading, with a Skip custom
+ * action. Reduced motion or power save: the pre-lift art as a static card for 1.2 s with short3 crossfades.
+ * [frozenAtMs] (showcase only) pins the elapsed time, never announces and never calls [onDone].
  */
 @Composable
-fun PlayWake(art: PlayWakeArt, onDone: () -> Unit, modifier: Modifier = Modifier, frozenAtMs: Long? = null) {
+fun PlayWake(
+    art: PlayWakeArt,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+    frozenAtMs: Long? = null,
+    announce: (String) -> Unit = {},
+) {
     val reduced = BtTheme.motion.reduced
-    val clock = remember(reduced) { PlayWakeClock(reduced) }
+    val powerSave = rememberPowerSaveMode()
+    val clock = remember(reduced, powerSave) { PlayWakeClock.forMotion(reduced, powerSave) }
     val elapsed = remember { mutableLongStateOf(frozenAtMs ?: 0L) }
     val done by rememberUpdatedState(onDone)
     val haptics = LocalHapticFeedback.current
@@ -224,12 +255,21 @@ fun PlayWake(art: PlayWakeArt, onDone: () -> Unit, modifier: Modifier = Modifier
         done()
     }
     LaunchedEffect(clock) {
-        snapshotFlow { clock.t(elapsed.longValue) >= PlayWakeTimeline.HAPTIC_MS || reduced }.first { it }
+        snapshotFlow { clock.t(elapsed.longValue) >= PlayWakeTimeline.HAPTIC_MS || clock.reduced }.first { it }
         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
     }
     val blocking by remember(clock) { derivedStateOf { clock.blocksInput(elapsed.longValue) } }
     val a11y = stringResource(Res.string.play_wake_a11y)
     val skip = stringResource(Res.string.play_wake_skip)
+    val say by rememberUpdatedState(announce)
+    val announcement = remember { PlayWakeAnnouncement() }
+    val heading = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        if (frozenAtMs != null) return@LaunchedEffect
+        announcement.appear(a11y, say)
+        withFrameMillis { }
+        runCatching { heading.requestFocus() } // § 5.1: screen-reader focus to the wake heading
+    }
     val colors = BtTheme.colors
     val dark = colors.play == PlayDark
     val surface = MaterialTheme.colorScheme.surface
@@ -254,8 +294,10 @@ fun PlayWake(art: PlayWakeArt, onDone: () -> Unit, modifier: Modifier = Modifier
                     Modifier
                 },
             )
+            .focusRequester(heading)
+            .focusable()
             .clearAndSetSemantics {
-                liveRegion = LiveRegionMode.Assertive
+                heading()
                 contentDescription = a11y
                 if (blocking) customActions = listOf(CustomAccessibilityAction(skip) { clock.tap(elapsed.longValue) })
             }

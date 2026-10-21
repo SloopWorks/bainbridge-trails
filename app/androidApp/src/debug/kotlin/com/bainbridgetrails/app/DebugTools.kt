@@ -46,7 +46,7 @@ object DebugTools {
                     Backend("prod", "Prod (temp workers.dev)", ApiConfig.PROD_BASE_URL),
                     Backend("local", "Local wrangler dev", LOCAL_BASE_URL),
                 ),
-                plugins = listOf(DatasetPlugin(app), TrailsDataPlugin, CoveragePlugin(app), RecordingPlugin(app), PlayClockPlugin(app), PlayFxPlugin),
+                plugins = listOf(DatasetPlugin(app), TrailsDataPlugin, CoveragePlugin(app), RecordingPlugin(app), PlayClockPlugin(app), PlayFxPlugin(app)),
             ),
             app,
         )

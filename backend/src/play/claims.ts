@@ -9,6 +9,8 @@ import {
   type Occurrence,
   type PlayItem,
   type PlayPack,
+  addDays,
+  capsOf,
   dateOfEpochDay,
   epochDay,
   islandDate,
@@ -81,8 +83,6 @@ const KIND_TYPE: Record<ClaimKind, string> = {
 
 export type ClaimCode = "stale_config" | "unknown_item" | "bad_occurrence" | "not_this_walk" | "no_bits" | "too_late" | "too_early";
 
-/** product § 3.5 (the one caps table), mirrored in every pack's `caps`. */
-const DEFAULT_CAPS = { foundPerWeek: 2800, weekLateDays: 7, findGraceDays: 2, clockAheadMin: 60 };
 const MAX_DAY_KEYS_PER_WEEK = 7;
 /** W-DAY needs a walk of at least 10 minutes (privacy review P2-3). */
 export const MIN_DAY_WALK_S = 600;
@@ -233,7 +233,6 @@ export interface Evaluation {
 }
 
 const isMonday = (d: string): boolean => !Number.isNaN(epochDay(d)) && weekId(d) === d;
-const addDays = (d: string, n: number): string => dateOfEpochDay(epochDay(d) + n);
 
 export function killed(pack: PlayPack, item: PlayItem): boolean {
   const k = pack.kill as { all?: boolean; types?: string[]; items?: string[] } | undefined;
@@ -304,7 +303,7 @@ function checkOccurrence(c: PlayClaim, config: string | null, ctx: ClaimContext)
 }
 
 /** The caps in force: the CURRENT pack's (P2-6), never the named version's. */
-const capsNow = (): typeof DEFAULT_CAPS => ({ ...DEFAULT_CAPS, ...((CURRENT.caps as Partial<typeof DEFAULT_CAPS> | undefined) ?? {}) });
+const capsNow = () => capsOf(CURRENT);
 
 /** Check 5 (product § 3.5 clock tolerance and replay guard). */
 function checkTime(c: PlayClaim, ch: Checked, ctx: ClaimContext): ClaimCode | null {

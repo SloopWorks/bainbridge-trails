@@ -99,8 +99,20 @@ class FerryTimetable private constructor(private val doc: Doc) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
 
-        fun parse(text: String): FerryTimetable {
-            val doc = json.decodeFromString(Doc.serializer(), text)
+        fun parse(text: String): FerryTimetable = validated(json.decodeFromString(Doc.serializer(), text))
+
+        /**
+         * The timetable of a pack's [ferry] block (its raw `timetables`, valid until the last one's `to`); null when it
+         * has none or it does not parse.
+         */
+        fun of(ferry: com.bainbridgetrails.play.config.Ferry?): FerryTimetable? = runCatching {
+            if (ferry == null) return@runCatching null
+            val tables = ferry.timetables.map { json.decodeFromJsonElement(Timetable.serializer(), it) }
+            val validUntil = tables.maxOfOrNull { it.to } ?: return@runCatching null
+            validated(Doc(route = ferry.route, crossingMin = ferry.crossingMin, validUntil = validUntil, timetables = tables))
+        }.getOrNull()
+
+        private fun validated(doc: Doc): FerryTimetable {
             require(doc.crossingMin in 1..180) { "crossingMin ${doc.crossingMin}" }
             for (t in doc.timetables) {
                 require(LocalDate.parse(t.from) <= LocalDate.parse(t.to)) { "${t.id}: from > to" }

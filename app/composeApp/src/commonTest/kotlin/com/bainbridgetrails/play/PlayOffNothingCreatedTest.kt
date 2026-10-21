@@ -54,6 +54,7 @@ class PlayOffNothingCreatedTest {
     fun playOffPlayOrNullNullNoFxClockNoPlaySensingNoPlayRequest() = runTest {
         val sensingBefore = PlaySensing.created
         val markersBefore = PlayMapAlloc.markersCreated
+        val recordBefore = PlayMapAlloc.recordRegistriesCreated
         val g = gate()
         g.start()
         settings.value = PlaySettings() // loaded: off (the default)
@@ -70,6 +71,9 @@ class PlayOffNothingCreatedTest {
         // Round 1 P2-10: the Map's Play marker renderer (and so its registry) is not built while off.
         assertNull(PlayMapAlloc.markersOrNull(settings.value?.enabled == true))
         assertEquals(markersBefore, PlayMapAlloc.markersCreated, "no PlayMarkers constructed while off")
+        // AC 9 P2: the Record map's live registry is not built while off either.
+        assertNull(PlayMapAlloc.recordRegistryOrNull(settings.value?.enabled == true, ferry = null))
+        assertEquals(recordBefore, PlayMapAlloc.recordRegistriesCreated, "no Record registry while off")
 
         // Turning Play on creates it once and starts it; the content check is the first Play request.
         settings.value = PlaySettings(enabled = true)
@@ -80,6 +84,8 @@ class PlayOffNothingCreatedTest {
         assertTrue(playRequests() >= 1)
         assertNotNull(PlayMapAlloc.markersOrNull(settings.value?.enabled == true))
         assertEquals(markersBefore + 1, PlayMapAlloc.markersCreated)
+        assertNotNull(PlayMapAlloc.recordRegistryOrNull(settings.value?.enabled == true, ferry = null))
+        assertEquals(recordBefore + 1, PlayMapAlloc.recordRegistriesCreated)
 
         // Off again: hidden and stopped, nothing deleted, no further request; on again reuses the same instance.
         settings.value = PlaySettings(enabled = false)

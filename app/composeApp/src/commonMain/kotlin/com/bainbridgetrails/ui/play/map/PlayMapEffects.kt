@@ -5,6 +5,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bainbridgetrails.coverage.TrailStatus
@@ -127,8 +132,17 @@ object PlayMapEffects {
     private const val M_PER_DEG = 111_195.0
 }
 
-/** Attack keys whose intro already played in this process (a tab switch never replays it). */
+/**
+ * Attack keys whose intro played to its end in this process (a tab switch never replays it). An intro is marked only
+ * once its instance has been live and is gone (DONE), so a registry rebuild or a held intro never loses it.
+ */
 private val introduced = HashSet<String>()
+
+/** An intro that never becomes live (queued behind another HERO this long) is not marked; it plays next time. */
+private const val INTRO_START_TIMEOUT_MS = 30_000L
+
+/** True while [id] is a live instance in [fx] (snapshot state: readable from `snapshotFlow`). */
+private fun FxHostState.isLive(id: String): Boolean = liveByKind.values.any { l -> l.any { it.instance.spec.id == id } }
 
 /**
  * The Play renderers of a live map (MapTab, RecordScreen): one per kind (`KrakenAttack` carries the kraken_attack Layer
@@ -155,16 +169,19 @@ fun rememberFerryTimetable(play: PlayRepository?): FerryTimetable? {
  * Nothing per frame: specs are rebuilt when the agenda or the covered set changes.
  */
 @Composable
-fun PlayMapEffectsSync(fx: FxHostState?, play: PlayRepository?, buckets: Map<TrailStatus, List<String>>, ferry: Boolean) {
+fun PlayMapEffectsSync(fx: FxHostState?, play: PlayRepository?, buckets: Map<TrailStatus, List<String>>, ferry: Boolean, holdIntros: Boolean = false) {
     if (fx == null || play == null) return
     val agenda by play.agenda.collectAsStateWithLifecycle()
     val derived = produceState(PlayDerived.Empty, play) { value = play.derivedTable() }.value
     val dataset = AppGraph.datasets.state.collectAsStateWithLifecycle().value as? Loadable.Ready
-    val lines = remember(dataset) {
-        val segs = dataset?.value?.dataset?.segments?.associate { s -> s.id to s.coords.map { GeoPoint(lon = it[0], lat = it[1]) } }.orEmpty()
-        val f: (String) -> List<GeoPoint>? = segs::get
-        f
-    }
+    // Built off Main (AC 9 P3): every segment's coordinates are converted once per dataset.
+    val lines = produceState<(String) -> List<GeoPoint>?>({ null }, dataset) {
+        value = withContext(Dispatchers.Default) {
+            val segs = dataset?.value?.dataset?.segments?.associate { s -> s.id to s.coords.map { GeoPoint(lon = it[0], lat = it[1]) } }.orEmpty()
+            val f: (String) -> List<GeoPoint>? = segs::get
+            f
+        }
+    }.value
     val covered = remember(buckets) { PlayMapEffects.covered(buckets) }
     val specs = produceState(emptyList<FxSpec>(), agenda, derived, lines, covered, ferry) {
         value = withContext(Dispatchers.Default) { PlayMapEffects.specs(agenda, derived, lines, covered, ferry) }
@@ -180,9 +197,21 @@ fun PlayMapEffectsSync(fx: FxHostState?, play: PlayRepository?, buckets: Map<Tra
             fx.spawn(s)
             spawned += s.id
         }
+    }
+    // Intros wait while the wake plays (never under its wash) and are marked introduced only at DONE. The watcher
+    // outlives an agenda tick (the host's scope), so a playing intro is never spawned twice.
+    val introScope = rememberCoroutineScope()
+    val playing = remember(fx) { HashSet<String>() }
+    LaunchedEffect(fx, agenda, lines, holdIntros) {
+        if (holdIntros) return@LaunchedEffect
         for (intro in PlayMapEffects.intros(agenda, lines, introduced)) {
-            introduced += intro.id.substringBefore('#')
+            if (!playing.add(intro.id)) continue
             fx.spawn(intro)
+            introScope.launch {
+                withTimeoutOrNull(INTRO_START_TIMEOUT_MS) { snapshotFlow { fx.isLive(intro.id) }.first { it } } ?: return@launch
+                snapshotFlow { fx.isLive(intro.id) }.first { !it }
+                introduced += intro.id.substringBefore('#')
+            }.invokeOnCompletion { playing -= intro.id }
         }
     }
     DisposableEffect(fx, play) {

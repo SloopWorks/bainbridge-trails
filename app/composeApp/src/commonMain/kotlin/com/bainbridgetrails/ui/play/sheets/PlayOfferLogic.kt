@@ -1,5 +1,7 @@
 package com.bainbridgetrails.ui.play.sheets
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.bainbridgetrails.data.PlaySettings
 import com.bainbridgetrails.tracking.RecordingState
 
@@ -49,5 +51,24 @@ class PlayOfferWatcher {
         /** Whether to show the offer for [walk] now. [overBlocking]: a celebration, onboarding or the Record flow is up. */
         fun shouldShow(play: PlaySettings, walk: ClosedResults, recording: Boolean, overBlocking: Boolean): Boolean =
             eligible(play) && walk.durationMs >= MIN_WALK_MS && !recording && !overBlocking
+    }
+}
+
+/**
+ * The shell's Play one-shots (ux.md § 2.11, § 3.3): the offer sheet is up, the wake is due, the start balance waits for
+ * the wake to end. `offerShown = true` is persisted before the sheet shows, so these survive rotation and process death
+ * through [Saver] (`rememberSaveable`) or the once-per-install offer would be lost.
+ */
+@androidx.compose.runtime.Stable
+class PlayShellState(showOffer: Boolean = false, wake: Boolean = false, pendingBalance: Int? = null) {
+    var showOffer by androidx.compose.runtime.mutableStateOf(showOffer)
+    var wake by androidx.compose.runtime.mutableStateOf(wake)
+    var pendingBalance by androidx.compose.runtime.mutableStateOf(pendingBalance)
+
+    companion object {
+        val Saver: androidx.compose.runtime.saveable.Saver<PlayShellState, Any> = androidx.compose.runtime.saveable.listSaver(
+            save = { listOf(it.showOffer, it.wake, it.pendingBalance ?: -1) },
+            restore = { PlayShellState(it[0] as Boolean, it[1] as Boolean, (it[2] as Int).takeIf { b -> b >= 0 }) },
+        )
     }
 }

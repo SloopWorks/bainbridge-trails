@@ -47,6 +47,9 @@ import com.bainbridgetrails.ui.play.sheets.PlayOptInGraph
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.bainbridgetrails.ui.play.sheets.PlayShellState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.input.pointer.pointerInput
 import com.bainbridgetrails.data.AppSettings
 import com.bainbridgetrails.graph.AppGraph
@@ -211,9 +214,8 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
     val playSnackbar = remember { androidx.compose.material3.SnackbarHostState() }
     val playScope = androidx.compose.runtime.rememberCoroutineScope()
     // Play (ux.md § 2.11, § 3.1, § 3.3): the wake over the Map, then the start-balance snackbar; the one-time offer.
-    var wake by remember { mutableStateOf(false) }
-    var pendingBalance by remember { mutableStateOf<Int?>(null) }
-    var showOffer by remember { mutableStateOf(false) }
+    // Saved (AC 9 P2): `offerShown = true` is persisted before the sheet shows; rotation / process death keep it up.
+    val playShell = rememberSaveable(saver = PlayShellState.Saver) { PlayShellState() }
     var offerStarting by remember { mutableStateOf(false) }
     val play = rememberPlay(graph, settings.play.enabled)
     val quietDay = play?.agenda?.collectAsState()?.value?.day?.quietDay == true
@@ -225,8 +227,8 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
     /** Start / replay: the Map tab, then the wake (MapTab skips it on a quiet day), then the snackbar. */
     fun startWake(marks: Int?) {
         nav.selectTab(MapRoute)
-        pendingBalance = marks
-        wake = true
+        playShell.pendingBalance = marks
+        playShell.wake = true
     }
     LaunchedEffect(controller) {
         val c = controller ?: return@LaunchedEffect
@@ -240,7 +242,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                 val blocking = d.isTab(RecordRoute) || d.isTab(OnboardingRoute) || d?.hasRoute(CelebrationRoute::class) == true
                 if (PlayOfferWatcher.shouldShow(p, closed, c.state.value is RecordingState.Recording, blocking)) {
                     graph.settings.update { it.copy(play = it.play.copy(offerShown = true)) } // once per install, ever (PF2-3)
-                    showOffer = true
+                    playShell.showOffer = true
                 }
             }
         }
@@ -260,11 +262,11 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     onRecord = { nav.openRecord() },
                     onPlayLogbook = { nav.navigate(LogbookRoute) },
                     onPlayChallenges = { nav.navigate(ChallengesRoute) },
-                    wake = wake,
+                    wake = playShell.wake,
                     onWakeDone = {
-                        wake = false
-                        showBalance(pendingBalance)
-                        pendingBalance = null
+                        playShell.wake = false
+                        showBalance(playShell.pendingBalance)
+                        playShell.pendingBalance = null
                     },
                 )
             }
@@ -370,7 +372,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             composable<LoreCardRoute> { entry -> com.bainbridgetrails.ui.play.screens.LoreCardScreen(graph, settings, entry.toRoute<LoreCardRoute>().itemId, onBack = { nav.popBackStack() }) }
             composable<PlayClockDebugRoute> { com.bainbridgetrails.ui.play.screens.PlayClockDebugScreen(graph, settings, onBack = { nav.popBackStack() }) }
         }
-        if (showOffer) {
+        if (playShell.showOffer) {
             PlayOfferSheet(
                 starting = offerStarting,
                 onStart = {
@@ -384,19 +386,11 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                         optIn.setEnabled(true)
                         val marks = optIn.awaitStartBalance()
                         offerStarting = false
-                        showOffer = false
+                        playShell.showOffer = false
                         startWake(marks)
                     }
                 },
-                onDismiss = { showOffer = false },
-            )
-        }
-        // ux.md § 2.11: the bar stays visible but inert while the wake plays over the Map.
-        if (wake && showBar) {
-            Box(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(barPadding).pointerInput(Unit) {
-                    awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } }
-                },
+                onDismiss = { playShell.showOffer = false },
             )
         }
         androidx.compose.material3.SnackbarHost(playSnackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = barPadding + 24.dp))
@@ -416,7 +410,8 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                 recordLabel = stringResource(if (recording) Res.string.nav_recording else Res.string.nav_record),
                 recording = recording,
                 onRecord = { nav.openRecord() },
-                modifier = Modifier.align(Alignment.BottomCenter),
+                // ux.md § 2.11: inert while the wake plays, for screen readers too.
+                modifier = Modifier.align(Alignment.BottomCenter).then(if (playShell.wake) Modifier.clearAndSetSemantics { } else Modifier),
             )
         }
         // ux.md §2.5: while a walk records and the Record flow is minimized, the pill floats above the bar.
@@ -428,6 +423,15 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                 settings,
                 onClick = { nav.openRecord() },
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = (if (showBar) barPadding + RecordDiscRise else navInset) + 12.dp),
+            )
+        }
+        // ux.md § 2.11: the bar stays visible but inert while the wake plays over the Map. Composed after the bar (so it
+        // is on top and takes the taps), tall enough to cover the Record disc's rise.
+        if (playShell.wake && showBar) {
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(barPadding + RecordDiscRise).pointerInput(Unit) {
+                    awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } }
+                },
             )
         }
     }

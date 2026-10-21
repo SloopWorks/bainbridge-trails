@@ -60,9 +60,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -291,11 +288,6 @@ class PlayRepository(
 
     /** The running pack's ferry timetable, or null (none, or expired). */
     suspend fun ferryTimetable(): FerryTimetable? = withContext(worker) { content.load()?.config?.let(::ferry) }
-
-    /** [refresh] without a result: the debug drawer (`:androidApp`) cannot see `:play`'s [PlayAgenda]. */
-    suspend fun reload() {
-        refresh()
-    }
 
     /** Recomputes [today] and [agenda] at the Play clock's now. Null when no pack is usable. */
     suspend fun refresh(): PlayAgenda? = withContext(worker) {
@@ -595,20 +587,7 @@ class PlayRepository(
 
     private fun ferry(config: PlayConfig): FerryTimetable? {
         ferryFor?.let { (c, f) -> if (c === config) return f }
-        val f = config.ferry?.let { fr ->
-            runCatching {
-                val validUntil = fr.timetables.mapNotNull { (it["to"] as? JsonPrimitive)?.content }.maxOrNull() ?: return@runCatching null
-                val doc = JsonObject(
-                    mapOf(
-                        "route" to JsonPrimitive(fr.route),
-                        "crossingMin" to JsonPrimitive(fr.crossingMin),
-                        "validUntil" to JsonPrimitive(validUntil),
-                        "timetables" to JsonArray(fr.timetables),
-                    ),
-                )
-                FerryTimetable.parse(doc.toString())
-            }.getOrNull()
-        }
+        val f = FerryTimetable.of(config.ferry)
         ferryFor = config to f
         return f
     }

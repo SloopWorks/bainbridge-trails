@@ -7,6 +7,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.FocusRequester
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,9 +39,16 @@ fun PlayOfferSheet(starting: Boolean, onStart: () -> Unit, onDismiss: () -> Unit
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Crossfade(accepted, animationSpec = tween(if (reduced) BtDuration.short3 else BtDuration.medium1)) { intro ->
+        val fadeMs = if (reduced) BtDuration.short3 else BtDuration.medium1
+        Crossfade(accepted, animationSpec = tween(fadeMs)) { intro ->
             if (intro) {
-                PlayIntroContent(starting, onStart, onDismiss)
+                // The crossfade drops screen-reader focus with the offer card: move it to the intro title (§ 5.1).
+                val introTitle = remember { FocusRequester() }
+                LaunchedEffect(Unit) {
+                    delay(fadeMs.toLong())
+                    runCatching { introTitle.requestFocus() }
+                }
+                PlayIntroContent(starting, onStart, onDismiss, titleFocus = introTitle)
             } else {
                 OptInCard(
                     title = stringResource(Res.string.play_offer_title),

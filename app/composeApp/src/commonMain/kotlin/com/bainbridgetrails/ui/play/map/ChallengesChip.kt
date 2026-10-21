@@ -31,6 +31,13 @@ import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PillShape
 import org.jetbrains.compose.resources.pluralStringResource
 
+/** ux.md § 5.3: at font scale ≥ [COMPACT_FONT_SCALE] the Play row's chips go compact (numbers only) and the row wraps. */
+object PlayChipRow {
+    const val COMPACT_FONT_SCALE = 1.5f
+
+    fun compact(fontScale: Float): Boolean = fontScale >= COMPACT_FONT_SCALE
+}
+
 /** ChallengesChip (ux.md §2.1): pennant + "2 challenges this week" ([compact]: the count only; a11y keeps the phrase). */
 @Composable
 fun ChallengesChip(count: Int, onClick: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {

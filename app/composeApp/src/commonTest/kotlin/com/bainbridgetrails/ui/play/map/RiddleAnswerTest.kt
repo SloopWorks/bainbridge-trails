@@ -1,5 +1,7 @@
 package com.bainbridgetrails.ui.play.map
 
+import com.bainbridgetrails.ui.play.PlayStringsXml
+
 import com.bainbridgetrails.play.PlayFixtures
 import com.bainbridgetrails.play.PlayState
 import com.bainbridgetrails.play.config.PlayConfig
@@ -18,7 +20,7 @@ class RiddleAnswerTest {
     private val config: PlayConfig = (PlayConfig.decode(PlayFixtures.pack) as PlayConfigResult.Ok).config
     private val frog = config.items.single { it.id == "riddle-frog" }
     private val bond = config.items.single { it.id == "riddle-bond" }
-    private val copy = RiddleCopy.english { EnglishPlayStrings[it] }
+    private val copy = RiddleCopy.english { PlayStringsXml[it] }
     private val today = LocalDate(2026, 10, 29)
     private val parks = mapOf("trail-grand-forest-west" to "Grand Forest", "trail-gazzam-lake" to "Gazzam Lake")
     private var ids = 0

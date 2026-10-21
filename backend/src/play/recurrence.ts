@@ -92,8 +92,25 @@ export function epochDay(date: string): number {
 }
 
 export const dateOfEpochDay = (e: number): string => new Date(e * DAY_MS).toISOString().slice(0, 10);
+
+/** [d] (`yyyy-mm-dd`) plus [n] calendar days. */
+export const addDays = (d: string, n: number): string => dateOfEpochDay(epochDay(d) + n);
+
+/** product § 3.5 (the one caps table), mirrored in every pack's `caps`; a pack value overrides its default. */
+export const DEFAULT_CAPS = { foundPerWeek: 2800, weekLateDays: 7, findGraceDays: 2, clockAheadMin: 60 };
+export type Caps = typeof DEFAULT_CAPS;
+
+/** [pack]'s caps with the product defaults for anything it leaves out. */
+export const capsOf = (pack: PlayPack): Caps => {
+  const c = (pack.caps as Partial<Caps> | undefined) ?? {};
+  return {
+    foundPerWeek: c.foundPerWeek ?? DEFAULT_CAPS.foundPerWeek,
+    weekLateDays: c.weekLateDays ?? DEFAULT_CAPS.weekLateDays,
+    findGraceDays: c.findGraceDays ?? DEFAULT_CAPS.findGraceDays,
+    clockAheadMin: c.clockAheadMin ?? DEFAULT_CAPS.clockAheadMin,
+  };
+};
 const weekdayIndex = (e: number): number => (new Date(e * DAY_MS).getUTCDay() + 6) % 7; // mon = 0
-const addDays = (date: string, n: number): string => dateOfEpochDay(epochDay(date) + n);
 
 /** Week id: the Monday of `date`'s week. */
 export const weekId = (date: string): string => dateOfEpochDay(epochDay(date) - weekdayIndex(epochDay(date)));

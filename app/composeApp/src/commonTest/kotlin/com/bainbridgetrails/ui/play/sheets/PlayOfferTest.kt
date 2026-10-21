@@ -79,4 +79,23 @@ class PlayOfferTest {
         assertFalse(PlayOfferWatcher.shouldShow(fresh, real, recording = true, overBlocking = false))
         assertTrue(PlayOfferWatcher.shouldShow(fresh, real, recording = false, overBlocking = false))
     }
+
+    @Test
+    fun shellStateSurvivesSavedStateRoundTrip() {
+        val scope = object : androidx.compose.runtime.saveable.SaverScope {
+            override fun canBeSaved(value: Any) = true
+        }
+        fun roundTrip(s: PlayShellState): PlayShellState {
+            val saved = assertNotNull(with(PlayShellState.Saver) { scope.save(s) })
+            return assertNotNull(PlayShellState.Saver.restore(saved))
+        }
+        val offer = roundTrip(PlayShellState(showOffer = true))
+        assertTrue(offer.showOffer, "the once-per-install offer survives rotation / process death")
+        assertFalse(offer.wake)
+        assertNull(offer.pendingBalance)
+        val waking = roundTrip(PlayShellState(wake = true, pendingBalance = 120))
+        assertTrue(waking.wake)
+        assertEquals(120, waking.pendingBalance)
+        assertEquals(0, roundTrip(PlayShellState(wake = true, pendingBalance = 0)).pendingBalance)
+    }
 }

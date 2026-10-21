@@ -19,6 +19,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -53,6 +56,7 @@ fun OptInCard(
     bullets: List<Pair<FxGlyph, String>> = emptyList(),
     art: OptInArt = OptInArt.Island,
     loading: Boolean = false,
+    titleFocus: FocusRequester? = null,
 ) {
     Column(
         modifier.fillMaxWidth().padding(horizontal = BtTheme.spacing.xl).padding(bottom = BtTheme.spacing.lg)
@@ -60,7 +64,7 @@ fun OptInCard(
         verticalArrangement = Arrangement.spacedBy(BtTheme.spacing.md),
     ) {
         OptInIllustration(art)
-        Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineSmall, maxLines = 3)
+        Text(title, (if (titleFocus != null) Modifier.focusRequester(titleFocus).focusable() else Modifier).semantics { heading() }, style = MaterialTheme.typography.headlineSmall, maxLines = 3)
         if (body != null) Text(body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         for ((glyph, text) in bullets) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(BtTheme.spacing.md)) {

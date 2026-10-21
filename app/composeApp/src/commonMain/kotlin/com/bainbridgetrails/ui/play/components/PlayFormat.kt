@@ -12,6 +12,16 @@ import kotlin.time.Instant
  * and times are island time (schedule § 9); the Logbook uses dates only (PF11-3).
  */
 object PlayFormat {
+    /** Positional `%n$s` / `%n$d` substitution for `play_*` templates resolved outside composition (pure logic). */
+    fun fill(template: String, vararg args: Any): String {
+        var out = template
+        args.forEachIndexed { i, a ->
+            val n = i + 1
+            out = out.replace("%$n\$s", a.toString()).replace("%$n\$d", a.toString())
+        }
+        return out
+    }
+
     private val DAYS = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
     private val MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -53,5 +63,5 @@ object PlayFormat {
 
     /** [text] + `play_island_time` ([template], "%1$s island time") when the phone's zone differs at [at]. */
     fun islandSuffix(text: String, phone: TimeZone, at: Instant, template: String): String =
-        if (phoneDiffers(phone, at)) template.replace("%1\$s", text) else text
+        if (phoneDiffers(phone, at)) fill(template, text) else text
 }

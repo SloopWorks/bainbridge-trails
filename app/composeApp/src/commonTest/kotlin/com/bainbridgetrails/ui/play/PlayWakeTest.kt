@@ -47,4 +47,27 @@ class PlayWakeTest {
         assertEquals(1_900, PlayWakeTimeline.HAPTIC_MS)
         assertEquals(1f, c.cardAlpha(500), "the full-motion art is not crossfaded")
     }
+
+    @Test
+    fun `wake line is announced once through the one announcer`() {
+        val said = ArrayList<String>()
+        val a = PlayWakeAnnouncement()
+        a.appear("The island wakes up", said::add)
+        a.appear("The island wakes up", said::add) // recomposition / clock change
+        a.appear("again", said::add)
+        assertEquals(listOf("The island wakes up"), said)
+        val blank = PlayWakeAnnouncement()
+        blank.appear("", said::add)
+        assertEquals(1, said.size, "nothing blank is said")
+    }
+
+    @Test
+    fun `power save gets the static card`() {
+        val c = PlayWakeClock.forMotion(reduced = false, powerSave = true)
+        assertTrue(c.reduced)
+        for (e in listOf(0L, 700L, 1_300L)) assertEquals(PlayWakeTimeline.LIFT_MS, c.t(e), "static pre-lift art")
+        assertTrue(c.done(PlayWakeTimeline.REDUCED_TOTAL_MS))
+        assertTrue(PlayWakeClock.forMotion(reduced = true, powerSave = false).reduced)
+        assertFalse(PlayWakeClock.forMotion(reduced = false, powerSave = false).reduced)
+    }
 }

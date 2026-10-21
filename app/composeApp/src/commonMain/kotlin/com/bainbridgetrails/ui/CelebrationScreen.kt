@@ -211,7 +211,8 @@ fun CelebrationScreen(
         // Play (ux.md §3.10): up to two lines (marks, rank-up) from this walk's Logbook entries; Play off: none.
         val play = if (settings?.play?.enabled == true) graph.playOrNull else null
         val playState = play?.store?.state?.collectAsStateWithLifecycle()?.value
-        val playLines = remember(playState, sessionId, preview) {
+        // Frozen at appear (AC 9 P2): later Logbook updates never re-read the assertive text.
+        val playLines = remember(playState != null, sessionId, preview) {
             if (playState == null || preview) emptyList()
             else celebrationPlayLines(ResultsPlayLogic.section(sessionId, playState.logbook, null, { it }, summaryShown = false))
         }

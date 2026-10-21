@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalLayoutApi::class)
+
 package com.bainbridgetrails.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -40,6 +42,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import com.bainbridgetrails.play.fx.FxPoliteness
+import com.bainbridgetrails.ui.play.map.PlayChipRow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -306,7 +315,7 @@ fun MapTab(
     val coastLabel = coast?.let { stringResource(Res.string.play_kraken_coast, it) }
     if (playMarkerArt != null) {
         PlayMapSync(fx, playMarkerArt, playMarkers, playSelected, coastLabel)
-        PlayMapEffectsSync(fx, play, snapshot?.segmentBuckets.orEmpty(), ferry = ferry != null)
+        PlayMapEffectsSync(fx, play, snapshot?.segmentBuckets.orEmpty(), ferry = ferry != null, holdIntros = wake)
     }
 
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -631,6 +640,8 @@ fun MapTab(
     val trailsLabel = stringResource(LocalGoal.current.s(Res.string.nav_trails))
     val animatedStack by animateDpAsState(stackHeight, tween(if (reduced) 0 else 200))
     var claimPop by remember { mutableStateOf<ClaimPopState?>(null) }
+    // § 5.1: when the wake ends, screen-reader focus lands on the Play chip.
+    val playChipFocus = remember { FocusRequester() }
 
     Box(modifier.fillMaxSize().onSizeChanged { mapHeight = with(density) { it.height.toDp() } }) {
         WithFxRenderOptions(fx) { renderOptions ->
@@ -689,21 +700,32 @@ fun MapTab(
             if (playOn) {
                 val agenda = playAgenda
                 if (agenda?.day?.quietDay == true) {
-                    QuietBanner(onRead = { playSelected = playMarkers.firstOrNull { it.kind == MarkerKind.REMEMBRANCE }?.key })
+                    QuietBanner(
+                        onRead = { playSelected = playMarkers.firstOrNull { it.kind == MarkerKind.REMEMBRANCE }?.key },
+                        day = agenda.day.date.toString(),
+                        announce = remember(fx) { fx?.announcer?.let { a -> { text: String -> a.say(text, FxPoliteness.POLITE) } } },
+                    )
                 } else {
                     val total = playState?.logbook?.total
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(end = 56.dp)) {
+                    // § 5.3: at font scale ≥ 1.5 both chips go compact and the row wraps.
+                    val compact = PlayChipRow.compact(density.fontScale)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(end = 56.dp),
+                    ) {
+                        val chipModifier = Modifier.focusRequester(playChipFocus)
                         if (total != null && agenda != null) {
                             val pop = remember { ClaimPopState(total) }
-                            claimPop = pop
+                            SideEffect { claimPop = pop }
                             // claim_pop (effects § 3.12): claimed marks fly into the chip; the first value is the baseline.
                             LaunchedEffect(total) { if (total > pop.total) pop.pop(total - pop.total, null, reduced) }
-                            LivePlayHud(pop, stringResource(Ranks.of(total).titleRes), onPlayLogbook)
+                            LivePlayHud(pop, stringResource(Ranks.of(total).titleRes), onPlayLogbook, compact, chipModifier)
                         } else {
-                            PlayHud(null, stringResource(Ranks.of(0).titleRes), onPlayLogbook)
+                            PlayHud(null, stringResource(Ranks.of(0).titleRes), onPlayLogbook, chipModifier, compact = compact)
                         }
                         val count = agenda?.let { PlayMarkerLogic.challengesThisWeek(it) } ?: 0
-                        if (count > 0) ChallengesChip(count, onPlayChallenges, compact = true)
+                        if (count > 0) ChallengesChip(count, onPlayChallenges, compact = compact)
                     }
                 }
             }
@@ -796,7 +818,16 @@ fun MapTab(
 
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = stackHeight + 64.dp))
         if (playOn) claimPop?.let { ClaimPopOverlay(it, Modifier.fillMaxSize(), announcer = fx?.announcer) }
-        if (wake) PlayWakeOnMap(controller, playAgenda, playMarkers, onWakeDone)
+        if (wake) {
+            PlayWakeOnMap(
+                controller, playAgenda, playMarkers, fx,
+                onDone = {
+                    onWakeDone()
+                    // § 5.1: focus moves from the wake heading to the Play chip (absent on a quiet day: no-op).
+                    runCatching { playChipFocus.requestFocus() }
+                },
+            )
+        }
 
         riddleListFor?.let { id ->
             val options = remember(data, playConfig) {
@@ -868,8 +899,8 @@ private fun LoadingChip() {
 
 /** The Play chip fed by [pop]: its number rolls as claimed marks land (only this chip recomposes per frame). */
 @Composable
-private fun LivePlayHud(pop: ClaimPopState, rankTitle: String, onClick: () -> Unit) {
-    PlayHud(pop.chipValue(pop.frame.longValue), rankTitle, onClick, Modifier.claimPopTarget(pop))
+private fun LivePlayHud(pop: ClaimPopState, rankTitle: String, onClick: () -> Unit, compact: Boolean, modifier: Modifier) {
+    PlayHud(pop.chipValue(pop.frame.longValue), rankTitle, onClick, modifier.claimPopTarget(pop), compact = compact)
 }
 
 /**
@@ -878,7 +909,10 @@ private fun LivePlayHud(pop: ClaimPopState, rankTitle: String, onClick: () -> Un
  * and plays [PlayWake]; [onDone] when it ends (or is skipped).
  */
 @Composable
-private fun PlayWakeOnMap(controller: TrailMapController, agenda: PlayAgenda?, markers: List<PlayMarker>, onDone: () -> Unit) {
+private fun PlayWakeOnMap(controller: TrailMapController, agenda: PlayAgenda?, markers: List<PlayMarker>, fx: FxHostState?, onDone: () -> Unit) {
+    val fxNow by rememberUpdatedState(fx)
+    // Motion on: the island camera move is long1 (ux.md § 6.3); reduced: instant.
+    val reducedNow by rememberUpdatedState(BtTheme.motion.reduced)
     val agendaNow by rememberUpdatedState(agenda)
     val markersNow by rememberUpdatedState(markers)
     val done by rememberUpdatedState(onDone)
@@ -888,13 +922,14 @@ private fun PlayWakeOnMap(controller: TrailMapController, agenda: PlayAgenda?, m
         withTimeoutOrNull(2_000) { snapshotFlow { agendaNow }.first { it != null } }
         if (agendaNow?.day?.quietDay == true) { done(); return@produceState }
         withTimeoutOrNull(1_000) { snapshotFlow { markersNow }.first { it.isNotEmpty() } }
-        map.fitTo(IslandBounds, DpPadding(left = 8.dp, top = topInset + 128.dp, right = 8.dp, bottom = 56.dp), animate = false, minZoom = 10.5)
+        map.fitTo(IslandBounds, DpPadding(left = 8.dp, top = topInset + 128.dp, right = 8.dp, bottom = 56.dp), animate = !reducedNow, minZoom = 10.5)
         delay(32)
         val cam = map.cameraPosition
         val items = markersNow.map { GeoPoint(lon = it.lon, lat = it.lat) }
         value = PlayWakeArt.load(items, GeoPoint(lon = cam.center.longitude, lat = cam.center.latitude), cam.zoom)
     }
-    art?.let { PlayWake(it, onDone = { done() }) }
+    // The assertive line goes through Play's one announcer (effects § 1.10), never a live region of the wake's own.
+    art?.let { PlayWake(it, onDone = { done() }, announce = { text -> fxNow?.announcer?.say(text, FxPoliteness.ASSERTIVE) }) }
 }
 
 /**
@@ -906,4 +941,11 @@ internal object PlayMapAlloc {
         private set
 
     fun markersOrNull(playOn: Boolean): PlayMarkers? = if (playOn) PlayMarkers().also { markersCreated++ } else null
+
+    /** RecordScreen's live registry (AC 9 P2): built only while Play is on. */
+    var recordRegistriesCreated = 0
+        private set
+
+    fun recordRegistryOrNull(playOn: Boolean, ferry: com.bainbridgetrails.play.time.FerryTimetable?): com.bainbridgetrails.play.fx.FxRendererRegistry? =
+        if (playOn) com.bainbridgetrails.ui.play.map.playLiveRegistry(null, ferry) { AppGraph.playClock.now() }.also { recordRegistriesCreated++ } else null
 }

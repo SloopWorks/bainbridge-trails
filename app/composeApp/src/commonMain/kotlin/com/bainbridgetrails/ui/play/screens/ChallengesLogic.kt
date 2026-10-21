@@ -174,13 +174,13 @@ object ChallengesLogic {
 
     /** The card's lines from [copy]: window days only, progress as text, the band line only when its count is known. */
     fun text(card: ChallengeCardModel, copy: ChallengeCopy): ChallengeCardText {
-        val window = copy.window.replace("%1\$s", PlayFormat.day(card.windowStart)).replace("%2\$s", PlayFormat.day(card.windowEnd))
+        val window = PlayFormat.fill(copy.window, PlayFormat.day(card.windowStart), PlayFormat.day(card.windowEnd))
         val p = card.progress
         val t = card.target
         val progress = when {
             p == null || t == null -> null
-            card.islandScope -> copy.islandProgress.replace("%1\$d", p.toString()).replace("%2\$d", t.toString())
-            else -> copy.progress.replace("%1\$s", p.coerceAtMost(t).toString()).replace("%2\$s", t.toString())
+            card.islandScope -> PlayFormat.fill(copy.islandProgress, p, t)
+            else -> PlayFormat.fill(copy.progress, p.coerceAtMost(t), t)
         }
         val band = card.band?.let { b ->
             val word = when (b.band) {
@@ -189,7 +189,7 @@ object ChallengesLogic {
                 "starting" -> copy.bandStarting
                 else -> return@let null
             }
-            copy.band.replace("%1\$s", word).replace("%2\$d", b.count.toString())
+            PlayFormat.fill(copy.band, word, b.count)
         }
         return ChallengeCardText(window, progress, band)
     }

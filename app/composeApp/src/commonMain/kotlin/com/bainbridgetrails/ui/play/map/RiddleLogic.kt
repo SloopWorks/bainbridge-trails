@@ -1,5 +1,7 @@
 package com.bainbridgetrails.ui.play.map
 
+import com.bainbridgetrails.ui.play.components.PlayFormat
+
 import com.bainbridgetrails.play.PlayState
 import com.bainbridgetrails.play.config.Item
 import com.bainbridgetrails.play.config.PlayConfig
@@ -123,7 +125,7 @@ object RiddleLogic {
         RiddleStage.UNSOLVED -> RiddleUi(stage, if (wrong) copy.wrong else null, null, null, answerRow = true, mapPicker = true, listPicker = true, walkThere = false)
         RiddleStage.SOLVED -> RiddleUi(stage, null, copy.solvedStamp, null, answerRow = false, mapPicker = false, listPicker = false, walkThere = true)
         RiddleStage.CLAIMED -> RiddleUi(
-            stage, null, null, PlayText.fmt(copy.claimed, claimedMarks?.toString() ?: ""),
+            stage, null, null, PlayFormat.fill(copy.claimed, claimedMarks?.toString() ?: ""),
             answerRow = false, mapPicker = false, listPicker = false, walkThere = false,
         )
     }

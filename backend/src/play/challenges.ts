@@ -8,6 +8,8 @@ import {
   type Occurrence,
   type PlayItem,
   type PlayPack,
+  addDays,
+  capsOf,
   dateOfEpochDay,
   epochDay,
   islandDate,
@@ -42,9 +44,6 @@ import {
  */
 
 const DAY_MS = 86_400_000;
-const DEFAULT_GRACE_DAYS = 2;
-const DEFAULT_WEEK_LATE_DAYS = 7;
-const DEFAULT_FOUND_PER_WEEK = 2800;
 const DEFAULT_MIN_PLAYERS = 3;
 const DEFAULT_RETREAT_MARKS = 50;
 /** W-WEEK ladder (product § 3.2). */
@@ -59,21 +58,6 @@ const PURGE_DAYS = 180;
 const CRON_ROWS = 200;
 const CRON_ROUNDS = 10;
 
-const addDays = (d: string, n: number): string => dateOfEpochDay(epochDay(d) + n);
-
-interface Caps {
-  findGraceDays?: number;
-  weekLateDays?: number;
-  foundPerWeek?: number;
-}
-const capsOf = (pack: PlayPack): Required<Caps> => {
-  const c = (pack.caps as Caps | undefined) ?? {};
-  return {
-    findGraceDays: c.findGraceDays ?? DEFAULT_GRACE_DAYS,
-    weekLateDays: c.weekLateDays ?? DEFAULT_WEEK_LATE_DAYS,
-    foundPerWeek: c.foundPerWeek ?? DEFAULT_FOUND_PER_WEEK,
-  };
-};
 
 // ---------------------------------------------------------------------------------------------------------------
 // Definitions
