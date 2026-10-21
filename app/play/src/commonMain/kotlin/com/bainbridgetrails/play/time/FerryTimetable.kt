@@ -34,7 +34,7 @@ class FerryTimetable private constructor(private val doc: Doc) {
     private val parsed: List<Pair<Season, Timetable>> = doc.timetables.map {
         Season(it.id, LocalDate.parse(it.from), LocalDate.parse(it.to)) to it
     }
-    private val holidays: List<Set<LocalDate>> = doc.timetables.map { t -> t.holidays.map(LocalDate::parse).toSet() }
+    private val holidays: List<Set<LocalDate>> = doc.timetables.map { t -> (t.holidays + t.weekendDates).map(LocalDate::parse).toSet() }
     val seasons: List<Season> get() = parsed.map { it.first }
 
     /** The season covering [date], or null when none does or the timetable has expired. */
@@ -91,6 +91,8 @@ class FerryTimetable private constructor(private val doc: Doc) {
         val weekend: Departures,
         val holiday: Departures? = null,
         val holidays: List<String> = emptyList(),
+        /** The pack's name for [holidays] (scripts/build-play-content.mjs `weekendDates`); both count. */
+        val weekendDates: List<String> = emptyList(),
     )
 
     @Serializable

@@ -2,37 +2,27 @@
   "schema": 1,
   "route": "seattle-bainbridge",
   "crossingMin": 35,
-  "source": "placeholder",
-  "note": "PLACEHOLDER: the illustrative departures of docs/play/schedule.md §4.7, NOT the WSF timetable. Owner action (plan.md preconditions): copy each season's departures from the WSF Seattle/Bainbridge schedule PDF (wsdot.wa.gov/ferries/schedule), set source to \"wsf-pdf <season> <date copied>\", and bump validUntil. Holidays run the weekend column (WSF: New Year's Day, Memorial Day, July 4, Labor Day, Thanksgiving, Christmas). HH >= 24 = after midnight, same service day.",
-  "validUntil": "2027-03-20",
+  "source": "https://wsdot.wa.gov/ferries/schedule/scheduledetailbyroute.aspx?route=sea-bi (Fall 2026, Sep 20 - Dec 26, 2026; fetched 2026-10-21); cross-checked against https://wsdot.wa.gov/sites/default/files/2026-09/WSF-BTTT-SEA-BI-Fall2026.pdf (WSF Best Times to Travel, Fall 2026)",
+  "note": "WSF Fall 2026 Seattle/Bainbridge Island sailing schedule, copied 2026-10-21. Times are island-local; HH >= 24 = after midnight, same service day (WSF prints them at the end of the day's column). weekend = Saturday, Sunday and holidays; the 07:55 Bainbridge departure runs Saturdays and holidays (Thanksgiving, Christmas) only, so it sits in the holiday column and is left out of weekend (Saturdays miss it on the sprite rather than Sundays showing a boat that does not sail). WSF runs the holiday (weekend) schedule on Thanksgiving and Christmas Day. Winter 2026-27 (Dec 27 - Mar 20) was not yet published on 2026-10-21: validUntil is the fall season end; the owner adds the winter season when WSF publishes it (and Seattle/Bainbridge gets a new schedule in spring 2027).",
+  "validUntil": "2026-12-26",
   "timetables": [
     {
-      "id": "2026-fall-PLACEHOLDER",
+      "id": "2026-fall",
       "from": "2026-09-20",
       "to": "2026-12-26",
       "weekday": {
-        "fromSeattle": ["05:30","06:20","07:05","07:55","08:45","09:35","10:25","11:15","12:05","12:55","13:45","14:35","15:25","16:15","17:05","17:55","18:45","19:35","20:25","21:15","22:30","23:59"],
-        "fromBainbridge": ["04:45","05:20","06:10","06:55","07:45","08:35","09:25","10:15","11:05","11:55","12:45","13:35","14:25","15:15","16:05","16:55","17:45","18:35","19:25","20:15","21:25","22:50"]
+        "fromSeattle": ["05:30","06:10","07:05","07:55","08:45","09:35","10:40","11:25","12:25","13:10","14:05","15:00","15:50","16:45","17:45","18:30","19:30","20:15","21:20","22:05","22:50","24:15","25:35"],
+        "fromBainbridge": ["04:45","05:20","06:20","07:05","07:55","08:45","09:40","10:25","11:30","12:20","13:15","14:05","14:55","15:50","16:45","17:35","18:40","19:20","20:20","21:00","22:00","23:30","24:55"]
       },
       "weekend": {
-        "fromSeattle": ["06:10","07:55","09:35","11:15","12:55","14:35","16:15","17:55","19:35","21:15","22:30","23:59"],
-        "fromBainbridge": ["05:20","06:55","08:35","10:15","11:55","13:35","15:15","16:55","18:35","20:15","21:25","22:50"]
+        "fromSeattle": ["06:10","07:55","08:55","09:35","10:40","11:25","12:30","13:15","14:10","15:05","15:50","16:45","17:35","18:25","19:20","20:10","21:00","21:45","22:40","23:15","24:45","26:10"],
+        "fromBainbridge": ["05:20","07:05","08:45","09:45","10:25","11:35","12:20","13:20","14:10","15:00","15:55","16:40","17:35","18:30","19:15","20:10","20:55","21:45","22:30","24:00","25:25"]
       },
-      "holidays": ["2026-11-26", "2026-12-25"]
-    },
-    {
-      "id": "2026-27-winter-PLACEHOLDER",
-      "from": "2026-12-27",
-      "to": "2027-03-20",
-      "weekday": {
-        "fromSeattle": ["05:30","06:20","07:05","07:55","08:45","09:35","10:25","11:15","12:05","12:55","13:45","14:35","15:25","16:15","17:05","17:55","18:45","19:35","20:25","21:15","22:30","23:59"],
-        "fromBainbridge": ["04:45","05:20","06:10","06:55","07:45","08:35","09:25","10:15","11:05","11:55","12:45","13:35","14:25","15:15","16:05","16:55","17:45","18:35","19:25","20:15","21:25","22:50"]
+      "holiday": {
+        "fromSeattle": ["06:10","07:55","08:55","09:35","10:40","11:25","12:30","13:15","14:10","15:05","15:50","16:45","17:35","18:25","19:20","20:10","21:00","21:45","22:40","23:15","24:45","26:10"],
+        "fromBainbridge": ["05:20","07:05","07:55","08:45","09:45","10:25","11:35","12:20","13:20","14:10","15:00","15:55","16:40","17:35","18:30","19:15","20:10","20:55","21:45","22:30","24:00","25:25"]
       },
-      "weekend": {
-        "fromSeattle": ["06:10","07:55","09:35","11:15","12:55","14:35","16:15","17:55","19:35","21:15","22:30","23:59"],
-        "fromBainbridge": ["05:20","06:55","08:35","10:15","11:55","13:35","15:15","16:55","18:35","20:15","21:25","22:50"]
-      },
-      "holidays": ["2027-01-01"]
+      "holidays": ["2026-11-26","2026-12-25"]
     }
   ]
 }

@@ -1108,7 +1108,8 @@ function checkFerry(f, err) {
       err(`${w}: {id, from, to} dates`);
       continue;
     }
-    for (const col of ["weekday", "weekend"]) {
+    // holiday: optional column for weekendDates (FerryTimetable falls back to weekend without it).
+    for (const col of ["weekday", "weekend", ...(t.holiday !== undefined ? ["holiday"] : [])]) {
       times(t[col]?.fromSeattle, `${w}.${col}.fromSeattle`);
       times(t[col]?.fromBainbridge, `${w}.${col}.fromBainbridge`);
     }
@@ -1127,7 +1128,7 @@ export function ferryDrift(pack, file) {
       out.push(`ferry timetable "${t.id}" (data/play/ferry-timetable.json) is not in the pack`);
       continue;
     }
-    for (const k of ["from", "to", "weekday", "weekend"]) if (!deepEqual(m[k], t[k])) out.push(`ferry timetable "${t.id}".${k} differs from data/play/ferry-timetable.json`);
+    for (const k of ["from", "to", "weekday", "weekend", "holiday"]) if (!deepEqual(m[k], t[k])) out.push(`ferry timetable "${t.id}".${k} differs from data/play/ferry-timetable.json`);
     if (!deepEqual(m.weekendDates ?? [], t.holidays ?? t.weekendDates ?? [])) out.push(`ferry timetable "${t.id}" weekendDates differ from data/play/ferry-timetable.json holidays`);
   }
   for (const id of mine.keys()) if (!(file.timetables ?? []).some((t) => t.id === id)) out.push(`ferry timetable "${id}" is not in data/play/ferry-timetable.json`);

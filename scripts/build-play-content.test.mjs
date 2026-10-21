@@ -6,7 +6,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import {
-  FIXTURE, MIN_SQUARE_PLAYERS, ROOT, PATHS, buildFixture, chartSquare, decodePolyline, derive, encodePolyline, epochDay, formatJson, hhmm,
+  FIXTURE, MIN_SQUARE_PLAYERS, ROOT, PATHS, buildFixture, chartSquare, decodePolyline, derive, encodePolyline, epochDay, ferryDrift, formatJson, hhmm,
   loadCoastline, loadMapData, makeIndex, readPublished, run, simplifyLine, suppressSmallCounts, sunDay, validatePack,
 } from "./build-play-content.mjs";
 
@@ -133,6 +133,7 @@ test("rejects in-place edit of published when", () => {
   removed.items = removed.items.filter((it) => it.id !== "egg-ladybug");
   hasError(errorsOf(removed, { published }), /items\.egg-ladybug: removed without "expires"/);
   const same = realPack();
+  same.version = "2026.11.0";
   same.items[0].copy.body = "Changed.";
   hasError(errorsOf(same, { published }), /version 2026\.11\.0 is already published/);
 });
@@ -228,8 +229,19 @@ test("committed pack is valid without map data and canonical", () => {
   const pack = JSON.parse(text);
   assert.equal(formatJson(pack), text);
   assert.deepEqual(errorsOf(pack, { published: readPublished(), coastline: loadCoastline() }), []);
-  assert.equal(pack.version, "2026.11.0");
+  assert.equal(pack.version, "2026.11.1");
   assert.equal(pack.epoch, "2026-10-29");
+});
+
+test("pack ferry block mirrors data/play/ferry-timetable.json, holiday column included", () => {
+  const file = JSON.parse(readFileSync(join(ROOT, "data/play/ferry-timetable.json"), "utf8"));
+  assert.notEqual(file.source, "placeholder");
+  assert.deepEqual(ferryDrift(realPack(), file), []);
+  const p = realPack();
+  p.ferry.timetables[0].holiday.fromBainbridge = p.ferry.timetables[0].holiday.fromBainbridge.slice(1);
+  assert.deepEqual(ferryDrift(p, file), [`ferry timetable "${file.timetables[0].id}".holiday differs from data/play/ferry-timetable.json`]);
+  p.ferry.timetables[0].holiday.fromBainbridge = ["7:55"];
+  hasError(errorsOf(p), /ferry\.timetables\[0\]\.holiday\.fromBainbridge: HH:MM list/);
 });
 
 test("chart squares use the single integer grid", () => {
