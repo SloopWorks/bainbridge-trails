@@ -21,10 +21,10 @@ import com.bainbridgetrails.play.fx.FxLayerIds
 import com.bainbridgetrails.play.fx.FxLive
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
-import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.effects.FxDrawPainter
 import com.bainbridgetrails.play.fx.effects.FxPin
 import com.bainbridgetrails.play.fx.effects.PIN_FIGURE_CY
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.ui.theme.BtTheme
 import org.maplibre.compose.expressions.ast.Expression
 import org.maplibre.compose.expressions.dsl.Case
@@ -210,7 +210,7 @@ class PlayMarkers : FxRenderer {
         }
 
         /** The one static instance (anchored mid-island; the features come from [markers]): never animates. */
-        fun spec(): FxSpec = FxSpec.static("play-markers", KIND, FxAnchor.Point(GeoPoint(-122.52, 47.63)), 0.0..24.0, FxBand.OVER_LABELS)
+        fun spec(): FxSpec = FxSpec.static("play-markers", KIND, FxAnchor.Point(GeoPoint(lat = 47.63, lon = -122.52)), 0.0..24.0, FxBand.OVER_LABELS)
 
         /** Remembrance: 20dp ink ring with one rule, a stem and a ground dot; no fill, no shadow (ux.md §2.2). */
         private fun quietPainter(ink: Color) = FxDrawPainter(24f, 54f) {

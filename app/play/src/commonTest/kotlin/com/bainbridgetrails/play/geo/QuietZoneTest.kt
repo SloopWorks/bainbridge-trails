@@ -10,7 +10,6 @@ import com.bainbridgetrails.play.config.TestPack.replace
 import com.bainbridgetrails.play.config.TestPack.withPool
 import com.bainbridgetrails.play.schedule.FakePlaceIndex
 import com.bainbridgetrails.play.schedule.FakePlaceIndex.Companion.MEMORIAL
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.RoadRef
 import com.bainbridgetrails.play.schedule.TrailRef
 import kotlin.test.Test
@@ -32,13 +31,13 @@ class QuietZoneTest {
         assertEquals(index.segments(TrailRef(MEMORIAL)).map { it.line }, memorial.lines)
         // 150 m east of the trail's north end is inside; the same distance from the trail's far (south) end would be
         // > 200 m from the start vertex alone, so this proves the buffer follows the whole line, not a centre circle.
-        val northEnd = GeoPoint(47.6157, -122.5097)
+        val northEnd = GeoPoint(lat = 47.6157, lon = -122.5097)
         val east150 = GeoMath.offset(northEnd, eastM = 150.0, northM = 0.0)
-        assertTrue(GeoMath.distanceM(east150, GeoPoint(47.6146, -122.5103)) > 200.0)
+        assertTrue(GeoMath.distanceM(east150, GeoPoint(lat = 47.6146, lon = -122.5103)) > 200.0)
         assertEquals("exclusion-memorial", QuietZones(zones).zoneAt(east150)?.id)
         assertNull(QuietZones(zones).zoneAt(GeoMath.offset(northEnd, eastM = 230.0, northM = 0.0)))
         // the old hand-typed circle (47.6098, −122.5076) is ≈ 0.6 km away and covers nothing
-        assertNull(QuietZones(zones).zoneAt(GeoPoint(47.6098, -122.5076)))
+        assertNull(QuietZones(zones).zoneAt(GeoPoint(lat = 47.6098, lon = -122.5076)))
     }
 
     @Test
@@ -58,7 +57,7 @@ class QuietZoneTest {
     @Test
     fun remembranceCardAllowedInItsOwnZone() {
         val card = TestPack.base.places.getValue("memorial-card")
-        assertNotNull(QuietZones(zones).zoneAt(GeoPoint(card.lat, card.lon)), "the card sits inside the memorial zone")
+        assertNotNull(QuietZones(zones).zoneAt(GeoPoint(lat = card.lat, lon = card.lon)), "the card sits inside the memorial zone")
         assertTrue(PlayConfigValidator.validate(TestPack.base, index).isEmpty())
         // ...but only as a quiet card: with an effect it is a playful marker and is rejected
         val playful = TestPack.base.replace(TestPack.memorial.copy(fx = "frog_rock"))

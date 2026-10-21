@@ -6,6 +6,7 @@ import com.bainbridgetrails.play.config.TierName
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.play.fx.effects.PIN_FIGURE_CY
 import com.bainbridgetrails.play.geo.ChartSquare
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.ActiveItem
 import com.bainbridgetrails.play.schedule.Gate
 import com.bainbridgetrails.play.schedule.PlayAgenda
@@ -140,7 +141,7 @@ object PlayMarkerLogic {
         agenda: PlayAgenda,
         lore: Map<String, String?>,
         solved: Set<String>,
-        water: Map<String, com.bainbridgetrails.play.fx.GeoPoint> = emptyMap(),
+        water: Map<String, GeoPoint> = emptyMap(),
     ): List<PlayMarker> {
         val out = ArrayList<PlayMarker>()
         for (a in agenda.active) out += markersOf(a, lore[a.occurrence.itemId], a.occurrence.itemId in solved, water[a.occurrence.key])
@@ -148,7 +149,7 @@ object PlayMarkerLogic {
         return shown.sortedWith(compareBy({ it.found }, { it.kind.ordinal }, { it.key })).take(MAX_MARKERS)
     }
 
-    private fun markersOf(a: ActiveItem, lore: String?, solved: Boolean, water: com.bainbridgetrails.play.fx.GeoPoint?): List<PlayMarker> {
+    private fun markersOf(a: ActiveItem, lore: String?, solved: Boolean, water: GeoPoint?): List<PlayMarker> {
         val o = a.occurrence
         fun found(key: String) = key in a.found || o.key in a.found
         val points = o.placements.filter { it.point != null }

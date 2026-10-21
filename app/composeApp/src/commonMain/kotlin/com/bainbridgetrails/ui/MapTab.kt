@@ -108,6 +108,7 @@ import com.bainbridgetrails.map.rankTap
 import com.bainbridgetrails.map.rememberTrailMapController
 import com.bainbridgetrails.map.segmentsById
 import com.bainbridgetrails.map.trailLines
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.record.PermStatus
 import com.bainbridgetrails.record.openAppSettings
 import com.bainbridgetrails.record.rememberPermissionRequester
@@ -285,7 +286,7 @@ fun MapTab(
             // The kraken marker sits on its attack's water point (the lurk / pool anchor, ux.md §2.2).
             water = data?.let { d ->
                 com.bainbridgetrails.ui.play.map.PlayMapEffects.waterPoints(playAgenda) { id ->
-                    d.dataset.segmentsById[id]?.coords?.map { com.bainbridgetrails.play.fx.GeoPoint(lon = it[0], lat = it[1]) }
+                    d.dataset.segmentsById[id]?.coords?.map { GeoPoint(lon = it[0], lat = it[1]) }
                 }
             }.orEmpty(),
         )
@@ -450,7 +451,7 @@ fun MapTab(
             val r = rankTap(hits) { names[it].orEmpty() }
             // Riddle pick mode (ux.md §3.5.4 step 0): every tap is an answer until the pick bar closes.
             riddlePickFor?.let { id ->
-                answerRiddle(id, RiddlePick(featureIds = hits.flatMap { it.trailIds }.distinct(), at = com.bainbridgetrails.play.schedule.GeoPoint(tapGeo.latitude, tapGeo.longitude)))
+                answerRiddle(id, RiddlePick(featureIds = hits.flatMap { it.trailIds }.distinct(), at = GeoPoint(lat = tapGeo.latitude, lon = tapGeo.longitude)))
                 return@launch
             }
             // Play only on a pure miss (PF3-5, PD-12): `fx-marker-hit`, never a casing or a stamp.
@@ -890,8 +891,8 @@ private fun PlayWakeOnMap(controller: TrailMapController, agenda: PlayAgenda?, m
         map.fitTo(IslandBounds, DpPadding(left = 8.dp, top = topInset + 128.dp, right = 8.dp, bottom = 56.dp), animate = false, minZoom = 10.5)
         delay(32)
         val cam = map.cameraPosition
-        val items = markersNow.map { com.bainbridgetrails.play.fx.GeoPoint(lon = it.lon, lat = it.lat) }
-        value = PlayWakeArt.load(items, com.bainbridgetrails.play.fx.GeoPoint(lon = cam.center.longitude, lat = cam.center.latitude), cam.zoom)
+        val items = markersNow.map { GeoPoint(lon = it.lon, lat = it.lat) }
+        value = PlayWakeArt.load(items, GeoPoint(lon = cam.center.longitude, lat = cam.center.latitude), cam.zoom)
     }
     art?.let { PlayWake(it, onDone = { done() }) }
 }

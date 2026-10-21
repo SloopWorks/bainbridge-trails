@@ -3,6 +3,7 @@ package com.bainbridgetrails.play
 import com.bainbridgetrails.coverage.Fix
 import com.bainbridgetrails.data.DataFixtures
 import com.bainbridgetrails.net.FakeServer
+import com.bainbridgetrails.play.claim.WalkDone
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.claim.ClaimKind

@@ -6,7 +6,7 @@ import com.bainbridgetrails.map.MapPalette
 import com.bainbridgetrails.play.fx.FxAnchor
 import com.bainbridgetrails.play.fx.FxBand
 import com.bainbridgetrails.play.fx.FxPalette
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.ui.theme.BtExtraDark
 import com.bainbridgetrails.ui.theme.BtExtraLight
 import com.bainbridgetrails.ui.theme.PlayDark
@@ -24,12 +24,12 @@ class KrakenInkTest {
     private val a = KrakenInk.Stretch(
         "road-manitou-beach-drive-northeast",
         listOf(
-            listOf(GeoPoint(-122.5052, 47.6590), GeoPoint(-122.5049, 47.6600), GeoPoint(-122.5047, 47.6610)),
-            listOf(GeoPoint(-122.5047, 47.6610), GeoPoint(-122.5045, 47.6620)),
+            listOf(GeoPoint(lat = 47.6590, lon = -122.5052), GeoPoint(lat = 47.6600, lon = -122.5049), GeoPoint(lat = 47.6610, lon = -122.5047)),
+            listOf(GeoPoint(lat = 47.6610, lon = -122.5047), GeoPoint(lat = 47.6620, lon = -122.5045)),
         ),
     )
-    private val b = KrakenInk.Stretch("road-northeast-gertie-johnson-road", listOf(listOf(GeoPoint(-122.5060, 47.6650), GeoPoint(-122.5055, 47.6660))))
-    private fun attack(active: Boolean = true) = KrakenInk.Attack("kraken-roads@2026-10-29", listOf(a, b), water = GeoPoint(-122.5025, 47.6603), active = active)
+    private val b = KrakenInk.Stretch("road-northeast-gertie-johnson-road", listOf(listOf(GeoPoint(lat = 47.6650, lon = -122.5060), GeoPoint(lat = 47.6660, lon = -122.5055))))
+    private fun attack(active: Boolean = true) = KrakenInk.Attack("kraken-roads@2026-10-29", listOf(a, b), water = GeoPoint(lat = 47.6603, lon = -122.5025), active = active)
 
     @Test
     fun casingOnlyOnActiveStretches() {

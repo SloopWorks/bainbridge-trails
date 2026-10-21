@@ -2,7 +2,6 @@ package com.bainbridgetrails.play.geo
 
 import com.bainbridgetrails.play.config.Place
 import com.bainbridgetrails.play.config.QuietZone
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.PlaceIndex
 import com.bainbridgetrails.play.schedule.PlaceRef
 import com.bainbridgetrails.play.schedule.Ref
@@ -33,7 +32,7 @@ object GeoMath {
 
     /** [p] moved [eastM] east and [northM] north. */
     fun offset(p: GeoPoint, eastM: Double, northM: Double): GeoPoint =
-        GeoPoint(p.lat + northM / M_PER_DEG_LAT, p.lon + eastM / M_PER_DEG_LON)
+        GeoPoint(lat = p.lat + northM / M_PER_DEG_LAT, lon = p.lon + eastM / M_PER_DEG_LON)
 
     fun lineLengthM(line: List<GeoPoint>): Double {
         var total = 0.0
@@ -50,7 +49,7 @@ object GeoMath {
             val d = distanceM(line[i], line[i + 1])
             if (acc + d >= half && d > 0) {
                 val t = (half - acc) / d
-                return GeoPoint(line[i].lat + t * (line[i + 1].lat - line[i].lat), line[i].lon + t * (line[i + 1].lon - line[i].lon))
+                return GeoPoint(lat = line[i].lat + t * (line[i + 1].lat - line[i].lat), lon = line[i].lon + t * (line[i + 1].lon - line[i].lon))
             }
             acc += d
         }
@@ -188,7 +187,7 @@ class QuietZones(val zones: List<Zone>) {
             for (spec in specs) {
                 val lines: List<List<GeoPoint>> = when (val ref = Ref.parse(spec.feature)) {
                     is TrailRef -> index.segments(ref).map { it.line }.filter { it.isNotEmpty() }
-                    is PlaceRef -> places[ref.id]?.let { listOf(listOf(GeoPoint(it.lat, it.lon))) }.orEmpty()
+                    is PlaceRef -> places[ref.id]?.let { listOf(listOf(GeoPoint(lat = it.lat, lon = it.lon))) }.orEmpty()
                     else -> emptyList()
                 }
                 if (lines.isEmpty() || spec.bufferM <= 0) unresolved += spec else zones += Zone(spec.id, spec.feature, spec.bufferM.toDouble(), lines)

@@ -1,9 +1,7 @@
 package com.bainbridgetrails.play.fx
 
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.rng.Fnv1a
-
-/** A WGS84 point (degrees). */
-data class GeoPoint(val lon: Double, val lat: Double)
 
 /** Where an effect is anchored (engine.md PF-3). */
 sealed interface FxAnchor {

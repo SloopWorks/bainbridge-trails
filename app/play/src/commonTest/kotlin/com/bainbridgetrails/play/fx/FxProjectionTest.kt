@@ -1,5 +1,6 @@
 package com.bainbridgetrails.play.fx
 
+import com.bainbridgetrails.play.geo.GeoPoint
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -12,12 +13,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class FxProjectionTest {
-    private val ferry = GeoPoint(-122.51283, 47.62371)           // Bainbridge terminal reference point
+    private val ferry = GeoPoint(lat = 47.62371, lon = -122.51283)           // Bainbridge terminal reference point
     private val points = listOf(
-        GeoPoint(-122.5194, 47.6253),                              // Winslow
-        GeoPoint(-122.5704, 47.6721),                              // Frog Rock area
-        GeoPoint(-122.4977, 47.5853),                              // Fort Ward / south end
-        GeoPoint(-122.5532, 47.7020),                              // north end
+        GeoPoint(lat = 47.6253, lon = -122.5194),                              // Winslow
+        GeoPoint(lat = 47.6721, lon = -122.5704),                              // Frog Rock area
+        GeoPoint(lat = 47.5853, lon = -122.4977),                              // Fort Ward / south end
+        GeoPoint(lat = 47.7020, lon = -122.5532),                              // north end
     )
 
     /** Hand formula: x = (λ+180)/360, y = (1 − ln(tan φ + sec φ)/π)/2, both × 512·2^z. */
@@ -42,7 +43,7 @@ class FxProjectionTest {
             }
         }
         // North is up: a point north of the anchor has a negative y offset; east has positive x.
-        FxProjection.offsetsDp(ferry, listOf(GeoPoint(ferry.lon + 0.01, ferry.lat + 0.01)), 15.0, out)
+        FxProjection.offsetsDp(ferry, listOf(GeoPoint(lat = ferry.lat + 0.01, lon = ferry.lon + 0.01)), 15.0, out)
         assertTrue(out[0] > 0f && out[1] < 0f)
     }
 

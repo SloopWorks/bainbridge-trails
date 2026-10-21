@@ -19,8 +19,9 @@ import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.FxTimeline
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.fxGeoJson
+import com.bainbridgetrails.play.geo.GeoPoint
 import org.maplibre.compose.expressions.dsl.asNumber
 import org.maplibre.compose.expressions.dsl.asString
 import org.maplibre.compose.expressions.dsl.eq
@@ -117,7 +118,7 @@ object KrakenInk : FxRenderer {
         return up * (1f - down)
     }
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
         val intro = live.lastOrNull { it.instance.spec.band == FxBand.OVERLAY && !it.reduced } ?: return
         val i = intro.instance
         val t = i.spec.timeline.foldedMs(i.localMs(nowMs), i.dismissedAtMs)
@@ -127,7 +128,7 @@ object KrakenInk : FxRenderer {
 
     /** Rest: the casing in full, no grip — unless an intro is still in flight (it keeps its values). */
     override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
-        if (live.any { it.instance.spec.band == FxBand.OVERLAY && !it.reduced }) return writeGlobalState(live, nowMs, out)
+        if (live.any { it.instance.spec.band == FxBand.OVERLAY && !it.reduced }) return writeGlobalState(live, nowMs, null, out)
         out.put(KEY_REVEAL, 1.0)
         out.put(KEY_GRIP, 0.0)
     }

@@ -1,12 +1,12 @@
 package com.bainbridgetrails.play.config
 
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.geo.QuietZones
 import com.bainbridgetrails.play.geo.check
 import com.bainbridgetrails.play.geo.isAtLeastAsStrictAs
 import com.bainbridgetrails.play.schedule.AllTrailheadsRef
 import com.bainbridgetrails.play.schedule.FeatureInfo
 import com.bainbridgetrails.play.schedule.FeatureRef
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.ParkRef
 import com.bainbridgetrails.play.schedule.PlaceIndex
 import com.bainbridgetrails.play.schedule.PlaceRef
@@ -276,7 +276,7 @@ object PlayConfigValidator {
 
         fun placeRef(path: String, ref: PlaceRef, exempt: Boolean) {
             val p = c.places[ref.id] ?: return err(Rule.BAD_REF, path, "unknown place '${ref.raw}'")
-            anchor(path, ref.raw, GeoPoint(p.lat, p.lon), exempt)
+            anchor(path, ref.raw, GeoPoint(lat = p.lat, lon = p.lon), exempt)
         }
 
         fun anchor(path: String, raw: String, p: GeoPoint, exempt: Boolean) {

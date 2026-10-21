@@ -33,9 +33,11 @@ import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.FxTimeline
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.fxPlacedAt
+import com.bainbridgetrails.play.geo.GeoPoint
 import org.maplibre.compose.overlay.MapOverlayScope
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 import kotlin.math.PI
 import kotlin.math.pow
@@ -60,19 +62,19 @@ object FrogRock : FxRenderer {
     fun hopSpec(id: String = "lore-frog#hop", at: GeoPoint = FrogRockStamp.LANDMARK): FxSpec =
         FxSpec(id, kind, FxAnchor.Point(at), 14.0..22.0, FxBand.OVERLAY, FxPriority.NOTICE, hopTimeline, loop = false, cooldownMs = 3_000)
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) =
-        FrogRockStamp.writeGlobalState(live.filter { it.instance.spec.band != FxBand.OVERLAY }, nowMs, out)
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) =
+        FrogRockStamp.writeGlobalState(live.filter { it.instance.spec.band != FxBand.OVERLAY }, nowMs, view, out)
 
     override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) =
         FrogRockStamp.writeRestState(live, nowMs, out)
 
     @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
         val stamps = remember(live) {
             if (live.any { it.instance.spec.band == FxBand.OVERLAY }) emptyList() else live.filter { it.instance.spec.band != FxBand.OVERLAY }
         }
-        FrogRockStamp.Layers(band, stamps, ctx)
+        FrogRockStamp.Layers(band, stamps, ctx, source)
     }
 
     /** The stamp's `icon-size` at [zoom] (FrogRockStamp: exponential 1.5 through .35/.6/1/1/1.4 at z10.5/12.5/14/16/18). */

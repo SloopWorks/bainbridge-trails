@@ -23,6 +23,7 @@ import com.bainbridgetrails.tracking.RecordingState
 import com.bainbridgetrails.tracking.WalkIndex
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.withLock
@@ -62,7 +64,6 @@ import com.bainbridgetrails.play.PlayRepository
 import com.bainbridgetrails.play.SnapshotMarks
 import com.bainbridgetrails.play.SystemPlayClock
 import com.bainbridgetrails.play.playGoal
-import com.bainbridgetrails.play.schedule.DerivedGoal
 import com.bainbridgetrails.sync.LocalWalk
 import com.bainbridgetrails.sync.StoreCoverage
 import com.bainbridgetrails.sync.SyncRepository
@@ -253,14 +254,17 @@ object AppGraph {
                 forceBundled = { playClock.overrides.value.bundledConfig },
                 io = Dispatchers.IO,
             )
-            val derived = suspend { readResourceOrNull("files/play/derived-${goal.name}.json") }
+            // The goal's derived table, read and parsed once for the place index, the scheduler, the walk marks and the map.
+            val derivedTable = scope.async(Dispatchers.Default, CoroutineStart.LAZY) {
+                readResourceOrNull("files/play/derived-${goal.name}.json")?.let(PlayDerived::parse)
+            }
             return PlayRepository(
                 scope = scope,
                 goal = goal,
                 clock = { playClock },
                 content = content,
-                places = { DatasetPlaceIndex(goal, datasets.await().dataset, derived()) },
-                derived = { derived()?.let { DerivedGoal.decode(it) } },
+                places = { DatasetPlaceIndex(goal, datasets.await().dataset, derivedTable.await()) },
+                derived = { derivedTable.await()?.derivedGoal() },
                 // No-backup dir (privacy review 2026-10-21 P1-2); an older file in the app dir moves on first load.
                 store = PlayFiles.store(privateDir, playCacheDir, goal, Dispatchers.IO),
                 track = flow {
@@ -270,12 +274,12 @@ object AppGraph {
                 api = api,
                 claims = playClaims,
                 signedIn = { auth.state.value is AuthState.SignedIn },
-                walkDerived = { snapshotMarks(goal) },
+                walkDerived = { derivedTable.await()?.let { snapshotMarks(goal, it) } },
                 walkContext = {
-                    val d = PlayDerived.parse(derived())
+                    val d = derivedTable.await() ?: PlayDerived.Empty
                     WalkContext(d.quietZones, d.quietFeatures, datasets.await().dataset.trails.associate { it.id to it.name })
                 },
-                derivedSource = { PlayDerived.parse(derived()) },
+                derivedSource = { derivedTable.await() ?: PlayDerived.Empty },
             )
         }
 
@@ -288,8 +292,7 @@ object AppGraph {
         private val playCacheDir: String get() = appDataDir(context) + "/play"
 
         /** The opt-in starting balance's input: walk-derived marks of the current local coverage (product § 3.6.4). */
-        private suspend fun snapshotMarks(goal: com.bainbridgetrails.play.config.Goal): com.bainbridgetrails.play.rules.WalkDerived? {
-            val derived = readResourceOrNull("files/play/derived-${goal.name}.json") ?: return null
+        private suspend fun snapshotMarks(goal: com.bainbridgetrails.play.config.Goal, derived: PlayDerived): com.bainbridgetrails.play.rules.WalkDerived? {
             val data = datasets.await()
             return withContext(Dispatchers.Default) {
                 val (state, sticky) = withContext(Dispatchers.IO) {

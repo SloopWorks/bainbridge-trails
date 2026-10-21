@@ -34,6 +34,7 @@ import com.bainbridgetrails.play.fx.FxGlyphImage
 import com.bainbridgetrails.play.fx.effects.ClaimPopOverlay
 import com.bainbridgetrails.play.fx.effects.ClaimPopState
 import com.bainbridgetrails.play.fx.effects.claimPopTarget
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.ui.play.PlayWake
 import com.bainbridgetrails.ui.play.PlayWakeArt
 import com.bainbridgetrails.ui.play.components.PlayFormat
@@ -43,7 +44,6 @@ import kotlinx.coroutines.delay
 import com.bainbridgetrails.data.Loadable
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.play.fx.FxSpec
-import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.effects.ExplorationFog
 import com.bainbridgetrails.play.fx.effects.FerryCrossing
 import com.bainbridgetrails.play.fx.effects.FrogRock
@@ -122,7 +122,7 @@ object FxPresets {
     val screenEffects: Set<String> = setOf(CLAIM_POP, PLAY_WAKE)
 
     private val manitouStretches = listOf("road-manitou-beach-drive-northeast", "road-northeast-gertie-johnson-road")
-    private val manitouWater = GeoPoint(-122.5039, 47.6568)
+    private val manitouWater = GeoPoint(lat = 47.6568, lon = -122.5039)
 
     val all: List<FxPreset> = listOf(
         FxPreset("fay-5", TreasureGlint.kind, 47.7010, -122.5080, 15.5, listOf("present")),
@@ -166,16 +166,16 @@ object FxPresets {
     /** What [preset] spawns in [state]. Kraken presets need the roads dataset for their stretch geometry. */
     fun specs(preset: FxPreset, state: String, data: FxShowcaseData): List<FxSpec> = when (preset.effect) {
         TreasureGlint.kind -> listOf(
-            GeoPoint(-122.5090, 47.7028), GeoPoint(-122.5072, 47.7018), GeoPoint(-122.5097, 47.7006),
-            GeoPoint(-122.5079, 47.6996), GeoPoint(-122.5110, 47.7012),
+            GeoPoint(lat = 47.7028, lon = -122.5090), GeoPoint(lat = 47.7018, lon = -122.5072), GeoPoint(lat = 47.7006, lon = -122.5097),
+            GeoPoint(lat = 47.6996, lon = -122.5079), GeoPoint(lat = 47.7012, lon = -122.5110),
         ).mapIndexed { i, p -> TreasureGlint.spec("treasure-fay@showcase#$i", p) }
         ExplorationFog.kind -> {
             val sorted = data.squares.sortedWith(compareBy({ it.row }, { it.col }))
             val lifted = sorted.indices.filter { it % 3 == 0 }.take(20).map { sorted[it].id }.toSet()
             ExplorationFog.specs(sorted, lifted, data.quiet)
         }
-        RiddleMarker.KIND -> listOf(RiddleMarker.spec("riddle-winslow@showcase", GeoPoint(preset.lon, preset.lat), lit = state == "lit"))
-        KrakenLurk.kind -> listOf(KrakenLurk.spec("kraken-lurk@showcase", GeoPoint(preset.lon, preset.lat)))
+        RiddleMarker.KIND -> listOf(RiddleMarker.spec("riddle-winslow@showcase", GeoPoint(lat = preset.lat, lon = preset.lon), lit = state == "lit"))
+        KrakenLurk.kind -> listOf(KrakenLurk.spec("kraken-lurk@showcase", GeoPoint(lat = preset.lat, lon = preset.lon)))
         FerryCrossing.KIND -> listOf(FerryCrossing.spec())
         FrogRockStamp.kind -> listOfNotNull(FrogRockStamp.spec(), if (state == "engaged") FrogRock.hopSpec() else null)
         KrakenInk.kind -> {
@@ -194,9 +194,9 @@ object FxPresets {
                 TreasureFound.spentSpec("treasure-fay@showcase", found) + TreasureFound.foundSpec("treasure-fay@showcase", found)
         }
         RiddleLight.kind -> {
-            val at = GeoPoint(preset.lon, preset.lat)
+            val at = GeoPoint(lat = preset.lat, lon = preset.lon)
             val others = if (preset.theme == "dark") {
-                listOf(GeoPoint(preset.lon - 0.0016, preset.lat + 0.0007), GeoPoint(preset.lon + 0.0014, preset.lat - 0.0006))
+                listOf(GeoPoint(lat = preset.lat + 0.0007, lon = preset.lon - 0.0016), GeoPoint(lat = preset.lat - 0.0006, lon = preset.lon + 0.0014))
             } else {
                 emptyList()
             }
@@ -208,8 +208,8 @@ object FxPresets {
 
     /** Fay Bainbridge Park shore, 5 treasures (effects §3.7). */
     private val FAY_TREASURES = listOf(
-        GeoPoint(-122.5090, 47.7028), GeoPoint(-122.5072, 47.7018), GeoPoint(-122.5097, 47.7006),
-        GeoPoint(-122.5079, 47.6996), GeoPoint(-122.5110, 47.7012),
+        GeoPoint(lat = 47.7028, lon = -122.5090), GeoPoint(lat = 47.7018, lon = -122.5072), GeoPoint(lat = 47.7006, lon = -122.5097),
+        GeoPoint(lat = 47.6996, lon = -122.5079), GeoPoint(lat = 47.7012, lon = -122.5110),
     )
 
     /** The 25 seeded items the wake's glyph wave pops (chart-square centres spread over the island). */
@@ -227,7 +227,7 @@ object FxPresets {
         val stretches = preset.stretches.map { id ->
             KrakenInk.Stretch(id, data.stretchSegments[id].orEmpty().mapNotNull { data.segmentLines[it] })
         }.filter { it.lines.isNotEmpty() }
-        val water = preset.water ?: GeoPoint(preset.lon + 180.0 / (111_195.0 * cos(preset.lat * PI / 180.0)), preset.lat)
+        val water = preset.water ?: GeoPoint(lat = preset.lat, lon = preset.lon + 180.0 / (111_195.0 * cos(preset.lat * PI / 180.0)))
         return KrakenInk.Attack("kraken@showcase-${preset.id}", stretches, water, active = true)
     }
 
@@ -238,7 +238,7 @@ object FxPresets {
         val squares = trails["segmentSquares"]!!.jsonObject.values.flatMap { v -> v.jsonArray.map { it.jsonPrimitive.content } }
             .toSet().mapNotNull { ChartSquare.parse(it) }
         val quiet = trails["quietZones"]!!.jsonArray.mapNotNull { z ->
-            z.jsonObject["polygon"]?.jsonArray?.map { p -> GeoPoint(p.jsonArray[0].jsonPrimitive.double, p.jsonArray[1].jsonPrimitive.double) }
+            z.jsonObject["polygon"]?.jsonArray?.map { p -> GeoPoint(lat = p.jsonArray[1].jsonPrimitive.double, lon = p.jsonArray[0].jsonPrimitive.double) }
         }
         val stretchSegments = HashMap<String, List<String>>()
         for (d in listOf(trails, roads)) d["stretches"]?.jsonObject?.forEach { (id, s) ->
@@ -350,7 +350,7 @@ private fun ChipValue(pops: ClaimPopState, color: androidx.compose.ui.graphics.C
 private fun WakeScene(preset: FxPreset, data: FxShowcaseData, pausedAt: Long?, modifier: Modifier) {
     val art by produceState<PlayWakeArt?>(null, data) {
         delay(1_500) // let the base map draw first: the wake lands on it
-        value = PlayWakeArt.load(FxPresets.wakeItems(data), GeoPoint(preset.lon, preset.lat), preset.zoom)
+        value = PlayWakeArt.load(FxPresets.wakeItems(data), GeoPoint(lat = preset.lat, lon = preset.lon), preset.zoom)
     }
     var shown by remember { mutableStateOf(true) }
     val a = art

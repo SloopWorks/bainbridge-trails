@@ -3,10 +3,10 @@ package com.bainbridgetrails.play
 import com.bainbridgetrails.coverage.Dataset
 import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.play.config.Goal
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.AllTrailheadsRef
 import com.bainbridgetrails.play.schedule.FeatureInfo
 import com.bainbridgetrails.play.schedule.FeatureRef
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.ParkRef
 import com.bainbridgetrails.play.schedule.PlaceIndex
 import com.bainbridgetrails.play.schedule.RoadRef
@@ -14,12 +14,6 @@ import com.bainbridgetrails.play.schedule.SegRef
 import com.bainbridgetrails.play.schedule.StretchRef
 import com.bainbridgetrails.play.schedule.TrailRef
 import com.bainbridgetrails.play.schedule.TrailheadRef
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /** The Play goal of a dataset profile (one goal per app run, RD-1). */
 val DatasetProfile.playGoal: Goal get() = if (this == DatasetProfile.ROADS) Goal.roads else Goal.trails
@@ -36,20 +30,12 @@ val DatasetProfile.playGoal: Goal get() = if (this == DatasetProfile.ROADS) Goal
 class DatasetPlaceIndex(
     val goal: Goal,
     private val dataset: Dataset,
-    /** `derived-<goal>.json` text; null = no derived table (stretches resolve to the whole feature). */
-    derivedJson: String?,
+    /** The goal's derived table; null = none (stretches resolve to the whole feature). */
+    derived: PlayDerived?,
 ) : PlaceIndex {
-    private val derived: JsonObject? = derivedJson?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
+    private val roadPass: Set<String> = derived?.roadSafety.orEmpty()
 
-    private val roadPass: Set<String> by lazy {
-        (derived?.get("roadSafety") as? JsonObject)?.get("ids")?.jsonArray?.map { it.jsonPrimitive.content }?.toSet().orEmpty()
-    }
-
-    private val stretches: Map<String, List<String>>? by lazy {
-        (derived?.get("stretches") as? JsonObject)?.mapValues { (_, v) ->
-            (v.jsonObject["segments"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonArray)?.firstOrNull()?.jsonPrimitive?.content }
-        }
-    }
+    private val stretches: Map<String, List<String>>? = derived?.stretchSegments
 
     private val features: Map<String, FeatureInfo> by lazy {
         dataset.trails.associate { t ->
@@ -95,7 +81,4 @@ class DatasetPlaceIndex(
     private fun segsOf(featureId: String): List<SegRef> =
         if (featureId !in features) emptyList() else featureSegments[featureId].orEmpty().mapNotNull { segments[it] }
 
-    private companion object {
-        val json = Json { ignoreUnknownKeys = true }
-    }
 }

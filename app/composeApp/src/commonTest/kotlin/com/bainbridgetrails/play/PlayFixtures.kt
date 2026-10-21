@@ -1,9 +1,9 @@
 package com.bainbridgetrails.play
 
 import com.bainbridgetrails.play.config.Goal
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.FeatureInfo
 import com.bainbridgetrails.play.schedule.FeatureRef
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.PlaceIndex
 import com.bainbridgetrails.play.schedule.SegRef
 import com.bainbridgetrails.play.time.IslandTime

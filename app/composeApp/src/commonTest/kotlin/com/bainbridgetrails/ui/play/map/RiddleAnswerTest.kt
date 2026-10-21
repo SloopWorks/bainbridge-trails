@@ -4,8 +4,8 @@ import com.bainbridgetrails.play.PlayFixtures
 import com.bainbridgetrails.play.PlayState
 import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.config.PlayConfigResult
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.rules.LogKind
-import com.bainbridgetrails.play.schedule.GeoPoint
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,7 +47,7 @@ class RiddleAnswerTest {
     fun `armchair solve stamps 0 marks`() {
         val before = PlayState()
         // Tapping Frog Rock's map area (PF8-1): the landmark place, or a tap within reach of it.
-        val solved = assertIs<RiddleOutcome.Solved>(answer(before, frog, RiddlePick(at = GeoPoint(47.69610, -122.52350))))
+        val solved = assertIs<RiddleOutcome.Solved>(answer(before, frog, RiddlePick(at = GeoPoint(lat = 47.69610, lon = -122.52350))))
         val st = solved.state
         assertEquals(today.toString(), st.solved["riddle-frog"])
         val stamp = st.logbook.entries.single()

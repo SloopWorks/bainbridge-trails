@@ -2,8 +2,8 @@ package com.bainbridgetrails.play.fx.effects
 
 import com.bainbridgetrails.play.fx.FxAnchor
 import com.bainbridgetrails.play.fx.FxBand
-import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.geo.ChartSquare
+import com.bainbridgetrails.play.geo.GeoPoint
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -15,7 +15,7 @@ class ExplorationFogTest {
     /** A rough 200 m circle (24-gon) at the memorial (a quiet zone's shape: a buffer polygon). */
     private val memorial: List<GeoPoint> = (0 until 24).map { i ->
         val a = 2 * kotlin.math.PI * i / 24
-        GeoPoint(-122.50985 + 0.0027 * kotlin.math.cos(a), 47.61400 + 0.0018 * kotlin.math.sin(a))
+        GeoPoint(lat = 47.61400 + 0.0018 * kotlin.math.sin(a), lon = -122.50985 + 0.0027 * kotlin.math.cos(a))
     }
 
     @Test
@@ -28,7 +28,7 @@ class ExplorationFogTest {
             val minLon = ring.minOf { it.lon }; val maxLon = ring.maxOf { it.lon }
             val minLat = ring.minOf { it.lat }; val maxLat = ring.maxOf { it.lat }
             for (i in 0..8) for (j in 0..8) {
-                val p = GeoPoint(minLon + (maxLon - minLon) * i / 8, minLat + (maxLat - minLat) * j / 8)
+                val p = GeoPoint(lat = minLat + (maxLat - minLat) * j / 8, lon = minLon + (maxLon - minLon) * i / 8)
                 assertTrue(!inside(p, memorial), "${s.id} covers $p inside the quiet zone")
             }
             // And no zone vertex lies inside the fog polygon.

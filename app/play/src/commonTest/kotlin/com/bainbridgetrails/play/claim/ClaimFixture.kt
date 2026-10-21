@@ -16,9 +16,9 @@ import com.bainbridgetrails.play.config.TestPack
 import com.bainbridgetrails.play.config.Tier
 import com.bainbridgetrails.play.config.TierName
 import com.bainbridgetrails.play.geo.GeoMath
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.DayPlan
 import com.bainbridgetrails.play.schedule.FakePlaceIndex
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.PlayScheduler
 import com.bainbridgetrails.play.schedule.RoadRef
 import com.bainbridgetrails.play.schedule.TrailRef
@@ -36,9 +36,9 @@ import kotlin.time.Instant
  */
 object ClaimFixture {
     const val MANITOU_M = 1158.0
-    val manitouStart = GeoPoint(47.6500, -122.5000)
+    val manitouStart = GeoPoint(lat = 47.6500, lon = -122.5000)
     val manitouEnd = GeoMath.offset(manitouStart, MANITOU_M, 0.0)
-    private val gertieStart = GeoPoint(47.6650, -122.5060)
+    private val gertieStart = GeoPoint(lat = 47.6650, lon = -122.5060)
 
     val index: FakePlaceIndex = FakePlaceIndex.island().let { base ->
         val features = (base.features(Goal.trails) + base.features(Goal.roads)).map { info ->
@@ -52,9 +52,9 @@ object ClaimFixture {
         )
     }
 
-    val chest = GeoPoint(47.6905, -122.5248)
-    val frogRock = GeoPoint(47.6910, -122.5245)
-    val inMemorialZone = GeoPoint(47.6150, -122.5108)
+    val chest = GeoPoint(lat = 47.6905, lon = -122.5248)
+    val frogRock = GeoPoint(lat = 47.6910, lon = -122.5245)
+    val inMemorialZone = GeoPoint(lat = 47.6150, lon = -122.5108)
 
     private val always = Recurrence(every = Every.always)
 
@@ -123,7 +123,7 @@ object ClaimFixture {
         val n = (len / (speed * stepS)).toInt()
         return (0..n).map { i ->
             val f = if (n == 0) 0.0 else i.toDouble() / n
-            val p = GeoPoint(from.lat + f * (to.lat - from.lat), from.lon + f * (to.lon - from.lon))
+            val p = GeoPoint(lat = from.lat + f * (to.lat - from.lat), lon = from.lon + f * (to.lon - from.lon))
             val q = GeoMath.offset(p, 0.0, northM)
             GatedFix(start.toEpochMilliseconds() + (i * stepS * 1000.0).roundToLong(), q.lat, q.lon, accuracyM)
         }

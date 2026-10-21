@@ -4,6 +4,7 @@ import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.Scope
 import com.bainbridgetrails.play.config.TierName
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.time.SunDay
 import com.bainbridgetrails.play.time.TideEvent
 import kotlinx.datetime.LocalDate
@@ -92,9 +93,8 @@ data class DayPlan(
 /** In memory only; [currentFeature] (the trail or road being walked) only sorts nearby items first. */
 data class PlayContext(val goal: Goal, val recording: Boolean = false, val currentFeature: String? = null)
 
-/** [salt]: v2 personal content only. [foundOcc]: claimed occurrence / placement keys. [resolved]: solved stamps. */
+/** [foundOcc]: claimed occurrence / placement keys. [resolved]: solved stamps. */
 data class PlayUserState(
-    val salt: ULong? = null,
     val resolved: Map<String, Instant> = emptyMap(),
     val foundOcc: Set<String> = emptySet(),
 )

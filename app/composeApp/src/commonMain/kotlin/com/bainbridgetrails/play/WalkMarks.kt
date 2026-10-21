@@ -1,7 +1,9 @@
 package com.bainbridgetrails.play
 
 import com.bainbridgetrails.play.config.Goal
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.rules.BoardState
+import com.bainbridgetrails.play.rules.LogCopy
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Logbook
@@ -22,7 +24,7 @@ data class DerivedBase(val coverage: Int = 0, val complete: Int = 0, val squares
 }
 
 /** A quiet zone's outline (lon/lat ring from `derived-<goal>.json` `quietZones[].polygon`) and its visit wording. */
-data class QuietZoneOutline(val id: String, val ring: List<com.bainbridgetrails.play.fx.GeoPoint>)
+data class QuietZoneOutline(val id: String, val ring: List<GeoPoint>)
 
 /**
  * The walk-derived Logbook entries of one finished walk (product § 3.2, § 3.8; plan L2-10): W-COV, W-DONE and W-SQUARE
@@ -32,21 +34,9 @@ data class QuietZoneOutline(val id: String, val ring: List<com.bainbridgetrails.
  * stamps carry no marks and never sync, so they are `accepted` at once. Idempotent per walk (Logbook dedupe).
  */
 object WalkMarks {
-    const val COV_WHAT = "New ground"
-    const val COV_WHY = "New coverage on this walk"
-    const val SQUARE_WHAT = "Fog lifted"
-    const val SQUARE_WHY = "First coverage in a chart square"
-    const val DONE_WHY = "Completed on this walk"
-
     /** Kinds this object writes that settle with the walk's upload. */
     val SETTLED_WITH_WALK: Set<LogKind> = setOf(LogKind.coverage, LogKind.complete, LogKind.square)
 
-    /** Remembrance visit wording per quiet zone id (product § 4.6.3 "Visited the Exclusion Memorial"). */
-    private val VISIT_WHAT = mapOf(
-        "exclusion-memorial" to "Visited the Exclusion Memorial",
-        "blakely-cemetery" to "Visited Port Blakely Cemetery",
-    )
-    const val VISIT_WHY = "A quiet place. No marks here."
 
     /**
      * [state] after walk [sessionId] (island [date]) given the snapshot [after]: [completed] = the walk's newly completed
@@ -68,22 +58,22 @@ object WalkMarks {
         var lb = state.logbook
         val done = Marks.doneMarks(goal)
         for (id in completed.distinct()) {
-            lb = lb.add(LogEntry(newId(), LogKind.complete, names(id), DONE_WHY, date, done, walkId = sessionId, contentId = id))
+            lb = lb.add(LogEntry(newId(), LogKind.complete, names(id), LogCopy.why(LogKind.complete), date, done, walkId = sessionId, contentId = id))
         }
         val base = state.derivedBase
         if (base == null) {
             val logged = state.logbook.entries.filter { it.kind.walkDerived }.sumOf { it.marks }
             val owed = after.total - logged - (lb.total - state.logbook.total)
-            if (owed > 0) lb = lb.add(LogEntry(newId(), LogKind.coverage, COV_WHAT, COV_WHY, date, owed, walkId = sessionId))
+            if (owed > 0) lb = lb.add(LogEntry(newId(), LogKind.coverage, LogCopy.what(LogKind.coverage), LogCopy.why(LogKind.coverage), date, owed, walkId = sessionId))
         } else {
             val cov = after.coverage - base.coverage
-            if (cov > 0) lb = lb.add(LogEntry(newId(), LogKind.coverage, COV_WHAT, COV_WHY, date, cov, walkId = sessionId))
+            if (cov > 0) lb = lb.add(LogEntry(newId(), LogKind.coverage, LogCopy.what(LogKind.coverage), LogCopy.why(LogKind.coverage), date, cov, walkId = sessionId))
             val sq = after.squares - base.squares
-            if (sq > 0) lb = lb.add(LogEntry(newId(), LogKind.square, SQUARE_WHAT, SQUARE_WHY, date, sq, walkId = sessionId))
+            if (sq > 0) lb = lb.add(LogEntry(newId(), LogKind.square, LogCopy.what(LogKind.square), LogCopy.why(LogKind.square), date, sq, walkId = sessionId))
         }
         for (zone in visited.sorted()) {
-            val what = VISIT_WHAT[zone] ?: continue
-            lb = lb.add(LogEntry(newId(), LogKind.visit, what, VISIT_WHY, date, 0, walkId = sessionId, contentId = "visit:$zone@$date", board = BoardState.accepted))
+            val what = LogCopy.visitWhat(zone) ?: continue
+            lb = lb.add(LogEntry(newId(), LogKind.visit, what, LogCopy.why(LogKind.visit), date, 0, walkId = sessionId, contentId = "visit:$zone@$date", board = BoardState.accepted))
         }
         return state.copy(logbook = lb, derivedBase = DerivedBase.of(after))
     }
@@ -93,11 +83,11 @@ object WalkMarks {
         logbook.entries.any { it.walkId == sessionId && it.kind in SETTLED_WITH_WALK && it.board == BoardState.pending }
 
     /** Quiet zone ids any of [points] (lon/lat) lies inside. */
-    fun visitedZones(points: List<com.bainbridgetrails.play.fx.GeoPoint>, zones: List<QuietZoneOutline>): Set<String> =
+    fun visitedZones(points: List<GeoPoint>, zones: List<QuietZoneOutline>): Set<String> =
         zones.filterTo(LinkedHashSet()) { z -> points.any { inside(it, z.ring) } }.mapTo(LinkedHashSet()) { it.id }
 
     /** Ray casting over a lon/lat ring. */
-    internal fun inside(p: com.bainbridgetrails.play.fx.GeoPoint, ring: List<com.bainbridgetrails.play.fx.GeoPoint>): Boolean {
+    internal fun inside(p: GeoPoint, ring: List<GeoPoint>): Boolean {
         var c = false
         var j = ring.lastIndex
         for (i in ring.indices) {

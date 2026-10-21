@@ -26,8 +26,8 @@ import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.FxTimeline
 import com.bainbridgetrails.play.fx.FxView
-import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.fxGeoJson
+import com.bainbridgetrails.play.geo.GeoPoint
 import org.maplibre.compose.expressions.dsl.asNumber
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.expressions.dsl.feature
@@ -95,8 +95,6 @@ object TreasureGlint : FxRenderer {
         if (view != null && view.zoom < GLINT_MIN_ZOOM) return false
         return live.any { glints(it) && (view == null || view.contains(it.instance.spec.anchor)) }
     }
-
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) = writeGlobalState(live, nowMs, null, out)
 
     override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
         if (drives(live, view)) out.put(KEY_T, globalT(nowMs))

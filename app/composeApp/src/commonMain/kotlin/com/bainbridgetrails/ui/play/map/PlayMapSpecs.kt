@@ -7,10 +7,10 @@ import androidx.compose.runtime.remember
 import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.fx.FxHostState
 import com.bainbridgetrails.play.fx.FxSpec
-import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.effects.FrogRockStamp
 import com.bainbridgetrails.play.fx.effects.RiddleMarker
 import com.bainbridgetrails.play.fx.effects.TreasureGlint
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.PlaceRef
 import com.bainbridgetrails.play.schedule.PoolRef
 import com.bainbridgetrails.play.schedule.Ref
@@ -20,8 +20,8 @@ import com.bainbridgetrails.play.schedule.TrailRef
 /** The FX instances for [markers]: unfound treasure glints, riddle lanterns (lit when solved), Frog Rock, the marker set. */
 fun playMapSpecs(markers: List<PlayMarker>): List<FxSpec> = buildList {
     for (m in markers) when {
-        m.kind == MarkerKind.TREASURE && !m.found -> add(TreasureGlint.spec(m.key, GeoPoint(m.lon, m.lat)))
-        m.kind == MarkerKind.RIDDLE && !m.found -> add(RiddleMarker.spec(m.key, GeoPoint(m.lon, m.lat), lit = m.lit))
+        m.kind == MarkerKind.TREASURE && !m.found -> add(TreasureGlint.spec(m.key, GeoPoint(lat = m.lat, lon = m.lon)))
+        m.kind == MarkerKind.RIDDLE && !m.found -> add(RiddleMarker.spec(m.key, GeoPoint(lat = m.lat, lon = m.lon), lit = m.lit))
         m.itemId == "lore-frog" -> add(FrogRockStamp.spec())
     }
     add(PlayMarkers.spec())

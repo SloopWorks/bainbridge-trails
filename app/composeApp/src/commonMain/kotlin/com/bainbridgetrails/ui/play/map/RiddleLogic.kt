@@ -4,9 +4,10 @@ import com.bainbridgetrails.play.PlayState
 import com.bainbridgetrails.play.config.Item
 import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.geo.GeoMath
+import com.bainbridgetrails.play.geo.GeoPoint
+import com.bainbridgetrails.play.rules.LogCopy
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.ParkRef
 import com.bainbridgetrails.play.schedule.PlaceRef
 import com.bainbridgetrails.play.schedule.PoolRef
@@ -74,7 +75,7 @@ object RiddleLogic {
         is PlaceRef -> pick.placeId == ref.id || run {
             val place = config.places[ref.id] ?: return@run false
             val at = pick.at ?: return@run false
-            val targets = listOfNotNull(place.landmark?.let { GeoPoint(it.lat, it.lon) }, GeoPoint(place.lat, place.lon))
+            val targets = listOfNotNull(place.landmark?.let { GeoPoint(lat = it.lat, lon = it.lon) }, GeoPoint(lat = place.lat, lon = place.lon))
             targets.any { GeoMath.distanceM(it, at) <= PLACE_TAP_M }
         }
         is TrailRef -> ref.id in pick.featureIds
@@ -108,7 +109,7 @@ object RiddleLogic {
     /** The solve itself (also the debug path): `solved[item] = today` and one 0-mark stamp. */
     fun solve(state: PlayState, item: Item, today: LocalDate, newId: () -> String): PlayState {
         if (item.id in state.solved) return state
-        val stamp = LogEntry(newId(), LogKind.stamp, item.copy.title, SOLVED_WHY, today, 0, contentId = "${item.id}#solved")
+        val stamp = LogEntry(newId(), LogKind.stamp, item.copy.title, LogCopy.why(LogKind.stamp), today, 0, contentId = "${item.id}#solved")
         return state.copy(solved = state.solved + (item.id to today.toString()), logbook = state.logbook.add(stamp))
     }
 
@@ -145,6 +146,4 @@ object RiddleLogic {
         val q = query.trim().lowercase()
         return if (q.isEmpty()) options else options.filter { q in it.name.lowercase() }
     }
-
-    const val SOLVED_WHY = "Riddle solved"
 }

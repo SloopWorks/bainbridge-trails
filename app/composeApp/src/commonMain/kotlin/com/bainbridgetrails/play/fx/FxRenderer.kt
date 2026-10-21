@@ -26,16 +26,11 @@ interface FxRenderer {
     /**
      * Layer-tier motion (engine PF-1 (2)): write this kind's `fx.<kind>.*` values for scene time [nowMs]. Called at
      * ≤ 30 Hz while the clock runs and the kind has live items; FxHost re-writes the last values after every
-     * `StyleLoaded` (spike S1: a base-style load resets global state). Must not allocate.
+     * `StyleLoaded` (spike S1: a base-style load resets global state). Must not allocate. [view] is the camera (zoom +
+     * visible bounds, null until the map reports one): a kind may skip writes for parts out of view or below their zoom
+     * (a write re-renders the map); most ignore it.
      */
-    fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {}
-
-    /**
-     * [writeGlobalState] with the camera ([view]: zoom + visible bounds, null until the map reports one). FxHost calls
-     * this one; override it to skip writes for parts out of view or below their zoom (a write re-renders the map).
-     */
-    fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) =
-        writeGlobalState(live, nowMs, out)
+    fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {}
 
     /**
      * The rest frame (engine PF-2): FxHost calls this when the clock stops (idle, recording, background, reduced, power
@@ -58,18 +53,12 @@ interface FxRenderer {
      * Map layers for every live instance of this kind, for [band] (called once per Layer-tier band; a kind may draw in
      * several). Inputs change only when the scene's instance set changes, never per frame: motion arrives through
      * `globalState`, paint transitions or feature state (PF-5). Layer ids come from [FxLayerIds]; layers declare no
-     * `onClick` (taps go through MapTab `onTap`, spike R7).
+     * `onClick` (taps go through MapTab `onTap`, spike R7). [source] is this kind's hoisted source (from
+     * [rememberSource]; null when the kind builds its own).
      */
     @Composable
     @MaplibreComposable
-    fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {}
-
-    /** [Layers] with this kind's hoisted [source] (from [rememberSource]); FxLayers calls this one. */
-    @Composable
-    @MaplibreComposable
-    fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
-        Layers(band, live, ctx)
-    }
+    fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {}
 
     /**
      * Compose overlay for one OVERLAY-band instance, placed with [fxPlacedAt] (hidden during gesture camera moves,

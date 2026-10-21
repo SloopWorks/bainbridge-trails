@@ -2,9 +2,7 @@ package com.bainbridgetrails.play.schedule
 
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.geo.GeoMath
-
-/** WGS84 point. */
-data class GeoPoint(val lat: Double, val lon: Double)
+import com.bainbridgetrails.play.geo.GeoPoint
 
 /**
  * One dataset segment as Play sees it (schedule.md §5.2): its id, the point at half its length, its length, the road

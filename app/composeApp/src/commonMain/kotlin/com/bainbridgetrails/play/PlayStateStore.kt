@@ -2,6 +2,7 @@ package com.bainbridgetrails.play
 
 import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.net.JsonFile
+import com.bainbridgetrails.play.claim.WalkDone
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.rules.BoardState
 import com.bainbridgetrails.play.rules.Logbook
@@ -43,27 +44,13 @@ data class PlayState(
      */
     val walks: List<WalkDone> = emptyList(),
 ) {
-    /** The scheduler's view (salt is v2). A solve counts from the start of its island day. */
+    /** The scheduler's view. A solve counts from the start of its island day. */
     fun userState(): PlayUserState = PlayUserState(
-        salt = null,
         resolved = solved.mapNotNull { (id, d) ->
             runCatching { id to IslandTime.instantOf(LocalDate.parse(d), LocalTime(0, 0)) }.getOrNull()
         }.toMap(),
         foundOcc = found,
     )
-}
-
-/**
- * One finished walk for solo challenge windows: [walkId] (the session in memory, opaque on disk like Logbook walk ids),
- * when it ended ([endedAt], epoch ms; no-backup dir only, pruned after [KEEP_MS]) and how many counted, non-quiet
- * features it completed first.
- */
-@Serializable
-data class WalkDone(val walkId: String, val endedAt: Long, val completed: Int) {
-    companion object {
-        /** Longer than any challenge window (a week) plus its late days. */
-        const val KEEP_MS = 15L * 24 * 60 * 60 * 1000
-    }
 }
 
 /** `<privateDir>/play/<goal>-walk-ids.json`: session id → opaque walk id of the Logbook's walks (never backed up). */

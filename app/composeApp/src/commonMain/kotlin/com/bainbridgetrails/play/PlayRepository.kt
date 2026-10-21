@@ -6,18 +6,18 @@ import com.bainbridgetrails.net.ApiClient
 import com.bainbridgetrails.net.ApiResult
 import com.bainbridgetrails.net.PlayChallengesDto
 import com.bainbridgetrails.net.PlayLogDto
-import com.bainbridgetrails.net.PlayMeDto
 import com.bainbridgetrails.play.claim.ClaimEvaluator
 import com.bainbridgetrails.play.claim.ClaimKind
 import com.bainbridgetrails.play.claim.ClaimResult
 import com.bainbridgetrails.play.claim.GatedFix
 import com.bainbridgetrails.play.claim.GatedSummary
-import com.bainbridgetrails.play.claim.PlayGatedHook
-import com.bainbridgetrails.play.claim.WalkCompletions
+import com.bainbridgetrails.play.claim.WalkDone
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.fx.FxSpec
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.rules.BoardState
+import com.bainbridgetrails.play.rules.LogCopy
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Logbook
@@ -178,13 +178,13 @@ class PlayRepository(
 
     /**
      * The Finalizer's `onGated` provider target (PD-12; wired in `RecordingGraph`): the gated, kept fixes of a finished
-     * walk go to the claim pass ([playHook], in `:play`'s types). Does nothing while stopped or under `kill.all`.
+     * walk go to the claim pass ([claimWalk], in `:play`'s types). Does nothing while stopped or under `kill.all`.
      */
     val gatedHook: suspend (sessionId: String, kept: List<Fix>, summary: SessionSummary) -> Unit = { id, kept, summary ->
         if (running && content.state.value?.config?.kill?.all != true) {
             liveSink.onGated(id, kept, summary)
-            playHook.onGated(id, kept.map { it.toGated() }, summary.toGated())
-            recordWalkMarks(id, kept.map { com.bainbridgetrails.play.fx.GeoPoint(it.lon, it.lat) }, summary.newlyCompleted, summary.endedAt)
+            claimWalk(id, kept.map { it.toGated() }, summary.toGated())
+            recordWalkMarks(id, kept.map { GeoPoint(lat = it.lat, lon = it.lon) }, summary.newlyCompleted, summary.endedAt)
         }
     }
 
@@ -193,7 +193,7 @@ class PlayRepository(
      * ([WalkMarks]): `pending` until its coverage upload is answered (a queued element with `walkMarks` makes the
      * upload carry the walk even without claims, so the server derives the same marks, PD-3). True when it wrote any.
      */
-    suspend fun recordWalkMarks(sessionId: String, kept: List<com.bainbridgetrails.play.fx.GeoPoint>, newlyCompleted: List<String>, endedAtMs: Long): Boolean {
+    private suspend fun recordWalkMarks(sessionId: String, kept: List<GeoPoint>, newlyCompleted: List<String>, endedAtMs: Long): Boolean {
         val queue = claims ?: return false
         val version = content.load()?.config?.version ?: return false
         val after = try {
@@ -216,9 +216,6 @@ class PlayRepository(
         store.update { st -> next(st).let { n -> n.copy(logbook = PlayClaims.settle(n.logbook, expired)) }.also { wrote = it.logbook != st.logbook } }
         return wrote
     }
-
-    /** L1-6's hook shape: the claim pass of one finalized walk. */
-    val playHook: PlayGatedHook = PlayGatedHook { id, kept, summary -> claimWalk(id, kept, summary) }
 
     private val _claimResults = MutableStateFlow<Map<String, ClaimResult>>(emptyMap())
 
@@ -295,7 +292,7 @@ class PlayRepository(
     /** The running pack's ferry timetable, or null (none, or expired). */
     suspend fun ferryTimetable(): FerryTimetable? = withContext(worker) { content.load()?.config?.let(::ferry) }
 
-    /** [refresh] without a result (callers that only trigger it, e.g. the debug drawer). */
+    /** [refresh] without a result: the debug drawer (`:androidApp`) cannot see `:play`'s [PlayAgenda]. */
     suspend fun reload() {
         refresh()
     }
@@ -310,7 +307,7 @@ class PlayRepository(
         val user = store.state.value.userState()
         if (liveEvaluator?.config !== state.config) liveEvaluator = ClaimEvaluator(state.config, ensurePlaces())
         val agenda = sched.agenda(now, PlayContext(goal), user)
-        _today.value = sched.dayPlan(date, goal, user.salt ?: 0uL)
+        _today.value = sched.dayPlan(date, goal)
         _agenda.value = agenda
         agenda
     }
@@ -351,9 +348,6 @@ class PlayRepository(
 
     // --- server summaries (Play on only) -----------------------------------------------------------------------------
 
-    /** `GET /v1/play/me` (signed in); null while stopped or without a client. */
-    suspend fun me(): ApiResult<PlayMeDto>? = if (running) api?.playMe() else null
-
     /** `GET /v1/play/challenges`; null while stopped or without a client. */
     suspend fun challenges(): ApiResult<PlayChallengesDto>? = if (running) api?.playChallenges() else null
 
@@ -379,18 +373,14 @@ class PlayRepository(
             val dates = ClaimEvaluator.islandDates(from, to).takeLast(MAX_WALK_DAYS)
             val user = store.load()
             val sched = schedulerFor(config, tidesFor(dates.first(), clock().overrides.value.tide))
-            val salt = user.userState().salt ?: 0uL
-            val plans = dates.map { sched.dayPlan(it, goal, salt) }
+            val plans = dates.map { sched.dayPlan(it, goal) }
             val ev = finishEvaluator?.takeIf { it.config === config } ?: ClaimEvaluator(config, ensurePlaces()).also { finishEvaluator = it }
-            val found = ev.evaluate(kept, plans, user.found, user.hints, _sensed.value, summary.droppedVehicle)
             // Solo `completed` challenges (P0-1): this walk's completions minus quiet features, over the earlier walks.
             val quiet = walkContext().quietFeatures
             val completed = summary.newlyCompleted.distinct().count { it !in quiet }
             val walkEnd = Instant.fromEpochMilliseconds(to)
-            val earlier = user.walks.filter { it.walkId != sessionId }.map { WalkCompletions(Instant.fromEpochMilliseconds(it.endedAt), it.completed) }
-            val known = found.claims.mapTo(HashSet()) { it.key }
-            val challenges = ev.challenges(plans, walkEnd, completed, earlier, user.found).filter { it.key !in known }
-            val result = if (challenges.isEmpty()) found else found.copy(claims = (found.claims + challenges).sortedBy { it.key })
+            val earlier = user.walks.filter { it.walkId != sessionId }
+            val result = ev.evaluate(kept, plans, user.found, user.hints, _sensed.value, summary.droppedVehicle, walkEnd, completed, earlier)
             val endDate = IslandTime.dateOf(walkEnd)
             val day = endDate.takeIf { Marks.isWalkingDay(to - from, summary.matchedM) && !user.logbook.hasDay(it) }
             Pass(config, result, day, user.hints, WalkDone(sessionId, to, completed).takeIf { completed > 0 })
@@ -455,7 +445,7 @@ class PlayRepository(
             wrote = restorable && owed > 0
             st.copy(
                 found = st.found + me.occ,
-                logbook = if (!wrote) credited else credited.add(LogEntry(newId(), LogKind.restored, RESTORED_WHAT, RESTORED_WHY, today, owed, board = BoardState.accepted)),
+                logbook = if (!wrote) credited else credited.add(LogEntry(newId(), LogKind.restored, LogCopy.what(LogKind.restored), LogCopy.why(LogKind.restored), today, owed, board = BoardState.accepted)),
             )
         }
         if (wrote) AppLog.i(TAG, "Logbook restored from the account")
@@ -476,22 +466,19 @@ class PlayRepository(
             val kind = SERVER_KINDS[row.kind] ?: continue
             val week = runCatching { LocalDate.parse(row.week) }.getOrNull() ?: continue
             if (row.marks < 0) continue
-            val (what, why) = SERVER_COPY.getValue(kind)
-            out = out.add(LogEntry(newId(), kind, what, why, IslandTime.weekId(week).plus(6, DateTimeUnit.DAY), row.marks, contentId = "${row.kind}@${row.week}", board = BoardState.accepted))
+            out = out.add(LogEntry(newId(), kind, LogCopy.what(kind), LogCopy.why(kind), IslandTime.weekId(week).plus(6, DateTimeUnit.DAY), row.marks, contentId = "${row.kind}@${row.week}", board = BoardState.accepted))
         }
         return out
     }
 
-    /**
-     * The opt-in starting balance (product § 3.6.4, PF1-2): "Your walks so far" once ever, from the current snapshot;
-     * later turn-ons add only walk-derived marks earned while Play was off; nothing after a restore ([StartBalance]).
-     * Idempotent. Returns the marks of a start balance entry this call wrote, else null.
-     */
-    suspend fun creditStartBalance(): Int? = creditOnce()?.marks
-
     private class Credit(val marks: Int?)
 
-    /** One attempt; null = the walk-derived input is not available (yet). */
+    /**
+     * The opt-in starting balance (product § 3.6.4, PF1-2), one attempt: "Your walks so far" once ever, from the current
+     * snapshot; later turn-ons add only walk-derived marks earned while Play was off; nothing after a restore
+     * ([StartBalance]). Idempotent. [Credit.marks] = a start balance entry this call wrote; null = the walk-derived
+     * input is not available (yet).
+     */
     private suspend fun creditOnce(): Credit? {
         val derived = try {
             walkDerived()
@@ -640,14 +627,6 @@ class PlayRepository(
 
         /** `GET /v1/play/me` `log` kinds the Logbook mirrors (server-only credits, P0-2). */
         private val SERVER_KINDS = mapOf("week" to LogKind.week, "retreat" to LogKind.retreat, "island_challenge" to LogKind.island_challenge)
-        private val SERVER_COPY = mapOf(
-            LogKind.week to ("Kept week" to "Walking days on 2 or more days this week"),
-            LogKind.retreat to ("The kraken retreats" to "Islanders sent it back"),
-            LogKind.island_challenge to ("Kraken week" to "Island challenge complete"),
-        )
-
-        const val RESTORED_WHAT = "Restored from your account"
-        const val RESTORED_WHY = "Your marks so far; earlier detail is not on this phone"
 
         /**
          * A debug tide table at a constant [heightCm] (events every 6 h) over [years]: LOW (0.5 m) opens and HIGH
@@ -726,35 +705,28 @@ class PlayGate(
  * Walk-derived marks of a whole coverage snapshot (product § 3.2, § 3.6.4; mirrors `backend/src/play/marks.ts`
  * `walkDerivedMarks`): W-COV over counted, non-quiet metres (each segment clamped to its length), W-DONE per completed
  * counted, non-quiet feature (coverage or sticky, TL-7), W-SQUARE per chart square of a covered counted, non-quiet
- * segment. [derivedJson] is the goal's `derived-<goal>.json` (`segmentSquares` = the counted segments, `quietSegments`,
+ * segment. [derived] is the goal's derived table (`segmentSquares` = the counted segments, `quietSegments`,
  * `quietFeatures`).
  */
 object SnapshotMarks {
-    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-
     fun of(
         goal: Goal,
         dataset: com.bainbridgetrails.coverage.Dataset,
         index: com.bainbridgetrails.coverage.SegmentIndex,
         state: com.bainbridgetrails.coverage.CoverageState,
         sticky: Set<String>,
-        derivedJson: String,
+        derived: PlayDerived,
     ): WalkDerived {
-        val root = json.parseToJsonElement(derivedJson) as JsonObject
-        fun strings(key: String): Set<String> =
-            (root[key] as? JsonArray)?.mapNotNullTo(HashSet()) { (it as? JsonPrimitive)?.content }.orEmpty()
-        val quietSegments = strings("quietSegments")
-        val quietFeatures = strings("quietFeatures")
-        val squaresBySegment = (root["segmentSquares"] as? JsonObject).orEmpty()
+        val quietFeatures = derived.quietFeatures
         var metres = 0.0
         val squares = HashSet<String>()
-        for ((id, sq) in squaresBySegment) {
-            if (id in quietSegments) continue
+        for ((id, sq) in derived.squaresBySegment) {
+            if (id in derived.quietSegments) continue
             val len = index.segments[id]?.lengthM ?: continue
             val c = state.coveredM(index, id).coerceIn(0.0, len)
             if (c <= 0.0) continue
             metres += c
-            (sq as? JsonArray)?.forEach { (it as? JsonPrimitive)?.content?.let(squares::add) }
+            squares.addAll(sq)
         }
         val progress = com.bainbridgetrails.coverage.Progress(dataset, index, com.bainbridgetrails.coverage.CoverageParams())
         val completed = progress.snapshot(state, sticky).trails

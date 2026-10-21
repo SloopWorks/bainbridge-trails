@@ -23,7 +23,8 @@ import com.bainbridgetrails.play.fx.FxLive
 import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.fx.FxView
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.time.FerryTimetable
 import com.bainbridgetrails.play.time.IslandTime
 import kotlinx.datetime.DateTimeUnit
@@ -82,7 +83,7 @@ class FerryCrossing(
         if (next != json) json = next
     }
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
         if (live.none { !it.reduced }) return
         if (gate.due(elapsedMs())) advance()
     }
@@ -113,7 +114,7 @@ class FerryCrossing(
             val b = leg[i]
             val seg = (legM[i] - legM[i - 1]).coerceAtLeast(1e-9)
             val u = ((d - legM[i - 1]) / seg).coerceIn(0.0, 1.0)
-            val p = if (d <= 0.0) leg.first() else GeoPoint(a.lon + (b.lon - a.lon) * u, a.lat + (b.lat - a.lat) * u)
+            val p = if (d <= 0.0) leg.first() else GeoPoint(lat = a.lat + (b.lat - a.lat) * u, lon = a.lon + (b.lon - a.lon) * u)
             return p to bearing(a, b)
         }
 
@@ -127,7 +128,7 @@ class FerryCrossing(
         }
 
         companion object {
-            private val SEATTLE = GeoPoint(-122.3393, 47.6026)
+            private val SEATTLE = GeoPoint(lat = 47.6026, lon = -122.3393)
 
             /** Basemap OSM ferry line (one direction), Winslow slip → east edge of the camera bounds. */
             val Default: Route = listOf(
@@ -136,7 +137,7 @@ class FerryCrossing(
                 -122.496502 to 47.619207, -122.495987 to 47.618506, -122.495306 to 47.617649, -122.493836 to 47.614875,
                 -122.492328 to 47.61212, -122.491427 to 47.610738, -122.490161 to 47.609458, -122.488455 to 47.608543,
                 -122.486503 to 47.608008, -122.484545 to 47.607794, -122.475243 to 47.607472,
-            ).map { (lon, lat) -> GeoPoint(lon, lat) }.let { leg ->
+            ).map { (lon, lat) -> GeoPoint(lat = lat, lon = lon) }.let { leg ->
                 val r = Route(leg, 0.0)
                 Route(leg, r.legLengthM + metres(leg.last(), SEATTLE))
             }

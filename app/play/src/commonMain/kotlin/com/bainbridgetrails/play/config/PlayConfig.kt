@@ -2,6 +2,7 @@
 
 package com.bainbridgetrails.play.config
 
+import com.bainbridgetrails.play.geo.GeoPoint
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerialName
@@ -228,9 +229,6 @@ data class LowTrafficSquares(val trails: List<String> = emptyList(), val roads: 
 data class QuietZone(val id: String, val feature: String, val bufferM: Int)
 
 @Serializable
-data class LatLon(val lat: Double, val lon: Double)
-
-@Serializable
 data class Place(
     val lat: Double,
     val lon: Double,
@@ -239,7 +237,7 @@ data class Place(
     /** True = the owner must confirm the spot on site before the items using it are enabled. */
     val verify: Boolean = false,
     /** Card coordinate when the trigger is snapped to a Play-safe line (product §4.0.2). */
-    val landmark: LatLon? = null,
+    val landmark: GeoPoint? = null,
 )
 
 /** [members]: feature refs or place refs. A pool with no [goal] serves either goal (each member by its own kind). */

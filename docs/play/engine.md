@@ -309,7 +309,7 @@ guards, palette guard → `:composeApp:testAndroidHostTest`. Visuals → FX show
 ```kotlin
 package com.bainbridgetrails.play.fx
 
-data class GeoPoint(val lon: Double, val lat: Double)
+data class GeoPoint(val lat: Double, val lon: Double)   // play.geo.GeoPoint, the one point type; construct with named args
 
 sealed interface FxAnchor {
     data class Point(val at: GeoPoint) : FxAnchor

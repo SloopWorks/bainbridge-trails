@@ -33,9 +33,10 @@ import com.bainbridgetrails.play.fx.FxProjection
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.FxTapTarget
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.KrakenTimeline
 import com.bainbridgetrails.play.fx.fxPlacedAt
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.rng.SplitMix64
 import com.bainbridgetrails.ui.theme.BtTheme
 import kotlinx.coroutines.flow.first
@@ -69,8 +70,8 @@ class KrakenAttack(
     /** Attack key → its water point, read from the attack's `UNDER_STATUS` water instance (the intro is a Line). */
     private var water by mutableStateOf<Map<String, GeoPoint>>(emptyMap())
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) =
-        KrakenInk.writeGlobalState(live, nowMs, out)
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) =
+        KrakenInk.writeGlobalState(live, nowMs, view, out)
 
     override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) =
         KrakenInk.writeRestState(live, nowMs, out)

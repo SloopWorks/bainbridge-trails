@@ -1,8 +1,8 @@
 package com.bainbridgetrails.play.fx.effects
 
 import com.bainbridgetrails.play.fx.FxProjection
-import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.KrakenTimeline
+import com.bainbridgetrails.play.geo.GeoPoint
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 
 class KrakenAnchorTest {
     // A N–S shore road at Manitou (lon −122.5050), the Sound to the east.
-    private val road = listOf(GeoPoint(-122.5050, 47.6590), GeoPoint(-122.5050, 47.6605), GeoPoint(-122.5050, 47.6620))
+    private val road = listOf(GeoPoint(lat = 47.6590, lon = -122.5050), GeoPoint(lat = 47.6605, lon = -122.5050), GeoPoint(lat = 47.6620, lon = -122.5050))
 
     private fun metres(a: GeoPoint, b: GeoPoint): Double =
         hypot((a.lon - b.lon) * 111_195.0 * cos(a.lat * PI / 180.0), (a.lat - b.lat) * 111_195.0)
@@ -35,12 +35,12 @@ class KrakenAnchorTest {
     @Test
     fun `anchor is the water point ≥ 60 m offshore`() {
         // Content's water point 30 m off the road: pushed out to 60 m on the same (water) side.
-        val near = GeoPoint(-122.5046, 47.6606)
+        val near = GeoPoint(lat = 47.6606, lon = -122.5046)
         val a = KrakenAttack.anchor(near, road)
         assertTrue(toLine(a, road) >= 60.0 - 0.5, "≥ 60 m offshore: ${toLine(a, road)}")
         assertTrue(a.lon > road[0].lon, "stays on the water side (east)")
         // A water point already offshore is the anchor, unchanged.
-        val far = GeoPoint(-122.5026, 47.6604)
+        val far = GeoPoint(lat = 47.6604, lon = -122.5026)
         assertTrue(toLine(far, road) > 60.0)
         assertEquals(far, KrakenAttack.anchor(far, road))
         // The intro's anchor comes from the attack's water instance, not the road midpoint vertex.
@@ -49,7 +49,7 @@ class KrakenAnchorTest {
 
     @Test
     fun `grip targets sit on the road 25 m apart`() {
-        val anchor = KrakenAttack.anchor(GeoPoint(-122.5030, 47.6606), road)
+        val anchor = KrakenAttack.anchor(GeoPoint(lat = 47.6606, lon = -122.5030), road)
         val targets = KrakenAttack.targets(anchor, road, count = 3)
         assertEquals(3, targets.size)
         for (t in targets) assertTrue(toLine(t, road) < 0.5, "on the road")
@@ -59,7 +59,7 @@ class KrakenAnchorTest {
 
     @Test
     fun `extent covers rig at z18`() {
-        val anchor = KrakenAttack.anchor(GeoPoint(-122.5030, 47.6606), road)
+        val anchor = KrakenAttack.anchor(GeoPoint(lat = 47.6606, lon = -122.5030), road)
         val targets = KrakenAttack.targets(anchor, road, count = 3)
         val extent = KrakenAttack.extentDp(anchor, targets, zoom = 18.0)
         val half = extent / 2f

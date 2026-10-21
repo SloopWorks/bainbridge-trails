@@ -18,8 +18,9 @@ import com.bainbridgetrails.play.fx.FxLive
 import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.fxGeoJson
+import com.bainbridgetrails.play.geo.GeoPoint
 import org.maplibre.compose.expressions.dsl.asNumber
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.expressions.dsl.exponential
@@ -83,7 +84,7 @@ object KrakenLurk : FxRenderer {
         return if (t in 1_100L until 1_300L) 1.0 else 0.0
     }
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
         val l = live.firstOrNull { !it.reduced } ?: return
         out.put(KEY_A, sawtooth(nowMs, RIPPLE_MS))
         out.put(KEY_B, sawtooth(nowMs + RIPPLE_MS / 2, RIPPLE_MS))

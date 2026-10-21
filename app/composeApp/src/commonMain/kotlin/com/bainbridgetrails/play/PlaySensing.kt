@@ -11,6 +11,7 @@ import com.bainbridgetrails.play.fx.FxBand
 import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.FxTimeline
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.ActiveItem
 import com.bainbridgetrails.play.schedule.DayPlan
 import com.bainbridgetrails.play.schedule.Occurrence
@@ -153,7 +154,7 @@ class PlaySensing internal constructor(
             return FxSpec(
                 id = "find:${find.key}",
                 kind = if (treasure) "treasure_found" else "claim_pop",
-                anchor = FxAnchor.Point(com.bainbridgetrails.play.fx.GeoPoint(lon = p.lon, lat = p.lat)),
+                anchor = FxAnchor.Point(GeoPoint(lon = p.lon, lat = p.lat)),
                 zoom = 11.0..22.0,
                 band = FxBand.OVERLAY,
                 priority = if (treasure) FxPriority.HERO else FxPriority.NOTICE,

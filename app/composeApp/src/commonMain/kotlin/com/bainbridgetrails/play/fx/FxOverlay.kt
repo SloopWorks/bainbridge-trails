@@ -6,6 +6,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.bainbridgetrails.play.geo.GeoPoint
 import org.maplibre.compose.overlay.MapOverlayScope
 import org.maplibre.spatialk.geojson.Position
 

@@ -1,6 +1,7 @@
 package com.bainbridgetrails.play.schedule
 
 import com.bainbridgetrails.play.config.Goal
+import com.bainbridgetrails.play.geo.GeoPoint
 
 /**
  * In-memory [PlaceIndex] for common tests (schedule.md §4.5: `:play` has no dataset dependency). Each feature is one
@@ -32,7 +33,7 @@ class FakePlaceIndex(
         private var seq = 0
 
         fun line(vararg latLon: Double): List<GeoPoint> =
-            latLon.toList().chunked(2).map { (lat, lon) -> GeoPoint(lat, lon) }
+            latLon.toList().chunked(2).map { (lat, lon) -> GeoPoint(lat = lat, lon = lon) }
 
         fun trail(id: String, line: List<GeoPoint>, park: String? = null): Feature =
             Feature(FeatureInfo(id, Goal.trails, park = park), listOf(SegRef.fromLine("seg-${id}-${seq++}", line)))
@@ -74,7 +75,7 @@ class FakePlaceIndex(
                 road("road-taylor", line(47.6150, -122.5125, 47.6160, -122.5125)),
                 road("road-uncounted", line(47.6850, -122.5300, 47.6860, -122.5290), counted = false),
             ),
-            trailheads = mapOf("th-forest" to GeoPoint(47.6550, -122.5560)),
+            trailheads = mapOf("th-forest" to GeoPoint(lat = 47.6550, lon = -122.5560)),
         )
     }
 }

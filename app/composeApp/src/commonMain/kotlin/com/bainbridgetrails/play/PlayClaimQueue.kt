@@ -7,6 +7,7 @@ import com.bainbridgetrails.net.PlayWalkClaimsDto
 import com.bainbridgetrails.play.claim.Claim
 import com.bainbridgetrails.play.claim.ClaimKind
 import com.bainbridgetrails.play.rules.BoardState
+import com.bainbridgetrails.play.rules.LogCopy
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Logbook
@@ -292,12 +293,12 @@ object PlayClaims {
         for (c in claims) {
             val date = com.bainbridgetrails.play.time.IslandTime.dateOf(c.at)
             lb = lb.addFind(
-                LogEntry(newId(), c.kind.logKind, title(c.itemId), why(c.kind), date, c.marks, walkId = sessionId, contentId = c.key, band = c.band),
+                LogEntry(newId(), c.kind.logKind, title(c.itemId), LogCopy.why(c.kind.logKind), date, c.marks, walkId = sessionId, contentId = c.key, band = c.band),
                 foundPerDay,
             )
         }
         if (walkingDay != null && !lb.hasDay(walkingDay)) {
-            lb = lb.add(LogEntry(newId(), LogKind.day, DAY_WHAT, DAY_WHY, walkingDay, Marks.DAY, walkId = sessionId))
+            lb = lb.add(LogEntry(newId(), LogKind.day, LogCopy.what(LogKind.day), LogCopy.why(LogKind.day), walkingDay, Marks.DAY, walkId = sessionId))
         }
         return state.copy(found = state.found + claims.map { it.key }, logbook = lb)
     }
@@ -335,15 +336,4 @@ object PlayClaims {
         )
     }
 
-    const val DAY_WHAT = "Walking day"
-    const val DAY_WHY = "First walk of the day, 10 minutes or more"
-
-    private fun why(kind: ClaimKind): String = when (kind) {
-        ClaimKind.treasure -> "Weekly treasure"
-        ClaimKind.egg -> "Hidden find"
-        ClaimKind.riddle -> "Riddle walked to"
-        ClaimKind.ink -> "Kraken stretch repelled"
-        ClaimKind.lore -> "Island story"
-        ClaimKind.challenge -> "Challenge complete"
-    }
 }

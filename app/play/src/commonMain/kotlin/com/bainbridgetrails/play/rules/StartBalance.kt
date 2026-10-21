@@ -11,18 +11,13 @@ import kotlinx.datetime.LocalDate
  * [newId] makes the entry id (a uuid in the app).
  */
 object StartBalance {
-    const val WHAT = "Your walks so far"
-    const val WHY = "Coverage, completions and squares from before Play"
-    const val CATCH_UP_WHAT = "Walks while Play was off"
-    const val CATCH_UP_WHY = "New coverage, completions and squares"
-
     fun onEnable(logbook: Logbook, derived: WalkDerived, date: LocalDate, newId: () -> String): Logbook {
         if (logbook.hasRestore) return logbook
         if (!logbook.hasStartBalance) {
-            return logbook.add(LogEntry(newId(), LogKind.start_balance, WHAT, WHY, date, derived.total))
+            return logbook.add(LogEntry(newId(), LogKind.start_balance, LogCopy.what(LogKind.start_balance), LogCopy.why(LogKind.start_balance), date, derived.total))
         }
         val logged = logbook.entries.filter { it.kind.walkDerived }.sumOf { it.marks }
         val owed = derived.total - logged
-        return if (owed > 0) logbook.add(LogEntry(newId(), LogKind.coverage, CATCH_UP_WHAT, CATCH_UP_WHY, date, owed)) else logbook
+        return if (owed > 0) logbook.add(LogEntry(newId(), LogKind.coverage, LogCopy.catchUp.what!!, LogCopy.catchUp.why, date, owed)) else logbook
     }
 }

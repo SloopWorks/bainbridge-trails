@@ -6,10 +6,10 @@ import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.Scope
 import com.bainbridgetrails.play.fx.FxLayerIds
 import com.bainbridgetrails.play.fx.effects.KrakenInk
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.ActiveItem
 import com.bainbridgetrails.play.schedule.DayInfo
 import com.bainbridgetrails.play.schedule.Gate
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.Occurrence
 import com.bainbridgetrails.play.schedule.PlayAgenda
 import com.bainbridgetrails.play.schedule.ResolvedPlacement
@@ -86,7 +86,7 @@ class MapTapPriorityTest {
         fun occ(key: String, type: ItemType, item: String, vararg p: ResolvedPlacement) = Occurrence(
             key, item, type, Scope.island, now, null, false, p.toList(), 0, null, true, emptyList(), emptyList(), false,
         )
-        fun place(key: String, lat: Double, lon: Double) = ResolvedPlacement(key, 0, "place:x", null, emptyList(), GeoPoint(lat, lon), "1:1")
+        fun place(key: String, lat: Double, lon: Double) = ResolvedPlacement(key, 0, "place:x", null, emptyList(), GeoPoint(lat = lat, lon = lon), "1:1")
         val agenda = PlayAgenda(
             active = listOf(
                 ActiveItem(occ("treasure-weekly-trails@2026-10-26", ItemType.treasure, "treasure-weekly-trails", place("t#1", 47.65, -122.55), place("t#2", 47.66, -122.56)), Gate.OPEN, found = setOf("t#2")),
@@ -110,7 +110,7 @@ class MapTapPriorityTest {
     fun `kraken marker is offshore`() {
         val now = Instant.parse("2026-10-29T21:00:00Z")
         // Two stretches along Manitou Beach Drive NE (the east shore): their points sit on the road, ashore.
-        fun stretch(key: String, lat: Double, lon: Double) = ResolvedPlacement(key, 0, "stretch:$key", "road-$key", listOf("s-$key"), GeoPoint(lat, lon), null)
+        fun stretch(key: String, lat: Double, lon: Double) = ResolvedPlacement(key, 0, "stretch:$key", "road-$key", listOf("s-$key"), GeoPoint(lat = lat, lon = lon), null)
         val occ = Occurrence(
             "kraken-roads@2026-10-29", "kraken-roads", ItemType.obstacle, Scope.island, now, null, false,
             listOf(stretch("a", 47.6612, -122.5052), stretch("b", 47.6590, -122.5046)), 0, null, true, emptyList(), emptyList(), false,
@@ -126,7 +126,7 @@ class MapTapPriorityTest {
         val ashore = fromCentreM(-122.5049, 47.6601)
         assertTrue(fromCentreM(kraken.lon, kraken.lat) - ashore > 150.0, "the label sits on the water, ≥ 150 m seaward of its stretches' middle")
         // With the attack's own water point (the lurk / pool anchor), the marker is exactly there.
-        val water = com.bainbridgetrails.play.fx.GeoPoint(lon = -122.4990, lat = 47.6620)
+        val water = GeoPoint(lon = -122.4990, lat = 47.6620)
         val anchored = PlayMarkerLogic.markers(agenda, emptyMap(), emptySet(), water = mapOf(occ.key to water)).single { it.kind == MarkerKind.KRAKEN }
         assertEquals(water.lon to water.lat, anchored.lon to anchored.lat)
     }

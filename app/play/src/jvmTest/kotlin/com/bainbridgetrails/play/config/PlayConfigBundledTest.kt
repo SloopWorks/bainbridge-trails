@@ -1,8 +1,8 @@
 package com.bainbridgetrails.play.config
 
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.geo.QuietZones
 import com.bainbridgetrails.play.geo.check
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.JvmDatasetPlaceIndex
 import com.bainbridgetrails.play.schedule.TrailRef
 import java.io.File
@@ -74,9 +74,9 @@ class PlayConfigBundledTest {
         assertEquals(listOf(7, 3), built.zones.map { it.lines.size }, "memorial 7 segments, cemetery 3 (PD-6)")
         val zones = QuietZones(built.zones)
         // the old hand-typed circle sat ≈ 0.6 km from the memorial trail
-        assertEquals(null, zones.zoneAt(GeoPoint(47.6098, -122.5076)))
+        assertEquals(null, zones.zoneAt(GeoPoint(lat = 47.6098, lon = -122.5076)))
         val card = config.places.getValue("memorial-card")
-        assertNotNull(zones.zoneAt(GeoPoint(card.lat, card.lon)))
+        assertNotNull(zones.zoneAt(GeoPoint(lat = card.lat, lon = card.lon)))
 
         val touchingTrails = index.features(Goal.trails).filter { zones.touching(index.segments(TrailRef(it.id))) != null }.map { it.id }
         assertEquals(

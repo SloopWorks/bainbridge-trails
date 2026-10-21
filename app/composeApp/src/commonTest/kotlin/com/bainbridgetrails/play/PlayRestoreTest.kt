@@ -6,6 +6,7 @@ import com.bainbridgetrails.net.FakeServer
 import com.bainbridgetrails.net.Reply
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.rules.BoardState
+import com.bainbridgetrails.play.rules.LogCopy
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.WalkDerived
 import com.bainbridgetrails.play.schedule.DerivedGoal
@@ -58,7 +59,7 @@ class PlayRestoreTest {
         val lb = r.store.state.value.logbook
         val entry = lb.entries.single()
         assertEquals(LogKind.restored, entry.kind)
-        assertEquals(PlayRepository.RESTORED_WHAT, entry.what)
+        assertEquals(LogCopy.what(LogKind.restored), entry.what)
         assertEquals(2410, entry.marks)
         assertEquals(2410, lb.total, "the Logbook total equals the server total")
         assertEquals(BoardState.accepted, entry.board)

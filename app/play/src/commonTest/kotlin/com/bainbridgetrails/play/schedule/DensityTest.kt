@@ -2,6 +2,7 @@ package com.bainbridgetrails.play.schedule
 
 import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.Scope
+import com.bainbridgetrails.play.geo.GeoPoint
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -14,7 +15,7 @@ class DensityTest {
     private fun occ(id: String, type: ItemType, vararg squares: String, hero: Boolean = false, scope: Scope = Scope.island, hidden: Boolean = false) = Occurrence(
         key = "$id@2027-01-07", itemId = id, type = type, scope = scope, start = t0, end = null, hero = hero,
         placements = squares.mapIndexed { i, sq ->
-            ResolvedPlacement("$id@2027-01-07#$i", i, "place:$id-$i", null, emptyList(), GeoPoint(47.6, -122.5), sq)
+            ResolvedPlacement("$id@2027-01-07#$i", i, "place:$id-$i", null, emptyList(), GeoPoint(lat = 47.6, lon = -122.5), sq)
         },
         marks = 0, variant = null, sensable = true, daySpans = emptyList(), resolvable = emptyList(), tideGated = false, hidden = hidden,
     )

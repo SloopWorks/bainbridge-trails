@@ -17,6 +17,7 @@ import com.bainbridgetrails.play.config.TimeExpr
 import com.bainbridgetrails.play.config.VariantWhen
 import com.bainbridgetrails.play.geo.ChartSquare
 import com.bainbridgetrails.play.geo.GeoMath
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.geo.QuietZones
 import com.bainbridgetrails.play.geo.passes
 import com.bainbridgetrails.play.rng.Fnv1a
@@ -112,8 +113,7 @@ class PlayScheduler(
     /** What is on now, what comes in the next 7 days, and the day's display facts (schedule.md §5.2). */
     fun agenda(now: Instant, ctx: PlayContext, user: PlayUserState = PlayUserState()): PlayAgenda {
         val date = IslandTime.dateOf(now)
-        val salt = user.salt ?: 0uL
-        val plan = dayPlan(date, ctx.goal, salt)
+        val plan = dayPlan(date, ctx.goal)
         val active = ArrayList<ActiveItem>()
         for (o in plan.occurrences) {
             if (!o.activeAt(now)) continue
@@ -131,7 +131,7 @@ class PlayScheduler(
         val seen = HashSet<String>()
         val upcoming = ArrayList<UpcomingItem>()
         for (i in 0..7) {
-            for (o in dayPlan(date.plus(i, DateTimeUnit.DAY), ctx.goal, salt).occurrences) {
+            for (o in dayPlan(date.plus(i, DateTimeUnit.DAY), ctx.goal).occurrences) {
                 if (o.scope != Scope.island || o.start <= now || o.start >= horizon || o.type == ItemType.ambient) continue
                 if (seen.add(o.key)) upcoming += UpcomingItem(o.key, o.itemId, o.type, o.start, o.end)
             }
@@ -381,7 +381,7 @@ class PlayScheduler(
     private fun placePick(ref: String): Pick? {
         val id = (Ref.parse(ref) as? PlaceRef)?.id ?: return null
         val p = config.places[id] ?: return null
-        return Pick(ref, null, emptyList(), GeoPoint(p.lat, p.lon))
+        return Pick(ref, null, emptyList(), GeoPoint(lat = p.lat, lon = p.lon))
     }
 
     /** A pool's member refs: the built-in Play-safe pool of [goal], or the pack pool's members. */
@@ -428,7 +428,7 @@ class PlayScheduler(
             }
             acc += seg.lengthM
         }
-        return Pick(ref, featureIdOf(r), s.map { it.id }, round(GeoPoint(mid.midLat, mid.midLon)))
+        return Pick(ref, featureIdOf(r), s.map { it.id }, round(GeoPoint(lat = mid.midLat, lon = mid.midLon)))
     }
 
     /** `along`: [k] seeded points (pool members, or segments of one feature), jittered along their segment. */
@@ -475,7 +475,7 @@ class PlayScheduler(
             val d = GeoMath.distanceM(line[i], line[i + 1])
             if (acc + d >= target && d > 0) {
                 val t = (target - acc) / d
-                return GeoPoint(line[i].lat + t * (line[i + 1].lat - line[i].lat), line[i].lon + t * (line[i + 1].lon - line[i].lon))
+                return GeoPoint(lat = line[i].lat + t * (line[i + 1].lat - line[i].lat), lon = line[i].lon + t * (line[i + 1].lon - line[i].lon))
             }
             acc += d
         }
@@ -483,7 +483,7 @@ class PlayScheduler(
     }
 
     /** Micro-degrees (≈ 0.1 m): stable text in goldens and claims on every platform. */
-    private fun round(p: GeoPoint) = GeoPoint((p.lat * 1e6).roundToLong() / 1e6, (p.lon * 1e6).roundToLong() / 1e6)
+    private fun round(p: GeoPoint) = GeoPoint(lat = (p.lat * 1e6).roundToLong() / 1e6, lon = (p.lon * 1e6).roundToLong() / 1e6)
 
     // --- the weekly treasure set ------------------------------------------------------------------------------------
 
@@ -598,7 +598,7 @@ class PlayScheduler(
     /** Mean of the pool members' half-length points (all members, before cooldown, so the quadrants never move). */
     private fun centre(poolRef: String, goal: Goal): GeoPoint? = centres.getOrPut("$goal|$poolRef") {
         val pts = members(poolRef, goal).mapNotNull { whole(it, goal)?.point }
-        if (pts.isEmpty()) null else GeoPoint(pts.sumOf { it.lat } / pts.size, pts.sumOf { it.lon } / pts.size)
+        if (pts.isEmpty()) null else GeoPoint(lat = pts.sumOf { it.lat } / pts.size, lon = pts.sumOf { it.lon } / pts.size)
     }
 
     /**

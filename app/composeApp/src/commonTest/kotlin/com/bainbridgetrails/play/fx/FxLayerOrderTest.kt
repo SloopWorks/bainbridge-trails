@@ -1,6 +1,7 @@
 package com.bainbridgetrails.play.fx
 
 import com.bainbridgetrails.map.StatusLayerSpec
+import com.bainbridgetrails.play.geo.GeoPoint
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -77,8 +78,8 @@ class FxLayerOrderTest {
     fun geoJsonFeaturesCarryNumericIdsEqualToSeq() {
         val json = fxGeoJson(
             listOf(
-                live(3, FxAnchor.Point(GeoPoint(-122.5, 47.6))),
-                live(7, FxAnchor.Line(listOf(GeoPoint(-122.5, 47.6), GeoPoint(-122.51, 47.61)))),
+                live(3, FxAnchor.Point(GeoPoint(lat = 47.6, lon = -122.5))),
+                live(7, FxAnchor.Line(listOf(GeoPoint(lat = 47.6, lon = -122.5), GeoPoint(lat = 47.61, lon = -122.51)))),
                 live(9, FxAnchor.Screen(0.5f, 0.5f)), // not geographic: skipped
             ),
         )

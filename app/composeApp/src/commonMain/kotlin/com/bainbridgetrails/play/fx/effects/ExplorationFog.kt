@@ -9,9 +9,9 @@ import com.bainbridgetrails.play.fx.FxLayerIds
 import com.bainbridgetrails.play.fx.FxLive
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
-import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.fxGeoJson
 import com.bainbridgetrails.play.geo.ChartSquare
+import com.bainbridgetrails.play.geo.GeoPoint
 import org.maplibre.compose.expressions.dsl.asBoolean
 import org.maplibre.compose.expressions.dsl.condition
 import org.maplibre.compose.expressions.dsl.const
@@ -19,6 +19,7 @@ import org.maplibre.compose.expressions.dsl.feature
 import org.maplibre.compose.expressions.dsl.switch
 import org.maplibre.compose.layers.FillLayer
 import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.TransitionOptions
 import org.maplibre.compose.util.MaplibreComposable
@@ -50,7 +51,7 @@ object ExplorationFog : FxRenderer {
             val keep = Array(CELLS) { r -> BooleanArray(CELLS) { c -> cellClear(r, c) } }
             var k = 0
             fun add(lon0: Double, lat0: Double, w: Double, h: Double) {
-                val ring = listOf(GeoPoint(lon0, lat0), GeoPoint(lon0 + w, lat0), GeoPoint(lon0 + w, lat0 + h), GeoPoint(lon0, lat0 + h), GeoPoint(lon0, lat0))
+                val ring = listOf(GeoPoint(lat = lat0, lon = lon0), GeoPoint(lat = lat0, lon = lon0 + w), GeoPoint(lat = lat0 + h, lon = lon0 + w), GeoPoint(lat = lat0 + h, lon = lon0), GeoPoint(lat = lat0, lon = lon0))
                 out += FxSpec.static("fog:${sq.id}#${k++}", kind, FxAnchor.Area(listOf(ring)), 0.0..22.0, FxBand.UNDER_STATUS)
             }
             if (keep.all { row -> row.all { it } }) {
@@ -78,7 +79,7 @@ object ExplorationFog : FxRenderer {
         val lon1 = lon0 + w
         val lat1 = lat0 + h
         if (poly.any { it.lon in lon0..lon1 && it.lat in lat0..lat1 }) return true
-        val corners = listOf(GeoPoint(lon0, lat0), GeoPoint(lon1, lat0), GeoPoint(lon1, lat1), GeoPoint(lon0, lat1))
+        val corners = listOf(GeoPoint(lat = lat0, lon = lon0), GeoPoint(lat = lat0, lon = lon1), GeoPoint(lat = lat1, lon = lon1), GeoPoint(lat = lat1, lon = lon0))
         if (corners.any { inside(it, poly) }) return true
         for (i in corners.indices) {
             val a = corners[i]
@@ -111,7 +112,7 @@ object ExplorationFog : FxRenderer {
 
     @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
         if (band != FxBand.UNDER_STATUS) return
         val json = remember(live) { fxGeoJson(live) }
         val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))

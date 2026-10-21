@@ -18,8 +18,9 @@ import com.bainbridgetrails.play.fx.FxLive
 import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.fxGeoJson
+import com.bainbridgetrails.play.geo.GeoPoint
 import org.maplibre.compose.expressions.dsl.asNumber
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.expressions.dsl.exponential
@@ -33,6 +34,7 @@ import org.maplibre.compose.expressions.dsl.zoom
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 import androidx.compose.ui.geometry.Size
@@ -63,7 +65,7 @@ object FrogRockStamp : FxRenderer {
         return if ((nowMs + (seed ushr 5).mod(period)).mod(period) < 320L) 1.0 else 0.0
     }
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
         val l = live.firstOrNull { !it.reduced } ?: return
         out.put(KEY_BLINK, blinkAt(nowMs, l.instance.spec.seed))
     }
@@ -75,7 +77,7 @@ object FrogRockStamp : FxRenderer {
 
     @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
         if (band != FxBand.OVER_STATUS) return
         val json = remember(live) { fxGeoJson(live) }
         val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))

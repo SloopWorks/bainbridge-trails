@@ -22,6 +22,7 @@ import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxProjection
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.KrakenTimeline
 import com.bainbridgetrails.play.fx.fxGeoJson
 import com.bainbridgetrails.play.fx.fxPlacedAt
@@ -41,6 +42,7 @@ import org.maplibre.compose.expressions.value.LineJoin
 import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.overlay.MapOverlayScope
 import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 
@@ -76,7 +78,7 @@ object KrakenRecede : FxRenderer {
             lines.mapIndexed { i, l -> FxSpec("$key:casing:$i", kind, FxAnchor.Line(l), 0.0..22.0, FxBand.CASING, FxPriority.AMBIENT, tl, loop = false) }
     }
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
         val hero = live.lastOrNull { it.instance.spec.band == FxBand.OVERLAY && !it.reduced } ?: return
         val i = hero.instance
         val t = i.spec.timeline.foldedMs(i.localMs(nowMs), i.dismissedAtMs)
@@ -99,7 +101,7 @@ object KrakenRecede : FxRenderer {
 
     @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
         if (band != FxBand.CASING) return
         val source = rememberGeoJsonSource(GeoJsonData.JsonString(remember(live) { casingGeoJson(live) }))
         val spec = StatusLayerSpec.current

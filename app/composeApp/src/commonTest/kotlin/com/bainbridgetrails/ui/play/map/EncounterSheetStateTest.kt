@@ -7,9 +7,9 @@ import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.config.PlayConfigResult
 import com.bainbridgetrails.play.config.Scope
 import com.bainbridgetrails.play.config.TierName
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.ActiveItem
 import com.bainbridgetrails.play.schedule.Gate
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.Occurrence
 import com.bainbridgetrails.play.schedule.ResolvedPlacement
 import com.bainbridgetrails.play.schedule.Span
@@ -39,7 +39,7 @@ class EncounterSheetStateTest {
 
     @Test
     fun `gated treasure has no CTA and a GateNote`() {
-        val p = ResolvedPlacement("treasure-weekly-trails@2026-10-26#03", 3, "trail:trail-grand-forest-west", "trail-grand-forest-west", listOf("s1"), GeoPoint(47.65472, -122.55968), "10:4", TierName.agate, 40)
+        val p = ResolvedPlacement("treasure-weekly-trails@2026-10-26#03", 3, "trail:trail-grand-forest-west", "trail-grand-forest-west", listOf("s1"), GeoPoint(lat = 47.65472, lon = -122.55968), "10:4", TierName.agate, 40)
         val o = occ("treasure-weekly-trails@2026-10-26", "treasure-weekly-trails", ItemType.treasure, listOf(p), resolvable = listOf(Span(dawn, dawn + 9.hours)))
         val m = EncounterLogic.model(items.getValue("treasure-weekly-trails"), ActiveItem(o, Gate.SLEEPING), p.key, night, sun, copy, names = { "Grand Forest West" })
         assertEquals(EncounterVariant.TREASURE_ASLEEP, m.variant)
@@ -59,7 +59,7 @@ class EncounterSheetStateTest {
 
     @Test
     fun `remembrance has no marks CTA or motion`() {
-        val p = ResolvedPlacement("lore-memorial@always", 0, "place:memorial-card", null, emptyList(), GeoPoint(47.6156, -122.5102), null)
+        val p = ResolvedPlacement("lore-memorial@always", 0, "place:memorial-card", null, emptyList(), GeoPoint(lat = 47.6156, lon = -122.5102), null)
         val o = occ("lore-memorial@always", "lore-memorial", ItemType.lore, listOf(p))
         val m = EncounterLogic.model(items.getValue("lore-memorial"), ActiveItem(o, Gate.VIEW), p.key, night, sun, copy, names = { null })
         assertEquals(EncounterVariant.REMEMBRANCE, m.variant)
@@ -76,8 +76,8 @@ class EncounterSheetStateTest {
     @Test
     fun `kraken 50 % row text`() {
         val stretches = listOf(
-            ResolvedPlacement("kraken-roads@2026-10-29#0", 0, "stretch:road-manitou-beach-drive-northeast", "road-manitou-beach-drive-northeast", listOf("a"), GeoPoint(47.65637, -122.51034), null),
-            ResolvedPlacement("kraken-roads@2026-10-29#1", 1, "stretch:road-northeast-gertie-johnson-road", "road-northeast-gertie-johnson-road", listOf("b"), GeoPoint(47.66593, -122.50630), null),
+            ResolvedPlacement("kraken-roads@2026-10-29#0", 0, "stretch:road-manitou-beach-drive-northeast", "road-manitou-beach-drive-northeast", listOf("a"), GeoPoint(lat = 47.65637, lon = -122.51034), null),
+            ResolvedPlacement("kraken-roads@2026-10-29#1", 1, "stretch:road-northeast-gertie-johnson-road", "road-northeast-gertie-johnson-road", listOf("b"), GeoPoint(lat = 47.66593, lon = -122.50630), null),
         )
         val day = PlayFixtures.island("2026-10-29T14:00")
         val o = occ("kraken-roads@2026-10-29", "kraken-roads", ItemType.obstacle, stretches, resolvable = listOf(Span(day - 2.hours, day + 2.hours)), tideGated = true)

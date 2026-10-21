@@ -29,8 +29,8 @@ import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.FxTimeline
-import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.fxPlacedAt
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.ui.theme.PlayDark
 import org.maplibre.compose.overlay.MapOverlayScope
 import kotlin.math.PI

@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import com.bainbridgetrails.map.LABEL_LAYER
+import com.bainbridgetrails.play.geo.GeoPoint
 import org.maplibre.compose.layers.Anchor
 import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable

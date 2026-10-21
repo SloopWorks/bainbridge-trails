@@ -20,7 +20,7 @@ import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.play.fx.FxGlyphImage
 import com.bainbridgetrails.play.geo.GeoMath
-import com.bainbridgetrails.play.schedule.GeoPoint
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.play_find_provisional
 import com.bainbridgetrails.resources.play_nearby_found
@@ -49,7 +49,7 @@ object PlayRecordLogic {
     /** ≤ 3 treasure / lore / found-egg markers within 400 m of [here], nearest first; [found] = sensed or claimed. */
     fun nearby(markers: List<PlayMarker>, here: GeoPoint, sensed: Set<String>, name: (PlayMarker) -> String): List<NearbyRow> =
         markers.filter { it.kind == MarkerKind.TREASURE || it.kind == MarkerKind.LORE || it.kind == MarkerKind.EGG }
-            .map { m -> m to GeoMath.distanceM(here, GeoPoint(m.lat, m.lon)) }
+            .map { m -> m to GeoMath.distanceM(here, GeoPoint(lat = m.lat, lon = m.lon)) }
             .filter { it.second <= NEARBY_M }
             .sortedBy { it.second }
             .take(NEARBY_MAX)

@@ -250,8 +250,6 @@ private fun MapOverlayScope.FrozenOverlays(host: FxHostState, frozen: FxShowcase
 private class ShowcaseRenderer(private val inner: FxRenderer, private val time: FxShowcaseTime, private val frozen: FxShowcaseFrozen) : FxRenderer {
     override val kind: String = inner.kind
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) = writeGlobalState(live, nowMs, null, out)
-
     override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
         val all = live + frozen.of(kind)
         val base = all.minOfOrNull { it.instance.spawnedAtMs } ?: nowMs

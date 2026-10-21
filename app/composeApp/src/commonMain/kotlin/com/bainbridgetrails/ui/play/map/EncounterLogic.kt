@@ -5,6 +5,7 @@ import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.ResolveBy
 import com.bainbridgetrails.play.config.TierName
 import com.bainbridgetrails.play.fx.FxGlyph
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.ActiveItem
 import com.bainbridgetrails.play.schedule.Gate
 import com.bainbridgetrails.play.schedule.Occurrence
@@ -274,6 +275,6 @@ object EncounterLogic {
         TierName.ships_bell -> FxGlyph.ShipsBell
     }
 
-    private fun walkTarget(featureId: String?, point: com.bainbridgetrails.play.schedule.GeoPoint?): WalkTarget? =
+    private fun walkTarget(featureId: String?, point: GeoPoint?): WalkTarget? =
         featureId?.let { WalkTarget.Feature(it) } ?: point?.let { WalkTarget.Point(it.lat, it.lon) }
 }

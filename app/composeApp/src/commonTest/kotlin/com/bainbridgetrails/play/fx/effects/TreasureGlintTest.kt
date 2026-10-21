@@ -4,7 +4,7 @@ import com.bainbridgetrails.play.fx.FxBand
 import com.bainbridgetrails.play.fx.FxGlobalStateSink
 import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.FxPriority
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.geo.GeoPoint
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TreasureGlintTest {
-    private fun spec(i: Int) = TreasureGlint.spec("treasure-fay@2026-W43#$i", GeoPoint(-122.508 + i * 0.0003, 47.701))
+    private fun spec(i: Int) = TreasureGlint.spec("treasure-fay@2026-W43#$i", GeoPoint(lat = 47.701, lon = -122.508 + i * 0.0003))
 
     @Test
     fun geoJsonNumericIdsEqualSeq() {

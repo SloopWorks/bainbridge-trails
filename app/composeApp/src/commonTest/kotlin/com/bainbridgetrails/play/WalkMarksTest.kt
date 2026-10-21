@@ -1,8 +1,9 @@
 package com.bainbridgetrails.play
 
 import com.bainbridgetrails.play.config.Goal
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.rules.BoardState
+import com.bainbridgetrails.play.rules.LogCopy
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Logbook
@@ -43,7 +44,7 @@ class WalkMarksTest {
 
     @Test
     fun noBaseYetOwesTheDifferenceOnce() {
-        val lb = Logbook(listOf(LogEntry("sb", LogKind.start_balance, StartBalance.WHAT, StartBalance.WHY, date, 600)))
+        val lb = Logbook(listOf(LogEntry("sb", LogKind.start_balance, LogCopy.what(LogKind.start_balance), LogCopy.why(LogKind.start_balance), date, 600)))
         val st = apply(PlayState(logbook = lb), WalkDerived(700, 0, 25))
         assertEquals(725, st.logbook.total)
         assertEquals(DerivedBase(700, 0, 25), st.derivedBase)
@@ -65,9 +66,9 @@ class WalkMarksTest {
 
     @Test
     fun visitedZonesByPolygon() {
-        val ring = listOf(GeoPoint(-122.52, 47.61), GeoPoint(-122.50, 47.61), GeoPoint(-122.50, 47.62), GeoPoint(-122.52, 47.62), GeoPoint(-122.52, 47.61))
+        val ring = listOf(GeoPoint(lat = 47.61, lon = -122.52), GeoPoint(lat = 47.61, lon = -122.50), GeoPoint(lat = 47.62, lon = -122.50), GeoPoint(lat = 47.62, lon = -122.52), GeoPoint(lat = 47.61, lon = -122.52))
         val zones = listOf(QuietZoneOutline("exclusion-memorial", ring))
-        assertEquals(setOf("exclusion-memorial"), WalkMarks.visitedZones(listOf(GeoPoint(-122.51, 47.615)), zones))
-        assertEquals(emptySet(), WalkMarks.visitedZones(listOf(GeoPoint(-122.53, 47.615)), zones))
+        assertEquals(setOf("exclusion-memorial"), WalkMarks.visitedZones(listOf(GeoPoint(lat = 47.615, lon = -122.51)), zones))
+        assertEquals(emptySet(), WalkMarks.visitedZones(listOf(GeoPoint(lat = 47.615, lon = -122.53)), zones))
     }
 }

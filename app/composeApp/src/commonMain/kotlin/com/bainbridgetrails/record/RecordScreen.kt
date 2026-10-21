@@ -1,5 +1,6 @@
 package com.bainbridgetrails.record
 
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.ui.play.components.rememberPlay
 import com.bainbridgetrails.ui.play.map.PlayMarkerLogic
 import com.bainbridgetrails.ui.play.record.FindMoment
@@ -431,7 +432,7 @@ private fun RecordContent(
                             if (a == null || here == null || items == null || a.day.quietDay) emptyList()
                             else PlayRecordLogic.nearby(
                                 PlayMarkerLogic.markers(a, items.associate { it.id to it.lore }, emptySet()),
-                                com.bainbridgetrails.play.schedule.GeoPoint(here.lat, here.lon), sensed,
+                                GeoPoint(lat = here.lat, lon = here.lon), sensed,
                             ) { m -> m.tier?.let { tierNames[it] } ?: items.firstOrNull { it.id == m.itemId }?.copy?.title ?: m.itemId }
                         }
                         PlayNearbyStrip(rows, { Format.distance(it, settings.units) })

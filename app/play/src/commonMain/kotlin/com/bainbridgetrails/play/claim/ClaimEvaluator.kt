@@ -9,12 +9,12 @@ import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.config.ResolveBy
 import com.bainbridgetrails.play.geo.GeoMath
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.geo.QuietZones
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Marks
 import com.bainbridgetrails.play.schedule.DayPlan
 import com.bainbridgetrails.play.schedule.FeatureRef
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.Occurrence
 import com.bainbridgetrails.play.schedule.PlaceIndex
 import com.bainbridgetrails.play.schedule.PlaceRef
@@ -25,6 +25,7 @@ import com.bainbridgetrails.play.time.IslandTime
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
+import kotlinx.serialization.Serializable
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
@@ -43,7 +44,7 @@ data class GatedFix(
     val accuracyM: Double? = null,
     val isMock: Boolean = false,
 ) {
-    val point: GeoPoint get() = GeoPoint(lat, lon)
+    val point: GeoPoint get() = GeoPoint(lat = lat, lon = lon)
     val instant: Instant get() = Instant.fromEpochMilliseconds(timeMs)
 }
 
@@ -60,14 +61,6 @@ data class GatedSummary(
     /** Fixes the Finalizer's vehicle gate dropped: the reason for items sensed live but gone at Finish. */
     val droppedVehicle: Int,
 )
-
-/**
- * The Finalizer's Play hook (product §3.6.2, PD-12), in :play types: called once per finalized walk, after the merge,
- * only while Play is on. The app adapts `Finalizer(onGated = …)` to it.
- */
-fun interface PlayGatedHook {
-    suspend fun onGated(sessionId: String, kept: List<GatedFix>, summary: GatedSummary)
-}
 
 /** A claim's wire `kind` (product §3.10). */
 enum class ClaimKind {
@@ -97,8 +90,18 @@ data class Unclaimed(val key: String, val itemId: String, val reason: UnclaimedR
 /** A walk through a quiet zone: a Logbook stamp with no number (product §4.6.3, PF10-2). */
 data class QuietVisit(val zoneId: String)
 
-/** One earlier walk of a challenge window: when it finished and how many counted features it completed first. */
-data class WalkCompletions(val endedAt: Instant, val completed: Int)
+/**
+ * One finished walk for solo challenge windows: [walkId] (the session in memory, opaque on disk like Logbook walk ids),
+ * when it ended ([endedAt], epoch ms; the app keeps it in the no-backup dir only, pruned after [KEEP_MS]) and how many
+ * counted, non-quiet features it completed first.
+ */
+@Serializable
+data class WalkDone(val walkId: String, val endedAt: Long, val completed: Int) {
+    companion object {
+        /** Longer than any challenge window (a week) plus its late days. */
+        const val KEEP_MS = 15L * 24 * 60 * 60 * 1000
+    }
+}
 
 /**
  * The claim pass of one walk. [stretchShares]: the walked share (0..1) of every kraken stretch the walk touched,
@@ -137,7 +140,9 @@ class ClaimEvaluator(val config: PlayConfig, private val places: PlaceIndex) {
      * The claim pass at Finish over the walk's [kept] fixes and the [plans] of every island date the walk touched
      * ([islandDates]). [found]: keys already claimed (never claimed or listed again: idempotent per walk and content);
      * [hints]: hints used per riddle item; [sensed]: keys [SensingTracker] sensed live, listed as unclaimed when the
-     * kept fixes no longer reach them ([droppedVehicle] > 0 → vehicle, else accuracy).
+     * kept fixes no longer reach them ([droppedVehicle] > 0 → vehicle, else accuracy). With [walkEnd], the solo
+     * `completed` challenges this walk reaches ([challenges]: [completedThisWalk] over the [earlier] walks) join the
+     * claims, sorted by key.
      */
     fun evaluate(
         kept: List<GatedFix>,
@@ -146,11 +151,18 @@ class ClaimEvaluator(val config: PlayConfig, private val places: PlaceIndex) {
         hints: Map<String, Int> = emptyMap(),
         sensed: Set<String> = emptySet(),
         droppedVehicle: Int = 0,
+        walkEnd: Instant? = null,
+        completedThisWalk: Int = 0,
+        earlier: List<WalkDone> = emptyList(),
     ): ClaimResult {
         val walk = Walk(found, hints)
         plans.forEach(walk::addPlan)
         for (f in kept.sortedBy { it.timeMs }) walk.add(f)
-        return walk.result(sensed, droppedVehicle)
+        val result = walk.result(sensed, droppedVehicle)
+        if (walkEnd == null) return result
+        val known = result.claims.mapTo(HashSet()) { it.key }
+        val challenges = challenges(plans, walkEnd, completedThisWalk, earlier, found).filter { it.key !in known }
+        return if (challenges.isEmpty()) result else result.copy(claims = (result.claims + challenges).sortedBy { it.key })
     }
 
     /**
@@ -159,11 +171,11 @@ class ClaimEvaluator(val config: PlayConfig, private val places: PlaceIndex) {
      * inside the window (half-open, island time), and the walk whose completions reach the goal's target claims it.
      * [earlier]: the earlier walks (any window; only those finished inside this one count).
      */
-    fun challenges(
+    internal fun challenges(
         plans: List<DayPlan>,
         walkEnd: Instant,
         completedThisWalk: Int,
-        earlier: List<WalkCompletions>,
+        earlier: List<WalkDone>,
         found: Set<String> = emptySet(),
     ): List<Claim> {
         if (completedThisWalk <= 0) return emptyList()
@@ -175,7 +187,8 @@ class ClaimEvaluator(val config: PlayConfig, private val places: PlaceIndex) {
             val spec = item.challenge ?: continue
             if (spec.scope != ChallengeScope.solo || spec.metric != ChallengeMetric.completed) continue
             val target = spec.target?.get(plan.goal) ?: continue
-            val prior = earlier.filter { it.endedAt < walkEnd && o.activeAt(it.endedAt) }.sumOf { it.completed }
+            val prior = earlier.map { Instant.fromEpochMilliseconds(it.endedAt) to it.completed }
+                .filter { (end, _) -> end < walkEnd && o.activeAt(end) }.sumOf { it.second }
             if (prior < target && prior + completedThisWalk >= target) {
                 out += Claim(o.key, item.id, ClaimKind.challenge, IslandTime.weekId(walkEnd), Marks.found(item), null, walkEnd)
             }
@@ -321,7 +334,7 @@ class ClaimEvaluator(val config: PlayConfig, private val places: PlaceIndex) {
                 is PlaceRef -> {
                     val place = config.places[ref.id] ?: return null
                     val radius = (item.resolve.radiusM ?: PLACE_ACCURACY_M.toInt()).toDouble()
-                    PointTarget(o.occ.key, item, o, ClaimKind.riddle, marks, GeoPoint(place.lat, place.lon), radius, min(radius, PLACE_ACCURACY_M))
+                    PointTarget(o.occ.key, item, o, ClaimKind.riddle, marks, GeoPoint(lat = place.lat, lon = place.lon), radius, min(radius, PLACE_ACCURACY_M))
                 }
                 is PoolRef, is FeatureRef -> {
                     val members = if (ref is PoolRef) config.pools[ref.id]?.members.orEmpty() else listOf(answer)
@@ -507,7 +520,7 @@ class ClaimEvaluator(val config: PlayConfig, private val places: PlaceIndex) {
                 val d = GeoMath.distanceM(line[i], line[i + 1])
                 if (acc + d >= target && d > 0) {
                     val t = (target - acc) / d
-                    return GeoPoint(line[i].lat + t * (line[i + 1].lat - line[i].lat), line[i].lon + t * (line[i + 1].lon - line[i].lon))
+                    return GeoPoint(lat = line[i].lat + t * (line[i + 1].lat - line[i].lat), lon = line[i].lon + t * (line[i + 1].lon - line[i].lon))
                 }
                 acc += d
             }

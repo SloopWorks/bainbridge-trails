@@ -1,5 +1,6 @@
 package com.bainbridgetrails.play.fx
 
+import com.bainbridgetrails.play.geo.GeoPoint
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.ln

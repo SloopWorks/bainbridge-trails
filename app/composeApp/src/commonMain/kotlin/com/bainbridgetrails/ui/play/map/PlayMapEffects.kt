@@ -17,7 +17,6 @@ import com.bainbridgetrails.play.fx.FxHostState
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxRendererRegistry
 import com.bainbridgetrails.play.fx.FxSpec
-import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.effects.ExplorationFog
 import com.bainbridgetrails.play.fx.effects.FerryCrossing
 import com.bainbridgetrails.play.fx.effects.FrogRock
@@ -29,6 +28,7 @@ import com.bainbridgetrails.play.fx.effects.RiddleLight
 import com.bainbridgetrails.play.fx.effects.RiddleMarker
 import com.bainbridgetrails.play.fx.effects.TreasureFound
 import com.bainbridgetrails.play.fx.effects.TreasureGlint
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.PlayAgenda
 import com.bainbridgetrails.play.time.FerryTimetable
 import kotlinx.coroutines.Dispatchers
@@ -86,8 +86,8 @@ object PlayMapEffects {
         val kx = M_PER_DEG * cos(lat * PI / 180.0)
         val dx = (lon - ISLAND_CENTRE.lon) * kx
         val dy = (lat - ISLAND_CENTRE.lat) * M_PER_DEG
-        val d = hypot(dx, dy).takeIf { it > 1e-6 } ?: return GeoPoint(lon, lat)
-        return GeoPoint(lon + dx / d * WATER_OFFSET_M / kx, lat + dy / d * WATER_OFFSET_M / M_PER_DEG)
+        val d = hypot(dx, dy).takeIf { it > 1e-6 } ?: return GeoPoint(lat = lat, lon = lon)
+        return GeoPoint(lat = lat + dy / d * WATER_OFFSET_M / M_PER_DEG, lon = lon + dx / d * WATER_OFFSET_M / kx)
     }
 
     /**

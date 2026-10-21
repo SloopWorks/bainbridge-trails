@@ -31,9 +31,10 @@ import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.FxTimeline
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.fxGeoJson
 import com.bainbridgetrails.play.fx.fxPlacedAt
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.rng.SplitMix64
 import com.bainbridgetrails.ui.theme.BtTheme
 import org.maplibre.compose.expressions.dsl.asNumber
@@ -44,6 +45,7 @@ import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.overlay.MapOverlayScope
 import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 import kotlin.math.PI
@@ -79,7 +81,7 @@ object TreasureFound : FxRenderer {
     /** Shell opacity at burst time [t]: 0 until 600, then → 1 by 900 (`standard`). */
     fun spentAt(t: Int): Float = timeline.phase(t, 600, 900, FxEasing.Standard)
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
         val burst = live.lastOrNull { it.instance.spec.band == FxBand.OVERLAY && !it.reduced }
         if (burst == null) {
             out.put(KEY_SPENT, 1.0)
@@ -90,11 +92,11 @@ object TreasureFound : FxRenderer {
     }
 
     /** At rest the shell is in full, unless a burst is still in flight (it keeps its crossfade value). */
-    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) = writeGlobalState(live, nowMs, out)
+    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) = writeGlobalState(live, nowMs, null, out)
 
     @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
         if (band != FxBand.OVER_STATUS) return
         val json = remember(live) { fxGeoJson(live.filter { it.instance.spec.band == FxBand.OVER_STATUS }) }
         val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))

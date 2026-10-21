@@ -18,8 +18,9 @@ import com.bainbridgetrails.play.fx.FxLive
 import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
-import com.bainbridgetrails.play.fx.GeoPoint
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.fxGeoJson
+import com.bainbridgetrails.play.geo.GeoPoint
 import org.maplibre.compose.expressions.dsl.asBoolean
 import org.maplibre.compose.expressions.dsl.asNumber
 import org.maplibre.compose.expressions.dsl.condition
@@ -57,7 +58,7 @@ class RiddleMarker : FxRenderer {
     internal var sway by mutableIntStateOf(0)
         private set
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
         if (live.none { !it.reduced && !it.instance.spec.isStatic }) return
         val step = if ((nowMs / SWAY_HALF_MS) % 2 == 0L) 1 else -1
         if (step != sway) sway = step

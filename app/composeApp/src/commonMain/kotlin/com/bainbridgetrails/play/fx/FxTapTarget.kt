@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.ui.theme.BtTheme
 import org.maplibre.compose.overlay.MapOverlayScope
 import org.maplibre.spatialk.geojson.Position

@@ -1,5 +1,6 @@
 package com.bainbridgetrails.play.fx
 
+import com.bainbridgetrails.play.geo.GeoPoint
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -8,7 +9,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FxSceneTest {
-    private val p = GeoPoint(-122.52, 47.63)
+    private val p = GeoPoint(lat = 47.63, lon = -122.52)
     private val oneShot3s = FxTimeline(spawnMs = 700, runMs = 1_300, settleMs = 600, despawnMs = 400, reducedAtMs = 3_000)
     private val long20s = FxTimeline(spawnMs = 1_000, runMs = 17_000, settleMs = 1_000, despawnMs = 1_000, reducedAtMs = 20_000)
     private val ambientLoop = FxTimeline(spawnMs = 300, runMs = 2_000, settleMs = 300, despawnMs = 200, runLoopMs = 2_000, reducedAtMs = 300)

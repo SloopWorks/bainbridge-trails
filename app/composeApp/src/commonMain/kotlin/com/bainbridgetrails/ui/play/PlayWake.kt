@@ -57,8 +57,8 @@ import com.bainbridgetrails.play.fx.FxArt
 import com.bainbridgetrails.play.fx.FxEasing
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.play.fx.FxProjection
-import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.KrakenTimeline
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.play_wake_a11y
 import com.bainbridgetrails.resources.play_wake_body

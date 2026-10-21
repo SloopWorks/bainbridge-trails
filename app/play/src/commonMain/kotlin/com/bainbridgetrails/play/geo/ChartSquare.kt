@@ -1,6 +1,5 @@
 package com.bainbridgetrails.play.geo
 
-import com.bainbridgetrails.play.schedule.GeoPoint
 import kotlin.math.roundToLong
 
 /**
@@ -15,8 +14,8 @@ data class ChartSquare(val row: Int, val col: Int) {
 
     val southWest: GeoPoint
         get() = GeoPoint(
-            (LAT0_MICRO + row.toLong() * D_LAT_MICRO) / 1e6,
-            (LON0_MICRO + col.toLong() * D_LON_MICRO) / 1e6,
+            lat = (LAT0_MICRO + row.toLong() * D_LAT_MICRO) / 1e6,
+            lon = (LON0_MICRO + col.toLong() * D_LON_MICRO) / 1e6,
         )
 
     companion object {

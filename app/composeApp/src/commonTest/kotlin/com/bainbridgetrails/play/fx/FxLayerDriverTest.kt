@@ -10,6 +10,7 @@ import com.bainbridgetrails.play.fx.effects.RiddleMarker
 import com.bainbridgetrails.play.fx.effects.TreasureFound
 import com.bainbridgetrails.play.fx.effects.TreasureGlint
 import com.bainbridgetrails.play.fx.effects.live
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.time.FerryTimetable
 import com.bainbridgetrails.play.time.IslandTime
 import kotlinx.datetime.LocalDate
@@ -23,7 +24,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class FxLayerDriverTest {
-    private val at = GeoPoint(-122.508, 47.701)
+    private val at = GeoPoint(lat = 47.701, lon = -122.508)
     private val values = HashMap<String, Double>()
     private val sink = FxGlobalStateSink { k, v -> values[k] = v }
 
@@ -64,7 +65,7 @@ class FxLayerDriverTest {
     @Test
     fun `kraken rest is the full casing unless the intro is in flight`() {
         val attack = KrakenInk.Attack(
-            "k", listOf(KrakenInk.Stretch("s", listOf(listOf(GeoPoint(-122.50, 47.66), GeoPoint(-122.49, 47.66))))), GeoPoint(-122.50, 47.661), true,
+            "k", listOf(KrakenInk.Stretch("s", listOf(listOf(GeoPoint(lat = 47.66, lon = -122.50), GeoPoint(lat = 47.66, lon = -122.49))))), GeoPoint(lat = 47.661, lon = -122.50), true,
         )
         val parts = KrakenInk.specs(attack, emptySet())
         assertTrue(parts.all { it.isStatic }, "casing and water are static parts")

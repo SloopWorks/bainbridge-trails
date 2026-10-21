@@ -2,6 +2,7 @@ package com.bainbridgetrails.play
 
 import com.bainbridgetrails.data.DataFixtures
 import com.bainbridgetrails.net.JsonFile
+import com.bainbridgetrails.play.claim.WalkDone
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.rules.BoardState
 import com.bainbridgetrails.play.rules.LogEntry

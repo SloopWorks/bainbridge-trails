@@ -348,3 +348,41 @@ test("K5 has 2 stretches ≥ 100 m (skip without data)", (t) => {
   assert.deepEqual(k5.stretches.map((s) => s.id), ["road-manitou-beach-drive-northeast", "road-northeast-gertie-johnson-road"]);
   for (const s of k5.stretches) assert.ok(s.lengthM >= 100, `${s.id} ${s.lengthM} m`);
 });
+
+// --- recurrence parity with the server ---------------------------------------------------------------------------
+// The script's date-level recurrence (startsOn / occurrence) is a third implementation next to Kotlin `Recurrence` and
+// backend/src/play/recurrence.ts (Kotlin ↔ TS are pinned by data/play/golden/date-rules-2027.json). This pins the
+// script to the TS one over every island date of 2027: for every item, the same occurrence keys (start dates); for the
+// items the server can evaluate (clock times, no anchor), the same windows too (island wall minutes from the start
+// date's midnight). Sun-relative and anchored windows are device-only, so the server has no window to compare.
+test("script recurrence agrees with backend recurrence.ts over 2027 (keys + windows)", async () => {
+  const ts = await import("../backend/src/play/recurrence.ts"); // Node ≥ 22.18 strips the types
+  const script = await import("./build-play-content.mjs");
+  const pack = realPack();
+  const keys = { script: [], server: [] };
+  const windows = { script: [], server: [] };
+  let items = 0;
+  for (const item of pack.items) {
+    const rec = ts.effectiveWhen(item, pack);
+    assert.ok(rec, `${item.id}: no recurrence`);
+    assert.deepEqual(script.effectiveWhen(item.when, pack.windows), rec, `${item.id}: effective recurrence`);
+    if (rec.every === "always") continue;
+    items++;
+    const evaluable = ts.serverEvaluable(rec, pack);
+    for (let e = epochDay("2027-01-01"); e < epochDay("2028-01-01"); e++) {
+      const date = script.dateOf(e);
+      if ((item.notBefore && date < item.notBefore) || (item.expires && date > item.expires)) continue;
+      if (ts.startsOn(rec, date, pack)) keys.server.push(`${item.id}@${date}`);
+      if (script.startsOn(rec, e, pack)) keys.script.push(`${item.id}@${date}`);
+      if (!evaluable) continue;
+      const o = ts.occurrenceOn(pack, item, date);
+      if (o) windows.server.push(`${o.key} ${script.islandMinutes(o.start, e)}..${script.islandMinutes(o.end, e)}`);
+      const w = script.startsOn(rec, e, pack) ? script.occurrence(rec, e) : null;
+      if (w && w.end > w.start) windows.script.push(`${item.id}@${date} ${w.start}..${w.end}`);
+    }
+  }
+  assert.ok(items >= 5, `only ${items} dated items`); // 8 in the 2026-10 pack: 729 keys, 364 server windows
+  assert.ok(windows.server.length > 100, `only ${windows.server.length} server windows`);
+  assert.deepEqual(keys.script, keys.server, "occurrence keys");
+  assert.deepEqual(windows.script, windows.server, "windows");
+});

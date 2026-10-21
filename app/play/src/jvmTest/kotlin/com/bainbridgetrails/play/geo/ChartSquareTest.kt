@@ -1,7 +1,6 @@
 package com.bainbridgetrails.play.geo
 
 import com.bainbridgetrails.play.config.Goal
-import com.bainbridgetrails.play.schedule.GeoPoint
 import com.bainbridgetrails.play.schedule.JvmDatasetPlaceIndex
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -23,7 +22,7 @@ class ChartSquareTest {
         assertEquals(ChartSquare(7, 7), ChartSquare.of(47.62371, -122.51283)) // the Bainbridge ferry terminal
         assertEquals("7:7", ChartSquare(7, 7).id)
         assertEquals(ChartSquare(7, 7), ChartSquare.parse("7:7"))
-        assertEquals(GeoPoint(47.62, -122.515), ChartSquare(7, 7).southWest)
+        assertEquals(GeoPoint(lat = 47.62, lon = -122.515), ChartSquare(7, 7).southWest)
         // floating-point edges land in the square they name (micro-degree arithmetic, as the pack build does)
         assertEquals(ChartSquare(5, 0), ChartSquare.of(47.60, -122.62))
         assertEquals(ChartSquare(0, 3), ChartSquare.of(47.55, -122.575))

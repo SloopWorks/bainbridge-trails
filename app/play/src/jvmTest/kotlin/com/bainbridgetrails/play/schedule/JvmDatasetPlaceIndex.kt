@@ -1,6 +1,7 @@
 package com.bainbridgetrails.play.schedule
 
 import com.bainbridgetrails.play.config.Goal
+import com.bainbridgetrails.play.geo.GeoPoint
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -156,7 +157,7 @@ class JvmDatasetPlaceIndex private constructor(
             )
             val trailheads = if (TRAILHEADS.exists()) {
                 json.decodeFromString(TrailheadsFile.serializer(), TRAILHEADS.readText()).trailheads
-                    .associate { it.id to GeoPoint(it.lat, it.lon) }
+                    .associate { it.id to GeoPoint(lat = it.lat, lon = it.lon) }
             } else {
                 emptyMap()
             }
@@ -178,7 +179,7 @@ class JvmDatasetPlaceIndex private constructor(
             }
             val trailheads = root.getValue("trailheads").jsonArray.associate { t ->
                 val a = t.jsonArray
-                a[0].jsonPrimitive.content to GeoPoint(a[1].jsonPrimitive.double, a[2].jsonPrimitive.double)
+                a[0].jsonPrimitive.content to GeoPoint(lat = a[1].jsonPrimitive.double, lon = a[2].jsonPrimitive.double)
             }
             return assemble(Source.FIXTURE, versions, rows, segs, trailheads)
         }
