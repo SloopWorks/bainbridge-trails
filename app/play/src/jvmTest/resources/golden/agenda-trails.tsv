@@ -1,21 +1,38 @@
-# agenda-trails.tsv: PlayScheduler over pack 2026.11.1, 2026-10-26 → 2027-12-31, island time (PlaySchedulerGoldenTest)
+# agenda-trails.tsv: PlayScheduler over pack 2026.11.2, 2026-10-26 → 2027-12-31, island time (PlaySchedulerGoldenTest)
 # regenerate: cd app && ./gradlew :play:jvmTest -Pplay.updateGolden=true
 # resolvable = window ∩ civil daylight ∩ playHours (∩ tide ≤ 2.44 m for the kraken); view = never sensed
 # permanent	occ	start	resolvable	placements
+permanent	egg-chillyhilly@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-sunny-hill-trail/seg-001142 47.58947,-122.51236 [3:7]
+permanent	egg-coastline@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-hawley-cove-trail/seg-000327 47.62694,-122.50379 [7:7]
+permanent	egg-fivemasts@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-fort-ward-to-blakely-harbor-trail/seg-004516 47.59321,-122.52411 [4:6]
+permanent	egg-hilltop@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-hilltop-trail/seg-006866 47.65541,-122.55316 [10:4]
 permanent	egg-ladybug@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	place:ladybug [14:6]
 permanent	egg-station-s@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	place:fort-ward [3:6]
+permanent	egg-strawberry@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-hayano-trail/seg-005083 47.62557,-122.52806 [7:6]
+permanent	egg-toejam@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-nutes-trail/seg-000719 47.58398,-122.51018 [3:7]
+permanent	lore-battlepoint@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-battle-point/seg-007627 47.66098,-122.57964 [11:2]
 permanent	lore-bloedel@2026-10-26	2026-10-26T00:00-07:00	view	-
 permanent	lore-eagleharbor@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-west-loop-trail/seg-003214 47.62239,-122.52054 [7:6]
 permanent	lore-ferry@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	place:ferry-anchor [7:6]
+permanent	lore-fortward-navy@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	place:fort-ward-south [2:6]
 permanent	lore-fortward@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	place:fort-ward-fence [3:6]
 permanent	lore-frog@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	place:frog-rock [14:6]
+permanent	lore-gazzam@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-gazzam-lake-main-trail/seg-007186 47.61051,-122.56460 [6:3]
+permanent	lore-hallbrothers@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	place:blakely-park-trailhead [4:6]
 permanent	lore-memorial@2026-10-26	2026-10-26T00:00-07:00	view	place:memorial-card [6:7]
 permanent	lore-mill@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	place:mill-trails [4:6]
+permanent	lore-moritani@2026-10-26	2026-10-26T00:00-07:00	view	-
 permanent	lore-yama@2026-10-26	2026-10-26T00:00-07:00	view	-
 permanent	riddle-bond@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	park:Grand Forest 47.65718,-122.54773 [10:4]
+permanent	riddle-close@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-close-trail/seg-007363 47.62502,-122.57198 [7:3]
+permanent	riddle-dock@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-hidden-cove-loop-trail/seg-005816 47.68815,-122.53515 [13:5]
 permanent	riddle-fairy@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-fairy-dell-trail/seg-007573 47.66761,-122.57819 [11:2]
 permanent	riddle-frog@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	place:frog-rock [14:6]
+permanent	riddle-gift@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	park:Ted Olson Nature Preserve 47.67100,-122.51800 [12:6]
 permanent	riddle-madrone@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-west-loop-trail/seg-003212 47.62267,-122.52055 [7:6]
+permanent	riddle-manzanita@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	park:Manzanita Park 47.68621,-122.54799 [13:4]
+permanent	riddle-roof@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-nutes-pond-trails/seg-000628 47.58328,-122.50956 [3:7]
+permanent	riddle-steep@2026-10-26	2026-10-26T00:00-07:00	07:13-18:33	trail-peters-trail/seg-006869 47.60947,-122.55589 [5:4]
 # date	occ	start	end	resolvable	placements (= as on the previous row of this occurrence)
 2026-10-26	treasure-weekly-trails@2026-10-26	2026-10-26T05:00-07:00	2026-11-02T00:00-08:00	07:13-18:33	#00 trail-farm-trail-north/seg-005627 sea_glass 47.67917,-122.53187 [12:5]; #01 trail-grand-forest-east-trail/seg-006291 sea_glass 47.65270,-122.54567 [10:4]; #02 trail-old-mill-trail/seg-005531 sea_glass 47.61001,-122.53696 [6:5]; #03 trail-westwood-link-trail/seg-007389 sea_glass 47.62402,-122.57326 [7:3]; #04 trail-taylor-trail/seg-000600 sea_glass 47.60408,-122.51176 [5:7]; #05 trail-schel-chelb-trail/seg-006807 sea_glass 47.60537,-122.55121 [5:4]; #06 trail-fort-ward-trail-2/seg-004645 sea_glass 47.59150,-122.52541 [4:6]; #07 trail-horseshoe-trail/seg-006183 agate 47.70836,-122.54308 [15:5]; #08 trail-morgan-road-path/seg-004507 agate 47.66836,-122.52419 [11:6]; #09 trail-grand-forest-north-loop-trail/seg-006901 agate 47.66195,-122.55714 [11:4]; #10 trail-mcredmond-trail/seg-006008 glass_float 47.65407,-122.53820 [10:5]; #11 trail-nutes-to-sunny-hill-trail/seg-001053 ships_bell 47.58472,-122.51176 [3:7]
 2026-10-27	treasure-weekly-trails@2026-10-26	2026-10-26T05:00-07:00	2026-11-02T00:00-08:00	07:15-18:31	=

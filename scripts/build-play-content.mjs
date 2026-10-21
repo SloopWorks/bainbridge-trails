@@ -245,7 +245,7 @@ export function makeIndex(raw) {
   const ring = raw.coastline?.rings?.[0] ?? null;
   return {
     versions: { trails: raw.trails.version ?? null, roads: raw.roads.version ?? null },
-    trails: features(raw.trails.trails, (f) => ({ park: f.park ?? null })),
+    trails: features(raw.trails.trails, (f) => ({ park: f.park ?? null, gainM: typeof f.gain_m === "number" ? f.gain_m : 0 })),
     roads: features(raw.roads.roads, (f) => ({
       category: f.category, speed_mph: f.speed_mph ?? null, public: f.public, ownership: f.ownership ?? null, counted: f.counted === true,
     })),
@@ -589,6 +589,22 @@ export function derive(pack, idx) {
     doc.touchingQuietZone = [...ag.touching].sort();
     doc.quietSegments = [...ag.quietSegments].sort();
     doc.pools = { [`play-safe-${g}`]: [...ag.playSafe].sort() };
+    if (g === "trails") {
+      // Park membership and climb per trail (brief docs/play/trails/brief.md § 2: W-CLIMB, W-STEEP, W-PARK1, W-PARKC,
+      // ch-climb, ch-parkhop). featurePark lists every trail with a park, excluded parks included (consumers apply
+      // excludedParks); featureGainM lists every trail's dataset gain_m; parks = the Play parks (excludedParks out).
+      const sorted = [...feats.values()].sort((x, y) => (x.id < y.id ? -1 : 1));
+      const featurePark = {};
+      const featureGainM = {};
+      for (const f of sorted) {
+        if (f.park) featurePark[f.id] = f.park;
+        featureGainM[f.id] = f.gainM;
+      }
+      const excluded = new Set(pack.excludedParks ?? []);
+      doc.featurePark = featurePark;
+      doc.featureGainM = featureGainM;
+      doc.parks = [...new Set(Object.values(featurePark))].filter((p) => !excluded.has(p)).sort();
+    }
     const stretches = {};
     for (const id of Object.keys(a.stretches).sort()) if (goalOfId(id) === g) stretches[id] = a.stretches[id];
     doc.stretches = stretches;

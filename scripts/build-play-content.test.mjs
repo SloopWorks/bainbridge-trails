@@ -24,10 +24,10 @@ const fixtureIndex = () =>
     trails: {
       version: "fixture",
       trails: [
-        { id: "trail-bainbridge-island-japanese-american-memorial-trail", name: "Memorial", park: "Pritchard Park", segment_ids: ["seg-m1"] },
-        { id: "trail-blakley-cemetary-trail", name: "Cemetery", park: null, segment_ids: ["seg-c1"] },
-        { id: "trail-pritchard-trail", name: "Pritchard", park: "Pritchard Park", segment_ids: ["seg-p1"] },
-        { id: "trail-ok-trail", name: "Ok", park: "Grand Forest", segment_ids: ["seg-t1"] },
+        { id: "trail-bainbridge-island-japanese-american-memorial-trail", name: "Memorial", park: "Pritchard Park", gain_m: 2.1, segment_ids: ["seg-m1"] },
+        { id: "trail-blakley-cemetary-trail", name: "Cemetery", park: null, gain_m: 66.5, segment_ids: ["seg-c1"] },
+        { id: "trail-pritchard-trail", name: "Pritchard", park: "Pritchard Park", gain_m: 57.9, segment_ids: ["seg-p1"] },
+        { id: "trail-ok-trail", name: "Ok", park: "Grand Forest", gain_m: 12, segment_ids: ["seg-t1"] },
       ],
     },
     trailSegments: {
@@ -229,7 +229,7 @@ test("committed pack is valid without map data and canonical", () => {
   const pack = JSON.parse(text);
   assert.equal(formatJson(pack), text);
   assert.deepEqual(errorsOf(pack, { published: readPublished(), coastline: loadCoastline() }), []);
-  assert.equal(pack.version, "2026.11.1");
+  assert.equal(pack.version, "2026.11.2");
   assert.equal(pack.epoch, "2026-10-29");
 });
 
@@ -351,6 +351,43 @@ test("derives 370 roadSafety roads on 2026-10-20 data (skip without data)", (t) 
   assert.equal(d.roads.roadSafety.ids.length, 370);
   // Taylor Ave NE and Welfare Ave NE pass roadSafety but touch the memorial zone, so they are not in the pool.
   assert.equal(d.roads.pools["play-safe-roads"].length, 368);
+});
+
+// docs/play/trails/brief.md § 2 (W-CLIMB, W-STEEP, W-PARK1, W-PARKC): the trails table carries park membership and
+// climb per trail; the roads table is untouched.
+test("derived trails table carries featurePark, featureGainM and the Play parks", () => {
+  const d = derive(fixturePack(), fixtureIndex());
+  assert.deepEqual(d.trails.featurePark, {
+    "trail-bainbridge-island-japanese-american-memorial-trail": "Pritchard Park", // excluded park kept as data
+    "trail-ok-trail": "Grand Forest",
+    "trail-pritchard-trail": "Pritchard Park",
+  });
+  assert.deepEqual(d.trails.featureGainM, {
+    "trail-bainbridge-island-japanese-american-memorial-trail": 2.1,
+    "trail-blakley-cemetary-trail": 66.5,
+    "trail-ok-trail": 12,
+    "trail-pritchard-trail": 57.9,
+  });
+  assert.deepEqual(d.trails.parks, ["Grand Forest"]);
+  assert.deepEqual(Object.keys(d.trails.featurePark), Object.keys(d.trails.featurePark).sort(), "sorted by trail id");
+  for (const k of ["featurePark", "featureGainM", "parks"]) assert.equal(k in d.roads, false, `roads.json has no ${k}`);
+  // a trail without gain_m reads 0
+  const idx = fixtureIndex();
+  idx.trails.get("trail-ok-trail").gainM = 0;
+  assert.equal(derive(fixturePack(), idx).trails.featureGainM["trail-ok-trail"], 0);
+});
+
+test("derives 19 Play parks and Peters Trail 92.1 m on 2026-10-18 data (skip without data)", (t) => {
+  if (!data.idx) return t.skip("no map data");
+  if (!String(data.idx.versions.trails).startsWith("2026-10-18")) return t.skip(`trails dataset ${data.idx.versions.trails} is not the 2026-10-18 build`);
+  const d = derive(realPack(), data.idx);
+  assert.equal(d.trails.parks.length, 19);
+  assert.ok(!d.trails.parks.includes("Pritchard Park"));
+  assert.ok(d.trails.parks.includes("Gazzam Lake Preserve"));
+  assert.equal(d.trails.featurePark["trail-pritchard-trail"], "Pritchard Park");
+  assert.equal("trail-hidden-cove-trails" in d.trails.featurePark, false, "a trail without a park is absent");
+  assert.equal(d.trails.featureGainM["trail-peters-trail"], 92.1);
+  assert.equal(Object.keys(d.trails.featureGainM).length, data.raw.trails.trails.length, "every trail");
 });
 
 test("K5 has 2 stretches ≥ 100 m (skip without data)", (t) => {
