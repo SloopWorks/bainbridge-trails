@@ -65,6 +65,13 @@ import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.data.AppSettings
 import com.bainbridgetrails.data.Loadable
 import com.bainbridgetrails.graph.AppGraph
+import com.bainbridgetrails.map.LABEL_LAYER
+import com.bainbridgetrails.play.fx.FxBand
+import com.bainbridgetrails.play.fx.FxHostInputs
+import com.bainbridgetrails.play.fx.FxLayers
+import com.bainbridgetrails.play.fx.FxOverlay
+import com.bainbridgetrails.play.fx.fxHostInputs
+import com.bainbridgetrails.play.fx.rememberFxHost
 import com.bainbridgetrails.map.MapStyle
 import com.bainbridgetrails.map.SpikeLaunch
 import com.bainbridgetrails.map.StatusLayers
@@ -150,6 +157,8 @@ import androidx.compose.ui.unit.Dp
 import com.bainbridgetrails.map.boundsOf
 import com.bainbridgetrails.map.fitTo
 import com.bainbridgetrails.map.rememberTrailMapController
+import org.maplibre.compose.layers.Anchor
+import org.maplibre.compose.map.RenderOptions
 import org.maplibre.compose.util.DpPadding
 
 private sealed interface Load {
@@ -278,7 +287,13 @@ private fun RecordContent(
     }
 
     Box(modifier.fillMaxSize()) {
-        RecordMap(controller, style, launch, follow = follow && state !is RecordingState.Done, fitWalkAbove = if (state is RecordingState.Done) resultsSheetH else null)
+        RecordMap(
+            controller, style, launch,
+            follow = follow && state !is RecordingState.Done,
+            fitWalkAbove = if (state is RecordingState.Done) resultsSheetH else null,
+            // Play gate (engine PF-8/PF-9): null when Play is off; ambient effects rest while a walk records.
+            fxInputs = fxHostInputs(settings.play, recording = recording != null),
+        )
 
         val busy = state is RecordingState.Finalizing || state is RecordingState.Stopped
         TopControls(
@@ -581,7 +596,14 @@ private fun RecordingSheet(
  * it only changes when [rememberThrottledTrack] hands it a new list (≤ every 5 s or 10 m).
  */
 @Composable
-private fun RecordMap(controller: RecordingController, style: MapStyle, launch: SpikeLaunch, follow: Boolean, fitWalkAbove: Dp? = null) {
+private fun RecordMap(
+    controller: RecordingController,
+    style: MapStyle,
+    launch: SpikeLaunch,
+    follow: Boolean,
+    fitWalkAbove: Dp? = null,
+    fxInputs: FxHostInputs? = null,
+) {
     val track by controller.track.collectAsState()
     val drawn = rememberThrottledTrack(track)
     val at = if (follow) drawn.lastOrNull()?.let { Position(longitude = it.lon, latitude = it.lat) } else null
@@ -598,8 +620,19 @@ private fun RecordMap(controller: RecordingController, style: MapStyle, launch: 
     val buckets = AppGraph.installedOrNull()?.progress?.snapshot?.collectAsState()?.value?.segmentBuckets.orEmpty()
     // Track colours follow the map style (a dark map in a light app still gets the dark-map track).
     val extra = if (style.isDark) BtExtraDark else BtExtraLight
-    TrailMap(style, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 56.dp, follow = at, controller = mapController) {
-        StatusLayers(buckets, dark = style.isDark)
+    val fx = if (fxInputs != null) rememberFxHost(fxInputs, mapController) else null
+    TrailMap(
+        style, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 56.dp, follow = at, controller = mapController,
+        fxOverlay = if (fx != null) ({ FxOverlay(fx) }) else null,
+        renderOptions = fx?.renderOptions ?: RenderOptions.Standard,
+    ) {
+        // Composition order = z-order (mapContentOrder); the live track stays above every FX layer.
+        if (fx != null) Anchor.Below(LABEL_LAYER) { FxLayers(fx, FxBand.UNDER_STATUS) }
+        StatusLayers(buckets, dark = style.isDark, casingFx = if (fx != null) ({ FxLayers(fx, FxBand.CASING) }) else null)
+        if (fx != null) {
+            Anchor.Below(LABEL_LAYER) { FxLayers(fx, FxBand.OVER_STATUS) }
+            Anchor.Top { FxLayers(fx, FxBand.OVER_LABELS) }
+        }
         TrackLayer(drawn, extra.userTrack, extra.userTrackCasing)
     }
 }

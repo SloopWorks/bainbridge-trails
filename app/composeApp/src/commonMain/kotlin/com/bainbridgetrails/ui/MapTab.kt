@@ -79,6 +79,7 @@ import com.bainbridgetrails.map.AttributionMode
 import com.bainbridgetrails.map.FOLLOW_MIN_ZOOM
 import com.bainbridgetrails.map.IslandBounds
 import com.bainbridgetrails.map.IslandCamera
+import com.bainbridgetrails.map.LABEL_LAYER
 import com.bainbridgetrails.map.MapFocus
 import com.bainbridgetrails.map.ScreenPoint
 import com.bainbridgetrails.map.SegmentHit
@@ -141,6 +142,11 @@ import com.bainbridgetrails.ui.components.TrailChooserSheet
 import com.bainbridgetrails.ui.components.TrailPeekSheet
 import com.bainbridgetrails.ui.components.TrailSummary
 import com.bainbridgetrails.ui.components.rememberRoadTexts
+import com.bainbridgetrails.play.fx.FxBand
+import com.bainbridgetrails.play.fx.FxLayers
+import com.bainbridgetrails.play.fx.FxOverlay
+import com.bainbridgetrails.play.fx.fxHostInputs
+import com.bainbridgetrails.play.fx.rememberFxHost
 import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PillShape
 import kotlinx.coroutines.Dispatchers
@@ -155,9 +161,11 @@ import org.jetbrains.compose.resources.stringResource
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.interaction.ClickEvent
+import org.maplibre.compose.layers.Anchor
 import org.maplibre.compose.layers.LocationIndicatorLayer
 import org.maplibre.compose.location.rememberLocationState
 import org.maplibre.compose.map.MapState
+import org.maplibre.compose.map.RenderOptions
 import org.maplibre.compose.util.DpPadding
 import org.maplibre.spatialk.geojson.LineString
 import org.maplibre.spatialk.geojson.MultiLineString
@@ -208,6 +216,9 @@ fun MapTab(
     val context = rememberPlatformContext()
     val requester = rememberPermissionRequester()
     val controller = rememberTrailMapController()
+    // Play gate (engine PF-9, plan L2-2): Play off → no FX host, scene, clock, sources or layers are created.
+    val fxInputs = fxHostInputs(settings.play, recording)
+    val fx = if (fxInputs != null) rememberFxHost(fxInputs, controller) else null
 
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var choices by rememberSaveable { mutableStateOf<List<String>?>(null) }
@@ -268,6 +279,8 @@ fun MapTab(
     }
 
     fun onTap(e: ClickEvent) {
+        // FX layers never take taps themselves (spike R7): this handler is their only route, after the pure query.
+        fx?.noteInteraction()
         val map = controller.mapState ?: return
         val d = data ?: return
         scope.launch {
@@ -417,8 +430,20 @@ fun MapTab(
             interactions = interactions,
             attribution = AttributionMode.Timed,
             chromePadding = PaddingValues(bottom = animatedStack),
+            fxOverlay = if (fx != null) ({ FxOverlay(fx) }) else null,
+            renderOptions = fx?.renderOptions ?: RenderOptions.Standard,
         ) {
-            StatusLayers(snapshot?.segmentBuckets.orEmpty(), style, selected, reduced, spec = spec, roadEnds = roadEnds)
+            // Composition order = z-order (mapContentOrder): UNDER_STATUS, StatusLayers (+ CASING), OVER_STATUS,
+            // OVER_LABELS, then the location puck above every FX layer.
+            if (fx != null) Anchor.Below(LABEL_LAYER) { FxLayers(fx, FxBand.UNDER_STATUS) }
+            StatusLayers(
+                snapshot?.segmentBuckets.orEmpty(), style, selected, reduced, spec = spec, roadEnds = roadEnds,
+                casingFx = if (fx != null) ({ FxLayers(fx, FxBand.CASING) }) else null,
+            )
+            if (fx != null) {
+                Anchor.Below(LABEL_LAYER) { FxLayers(fx, FxBand.OVER_STATUS) }
+                Anchor.Top { FxLayers(fx, FxBand.OVER_LABELS) }
+            }
             if (locating && locationGranted) {
                 LocationIndicatorLayer(
                     id = "app-user-location",
