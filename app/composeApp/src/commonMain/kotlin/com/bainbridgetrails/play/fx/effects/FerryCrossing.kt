@@ -1,7 +1,6 @@
 package com.bainbridgetrails.play.fx.effects
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.play.fx.FxAnchor
 import com.bainbridgetrails.play.fx.FxArt
 import com.bainbridgetrails.play.fx.FxBand
+import com.bainbridgetrails.play.fx.FxClockPolicy
+import com.bainbridgetrails.play.fx.FxGlobalStateSink
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.play.fx.FxLayerContext
 import com.bainbridgetrails.play.fx.FxLayerIds
@@ -25,7 +26,6 @@ import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.time.FerryTimetable
 import com.bainbridgetrails.play.time.IslandTime
-import kotlinx.coroutines.delay
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.minus
 import org.maplibre.compose.expressions.dsl.asNumber
@@ -44,6 +44,7 @@ import org.maplibre.compose.expressions.value.LineCap
 import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 import kotlin.math.PI
@@ -55,17 +56,48 @@ import kotlin.time.TimeSource
 
 /**
  * `ferry_crossing` (effects §3.3, plan §2): the boat (`OVER_STATUS`) and its 400 m wake (`UNDER_STATUS`, `play.fog`
- * foam fading to the stern via `line-gradient`) on the timetable run, rebuilt at ≤ 1 Hz ([UpdateGate]; once a minute
- * under reduced motion, product PF3-4). Only the island leg inside the camera bounds is drawn (route baked from the
- * basemap's OSM ferry line; L4 bakes it into Play content later). Hidden when the timetable is expired. [now] is the
- * Play clock (the showcase passes a time-warped one). One instance per registry.
+ * foam fading to the stern via `line-gradient`) on the timetable run, in one GeoJSON source shared by both bands
+ * ([rememberSource]). The position is advanced only by the FxHost clock: from [writeGlobalState] at ≤ 1 Hz of real
+ * time ([UpdateGate] on [elapsedMs]) while the clock runs, so it stops with every other part (idle, recording,
+ * background); to "now" at rest ([writeRestState]), which FxHost also calls once a minute under reduced motion / power
+ * save (product PF3-4, [FxClockPolicy.REDUCED_TICK_MS]). No coroutine of its own. Only the island leg inside the camera
+ * bounds is drawn (route baked from the basemap's OSM ferry line; L4 bakes it into Play content later). Hidden when the
+ * timetable is expired. [now] is the Play clock (the showcase passes a time-warped one). One instance per registry.
  */
 class FerryCrossing(
     private val timetable: FerryTimetable?,
     private val route: Route = Route.Default,
     private val now: () -> Instant,
+    private val elapsedMs: () -> Long = MonotonicMs(),
 ) : FxRenderer {
     override val kind: String = KIND
+    private val gate = UpdateGate(INTERVAL_MS)
+
+    /** The boats + wakes FeatureCollection; changes only when the host advances it. */
+    var json: String by mutableStateOf(geoJson(boats(timetable, route, now()), route))
+        private set
+
+    private fun advance() {
+        val next = geoJson(boats(timetable, route, now()), route)
+        if (next != json) json = next
+    }
+
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+        if (live.none { !it.reduced }) return
+        if (gate.due(elapsedMs())) advance()
+    }
+
+    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) = advance()
+
+    @Composable
+    override fun rememberSource(live: List<FxLive>, ctx: FxLayerContext): GeoJsonSource =
+        rememberGeoJsonSource(GeoJsonData.JsonString(json)) { lineMetrics = true }
+
+    private class MonotonicMs : () -> Long {
+        private val mark = TimeSource.Monotonic.markNow()
+
+        override fun invoke(): Long = mark.elapsedNow().inWholeMilliseconds
+    }
 
     /** The island leg ([leg], terminal slip first, lon/lat) and the whole route length to Seattle ([totalM]). */
     class Route(val leg: List<GeoPoint>, val totalM: Double) {
@@ -127,18 +159,9 @@ class FerryCrossing(
 
     @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
         if (band != FxBand.OVER_STATUS && band != FxBand.UNDER_STATUS) return
-        var json by remember { mutableStateOf(geoJson(boats(timetable, route, now()), route)) }
-        LaunchedEffect(ctx.reduced) {
-            val gate = UpdateGate(if (ctx.reduced) REDUCED_INTERVAL_MS else INTERVAL_MS)
-            val mark = TimeSource.Monotonic.markNow()
-            while (true) {
-                if (gate.due(mark.elapsedNow().inWholeMilliseconds)) json = geoJson(boats(timetable, route, now()), route)
-                delay(250)
-            }
-        }
-        val source = rememberGeoJsonSource(GeoJsonData.JsonString(json)) { lineMetrics = true }
+        if (source == null) return
         val p = ctx.palette
         val kindIs = feature["k"].asString(const(""))
         if (band == FxBand.UNDER_STATUS) {
@@ -180,7 +203,7 @@ class FerryCrossing(
     companion object {
         const val KIND = "ferry_crossing"
         const val INTERVAL_MS = 1_000L
-        const val REDUCED_INTERVAL_MS = 60_000L
+        const val REDUCED_INTERVAL_MS = FxClockPolicy.REDUCED_TICK_MS
         const val WAKE_M = 400.0
         private const val DOCK_GAP_MS = 60L * 60_000L
         private val BOAT = FxLayerIds.of(KIND, "boat")

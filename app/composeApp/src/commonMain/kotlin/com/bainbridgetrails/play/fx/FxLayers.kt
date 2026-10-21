@@ -1,16 +1,18 @@
 package com.bainbridgetrails.play.fx
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import com.bainbridgetrails.map.LABEL_LAYER
 import org.maplibre.compose.layers.Anchor
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 
 /**
  * Layer-tier rendering of one band (engine §2.2): every registered kind with live instances contributes its layers,
- * in registry order. With no live instances (or no renderers, L2-2) this composes nothing. Recomposes only when the
- * scene's instance set changes, never per frame.
+ * in registry order, on its one hoisted source ([LocalFxSources], from [PlayMapContent]). With no live instances (or no
+ * renderers, L2-2) this composes nothing. Recomposes only when the scene's instance set changes, never per frame.
  */
 @Composable
 @MaplibreComposable
@@ -19,11 +21,28 @@ fun FxLayers(host: FxHostState, band: FxBand) {
     val byKind = host.liveByKind
     if (byKind.isEmpty()) return
     val ctx = host.layerContext
+    val sources = LocalFxSources.current
     for (kind in host.renderers.kinds) {
         val live = byKind[kind] ?: continue
         val renderer = host.renderers[kind] ?: continue
-        key(kind) { renderer.Layers(band, live, ctx) }
+        key(kind) { renderer.Layers(band, live, ctx, sources[kind]) }
     }
+}
+
+/** One source per kind with live instances (not one per band, PF-5); recomposes on instance-set changes only. */
+@Composable
+private fun rememberFxSources(host: FxHostState): FxKindSources {
+    val byKind = host.liveByKind
+    if (byKind.isEmpty()) return FxKindSources.None
+    val ctx = host.layerContext
+    val out = LinkedHashMap<String, GeoJsonSource>()
+    for (kind in host.renderers.kinds) {
+        val live = byKind[kind] ?: continue
+        val renderer = host.renderers[kind] ?: continue
+        val source = key(kind) { renderer.rememberSource(live, ctx) }
+        if (source != null) out[kind] = source
+    }
+    return FxKindSources(out)
 }
 
 /** One step of the map's style composition at the Play call sites (MapTab, RecordScreen). */
@@ -57,7 +76,8 @@ fun mapContentOrder(play: Boolean, location: Boolean): List<MapContentPart> = bu
  * The map's style content at a Play call site (MapTab, RecordScreen), composed in [mapContentOrder] (PF-3, spike S3):
  * UNDER_STATUS and OVER_STATUS under the trail labels, [status] (handed the CASING band slot, null when Play is off),
  * OVER_LABELS on top, then [location] (puck / live track) above every FX layer. [fx] null = Play off = today's map.
- * Each part is keyed, so a Play toggle adds / removes the FX parts without recreating the status layers.
+ * Each part is keyed, so a Play toggle adds / removes the FX parts without recreating the status layers. Each kind's
+ * source is created here once ([FxRenderer.rememberSource]) and provided to every band through [LocalFxSources].
  */
 @Composable
 @MaplibreComposable
@@ -68,12 +88,15 @@ fun PlayMapContent(
 ) {
     val casingFx: (@Composable @MaplibreComposable () -> Unit)? =
         remember(fx) { if (fx != null) ({ FxLayers(fx, FxBand.CASING) }) else null }
-    for (part in mapContentOrder(play = fx != null, location = location != null)) {
-        key(part) {
-            when (part) {
-                is MapContentPart.Fx -> if (fx != null) FxBandLayers(fx, part.band)
-                MapContentPart.Status -> status(casingFx)
-                MapContentPart.Location -> location?.invoke()
+    val sources = if (fx != null) rememberFxSources(fx) else FxKindSources.None
+    CompositionLocalProvider(LocalFxSources provides sources) {
+        for (part in mapContentOrder(play = fx != null, location = location != null)) {
+            key(part) {
+                when (part) {
+                    is MapContentPart.Fx -> if (fx != null) FxBandLayers(fx, part.band)
+                    MapContentPart.Status -> status(casingFx)
+                    MapContentPart.Location -> location?.invoke()
+                }
             }
         }
     }

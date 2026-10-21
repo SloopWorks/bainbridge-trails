@@ -33,6 +33,7 @@ import org.maplibre.compose.expressions.dsl.zoom
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 import androidx.compose.ui.graphics.Color
@@ -50,6 +51,9 @@ object KrakenLurk : FxRenderer {
     const val KEY_EYE = "fx.kraken_lurk.eye"
     const val KEY_BLINK = "fx.kraken_lurk.blink"
     const val RIPPLE_MS = 3_200L
+
+    /** Ring phase at rest: radius 6 + 28 × .5 = 20 dp. */
+    const val REST_A = 0.5
     private val RING_A = FxLayerIds.of(kind, "ring-a")
     private val RING_B = FxLayerIds.of(kind, "ring-b")
     private val EYE = FxLayerIds.of(kind, "eye")
@@ -87,17 +91,29 @@ object KrakenLurk : FxRenderer {
         out.put(KEY_BLINK, blinkAt(nowMs, l.instance.spec.seed))
     }
 
+    /** Rest: one still ring (r 20 dp, ring B faded out), the eye sunk. */
+    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+        out.put(KEY_A, REST_A)
+        out.put(KEY_B, 1.0)
+        out.put(KEY_EYE, 0.0)
+        out.put(KEY_BLINK, 0.0)
+    }
+
+    /** One source for the rings (UNDER_STATUS) and the eye (OVER_STATUS). */
+    @Composable
+    override fun rememberSource(live: List<FxLive>, ctx: FxLayerContext): GeoJsonSource =
+        rememberGeoJsonSource(GeoJsonData.JsonString(remember(live) { fxGeoJson(live) }))
+
     @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
         if (band != FxBand.UNDER_STATUS && band != FxBand.OVER_STATUS) return
-        val json = remember(live) { fxGeoJson(live) }
-        val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))
+        if (source == null) return
         val p = ctx.palette
         if (band == FxBand.UNDER_STATUS) {
             for ((id, key) in listOf(RING_A to KEY_A, RING_B to KEY_B)) {
                 if (ctx.reduced && id == RING_B) continue
-                val t = globalState(key).asNumber(const(0.5f))
+                val t = globalState(key).asNumber(const(if (id == RING_A) REST_A.toFloat() else 1f))
                 CircleLayer(
                     id = id, source = source, minZoom = 12.5f,
                     color = const(Color.Transparent), strokeColor = const(p.ink), strokeWidth = const(1.25.dp),

@@ -662,7 +662,8 @@ unfolds, showing the egg's figure. After that the item is a normal stamp.
 Solve (in the sheet, armchair: a stamp, product § 4.4) → the lantern lights and stays lit; claiming happens later by
 walking there. Wrong answer → it shakes.
 
-**Where.** Lantern = (map) `OVER_STATUS` pin. Idle sway = layer `icon-rotate`, 2 keyframe transitions per period. Lighting =
+**Where.** Lantern = (map) `OVER_STATUS` pin. Idle sway = layer `icon-translate` ±1.5 dp, 2 keyframe transitions per
+period (see the sway note below). Lighting =
 (overlay) `OVERLAY`, HERO, 1100 ms, then the lit (map) image. Wrong = (sheet) micro on the lantern thumbnail in the sheet,
 **and** (overlay) if the map is visible.
 
@@ -677,6 +678,12 @@ walking there. Wrong answer → it shakes.
 | 900–1100 | Handoff | → lit layer image + `UNDER_STATUS` glow circle | — |
 | idle (lit) | Flicker | Glow α .55↔.65, 3 seeded keyframes per 4 s; z ≥ 15 only | MapLibre ease |
 | idle (unlit) | Sway | `icon-rotate` ±3° about the post top, period 3200, seeded phase; z ≥ 15 only | MapLibre ease |
+
+**Sway note (as built, UI review 2026-10-21).** The sway is a ±1.5 dp horizontal `icon-translate`, not a ±3° rotate:
+`icon-rotate` is a layout property, so it cannot take a paint transition and every keyframe would re-place the symbol.
+`icon-translate` is a paint property with `iconTranslateTransition`, so two writes per 3.2 s period ease on the GPU. The
+step follows the FxHost clock (stops on idle, recording, background, reduced motion) and returns to centre (0 dp) at
+rest. Lit lanterns are static parts: no sway of their own; the glow rests at α .6.
 
 **Wrong answer (`riddle_reject`, 360 ms).** Lantern translateX 0→−4→4→−3→3→0dp (3 cycles), `reject` haptic. **No red,
 no ✕.** The sheet says "Not quite" (product copy).

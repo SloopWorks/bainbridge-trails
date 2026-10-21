@@ -2,6 +2,7 @@ package com.bainbridgetrails.play.fx
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -150,5 +151,58 @@ class FxSceneTest {
         assertEquals(FxSceneSummary(false, false, false, false), s.summary())
         s.tick(533, reduced = false)
         assertTrue(s.isAnimating)
+    }
+
+    private fun static(id: String, band: FxBand = FxBand.UNDER_STATUS) =
+        FxSpec.static(id = id, kind = "k_static", anchor = FxAnchor.Point(p), zoom = 0.0..22.0, band = band)
+
+    @Test
+    fun `static parts do not animate or count toward caps`() {
+        val s = FxScene()
+        // 40 fog cells + 12 glints: the fog never animates and never demotes a glint.
+        repeat(40) { assertIs<SpawnResult.Spawned>(s.spawn(static("fog$it"), it.toLong())) }
+        assertFalse(s.isAnimating)
+        assertEquals(FxSceneSummary(false, false, false, false), s.summary())
+        repeat(12) { s.spawn(spec("amb$it", FxPriority.AMBIENT, timeline = ambientLoop), 100L + it) }
+        val f = s.tick(200, reduced = false)
+        assertEquals(52, f.live.size)
+        assertTrue(f.live.none { it.demoted }, "a static part took an animated-AMBIENT slot")
+        val fog = f.live.filter { it.instance.spec.isStatic }
+        assertEquals(40, fog.size)
+        assertTrue(fog.all { it.t == it.instance.spec.timeline.reducedAtMs }, "static parts draw their rest frame")
+        assertTrue(s.summary().animatingAmbient && s.summary().animatingLayer)
+        // The 13th animated AMBIENT still demotes the oldest animated one, never a static part.
+        s.spawn(spec("amb12", FxPriority.AMBIENT, timeline = ambientLoop), 300)
+        assertEquals(listOf("amb0"), s.tick(301, reduced = false).live.filter { it.demoted }.map { it.instance.spec.id })
+        // Static parts live until dismissed, then leave at once.
+        s.dismiss("fog0", 400)
+        assertFalse(s.tick(401, reduced = false).live.any { it.instance.spec.id == "fog0" })
+    }
+
+    @Test
+    fun `clock mode STOPPED with only static parts`() {
+        val s = FxScene()
+        s.spawn(static("markers", FxBand.OVER_LABELS), 0)
+        s.spawn(static("fog", FxBand.UNDER_STATUS), 0)
+        s.spawn(static("casing", FxBand.CASING), 0)
+        s.tick(1_000, reduced = false)
+        val mode = FxClockPolicy.mode(playOn = true, resumed = true, reduced = false, scene = s.summary(), msSinceInteraction = 0, recording = false)
+        assertEquals(FxClockPolicy.Mode.STOPPED, mode)
+        assertEquals(null, FxClockPolicy.mapMaxFps(mode, s.summary()))
+        // One animated glint starts the 30 Hz ambient clock; static parts alone never do.
+        s.spawn(spec("glint", FxPriority.AMBIENT, band = FxBand.OVER_LABELS, timeline = ambientLoop), 1_000)
+        s.tick(1_033, reduced = false)
+        assertEquals(
+            FxClockPolicy.Mode.AMBIENT_30HZ,
+            FxClockPolicy.mode(playOn = true, resumed = true, reduced = false, scene = s.summary(), msSinceInteraction = 0, recording = false),
+        )
+    }
+
+    @Test
+    fun `static spec is Layer-tier AMBIENT only`() {
+        val ok = static("a")
+        assertTrue(ok.isStatic && ok.priority == FxPriority.AMBIENT && ok.timeline.runLoopMs != null)
+        assertFailsWith<IllegalArgumentException> { static("o", FxBand.OVERLAY) }
+        assertFailsWith<IllegalArgumentException> { ok.copy(priority = FxPriority.HERO) }
     }
 }

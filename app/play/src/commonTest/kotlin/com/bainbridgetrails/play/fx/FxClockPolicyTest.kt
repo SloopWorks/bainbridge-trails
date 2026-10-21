@@ -83,4 +83,17 @@ class FxClockPolicyTest {
         assertNull(FxClockPolicy.mapMaxFps(Mode.FULL, hero))            // overlay-only animation: map uncapped
         assertNull(FxClockPolicy.mapMaxFps(Mode.STOPPED, ambient))       // clock stopped: restore the default
     }
+
+    @Test
+    fun `reduced motion steps real-time parts once a minute, lifecycle-gated`() {
+        fun tick(resumed: Boolean = true, reduced: Boolean = true, powerSave: Boolean = false, recording: Boolean = false, idleMs: Long = 0) =
+            FxClockPolicy.reducedTick(playOn = true, resumed = resumed, reduced = reduced, powerSave = powerSave, recording = recording, msSinceInteraction = idleMs)
+        assertTrue(tick())
+        assertTrue(tick(reduced = false, powerSave = true))
+        assertTrue(!tick(reduced = false)) // the running clock drives them instead
+        assertTrue(!tick(resumed = false))
+        assertTrue(!tick(recording = true))
+        assertTrue(!tick(idleMs = 20_000))
+        assertEquals(60_000L, FxClockPolicy.REDUCED_TICK_MS)
+    }
 }

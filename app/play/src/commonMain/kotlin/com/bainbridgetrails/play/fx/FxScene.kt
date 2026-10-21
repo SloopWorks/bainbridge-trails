@@ -39,7 +39,8 @@ data class FxLive(
  * cooldown of [FxCaps.heroCooldownMs] after a HERO's DONE, ≤ [FxCaps.notice] NOTICE (more are rejected),
  * ≤ [FxCaps.ambientAnimated] animated AMBIENT and ≤ [FxCaps.overlay] animated Overlay-tier items (over a cap the
  * lowest-priority oldest is demoted to its final frame / Layer LOD). Overlay-tier items retire at
- * [FxCaps.overlayMaxMs] and never loop.
+ * [FxCaps.overlayMaxMs] and never loop. Static parts ([FxSpec.isStatic], [FxSpec.static]) draw their rest frame, never
+ * animate and never count toward a cap, so a scene of markers, fog and casing alone keeps the clock STOPPED.
  */
 class FxScene(private val caps: FxCaps = FxCaps()) {
     private class Entry(var instance: FxInstance, val finalFrame: Boolean) {
@@ -112,7 +113,7 @@ class FxScene(private val caps: FxCaps = FxCaps()) {
             val inst = e.instance
             val tl = inst.spec.timeline
             val local = inst.localMs(nowMs)
-            val still = reduced || e.demoted || e.finalFrame
+            val still = reduced || e.demoted || e.finalFrame || inst.spec.isStatic
             live += FxLive(
                 instance = inst,
                 stage = tl.stageAt(local, inst.dismissedAtMs),
@@ -202,7 +203,7 @@ class FxScene(private val caps: FxCaps = FxCaps()) {
     }
 
     private fun animating(e: Entry, nowMs: Long): Boolean {
-        if (e.demoted || e.finalFrame) return false
+        if (e.demoted || e.finalFrame || e.instance.spec.isStatic) return false
         val local = e.instance.localMs(nowMs)
         val done = doneLocalMs(e.instance)
         return done == null || local < done

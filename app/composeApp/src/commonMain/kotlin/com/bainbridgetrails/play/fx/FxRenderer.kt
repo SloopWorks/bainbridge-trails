@@ -3,9 +3,11 @@ package com.bainbridgetrails.play.fx
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
 import org.maplibre.compose.camera.CameraMoveReason
 import org.maplibre.compose.map.MapState
 import org.maplibre.compose.overlay.MapOverlayScope
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 
 /** Receives a renderer's Layer-tier `globalState` values for one driver frame. Keys start with `fx.`. */
@@ -29,6 +31,30 @@ interface FxRenderer {
     fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {}
 
     /**
+     * [writeGlobalState] with the camera ([view]: zoom + visible bounds, null until the map reports one). FxHost calls
+     * this one; override it to skip writes for parts out of view or below their zoom (a write re-renders the map).
+     */
+    fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) =
+        writeGlobalState(live, nowMs, out)
+
+    /**
+     * The rest frame (engine PF-2): FxHost calls this when the clock stops (idle, recording, background, reduced, power
+     * save), when the instance set changes while stopped, and once per [FxClockPolicy.REDUCED_TICK_MS] under reduced
+     * motion. Write the values every `fx.<kind>.*` key takes at rest (eyes open, no sparkle, no sway) so nothing freezes
+     * mid-motion; a part that follows real time (the ferry) moves to "now". A HERO still in flight keeps its values.
+     */
+    fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {}
+
+    /**
+     * The kind's one GeoJSON source per map (PF-5): composed once by [PlayMapContent] and handed to every band's
+     * [Layers], so the bands share one tiling and one feature-state set. Keyed on the instance set (never per frame).
+     * null = the kind builds its own sources inside [Layers]. A kind drawing in the CASING band must change its source
+     * only with the instance set.
+     */
+    @Composable
+    fun rememberSource(live: List<FxLive>, ctx: FxLayerContext): GeoJsonSource? = null
+
+    /**
      * Map layers for every live instance of this kind, for [band] (called once per Layer-tier band; a kind may draw in
      * several). Inputs change only when the scene's instance set changes, never per frame: motion arrives through
      * `globalState`, paint transitions or feature state (PF-5). Layer ids come from [FxLayerIds]; layers declare no
@@ -37,6 +63,13 @@ interface FxRenderer {
     @Composable
     @MaplibreComposable
     fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {}
+
+    /** [Layers] with this kind's hoisted [source] (from [rememberSource]); FxLayers calls this one. */
+    @Composable
+    @MaplibreComposable
+    fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
+        Layers(band, live, ctx)
+    }
 
     /**
      * Compose overlay for one OVERLAY-band instance, placed with [fxPlacedAt] (hidden during gesture camera moves,
@@ -65,6 +98,23 @@ class FxRendererRegistry(renderers: List<FxRenderer>) {
         val Empty = FxRendererRegistry(emptyList())
     }
 }
+
+/** Each kind's hoisted source ([FxRenderer.rememberSource]) for one map; equal when the same sources. */
+@Immutable
+class FxKindSources(private val byKind: Map<String, GeoJsonSource>) {
+    operator fun get(kind: String): GeoJsonSource? = byKind[kind]
+
+    override fun equals(other: Any?): Boolean = other is FxKindSources && other.byKind == byKind
+
+    override fun hashCode(): Int = byKind.hashCode()
+
+    companion object {
+        val None = FxKindSources(emptyMap())
+    }
+}
+
+/** Provided by [PlayMapContent] around every band (the CASING slot inside StatusLayers included). */
+internal val LocalFxSources = compositionLocalOf { FxKindSources.None }
 
 /** Stable inputs for [FxRenderer.Layers]: never the frame time (PF-5). */
 @Immutable

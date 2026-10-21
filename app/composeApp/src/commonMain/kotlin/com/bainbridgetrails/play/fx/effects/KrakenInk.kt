@@ -22,6 +22,8 @@ import com.bainbridgetrails.play.fx.FxTimeline
 import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.fxGeoJson
 import org.maplibre.compose.expressions.dsl.asNumber
+import org.maplibre.compose.expressions.dsl.asString
+import org.maplibre.compose.expressions.dsl.eq
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.expressions.dsl.exponential
 import org.maplibre.compose.expressions.dsl.feature
@@ -38,6 +40,7 @@ import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 import kotlin.math.PI
@@ -50,7 +53,9 @@ import kotlin.math.hypot
  * line stays on top), the ink pool in the water (`UNDER_STATUS`, α .2), the far-zoom marker (`OVER_LABELS`, < z13.5)
  * and the grip stroke (a `LineLayer` in `CASING` on the intro's grip section, never Canvas). The intro instance
  * ([introSpec], HERO, `OVERLAY`, 2.6 s) drives two `globalState` keys: [KEY_REVEAL] (casing draws on outward from the
- * grip by per-feature `order`) and [KEY_GRIP]. Absent keys = the final frame (casing in full, no grip).
+ * grip by per-feature `order`) and [KEY_GRIP]. Absent keys = the final frame (casing in full, no grip). Casing and
+ * water are static parts ([FxSpec.static]); every part is one feature of the kind's one source ([geoJson], `p` =
+ * [PART_CASING] / [PART_GRIP] / [PART_WATER]), shared by the three bands.
  */
 object KrakenInk : FxRenderer {
     override val kind: String = "kraken_attack"
@@ -61,7 +66,9 @@ object KrakenInk : FxRenderer {
     private val POOL = FxLayerIds.of(kind, "pool")
     private val MARKER = FxLayerIds.of(kind, "marker")
     val layerIds: List<String> = listOf(CASING, GRIP, POOL, MARKER)
-    private val still = loopTimeline(60_000)
+    const val PART_CASING = "c"
+    const val PART_GRIP = "g"
+    const val PART_WATER = "w"
 
     /** Intro: converge 0–500, tentacles 500–1100, reveal 1100–1700, squeeze ~1500, hand-off 1800–2600 (effects §3.1). */
     val introTimeline = FxTimeline(spawnMs = 500, runMs = 1_300, settleMs = 800, despawnMs = 0, runLoopMs = null, reducedAtMs = 2_600)
@@ -80,10 +87,10 @@ object KrakenInk : FxRenderer {
         val out = ArrayList<FxSpec>()
         for (s in open) s.lines.forEachIndexed { i, line ->
             if (line.size >= 2) {
-                out += FxSpec("${attack.key}#casing:${s.id}:$i", kind, FxAnchor.Line(line), 0.0..22.0, FxBand.CASING, FxPriority.AMBIENT, still, loop = true)
+                out += FxSpec.static("${attack.key}#casing:${s.id}:$i", kind, FxAnchor.Line(line), 0.0..22.0, FxBand.CASING)
             }
         }
-        out += FxSpec("${attack.key}#water", kind, FxAnchor.Point(attack.water), 0.0..22.0, FxBand.UNDER_STATUS, FxPriority.AMBIENT, still, loop = true)
+        out += FxSpec.static("${attack.key}#water", kind, FxAnchor.Point(attack.water), 0.0..22.0, FxBand.UNDER_STATUS)
         return out
     }
 
@@ -118,39 +125,59 @@ object KrakenInk : FxRenderer {
         out.put(KEY_GRIP, gripAt(t).toDouble())
     }
 
-    /** Casing lines with `order` 0..0.6: distance of the line from the water anchor (the reveal spreads outward). */
-    fun casingGeoJson(live: List<FxLive>): String {
+    /** Rest: the casing in full, no grip — unless an intro is still in flight (it keeps its values). */
+    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+        if (live.any { it.instance.spec.band == FxBand.OVERLAY && !it.reduced }) return writeGlobalState(live, nowMs, out)
+        out.put(KEY_REVEAL, 1.0)
+        out.put(KEY_GRIP, 0.0)
+    }
+
+    /**
+     * The kind's one FeatureCollection: casing lines (`p` = c, with `order` 0..0.6 = distance from the water: the reveal spreads outward), the intro's grip section (g) and the water
+     * points (w); ids are scene seqs, so feature state is set once per instance.
+     */
+    fun geoJson(live: List<FxLive>): String {
         val water = live.firstNotNullOfOrNull { (it.instance.spec.anchor as? FxAnchor.Point)?.at }
         val casing = live.filter { it.instance.spec.band == FxBand.CASING }
         val d = casing.associate { l -> l.instance.seq to (water?.let { w -> (l.instance.spec.anchor as FxAnchor.Line).path.minOf { metres(it, w) } } ?: 0.0) }
         val lo = d.values.minOrNull() ?: 0.0
         val span = ((d.values.maxOrNull() ?: 0.0) - lo).takeIf { it > 1.0 } ?: 1.0
-        return fxGeoJson(casing) { l, sb -> sb.append("\"order\":").append(0.6 * ((d[l.instance.seq] ?: lo) - lo) / span) }
+        return fxGeoJson(live) { l, sb ->
+            val spec = l.instance.spec
+            when {
+                spec.band == FxBand.CASING ->
+                    sb.append("\"p\":\"$PART_CASING\",\"order\":").append(0.6 * ((d[l.instance.seq] ?: lo) - lo) / span)
+                spec.band == FxBand.OVERLAY -> sb.append("\"p\":\"$PART_GRIP\"")
+                else -> sb.append("\"p\":\"$PART_WATER\"")
+            }
+        }
     }
 
     @Composable
+    override fun rememberSource(live: List<FxLive>, ctx: FxLayerContext): GeoJsonSource =
+        rememberGeoJsonSource(GeoJsonData.JsonString(remember(live) { geoJson(live) }))
+
+    @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
+        if (source == null) return
         val p = ctx.palette
+        val part = feature["p"].asString(const(""))
         when (band) {
             FxBand.CASING -> {
-                val casing = rememberGeoJsonSource(GeoJsonData.JsonString(remember(live) { casingGeoJson(live) }))
                 val spec = StatusLayerSpec.current
                 val stops = spec.widths.getValue(TrailStatus.COMPLETE).map { (z, w) -> z to const((w + 8f).dp) }
                 val width = if (stops.size == 1) stops[0].second else interpolate(linear(), zoom(), *stops.toTypedArray())
                 val reveal = globalState(KEY_REVEAL).asNumber(const(1f)) - feature["order"].asNumber(const(0f))
                 LineLayer(
-                    id = CASING, source = casing,
+                    id = CASING, source = source, filter = part eq const(PART_CASING),
                     color = const(p.inkCasing), width = width,
                     opacity = if (ctx.reduced) const(1f) else interpolate(linear(), reveal, 0 to const(0f), 0.25 to const(1f)),
                     cap = const(LineCap.Round), join = const(LineJoin.Round),
                 )
-                val grip = rememberGeoJsonSource(
-                    GeoJsonData.JsonString(remember(live) { fxGeoJson(live.filter { it.instance.spec.band == FxBand.OVERLAY }) }),
-                )
                 val gripStops = spec.widths.getValue(TrailStatus.COMPLETE).map { (z, w) -> z to const((w + 12f).dp) }
                 LineLayer(
-                    id = GRIP, source = grip,
+                    id = GRIP, source = source, filter = part eq const(PART_GRIP),
                     color = const(p.ink),
                     width = if (gripStops.size == 1) gripStops[0].second else interpolate(linear(), zoom(), *gripStops.toTypedArray()),
                     opacity = if (ctx.reduced) const(0f) else const(0.6f) * globalState(KEY_GRIP).asNumber(const(0f)),
@@ -158,12 +185,11 @@ object KrakenInk : FxRenderer {
                 )
             }
             FxBand.UNDER_STATUS, FxBand.OVER_LABELS -> {
-                val json = remember(live) { fxGeoJson(live.filter { it.instance.spec.anchor is FxAnchor.Point }) }
-                val water = rememberGeoJsonSource(GeoJsonData.JsonString(json))
+                val water = part eq const(PART_WATER)
                 if (band == FxBand.UNDER_STATUS) {
                     // Geo 60 m at 47.66° N ≈ 37.3 dp at z15; exponential base 2 keeps it zoom-true.
                     CircleLayer(
-                        id = POOL, source = water,
+                        id = POOL, source = source, filter = water,
                         color = const(p.inkPool), opacity = const(0.57f), blur = const(0.5f),
                         radius = interpolate(exponential(2f), zoom(), 10 to const((37.3f / 32f).dp), 20 to const((37.3f * 32f).dp)),
                     )
@@ -171,7 +197,7 @@ object KrakenInk : FxRenderer {
                     val eye = rememberVectorPainter(remember(p) { FxArt.vector(FxGlyph.KrakenEye, p.ink) })
                     val glyph = remember(p, eye) { stampPainter(eye, 14f, p.paper, p.ink) }
                     SymbolLayer(
-                        id = MARKER, source = water, maxZoom = 13.5f,
+                        id = MARKER, source = source, filter = water, maxZoom = 13.5f,
                         iconImage = image(glyph, DpSize(14.dp, 14.dp)),
                         iconAllowOverlap = const(true), iconIgnorePlacement = const(true),
                     )

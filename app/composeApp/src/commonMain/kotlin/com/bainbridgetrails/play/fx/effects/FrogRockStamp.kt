@@ -68,6 +68,11 @@ object FrogRockStamp : FxRenderer {
         out.put(KEY_BLINK, blinkAt(nowMs, l.instance.spec.seed))
     }
 
+    /** Rest: eyes open. */
+    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+        out.put(KEY_BLINK, 0.0)
+    }
+
     @Composable
     @MaplibreComposable
     override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {

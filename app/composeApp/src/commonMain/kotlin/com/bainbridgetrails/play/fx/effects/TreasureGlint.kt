@@ -25,6 +25,7 @@ import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.FxTimeline
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.fxGeoJson
 import org.maplibre.compose.expressions.dsl.asNumber
@@ -40,6 +41,7 @@ import org.maplibre.compose.expressions.dsl.times
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 
@@ -47,13 +49,20 @@ import org.maplibre.compose.util.MaplibreComposable
  * `treasure_glint` (effects §3.7, ux §2.2, plan §2): Layer tier only. Island zoom (< z13) a 6 dp sea-glass dot with an
  * ink ring; z13–14 a 22 dp pin lifted 26 dp; z ≥ 14 a 28 dp pin lifted 30 dp (`OVER_LABELS`, always shown). The glint
  * (halo + sparkle, `OVER_STATUS`) runs on the GPU from one `globalState` key ([KEY_T], a 0..1 sawtooth written ≤ 30 Hz)
- * plus a per-feature seeded `phase`; at most [MAX_GLINTING] glint, the rest stay matte. Reduced = matte (final frame).
+ * plus a per-feature seeded `phase`; at most [MAX_GLINTING] glint, the rest stay matte. [KEY_T] is written only while
+ * a glinting treasure is in view at z ≥ [GLINT_MIN_ZOOM] (the halo / sparkle layers' `minZoom`); at rest it is
+ * [REST_T] (every phase lands before the first flash stop: matte). Reduced = matte (final frame). One source for both
+ * bands ([rememberSource]).
  */
 object TreasureGlint : FxRenderer {
     override val kind: String = "treasure_glint"
     const val KEY_T = "fx.treasure_glint.t"
     const val PERIOD_MS = 4_000
     const val MAX_GLINTING = 6
+    const val GLINT_MIN_ZOOM = 14.0
+
+    /** `t + phase` ∈ [−1, 0) is below the first flash stop: matte, whatever the phase. Also the absent-key default. */
+    const val REST_T = -1.0
 
     val timeline: FxTimeline = loopTimeline(PERIOD_MS)
     private val DOT = FxLayerIds.of(kind, "dot")
@@ -79,19 +88,36 @@ object TreasureGlint : FxRenderer {
         }
     }
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
-        if (live.any { !it.reduced }) out.put(KEY_T, globalT(nowMs))
+    private fun glints(l: FxLive): Boolean = !l.reduced && !l.demoted && !l.finalFrame && !l.instance.spec.isStatic
+
+    /** Drive [KEY_T]? Only while a glinting treasure is in [view] at z ≥ 14 (unknown view: yes). */
+    fun drives(live: List<FxLive>, view: FxView?): Boolean {
+        if (view != null && view.zoom < GLINT_MIN_ZOOM) return false
+        return live.any { glints(it) && (view == null || view.contains(it.instance.spec.anchor)) }
+    }
+
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) = writeGlobalState(live, nowMs, null, out)
+
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
+        if (drives(live, view)) out.put(KEY_T, globalT(nowMs))
+    }
+
+    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+        out.put(KEY_T, REST_T)
     }
 
     @Composable
+    override fun rememberSource(live: List<FxLive>, ctx: FxLayerContext): GeoJsonSource =
+        rememberGeoJsonSource(GeoJsonData.JsonString(remember(live) { geoJson(live) }))
+
+    @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
         if (band != FxBand.OVER_STATUS && band != FxBand.OVER_LABELS) return
-        val json = remember(live) { geoJson(live) }
-        val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))
+        if (source == null) return
         val p = ctx.palette
         if (band == FxBand.OVER_STATUS) {
-            val local = globalState(KEY_T).asNumber(const(0f)) + feature["phase"].asNumber(const(0f))
+            val local = globalState(KEY_T).asNumber(const(REST_T.toFloat())) + feature["phase"].asNumber(const(0f))
             val flash = if (ctx.reduced) {
                 const(0f)
             } else {
@@ -142,7 +168,10 @@ object TreasureGlint : FxRenderer {
 /** Figure centre above the ground dot of a full pin (30 dp lift + half the 28 dp figure). */
 internal const val PIN_FIGURE_CY = 44f
 
-/** A Layer-tier part that rests on one frame (or loops through `globalState`): RUN loops forever. */
+/**
+ * A Layer-tier part that loops through `globalState`: RUN loops forever. A part with no motion of its own uses
+ * [com.bainbridgetrails.play.fx.FxSpec.static] instead (it never animates or keeps the clock running).
+ */
 internal fun loopTimeline(periodMs: Int): FxTimeline = FxTimeline(0, periodMs, 0, 0, runLoopMs = periodMs, reducedAtMs = 0)
 
 /** Deterministic per-instance phase in [0, 1) from the spec's fnv1a seed (never `hashCode`, PD-10). */

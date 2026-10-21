@@ -45,6 +45,7 @@ import com.bainbridgetrails.play.fx.FxOverlay
 import com.bainbridgetrails.play.fx.FxOverlayContext
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxRendererRegistry
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.PlayMapContent
 import com.bainbridgetrails.play.fx.WithFxRenderOptions
 import com.bainbridgetrails.play.fx.effects.ExplorationFog
@@ -67,6 +68,7 @@ import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.milliseconds
 import org.maplibre.compose.map.MapEvent
 import org.maplibre.compose.overlay.MapOverlayScope
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 import kotlin.time.Instant
 import kotlin.time.TimeSource
@@ -248,18 +250,33 @@ private fun MapOverlayScope.FrozenOverlays(host: FxHostState, frozen: FxShowcase
 private class ShowcaseRenderer(private val inner: FxRenderer, private val time: FxShowcaseTime, private val frozen: FxShowcaseFrozen) : FxRenderer {
     override val kind: String = inner.kind
 
-    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) = writeGlobalState(live, nowMs, null, out)
+
+    override fun writeGlobalState(live: List<FxLive>, nowMs: Long, view: FxView?, out: FxGlobalStateSink) {
         val all = live + frozen.of(kind)
         val base = all.minOfOrNull { it.instance.spawnedAtMs } ?: nowMs
-        inner.writeGlobalState(all, time.map(nowMs, base), out)
+        inner.writeGlobalState(all, time.map(nowMs, base), view, out)
+    }
+
+    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) {
+        val all = live + frozen.of(kind)
+        val base = all.minOfOrNull { it.instance.spawnedAtMs } ?: nowMs
+        inner.writeRestState(all, time.map(nowMs, base), out)
     }
 
     @Composable
+    override fun rememberSource(live: List<FxLive>, ctx: FxLayerContext): GeoJsonSource? = inner.rememberSource(withStill(live), ctx)
+
+    @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
+        inner.Layers(band, withStill(live), ctx, source)
+    }
+
+    @Composable
+    private fun withStill(live: List<FxLive>): List<FxLive> {
         val still = frozen.of(kind)
-        val all = remember(live, still) { if (still.isEmpty()) live else live + still }
-        inner.Layers(band, all, ctx)
+        return remember(live, still) { if (still.isEmpty()) live else live + still }
     }
 
     @Composable

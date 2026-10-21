@@ -7,7 +7,6 @@ import com.bainbridgetrails.play.fx.FxBand
 import com.bainbridgetrails.play.fx.FxLayerContext
 import com.bainbridgetrails.play.fx.FxLayerIds
 import com.bainbridgetrails.play.fx.FxLive
-import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.GeoPoint
@@ -30,14 +29,14 @@ import kotlin.time.Duration.Companion.milliseconds
  * `exploration_fog` (effects §3.18, ux §3.5.3): one `UNDER_STATUS` FillLayer of `play.fog` over every chart square the
  * user has no counted coverage in, under the status halos, never inside a quiet zone. Each fogged square is one
  * instance (one polygon); a square touching a quiet zone is split into a [CELLS]×[CELLS] grid and only the cells clear of
- * every zone stay, as per-row rectangles. Static (no drift); the provisional lift is feature state `lifting` → α .25.
+ * every zone stay, as per-row rectangles. Static ([FxSpec.static]: no drift, never animating, never in the ambient cap);
+ * the provisional lift is feature state `lifting` → α .25.
  */
 object ExplorationFog : FxRenderer {
     override val kind: String = "exploration_fog"
     const val CELLS = 4
     private val FILL = FxLayerIds.of(kind, "fill")
     val layerIds: List<String> = listOf(FILL)
-    private val timeline = loopTimeline(60_000)
 
     /** Fog specs for [squares] minus [lifted] (square ids), cut out of every [quiet] polygon (lon/lat rings). */
     fun specs(squares: Collection<ChartSquare>, lifted: Set<String>, quiet: List<List<GeoPoint>>): List<FxSpec> {
@@ -52,7 +51,7 @@ object ExplorationFog : FxRenderer {
             var k = 0
             fun add(lon0: Double, lat0: Double, w: Double, h: Double) {
                 val ring = listOf(GeoPoint(lon0, lat0), GeoPoint(lon0 + w, lat0), GeoPoint(lon0 + w, lat0 + h), GeoPoint(lon0, lat0 + h), GeoPoint(lon0, lat0))
-                out += FxSpec("fog:${sq.id}#${k++}", kind, FxAnchor.Area(listOf(ring)), 0.0..22.0, FxBand.UNDER_STATUS, FxPriority.AMBIENT, timeline, loop = true)
+                out += FxSpec.static("fog:${sq.id}#${k++}", kind, FxAnchor.Area(listOf(ring)), 0.0..22.0, FxBand.UNDER_STATUS)
             }
             if (keep.all { row -> row.all { it } }) {
                 add(sw.lon, sw.lat, ChartSquare.D_LON, ChartSquare.D_LAT)

@@ -1,6 +1,8 @@
 package com.bainbridgetrails.play.fx.effects
 
 import com.bainbridgetrails.play.fx.FxBand
+import com.bainbridgetrails.play.fx.FxGlobalStateSink
+import com.bainbridgetrails.play.fx.FxView
 import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.GeoPoint
 import kotlinx.serialization.json.Json
@@ -57,5 +59,26 @@ class TreasureGlintTest {
         assertEquals(FxPriority.AMBIENT, s.priority)
         assertEquals(FxBand.OVER_LABELS, s.band)
         assertTrue(s.timeline.runLoopMs != null)
+    }
+
+    @Test
+    fun `KEY_T written only in view at z14 and up`() {
+        val live = listOf(live(spec(1), 1)) // at (-122.5077, 47.701)
+        val out = HashMap<String, Double>()
+        val sink = FxGlobalStateSink { k, v -> out[k] = v }
+        val inView = FxView(zoom = 15.5, west = -122.515, south = 47.695, east = -122.500, north = 47.707)
+        TreasureGlint.writeGlobalState(live, 1_000, inView, sink)
+        assertEquals(TreasureGlint.globalT(1_000), out[TreasureGlint.KEY_T])
+        out.clear()
+        TreasureGlint.writeGlobalState(live, 1_000, inView.copy(zoom = 13.9), sink)
+        assertTrue(out.isEmpty(), "below z14 the halo / sparkle layers are hidden: no write")
+        TreasureGlint.writeGlobalState(live, 1_000, FxView(15.5, -122.40, 47.60, -122.38, 47.62), sink)
+        assertTrue(out.isEmpty(), "out of view: no write")
+        TreasureGlint.writeGlobalState(listOf(live(spec(2), 2, demoted = true)), 1_000, inView, sink)
+        assertTrue(out.isEmpty(), "only matte treasures in view: no write")
+        // Rest: every phase lands before the first flash stop.
+        TreasureGlint.writeRestState(live, 1_000, sink)
+        assertEquals(TreasureGlint.REST_T, out[TreasureGlint.KEY_T])
+        assertTrue(TreasureGlint.REST_T + 0.999 < 0.0)
     }
 }

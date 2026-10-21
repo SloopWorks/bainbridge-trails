@@ -37,7 +37,10 @@ class FxShowcaseStats {
     var note by mutableStateOf("")
 }
 
-/** Top-right budget readout on `mapChrome` (ux §3.19): fps, render p50/p95, clock mode, live count. Updates at 2 Hz. */
+/**
+ * Top-right budget readout on `mapChrome` (ux §3.19): fps, render p50/p95, clock mode, `maxFps`, live / static counts and
+ * what animates. Updates at 2 Hz.
+ */
 @Composable
 fun FxHud(stats: FxShowcaseStats, modifier: Modifier = Modifier) {
     val text by produceState("…", stats) {
@@ -49,6 +52,7 @@ fun FxHud(stats: FxShowcaseStats, modifier: Modifier = Modifier) {
             val host = stats.host
             value = "fps ${f * 2} · render p50 ${fmt(stats.renderMs.p50)} p95 ${fmt(stats.renderMs.p95)} ms\n" +
                 "clock ${host?.clock?.mode ?: "-"} · maxFps ${host?.maximumFps ?: "std"}" +
+                (host?.let { "\n${it.debugCounts}" } ?: "") +
                 (if (stats.note.isNotEmpty()) "\n${stats.note}" else "")
         }
     }

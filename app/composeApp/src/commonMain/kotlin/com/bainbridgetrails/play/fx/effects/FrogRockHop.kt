@@ -63,6 +63,9 @@ object FrogRock : FxRenderer {
     override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) =
         FrogRockStamp.writeGlobalState(live.filter { it.instance.spec.band != FxBand.OVERLAY }, nowMs, out)
 
+    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) =
+        FrogRockStamp.writeRestState(live, nowMs, out)
+
     @Composable
     @MaplibreComposable
     override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {

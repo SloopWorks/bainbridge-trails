@@ -87,7 +87,7 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
     /** Scene ms of the last [FxScene.summary] (re-read on an instance-set change, else at most every 33 ms). */
     private var summaryAtMs = Long.MIN_VALUE / 2
 
-    /** Live instances per kind (all bands), for [FxLayers]. */
+    /** Live instances per kind (all bands), for [FxLayers]; a kind whose instance set is unchanged keeps its list. */
     internal var liveByKind by mutableStateOf<Map<String, List<FxLive>>>(emptyMap())
         private set
 
@@ -122,6 +122,18 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
         if (fps == null) RenderOptions.Standard else RenderOptions(RenderOptions.Standard) { maximumFps = fps }
     }
 
+    /** Reduced motion / power save: real-time parts (the ferry) still step once a minute (PF3-4), lifecycle-gated. */
+    private val reducedTick: Boolean by derivedStateOf {
+        FxClockPolicy.reducedTick(
+            playOn = true,
+            resumed = resumed && map != null,
+            reduced = reduced,
+            powerSave = powerSave,
+            recording = ambientOff,
+            msSinceInteraction = if (idle) Long.MAX_VALUE else 0L,
+        )
+    }
+
     /** Last written `fx.*` global-state values (re-written after every base-style load). */
     private val globals = HashMap<String, Double>()
     private val sink = FxGlobalStateSink { key, value ->
@@ -131,6 +143,21 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
             map?.let { it.style.globalState.setProperty(key, JsonPrimitive(value)) }
         }
     }
+    private val driver = FxLayerDriver(renderers, sink)
+
+    /** The camera for Layer-tier drivers; re-read (≤ 30 Hz) after a camera move, null until the map has a viewport. */
+    private var view: FxView? = null
+    private var viewDirty = true
+
+    /** HUD (showcase): live instances, how many of them are static, and whether anything animates. */
+    val debugCounts: String
+        get() {
+            val all = liveByKind.values.sumOf { it.size }
+            val static = liveByKind.values.sumOf { l -> l.count { it.instance.spec.isStatic } }
+            val s = summary
+            val anim = listOfNotNull("hero".takeIf { s.animatingHero }, "notice".takeIf { s.animatingNotice }, "ambient".takeIf { s.animatingAmbient })
+            return "live $all · static $static · animating ${anim.joinToString("+").ifEmpty { "none" }}"
+        }
 
     /** Spawn [spec] at the current scene time (see [FxScene.spawn]); starts the clock when it animates. */
     fun spawn(spec: FxSpec, inView: Boolean = true): SpawnResult = scene.spawn(spec, clock.frameMs, inView).also { refresh() }
@@ -164,8 +191,10 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
                 byKind.getOrPut(l.instance.spec.kind) { ArrayList() } += l
                 if (l.instance.spec.band == FxBand.OVERLAY) overlay += l
             }
-            liveByKind = byKind
+            liveByKind = FxLayerDriver.reuseUnchanged(liveByKind, byKind)
             overlayItems = overlay
+            // A stopped clock still shows new instances on their rest frame (a glint spawned while idle is matte).
+            if (clock.mode == FxClockPolicy.Mode.STOPPED) driver.rest(liveByKind, nowMs)
         }
         if (changed || nowMs - summaryAtMs >= SUMMARY_INTERVAL_MS) {
             summaryAtMs = nowMs
@@ -174,8 +203,14 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
     }
 
     private fun writeGlobals() {
-        val nowMs = clock.frameMs
-        for ((kind, live) in liveByKind) renderers[kind]?.writeGlobalState(live, nowMs, sink)
+        val m = map
+        if (viewDirty && m != null) {
+            view = runCatching {
+                m.getVisibleBounds()?.let { b -> FxView(m.cameraPosition.zoom, b.west, b.south, b.east, b.north) }
+            }.getOrNull()
+            viewDirty = view == null
+        }
+        driver.frame(liveByKind, clock.frameMs, view)
     }
 
     private fun rewriteGlobals(m: MapState) {
@@ -203,15 +238,21 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
                     // The first StyleLoaded can land before this collector subscribes: write the globals now too.
                     rewriteGlobals(m)
                     var gestureMove = false
+                    viewDirty = true
                     m.events.collect { e ->
                         when (e) {
                             is MapEvent.StyleLoaded -> rewriteGlobals(m)
                             is MapEvent.CameraMoveStarted -> {
                                 noteInteraction()
+                                viewDirty = true
                                 gestureMove = m.cameraMoveReason is CameraMoveReason.Gesture
                             }
-                            is MapEvent.CameraMoved -> if (m.cameraMoveReason is CameraMoveReason.Gesture) gestureMove = true
+                            is MapEvent.CameraMoved -> {
+                                viewDirty = true
+                                if (m.cameraMoveReason is CameraMoveReason.Gesture) gestureMove = true
+                            }
                             is MapEvent.CameraMoveEnded -> {
+                                viewDirty = true
                                 // Only a gesture move hid the overlay; programmatic moves keep it (no fade).
                                 if (gestureMove || m.cameraMoveReason is CameraMoveReason.Gesture) gestureEndedAtMs = clock.frameMs
                                 gestureMove = false
@@ -221,9 +262,20 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
                     }
                 }
             }
-            // The clock: withFrameNanos every frame while not STOPPED, publishing through the gate (S1 #3).
+            // Reduced motion: real-time parts step once a minute while the map is up (the clock is stopped).
+            launch {
+                snapshotFlow { reducedTick }.collectLatest { on ->
+                    while (on) {
+                        driver.rest(liveByKind, clock.frameMs)
+                        delay(FxClockPolicy.REDUCED_TICK_MS)
+                    }
+                }
+            }
+            // The clock: withFrameNanos every frame while not STOPPED, publishing through the gate (S1 #3). On the
+            // transition to STOPPED every kind writes its rest frame (PF-2): nothing freezes mid-blink or mid-sway.
             snapshotFlow { mode }.collectLatest { m ->
                 clock.mode = m
+                driver.onMode(m, liveByKind, clock.frameMs)
                 if (m == FxClockPolicy.Mode.STOPPED) return@collectLatest
                 gate.restart()
                 while (true) {
@@ -246,6 +298,55 @@ class FxHostState internal constructor(val renderers: FxRendererRegistry) {
 
     private companion object {
         const val SUMMARY_INTERVAL_MS = 33L
+    }
+}
+
+/**
+ * The Layer-tier drivers of one host (engine PF-2): per-frame `globalState` writes while the clock runs, and the rest
+ * frame when it stops. Pure (no map, no clock): FxHostState feeds it. Main thread only.
+ */
+internal class FxLayerDriver(private val renderers: FxRendererRegistry, private val sink: FxGlobalStateSink) {
+    private var lastMode = FxClockPolicy.Mode.STOPPED
+
+    /** One driver frame (≤ 30 Hz, only while the clock runs). */
+    fun frame(liveByKind: Map<String, List<FxLive>>, nowMs: Long, view: FxView?) {
+        for ((kind, live) in liveByKind) renderers[kind]?.writeGlobalState(live, nowMs, view, sink)
+    }
+
+    /** Every kind's rest values ([FxRenderer.writeRestState]). */
+    fun rest(liveByKind: Map<String, List<FxLive>>, nowMs: Long) {
+        for ((kind, live) in liveByKind) renderers[kind]?.writeRestState(live, nowMs, sink)
+    }
+
+    /** The clock's mode changed to [mode]: on the transition to STOPPED, write the rest frame. */
+    fun onMode(mode: FxClockPolicy.Mode, liveByKind: Map<String, List<FxLive>>, nowMs: Long) {
+        if (mode == FxClockPolicy.Mode.STOPPED && lastMode != FxClockPolicy.Mode.STOPPED) rest(liveByKind, nowMs)
+        lastMode = mode
+    }
+
+    companion object {
+        /**
+         * [next] with each kind's previous list kept when its instance set is unchanged (same instances, same
+         * reduced / demoted / final-frame / dismissal), so one kind's change does not rebuild every kind's GeoJSON.
+         */
+        fun reuseUnchanged(prev: Map<String, List<FxLive>>, next: Map<String, List<FxLive>>): Map<String, List<FxLive>> {
+            val out = LinkedHashMap<String, List<FxLive>>(next.size)
+            for ((kind, live) in next) {
+                val old = prev[kind]
+                out[kind] = if (old != null && sameSet(old, live)) old else live
+            }
+            return out
+        }
+
+        private fun sameSet(a: List<FxLive>, b: List<FxLive>): Boolean {
+            if (a.size != b.size) return false
+            for (i in a.indices) {
+                val x = a[i]
+                val y = b[i]
+                if (x.instance != y.instance || x.reduced != y.reduced || x.demoted != y.demoted || x.finalFrame != y.finalFrame) return false
+            }
+            return true
+        }
     }
 }
 

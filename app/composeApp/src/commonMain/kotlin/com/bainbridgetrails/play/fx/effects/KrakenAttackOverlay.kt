@@ -40,6 +40,7 @@ import com.bainbridgetrails.play.rng.SplitMix64
 import com.bainbridgetrails.ui.theme.BtTheme
 import kotlinx.coroutines.flow.first
 import org.maplibre.compose.overlay.MapOverlayScope
+import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 import kotlin.math.PI
 import kotlin.math.abs
@@ -71,10 +72,16 @@ class KrakenAttack(
     override fun writeGlobalState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) =
         KrakenInk.writeGlobalState(live, nowMs, out)
 
+    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) =
+        KrakenInk.writeRestState(live, nowMs, out)
+
+    @Composable
+    override fun rememberSource(live: List<FxLive>, ctx: FxLayerContext): GeoJsonSource = KrakenInk.rememberSource(live, ctx)
+
     @Composable
     @MaplibreComposable
-    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
-        KrakenInk.Layers(band, live, ctx)
+    override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext, source: GeoJsonSource?) {
+        KrakenInk.Layers(band, live, ctx, source)
         if (band == FxBand.UNDER_STATUS) {
             val points = remember(live) {
                 live.mapNotNull { l -> (l.instance.spec.anchor as? FxAnchor.Point)?.let { attackKey(l.instance.spec) to it.at } }.toMap()

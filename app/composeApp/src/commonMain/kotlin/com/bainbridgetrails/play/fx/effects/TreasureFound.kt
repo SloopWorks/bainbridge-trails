@@ -72,9 +72,9 @@ object TreasureFound : FxRenderer {
     fun foundSpec(id: String, at: GeoPoint): FxSpec =
         FxSpec("$id#found", kind, FxAnchor.Point(at), 14.0..22.0, FxBand.OVERLAY, FxPriority.HERO, timeline, loop = false)
 
-    /** The found shell that stays on the chart (AMBIENT, static). */
+    /** The found shell that stays on the chart (static: never animating, never in the ambient cap). */
     fun spentSpec(id: String, at: GeoPoint): FxSpec =
-        FxSpec("$id#spent", kind, FxAnchor.Point(at), 10.5..22.0, FxBand.OVER_STATUS, FxPriority.AMBIENT, loopTimeline(60_000), loop = true)
+        FxSpec.static("$id#spent", kind, FxAnchor.Point(at), 10.5..22.0, FxBand.OVER_STATUS)
 
     /** Shell opacity at burst time [t]: 0 until 600, then → 1 by 900 (`standard`). */
     fun spentAt(t: Int): Float = timeline.phase(t, 600, 900, FxEasing.Standard)
@@ -89,6 +89,9 @@ object TreasureFound : FxRenderer {
         out.put(KEY_SPENT, spentAt(i.spec.timeline.foldedMs(i.localMs(nowMs), i.dismissedAtMs)).toDouble())
     }
 
+    /** At rest the shell is in full, unless a burst is still in flight (it keeps its crossfade value). */
+    override fun writeRestState(live: List<FxLive>, nowMs: Long, out: FxGlobalStateSink) = writeGlobalState(live, nowMs, out)
+
     @Composable
     @MaplibreComposable
     override fun Layers(band: FxBand, live: List<FxLive>, ctx: FxLayerContext) {
@@ -96,7 +99,9 @@ object TreasureFound : FxRenderer {
         val json = remember(live) { fxGeoJson(live.filter { it.instance.spec.band == FxBand.OVER_STATUS }) }
         val source = rememberGeoJsonSource(GeoJsonData.JsonString(json))
         val p = ctx.palette
-        val opacity = if (ctx.reduced) const(1f) else globalState(KEY_SPENT).asNumber(const(1f))
+        // While a burst plays the shell starts hidden: the default must not show it before the first global-state write.
+        val bursting = remember(live) { live.any { it.instance.spec.band == FxBand.OVERLAY && !it.reduced } }
+        val opacity = if (ctx.reduced) const(1f) else globalState(KEY_SPENT).asNumber(const(if (bursting) 0f else 1f))
         CircleLayer(
             id = SHELL_DOT, source = source, maxZoom = 13f,
             color = const(p.ink.copy(alpha = 0f)), radius = const(3.dp), strokeColor = const(p.ink.copy(alpha = 0.4f)), strokeWidth = const(1.5.dp),
