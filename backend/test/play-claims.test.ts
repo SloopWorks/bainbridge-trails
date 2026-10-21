@@ -300,6 +300,41 @@ describe("claims on PUT /v1/coverage", () => {
     expect(run(killed({ all: true })).rejected.map((r) => r.code)).toEqual(["unknown_item", "unknown_item"]);
   });
 
+  describe("kill switches are the current pack's", () => {
+    const OLD = "2026.10.9";
+    const walkId = crypto.randomUUID();
+    const play = parsePlay({ playConfig: OLD, play: [{ walkId, claims: [claim(EGG, "egg"), claim(TREASURE0, "treasure")] }] })!;
+    const run = (current: PlayPack) =>
+      evaluatePlay(play, {
+        dataset: "trails",
+        now: THU,
+        packFor: (v) => (v === OLD ? { ...CURRENT, version: OLD } : v === current.version ? current : null),
+        current,
+        freshWalks: new Map([[walkId, 3600]]),
+        coverage: new Map(),
+        existing: new Set(),
+        weeks: new Map(),
+      });
+    const patched = (id: string, patch: Record<string, unknown>): PlayPack => ({
+      ...CURRENT,
+      items: CURRENT.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+    });
+
+    it("killed item in current pack rejected even when client names an older pack", () => {
+      const kill = (k: Record<string, unknown>): PlayPack => ({ ...CURRENT, kill: { all: false, types: [], items: [], ...k } });
+      expect(run(kill({})).accepted).toEqual([EGG, TREASURE0]);
+      expect(run(kill({ items: ["egg-station-s"] })).rejected).toEqual([{ id: EGG, code: "unknown_item" }]);
+      expect(run(kill({ types: ["treasure"] })).rejected).toEqual([{ id: TREASURE0, code: "unknown_item" }]);
+      expect(run(kill({ all: true })).rejected.map((r) => r.code)).toEqual(["unknown_item", "unknown_item"]);
+      expect(run(patched("egg-station-s", { enabled: false })).rejected).toEqual([{ id: EGG, code: "unknown_item" }]);
+    });
+
+    it("item expired in current pack rejected", () => {
+      expect(run(patched("egg-station-s", { expires: "2026-10-25" })).rejected).toEqual([{ id: EGG, code: "unknown_item" }]);
+      expect(run(patched("egg-station-s", { expires: "2026-12-31" })).accepted).toEqual([EGG, TREASURE0]);
+    });
+  });
+
   // privacy review 2026-10-20 P2-3: W-DAY needs a walk of at least 10 minutes
   it("dayKey on a walk under 10 min ignored", async () => {
     const p = await playOf(await syncPlay({}, (w) => [{ walkId: w, claims: [], dayKey: WEEK }], { durationS: 599 }));

@@ -43,6 +43,7 @@ import {
  *      has less than `minM` covered (after the merge);
  *   7. marks from the pack (tier / band / stars and hints / item marks); over the weekly found cap the claim is
  *      accepted with 0 marks and listed in `capped`.
+ * Kill switches (`kill`, `enabled:false`, `expires`) are always the CURRENT pack's, whichever version is named.
  * Caps (weekly found cap, grace days, clock tolerance) always come from the CURRENT pack, never from the version the
  * client names (P2-6); marks stay per named version. An open-ended ("always") occurrence is booked to the server's
  * current week whatever `weekId` the client sent (P2-5), so a week boundary never doubles the weekly cap.
@@ -182,6 +183,8 @@ export interface ClaimContext {
   now: number;
   /** Kept packs by version (`config.packByVersion`). */
   packFor(version: string): PlayPack | null;
+  /** The CURRENT pack, for kill switches / `enabled` / `expires` (default: `config.CURRENT`). Injectable for tests. */
+  current?: PlayPack;
   /** Walks this upload credits (new for this user and dataset): walk id → `durationS`. */
   freshWalks: ReadonlyMap<string, number>;
   /** The user's coverage after the merge. */
@@ -267,6 +270,13 @@ function checkOccurrence(c: PlayClaim, config: string | null, ctx: ClaimContext)
   const kind = c.kind as ClaimKind;
   const item = pack.items.find((i) => i.id === key.itemId);
   if (!item || item.enabled === false || killed(pack, item) || !inGoal(item, ctx.dataset)) return "unknown_item";
+  // Kill switches are the CURRENT pack's, whichever version the client names (an old pack must not dodge a kill).
+  const cur = ctx.current ?? CURRENT;
+  if (cur !== pack) {
+    const curItem = cur.items.find((i) => i.id === key.itemId);
+    if (killed(cur, curItem ?? item)) return "unknown_item";
+    if (curItem && (curItem.enabled === false || (curItem.expires && key.date > curItem.expires))) return "unknown_item";
+  }
   if (!(CLAIM_KINDS as readonly string[]).includes(kind) || KIND_TYPE[kind] !== item.type) return "unknown_item";
   const occ = occurrenceOn(pack, item, key.date);
   if (!occ) return "bad_occurrence";
