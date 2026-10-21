@@ -15,8 +15,8 @@ v1 scope: [`product.md` § "v1 scope"](product.md).
 | [`engine.md`](engine.md) | **Rendering (normative)**: MapFx tiers, clock, scene, bands, projection, budgets, PF-1 … PF-9, engine plan | ACCEPTED |
 | [`effects.md`](effects.md) | Look, motion, sound, haptics and announcements of every effect; conforms to engine, product and schedule | ACCEPTED |
 | [`ai.md`](ai.md) | AI for content: v1 = offline authoring only (content-pack workflow, riddles, sprites) | ACCEPTED |
-| `ux.md` | Screen layout and interaction (being written separately) | in progress |
-| `plan.md` | The staged build plan, the AC 8 e2e script and the effect inventory per stage | to write (PD-17) |
+| [`ux.md`](ux.md) | **Screen layout and interaction**: Play tokens, components, screens, motion, a11y, copy keys | ACCEPTED (PD-18) |
+| [`plan.md`](plan.md) | The staged build plan (lanes L1–L4, waves W0–W8), the AC 8 e2e script, the effect inventory per stage | written (PD-17) |
 | [`reviews/`](reviews/) | Adversarial reviews | — |
 
 Precedence: `decisions.md` > `product.md` > `schedule.md` > `engine.md` > `effects.md` > `ai.md` > the brief.

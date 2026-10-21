@@ -47,6 +47,33 @@ Repo facts: rotation and pitch gestures are disabled (`chartInteractions()`), `f
 `mercatorOffsetDp` (`map/MapLogic.kt`) already projects relative to a reference point with `WORLD_DP = 512·2^zoom` and is
 used for tap ranking; `TrailMap` owns the `overlay` slot privately (`TrailMapOverlay`); a tab switch disposes the map.
 
+### Spike corrections (Stage 0, 2026-10-20; normative — `docs/play/spikes/fx.md`, PD-19)
+
+Measured on Android emulator API 37 and iOS 26.3 simulator; device numbers pending (stage 9). These override the
+table above and §2–§3 where they differ:
+
+1. `MapEvent.FrameRendered.stats` is `RenderStats?`; `style.sources[…]` and `style.layers[id]` return nullable handles.
+2. Layer `onClick` is `ClickEvent.(features: List<Feature<Geometry, JsonObject?>>) -> ClickResult` (receiver lambda);
+   `ClickEvent.position` is `Position?`. **Map-level `click` runs first** and `ClickResult.Consume` (what
+   `chartInteractions` returns) suppresses layer handlers (R7): FX taps go through MapTab `onTap` +
+   `queryRenderedFeatures(fx-*)`, after the pure `TappableTrailLayerIds` query misses. `MapState.click(DpOffset)` exists.
+3. `MapUiOptions.renderMode` is Android-only (expect/actual if ever needed); v1 keeps the default Surface mode.
+4. Paint `…Transition` params are nullable (null = style transition); build `TransitionOptions(duration = …)`.
+5. **`globalState` is reset by every base-style load; feature state survives.** FxHost re-writes every live `fx.*`
+   key on `MapEvent.StyleLoaded` (theme switch, tab return).
+6. **A `globalState` write at ≤ 30 Hz does not cap MapLibre at 30 Hz** (it repaints at display rate). While any
+   Layer-tier kind animates, FxHost sets `RenderOptions { maximumFps = 30 }` and restores it when the clock stops
+   (measured 27–29 frames/s). §2.3's "MapLibre re-renders at ≤ 30 Hz" and §3 are read with this cap.
+7. **FxClock gates on elapsed frame time** (run `withFrameNanos` every frame, publish when ≥ 33 ms elapsed); the §2.2
+   `delay(33)` sketch gives ~20 Hz at 120 Hz and 12–15 Hz on slow devices.
+8. **`placedAt` is not frame-locked to map pixels** under gestures (iOS) or dropped frames (Android): up to one frame
+   of camera motion (measured 2–17 dp). See PF-4 (amended) and PD-19.
+9. Confirmed as written: `globalState(name)`, `feature.state`, `set/getFeatureState` on numeric GeoJSON ids (S2, no
+   `promoteId`), composition order = z-order across `Anchor` blocks incl. after Topo→Dark (S3; un-anchored layers
+   composed later land above earlier `Anchor.Top` blocks, so `LocationIndicatorLayer` is composed after
+   `OVER_LABELS`), `screenLocationFromPosition`, `animateCamera(… CameraAnimation.Ease …)`, `StyleLoaded` once per load,
+   `const(snapshotState)` recomposition reaches native every write (R8).
+
 ### Compose Multiplatform (ui-graphics 1.11.1 sources; app is on 1.12.2)
 
 - Common: `withFrameNanos` (runtime), `Modifier.drawWithCache`, `Modifier.graphicsLayer`, `Path`/`PathMeasure`,
@@ -173,6 +200,17 @@ whose `Canvas` draws in anchor-local dp; local offsets come from `FxProjection.o
 `mercatorOffsetDp` math, moved/duplicated into `:play` with a parity test). `zoom` is read from `state.viewport` in the
 **draw** phase only. Guard: if `bearing != 0 || pitch != 0` (impossible with `chartInteractions`, but defensive) the
 effect falls back to P2 per vertex. Do not read `LocalViewport` in composition (it recomposes per camera change).
+
+**Amended after spike S4 (FAIL, 2026-10-20; PD-19).** `placedAt` re-places on presented frames but the overlay and
+the map can present different camera frames: drift is ≈ 0 at rest and under programmatic `animateCamera` (iOS),
+2–15 dp during fling (iOS) and 4–17 dp when frames drop (Android). The error is frame sync, not the draw-phase zoom
+(`zoomSkew` 0.0), so the old fallback (zoom from two anchors) does not help. Consequences, normative:
+(1) anything that must coincide with map geometry is **Layer tier** (the kraken grip stroke is a `LineLayer`, not
+`drawRoadStroke` on the Canvas; glints, halos, pin bump and select ring are layers); (2) Overlay-tier parts are
+transient (≤ `overlayMaxMs`), tolerate one frame of slip by design (water, bursts, figures), and are **hidden or
+handed to their Layer LOD while `isCameraMoving && cameraMoveReason == GESTURE`**, fading back on `CameraMoveEnded`;
+(3) screen-anchored moments (`claim_pop` flight, `play_wake`) are unaffected; (4) re-measure on a physical Android
+device in stage 9.
 
 ### PF-5 (B/C) Rendering contract per tier
 
@@ -683,7 +721,8 @@ PRECONDITIONS: branch gamification/v1 (or a child branch from latest main per CL
   if not landed yet, Stage 4 adds `play: Boolean = false`, JSON-default compatible).
 ```
 
-**STAGE 0 — Spikes S1–S4** (§5). Code only in a throwaway branch / the existing style spike screen; results +
+**STAGE 0 — Spikes S1–S4** (§5) — **DONE 2026-10-20**: S1, S2, S3, R8 PASS; R7 documented; S4 FAIL → PF-4 amended,
+PD-19; results `docs/play/spikes/fx.md`. Build order for stages 1–9 is `docs/play/plan.md`. Code only in a throwaway branch / the existing style spike screen; results +
 screenshots in `docs/play/spikes/fx.md`.
 - files: `docs/play/spikes/fx.md`
 - test-first: n/a (spike); each spike states pass/fail criteria up front
@@ -799,6 +838,11 @@ REVIEW: adversarial-reviewer (this doc) → compose-ui-reviewer + mobile expert 
 | S6 | compottie Moment-tier cost and binary size (only if a designer delivers Lottie scenes) | Load a 3 s, 60-layer Lottie in a full-screen scene; measure APK delta (R8) and frame time | ≤ +1.5 MB release APK, p95 frame < 8 ms | hand-written Canvas moments (default) |
 | R7 | Per-layer `onClick` on FX layers vs MapTab's map-level `click` consumer: which wins | Add `onClick` to a CircleLayer; tap it | documented precedence | always route through MapTab `onTap` + `queryRenderedFeatures(fx ids)` (design already does this) |
 | R8 | `rememberMapState(content=…)` style composition picks up snapshot reads promptly enough for `FxLayerDriver` (fallback of S1) | Animate a layer `opacity = const(state.value)` from a `withFrameNanos` loop | ≥ 30 updates/s observed via RenderStats | Layer tier limited to transitions + `setData` |
+
+**Outcomes (2026-10-20, `docs/play/spikes/fx.md`):** S1 PASS (re-write global state on `StyleLoaded`; cap
+`maximumFps` 30 while animating) · S2 PASS (no fallback needed) · S3 PASS (no predicate anchors needed) · **S4 FAIL**
+(gestures / dropped frames: up to one frame of slip; fallback in the table does not apply; PF-4 amended, PD-19) ·
+R7 documented (map-level click first) · R8 PASS (`FxLayerDriver` works if ever needed). S5/S6 not run (v2 / not needed).
 
 Other risks: Surface render mode means no Compose post-processing of map pixels (no map-wide blur/tint "storm"
 effects) unless `AndroidRenderMode.Texture` is adopted after measurement; overlay effects draw above map labels;

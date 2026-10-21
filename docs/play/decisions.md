@@ -222,6 +222,43 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
 - **Consequence.** `docs/play/plan.md` is the next document (plan-author); this round does not write it.
 - **Resolves:** 22.
 
+## PD-18 UX spec accepted; UI follows the reconciled rules
+- **Context.** `docs/play/ux.md` was written in parallel with the round-1 reconciliation against the earlier
+  product.md, so it carried pre-reconciliation vocabulary (points, races, 30 mph) and open items that the other docs
+  had since settled.
+- **Decision.** ux.md is ACCEPTED after a conformance pass (2026-10-20). Its design decisions stand: sea glass is
+  `#037245` / `#45E0AE` (ΔE ≥ 20 from spruce and every status hue); the Play HUD sits top-left on a second chrome row,
+  nothing Play on the right column; every tappable marker is a lifted pin, stamps are never tappable, line taps stay
+  pure; island zoom shows dots/clusters, never figures; one non-modal EncounterSheet capped at 60 %; Play selection
+  never dims trails; no HUD or marks counter on the record screen (provisional finds only); no countdown, ghost, tape or
+  chevrons anywhere; the float line counts kept weeks; the Offer morphs into the Intro in one sheet; a quiet day
+  replaces the Play row with one banner and hides the HUD; What's On is pushed from Me › PlayCard; ambient effects have
+  their own toggle, overridden by reduced motion and battery saver. Where ux.md and product/schedule still differ,
+  product and schedule win (README precedence); `roadSafety` is ≤ 25 mph (PD-7).
+- **Consequence.** UI stages in `plan.md` build against ux.md §2–§3 and its §8 BUILD NOTES; pin bump and select ring
+  are Layer-tier (PD-19). Open items left: Prue's House (OD-1), the `FxArt` glyph author (placeholders until art
+  lands), the ambient default for battery-sensitive users (on, with battery saver forcing off).
+- **Resolves:** ux.md §7.2 #2 (schedule conflicts) and #3 (S4).
+
+## PD-19 Overlay tier after spike S4: geometry-exact art is Layer tier
+- **Context.** Engine PF-4 assumed `MapOverlayScope.placedAt` keeps Compose overlay drawing "in sync with the pixels on
+  screen". Spike S4 (`docs/play/spikes/fx.md`, 2026-10-20) failed its ≤ 1 dp pan / ≤ 2 dp pinch criterion: the overlay
+  and the map present different camera frames under gestures (iOS fling 2–15 dp) and dropped frames (Android 4–17 dp);
+  at rest and under programmatic `animateCamera` it holds (≤ 1 dp on iOS). The error is overlay/map frame sync, so the
+  fallback in engine §5 (zoom from two anchors) does not fix it. S1–S3 and R8 passed; R7 documented.
+- **Decision.** Anything that must coincide with map geometry renders in the **Layer tier** (GeoJSON + `globalState` /
+  feature state): the kraken's grip stroke and ink casing, glints and halos on markers, pin bump and select ring.
+  The **Overlay tier** is only for transient art that tolerates one frame of slip (tentacles in water, bursts, the frog
+  hop, lantern lighting), still ≤ `overlayMaxMs`, shown at rest or during programmatic camera moves, and **hidden (or
+  handed to its Layer LOD) while the camera moves by gesture**, fading back on `CameraMoveEnded`. Screen-anchored
+  moments (`claim_pop` flight, `play_wake`) are unaffected. FxHost also re-writes `fx.*` global state after every
+  `StyleLoaded`, caps `maximumFps` at 30 while Layer-tier animation runs, and gates its clock on elapsed frame time
+  (spike API corrections, engine §0).
+- **Consequence.** Engine PF-4 and §0 amended; effects keep their ids and showcase presets, with the tier split in
+  `docs/play/plan.md` §2. ux.md §7.2 open 3 is answered (pin bump/select ring layer-only). S4 is re-run on a physical
+  Android device in engine stage 9.
+- **Resolves:** engine §5 S4; ux.md §7.2 #3.
+
 ## Status
 
 | doc | status |
@@ -231,5 +268,5 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
 | `engine.md` | ACCEPTED (round 1 findings resolved) |
 | `effects.md` | ACCEPTED (round 1 findings resolved) |
 | `ai.md` | ACCEPTED (round 1 findings resolved) |
-| `ux.md` | not part of round 1 (being written separately) |
-| `plan.md` | not written yet (PD-17) |
+| `ux.md` | ACCEPTED 2026-10-20 after the conformance pass (PD-18) |
+| `plan.md` | written 2026-10-20 (PD-17); PD-19 recorded |
