@@ -104,6 +104,10 @@ class PlayRepository(
     private val signedIn: () -> Boolean = { false },
     /** W-COV + W-DONE + W-SQUARE of the current coverage snapshot (the opt-in starting balance); null = unknown. */
     private val walkDerived: suspend () -> WalkDerived? = { null },
+    /** Quiet zones, quiet features and feature names for a finished walk's walk-derived entries ([WalkMarks]). */
+    private val walkContext: suspend () -> WalkContext = { WalkContext() },
+    /** The goal's derived table (map fog, kraken stretches); read once. */
+    private val derivedSource: suspend () -> PlayDerived = { PlayDerived.Empty },
     private val newId: () -> String = { Uuid.random().toString() },
 ) {
     private val worker = compute.limitedParallelism(1)
@@ -176,7 +180,37 @@ class PlayRepository(
         if (running && content.state.value?.config?.kill?.all != true) {
             liveSink.onGated(id, kept, summary)
             playHook.onGated(id, kept.map { it.toGated() }, summary.toGated())
+            recordWalkMarks(id, kept.map { com.bainbridgetrails.play.fx.GeoPoint(it.lon, it.lat) }, summary.newlyCompleted, summary.endedAt)
         }
+    }
+
+    /**
+     * The finished walk's walk-derived Logbook entries (W-COV, W-DONE, W-SQUARE) and remembrance visit stamps
+     * ([WalkMarks]): `pending` until its coverage upload is answered (a queued element with `walkMarks` makes the
+     * upload carry the walk even without claims, so the server derives the same marks, PD-3). True when it wrote any.
+     */
+    suspend fun recordWalkMarks(sessionId: String, kept: List<com.bainbridgetrails.play.fx.GeoPoint>, newlyCompleted: List<String>, endedAtMs: Long): Boolean {
+        val queue = claims ?: return false
+        val version = content.load()?.config?.version ?: return false
+        val after = try {
+            walkDerived()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.e(TAG, "walk marks unavailable: ${e.message}")
+            null
+        } ?: return false
+        val ctx = walkContext()
+        val date = IslandTime.dateOf(if (endedAtMs > 0) Instant.fromEpochMilliseconds(endedAtMs) else clock().now())
+        val visited = WalkMarks.visitedZones(kept, ctx.quietZones)
+        val completed = newlyCompleted.filter { it !in ctx.quietFeatures }
+        fun next(st: PlayState) = WalkMarks.apply(st, goal, sessionId, date, after, completed, { ctx.names[it] ?: it }, visited, newId)
+        val before = store.load()
+        // Queue first (as the claim pass does): a crash before the Logbook write leaves the walk carried, not lost.
+        if (WalkMarks.hasPending(next(before).logbook, sessionId)) queue.add(QueuedPlay(sessionId, version, walkMarks = true))
+        var wrote = false
+        store.update { st -> next(st).also { wrote = it.logbook != st.logbook } }
+        return wrote
     }
 
     /** L1-6's hook shape: the claim pass of one finalized walk. */
@@ -237,6 +271,14 @@ class PlayRepository(
         content.refreshIfDue()
         refresh()
     }
+
+    private var derivedMemo: PlayDerived? = null
+
+    /** The goal's derived table ([PlayDerived]), parsed once (the map's fog and kraken geometry). */
+    suspend fun derivedTable(): PlayDerived = withContext(worker) { derivedMemo ?: derivedSource().also { derivedMemo = it } }
+
+    /** The running pack's ferry timetable, or null (none, or expired). */
+    suspend fun ferryTimetable(): FerryTimetable? = withContext(worker) { content.load()?.config?.let(::ferry) }
 
     /** [refresh] without a result (callers that only trigger it, e.g. the debug drawer). */
     suspend fun reload() {
@@ -403,7 +445,7 @@ class PlayRepository(
         store.update { st ->
             val after = StartBalance.onEnable(st.logbook, derived, today, newId)
             credited = after.entries.drop(st.logbook.entries.size).firstOrNull { it.kind == LogKind.start_balance }?.marks
-            st.copy(logbook = after)
+            st.copy(logbook = after, derivedBase = DerivedBase.of(derived))
         }
         return Credit(credited)
     }
@@ -550,6 +592,13 @@ class PlayRepository(
         }
     }
 }
+
+/** What [WalkMarks] needs beyond the snapshot: quiet zone outlines, quiet feature ids, feature display names. */
+class WalkContext(
+    val quietZones: List<QuietZoneOutline> = emptyList(),
+    val quietFeatures: Set<String> = emptySet(),
+    val names: Map<String, String> = emptyMap(),
+)
 
 /**
  * The Play gate for the app graph (PD-1): [current] is null while Play is off; the repository is created the first

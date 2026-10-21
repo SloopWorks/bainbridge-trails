@@ -6,7 +6,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.fx.FxHostState
-import com.bainbridgetrails.play.fx.FxRendererRegistry
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.fx.GeoPoint
 import com.bainbridgetrails.play.fx.effects.FrogRockStamp
@@ -17,13 +16,6 @@ import com.bainbridgetrails.play.schedule.PoolRef
 import com.bainbridgetrails.play.schedule.Ref
 import com.bainbridgetrails.play.schedule.RoadRef
 import com.bainbridgetrails.play.schedule.TrailRef
-
-/**
- * The map's Play registry (MapTab): L2-4's marker effects, then [PlayMarkers] last so its ring, label and hit rects
- * sit above every other OVER_LABELS layer. (Fog, ferry and kraken ink need dataset geometry: wired in L2-10.)
- */
-fun playMapRegistry(markers: PlayMarkers): FxRendererRegistry =
-    FxRendererRegistry(listOf(FrogRockStamp, RiddleMarker(), TreasureGlint, markers))
 
 /** The FX instances for [markers]: unfound treasure glints, riddle lanterns (lit when solved), Frog Rock, the marker set. */
 fun playMapSpecs(markers: List<PlayMarker>): List<FxSpec> = buildList {

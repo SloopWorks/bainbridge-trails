@@ -135,6 +135,26 @@ path. Simulator screenshots: launch arguments `-btScreen trails|me|leaderboard|p
 `-btDevSignIn 1`, `-apiBaseUrl http://localhost:8787` (debug binaries only; `xcrun simctl launch <udid>
 com.bainbridgetrails.app -btScreen me`).
 
+## Play (opt-in gamification; docs/play/)
+
+Play is off by default (`AppSettings.play.enabled`); with it off nothing Play is created, composed, requested or
+tracked (PF0, `PureModeTest`). Specs: `docs/play/README.md`; build order and e2e: `docs/play/plan.md`.
+
+- **Content pack.** Source in `data/play/`; build and check with `node scripts/build-play-content.mjs` (writes the
+  generated copies into `backend/src/data/play/` and `composeApp/src/commonMain/composeResources/files/play/`:
+  `play-content.json`, `derived-{trails,roads}.json`, tides) and `node scripts/build-play-content.mjs --check` (what
+  `npm test` in `backend/` runs). Script tests: `node --test scripts/*.test.mjs` (CI runs them before `npm test`).
+- **Play clock (debug builds only).** Android: `adb shell am start -n <pkg>/com.bainbridgetrails.app.MainActivity --es
+  playClock 2026-10-29T14:00 --es playTide low|high|expired --es playConfig bundled`; the debug drawer's Play clock
+  plugin and Settings › Play clock (debug) do the same at run time. iOS: `-btPlayClock 2026-10-29T14:00 -btPlayTide low
+  -btPlayConfig bundled`. The clock is island time (America/Los_Angeles) and ticks from the given instant.
+- **Screens.** iOS `-btScreen logbook|whats-on|challenges|ranks|stories` (Play must be on). FX showcase: Android
+  `--es screen fx --es fx <effect id> --es preset <preset id>` (`--es reduced 1` = final frame, `--es t <ms>` = paused at a key frame, `--es theme dark`); iOS
+  `-btScreen fx` (iOS opens the first preset; pick others in the showcase controls). Effect ids and preset ids:
+  `docs/play/plan.md` § 2 (e.g. `treasure_glint`/`fay-5`, `kraken_attack`/`manitou`, `play_wake`/`island-home`).
+- **E2E (AC 8).** The opt-in → treasure → kraken → riddle → challenge → Logbook walkthrough, its fixed clock, the
+  local wrangler dev clock and the screenshot list are in `docs/play/plan.md` § 3 (`docs/play/e2e-ids.env` pins ids).
+
 ## Local backend
 
 ```sh

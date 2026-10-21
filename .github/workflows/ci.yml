@@ -70,6 +70,9 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      # Play pack build script tests (docs/play/plan.md L2-10), from the repo root.
+      - run: node --test scripts/*.test.mjs
+        working-directory: .
       - run: npm test
       - run: npx tsc --noEmit
       - name: Store metadata limits

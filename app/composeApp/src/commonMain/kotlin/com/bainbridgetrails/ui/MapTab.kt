@@ -173,7 +173,22 @@ import com.bainbridgetrails.ui.play.map.RiddleOutcome
 import com.bainbridgetrails.ui.play.map.RiddlePick
 import com.bainbridgetrails.ui.play.map.RiddlePickBar
 import com.bainbridgetrails.ui.play.map.WalkTarget
-import com.bainbridgetrails.ui.play.map.playMapRegistry
+import com.bainbridgetrails.ui.play.map.playLiveRegistry
+import com.bainbridgetrails.ui.play.map.rememberFerryTimetable
+import com.bainbridgetrails.ui.play.map.PlayMapEffectsSync
+import com.bainbridgetrails.ui.play.map.PlayMapFocus
+import com.bainbridgetrails.ui.play.map.PlayFocusLogic
+import com.bainbridgetrails.ui.play.map.PlayMarker
+import com.bainbridgetrails.play.fx.effects.ClaimPopState
+import com.bainbridgetrails.play.fx.effects.ClaimPopOverlay
+import com.bainbridgetrails.play.fx.effects.claimPopTarget
+import com.bainbridgetrails.ui.play.PlayWake
+import com.bainbridgetrails.ui.play.PlayWakeArt
+import com.bainbridgetrails.play.schedule.PlayAgenda
+import com.bainbridgetrails.map.IslandBounds
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.snapshotFlow
 import com.bainbridgetrails.ui.play.map.rememberEncounterCopy
 import com.bainbridgetrails.ui.play.map.rememberRiddleCopy
 import com.bainbridgetrails.ui.play.map.riddleTarget
@@ -226,10 +241,13 @@ fun MapTab(
     onLeaderboard: () -> Unit = {},
     onSearch: () -> Unit = {},
     onRecord: () -> Unit = {},
-    /** Play chip → Logbook (wired in L2-10). */
+    /** Play chip → Logbook. */
     onPlayLogbook: () -> Unit = {},
-    /** Challenges chip → Challenges (wired in L2-10). */
+    /** Challenges chip → Challenges. */
     onPlayChallenges: () -> Unit = {},
+    /** "The island wakes up" (ux.md § 2.11) is due: drawn over this map at its island camera; [onWakeDone] when over. */
+    wake: Boolean = false,
+    onWakeDone: () -> Unit = {},
 ) {
     val datasetState by AppGraph.datasets.state.collectAsStateWithLifecycle()
     val data = datasetState.valueOrNull
@@ -256,7 +274,9 @@ fun MapTab(
     val playState = play?.store?.state?.collectAsStateWithLifecycle()?.value
     val playConfig = play?.config?.collectAsStateWithLifecycle()?.value?.config
     val playMarkerArt = remember { PlayMarkers() }
-    val playRegistry = remember(playMarkerArt) { playMapRegistry(playMarkerArt) }
+    val ferry = rememberFerryTimetable(play)
+    // One renderer per kind (KrakenAttack carries the ink casing, FrogRock the stamp + hop); rebuilt only with the timetable.
+    val playRegistry = remember(playMarkerArt, ferry) { playLiveRegistry(playMarkerArt, ferry) { AppGraph.playClock.now() } }
     val playMarkers = remember(playAgenda, playState?.solved, playConfig) {
         if (playAgenda == null || playConfig == null) emptyList()
         else PlayMarkerLogic.markers(playAgenda, playConfig.items.associate { it.id to it.lore }, playState?.solved?.keys.orEmpty())
@@ -272,7 +292,10 @@ fun MapTab(
     val krakenStretches = playAgenda?.active?.firstOrNull { it.occurrence.type == com.bainbridgetrails.play.config.ItemType.obstacle }?.occurrence?.placements?.map { it.ref }.orEmpty()
     val coast = remember(krakenStretches, playConfig) { playConfig?.let { c -> PlayMarkerLogic.coastOf(krakenStretches, c.pools.mapValues { it.value.members }) } }
     val coastLabel = coast?.let { stringResource(Res.string.play_kraken_coast, it) }
-    if (playOn) PlayMapSync(fx, playMarkerArt, playMarkers, playSelected, coastLabel)
+    if (playOn) {
+        PlayMapSync(fx, playMarkerArt, playMarkers, playSelected, coastLabel)
+        PlayMapEffectsSync(fx, play, snapshot?.segmentBuckets.orEmpty(), ferry = ferry != null)
+    }
 
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var choices by rememberSaveable { mutableStateOf<List<String>?>(null) }
@@ -474,6 +497,39 @@ fun MapTab(
         select(id, controller.mapState)
     }
 
+    // "Show on map" from What's On / Challenges (ux.md § 2.8, § 3.16): select the occurrence, open its sheet, fit it.
+    val playFocus by PlayMapFocus.key.collectAsStateWithLifecycle()
+    LaunchedEffect(playFocus, playMarkers, controller.mapState) {
+        val key = playFocus ?: return@LaunchedEffect
+        val map = controller.mapState ?: return@LaunchedEffect
+        if (!playOn) { PlayMapFocus.consume(); return@LaunchedEffect }
+        if (playMarkers.isEmpty()) return@LaunchedEffect // agenda not ready yet: the markers change re-runs this
+        PlayMapFocus.consume()
+        val t = PlayFocusLogic.target(key, playMarkers) ?: return@LaunchedEffect
+        clearSelection()
+        playSelected = t.select
+        following = false
+        delay(16)
+        if (t.isPoint) {
+            map.moveTo(CameraPosition(center = Position(longitude = t.centerLon, latitude = t.centerLat), zoom = maxOf(map.cameraPosition.zoom, PlayFocusLogic.POINT_ZOOM)), animate = !reduced)
+        } else {
+            map.fitTo(
+                com.bainbridgetrails.map.GeoBounds(west = t.west, south = t.south, east = t.east, north = t.north),
+                DpPadding(left = 48.dp, top = topInset + 128.dp, right = 48.dp, bottom = maxOf(stackHeight, 220.dp) + 24.dp),
+                animate = !reduced, minZoom = 10.5,
+            )
+        }
+    }
+    // Analytics (product § 7.4; gated: nothing while Play is off, PF0-4).
+    LaunchedEffect(playSelected) {
+        val key = playSelected ?: return@LaunchedEffect
+        val m = playMarkers.firstOrNull { it.key == key } ?: return@LaunchedEffect
+        graph.playAnalytics.track(com.bainbridgetrails.analytics.PlayAnalytics.CONTENT_OPENED, mapOf("type" to m.kind.name.lowercase(), "content_id" to m.itemId))
+    }
+    LaunchedEffect(playAgenda?.day?.date, playAgenda?.day?.quietDay) {
+        if (playAgenda?.day?.quietDay == true) graph.playAnalytics.track(com.bainbridgetrails.analytics.PlayAnalytics.QUIET_DAY)
+    }
+
     // Locate: follow the fix while following; first fix decides "off the island".
     val fix = locationState.lastLocation?.position
     LaunchedEffect(locating, following, fix, controller.mapState) {
@@ -560,6 +616,7 @@ fun MapTab(
     val mapA11y = stringResource(LocalGoal.current.s(Res.string.map_a11y), completed, total)
     val trailsLabel = stringResource(LocalGoal.current.s(Res.string.nav_trails))
     val animatedStack by animateDpAsState(stackHeight, tween(if (reduced) 0 else 200))
+    var claimPop by remember { mutableStateOf<ClaimPopState?>(null) }
 
     Box(modifier.fillMaxSize().onSizeChanged { mapHeight = with(density) { it.height.toDp() } }) {
         WithFxRenderOptions(fx) { renderOptions ->
@@ -622,7 +679,15 @@ fun MapTab(
                 } else {
                     val total = playState?.logbook?.total
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(end = 56.dp)) {
-                        PlayHud(total.takeIf { agenda != null }, stringResource(Ranks.of(total ?: 0).titleRes), onPlayLogbook)
+                        if (total != null && agenda != null) {
+                            val pop = remember { ClaimPopState(total) }
+                            claimPop = pop
+                            // claim_pop (effects § 3.12): claimed marks fly into the chip; the first value is the baseline.
+                            LaunchedEffect(total) { if (total > pop.total) pop.pop(total - pop.total, null, reduced) }
+                            LivePlayHud(pop, stringResource(Ranks.of(total).titleRes), onPlayLogbook)
+                        } else {
+                            PlayHud(null, stringResource(Ranks.of(0).titleRes), onPlayLogbook)
+                        }
                         val count = agenda?.let { PlayMarkerLogic.challengesThisWeek(it) } ?: 0
                         if (count > 0) ChallengesChip(count, onPlayChallenges, compact = true)
                     }
@@ -714,6 +779,8 @@ fun MapTab(
         }
 
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = stackHeight + 64.dp))
+        if (playOn) claimPop?.let { ClaimPopOverlay(it, Modifier.fillMaxSize(), announcer = fx?.announcer) }
+        if (wake) PlayWakeOnMap(controller, playAgenda, playMarkers, onWakeDone)
 
         riddleListFor?.let { id ->
             val options = remember(data, playConfig) {
@@ -781,4 +848,35 @@ private fun LoadingChip() {
         CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
         Text(stringResource(LocalGoal.current.s(Res.string.map_loading_trails)), style = MaterialTheme.typography.labelLarge, color = BtTheme.colors.onMapChrome)
     }
+}
+
+/** The Play chip fed by [pop]: its number rolls as claimed marks land (only this chip recomposes per frame). */
+@Composable
+private fun LivePlayHud(pop: ClaimPopState, rankTitle: String, onClick: () -> Unit) {
+    PlayHud(pop.chipValue(pop.frame.longValue), rankTitle, onClick, Modifier.claimPopTarget(pop))
+}
+
+/**
+ * "The island wakes up" over the live map (ux.md § 2.11, § 3.1–3.3): waits ≤ 2 s for the agenda, skips on a quiet
+ * day (§ 3.1), moves the map to the island camera, projects the coast and the present items' glyphs for that camera
+ * and plays [PlayWake]; [onDone] when it ends (or is skipped).
+ */
+@Composable
+private fun PlayWakeOnMap(controller: TrailMapController, agenda: PlayAgenda?, markers: List<PlayMarker>, onDone: () -> Unit) {
+    val agendaNow by rememberUpdatedState(agenda)
+    val markersNow by rememberUpdatedState(markers)
+    val done by rememberUpdatedState(onDone)
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val art by produceState<PlayWakeArt?>(null, controller) {
+        val map = snapshotFlow { controller.mapState }.first { it != null }!!
+        withTimeoutOrNull(2_000) { snapshotFlow { agendaNow }.first { it != null } }
+        if (agendaNow?.day?.quietDay == true) { done(); return@produceState }
+        withTimeoutOrNull(1_000) { snapshotFlow { markersNow }.first { it.isNotEmpty() } }
+        map.fitTo(IslandBounds, DpPadding(left = 8.dp, top = topInset + 128.dp, right = 8.dp, bottom = 56.dp), animate = false, minZoom = 10.5)
+        delay(32)
+        val cam = map.cameraPosition
+        val items = markersNow.map { com.bainbridgetrails.play.fx.GeoPoint(lon = it.lon, lat = it.lat) }
+        value = PlayWakeArt.load(items, com.bainbridgetrails.play.fx.GeoPoint(lon = cam.center.longitude, lat = cam.center.latitude), cam.zoom)
+    }
+    art?.let { PlayWake(it, onDone = { done() }) }
 }

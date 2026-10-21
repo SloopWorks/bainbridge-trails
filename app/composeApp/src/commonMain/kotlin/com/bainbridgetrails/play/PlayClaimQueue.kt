@@ -34,6 +34,8 @@ data class QueuedPlay(
     val claims: List<PlayClaimDto> = emptyList(),
     val dayKey: String? = null,
     val hints: Map<String, Int>? = null,
+    /** The walk has walk-derived Logbook entries ([WalkMarks]): sent even with no claims, so the server derives them. */
+    val walkMarks: Boolean = false,
 )
 
 @Serializable
@@ -50,6 +52,8 @@ data class PlaySettled(
     val capped: Set<String> = emptySet(),
     val localOnly: Map<String, String> = emptyMap(),
     val day: BoardState? = null,
+    /** The walk's walk-derived entries ([WalkMarks.SETTLED_WITH_WALK]): accepted once the upload is answered with `play`. */
+    val walk: BoardState? = null,
 )
 
 /**
@@ -83,6 +87,7 @@ class PlayClaimQueue(path: String, private val io: CoroutineDispatcher = Dispatc
                 claims = old.claims + element.claims.filter { it.id !in ids },
                 dayKey = old.dayKey ?: element.dayKey,
                 hints = ((old.hints ?: emptyMap()) + (element.hints ?: emptyMap())).ifEmpty { null },
+                walkMarks = old.walkMarks || element.walkMarks,
             )
             f.walks.toMutableList().also { it[i] = merged }
         }
@@ -111,7 +116,7 @@ class PlayClaimQueue(path: String, private val io: CoroutineDispatcher = Dispatc
         var claims = 0
         for (e in queued) {
             val walkId = walkIdBySession[e.sessionId] ?: continue
-            if (walkId !in walksInThisUpload || (e.claims.isEmpty() && e.dayKey == null)) continue
+            if (walkId !in walksInThisUpload || (e.claims.isEmpty() && e.dayKey == null && !e.walkMarks)) continue
             if (claims + e.claims.size > MAX_CLAIMS) continue
             claims += e.claims.size
             included[e.sessionId] = PlayWalkClaimsDto(walkId, e.claims, e.dayKey, e.hints?.ifEmpty { null })
@@ -163,6 +168,7 @@ class PlayClaimQueue(path: String, private val io: CoroutineDispatcher = Dispatc
                     capped = ids.filterTo(LinkedHashSet()) { it in r.capped },
                     localOnly = ids.filter { it in rejected || it !in accepted }.associateWith { rejected[it] ?: NO_ANSWER },
                     day = e.dayKey?.let { BoardState.accepted },
+                    walk = BoardState.accepted.takeIf { e.walkMarks },
                 )
             }
         }
@@ -172,6 +178,7 @@ class PlayClaimQueue(path: String, private val io: CoroutineDispatcher = Dispatc
         sessionId = e.sessionId,
         localOnly = e.claims.associate { it.id to code },
         day = e.dayKey?.let { BoardState.local_only },
+        walk = BoardState.local_only.takeIf { e.walkMarks },
     )
 
     private suspend fun read(): PlayClaimFile = withContext(io) { file.read() ?: PlayClaimFile() }
@@ -251,6 +258,7 @@ object PlayClaims {
                 if (e.board != BoardState.pending) return@map e
                 when {
                     e.kind == LogKind.day -> s.day?.let { e.copy(board = it) } ?: e
+                    e.kind in WalkMarks.SETTLED_WITH_WALK -> s.walk?.let { e.copy(board = it) } ?: e
                     e.contentId == null -> e
                     e.contentId in s.capped -> e.copy(board = BoardState.accepted, marks = 0, capped = true)
                     e.contentId in s.accepted -> e.copy(board = BoardState.accepted)

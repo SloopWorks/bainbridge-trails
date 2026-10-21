@@ -326,7 +326,7 @@ fun RanksScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: () -> 
 
 /** What's On (ux.md § 3.15): the agenda as rows; island time with the suffix when the phone differs. */
 @Composable
-fun WhatsOnScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: () -> Unit, onChallenges: () -> Unit, onLore: (String) -> Unit, onShowOnMap: () -> Unit) {
+fun WhatsOnScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: () -> Unit, onChallenges: () -> Unit, onLore: (String) -> Unit, onShowOnMap: (String?) -> Unit) {
     val title = stringResource(Res.string.play_whats_on_title)
     WithPlay(graph, title, onBack) { play ->
         val agenda by play.agenda.collectAsStateWithLifecycle()
@@ -364,8 +364,8 @@ fun WhatsOnScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: () -
                 val onClick: (() -> Unit)? = when (row.kind) {
                     WhatsOnKind.Challenge -> onChallenges
                     WhatsOnKind.Memorial -> ({ onLore(row.itemId) })
-                    // L2-10: open this occurrence's EncounterSheet on the Map (ux § 2.8: MapRoute with row.key), not just the tab.
-                    else -> onShowOnMap
+                    // ux § 2.8: the Map tab with this occurrence selected and its EncounterSheet open.
+                    else -> ({ onShowOnMap(row.key) })
                 }
                 WhatsOnRow(row.kind, rowTitle, window, row.gate, WhatsOnLogic.spoken(rowTitle, window, starsSpoken), onClick)
             }
@@ -389,7 +389,7 @@ fun WhatsOnScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: () -
 
 /** Challenges (ux.md § 3.16, PF9): Just you / Whole island / Ended; card → ChallengeSheet. */
 @Composable
-fun ChallengesScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: () -> Unit, onShowOnMap: () -> Unit) {
+fun ChallengesScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: () -> Unit, onShowOnMap: (String?) -> Unit) {
     val title = stringResource(Res.string.play_challenges_title)
     WithPlay(graph, title, onBack) { play ->
         val agenda by play.agenda.collectAsStateWithLifecycle()
@@ -422,8 +422,11 @@ fun ChallengesScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: (
         open?.let { card ->
             ChallengeSheet(
                 card,
-                // L2-10: land on the Map with the KrakenAttackSheet open (ux § 3.16), not just the Map tab.
-                onShowOnMap = if (card.itemId == "ch-krakenweek") ({ open = null; onShowOnMap() }) else null,
+                // ux § 3.16: the Map with this week's KrakenAttackSheet open.
+                onShowOnMap = if (card.itemId == "ch-krakenweek") ({
+                    open = null
+                    onShowOnMap(agenda?.active?.firstOrNull { it.occurrence.type == com.bainbridgetrails.play.config.ItemType.obstacle }?.occurrence?.key)
+                }) else null,
                 onDismiss = { open = null },
             )
         }

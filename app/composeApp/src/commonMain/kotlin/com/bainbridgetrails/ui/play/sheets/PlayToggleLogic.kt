@@ -89,8 +89,17 @@ class PlayOptInGraph(
     private val updatePlay: suspend ((PlaySettings) -> PlaySettings) -> Unit,
     private val repo: () -> PlayRepository?,
     private val timeoutMs: Long = 5_000L,
+    /** Gated Play events (`play_enabled` after the write, `play_disabled` before it: both while Play is on). */
+    private val analytics: com.bainbridgetrails.analytics.PlayAnalytics? = null,
+    /** `play_enabled` source: `settings` or `offer`. */
+    private val source: String = "settings",
+    private val goal: String = "",
 ) : PlayOptIn {
-    override suspend fun setEnabled(on: Boolean) = updatePlay { it.copy(enabled = on, everToggled = true) }
+    override suspend fun setEnabled(on: Boolean) {
+        if (!on) analytics?.track(com.bainbridgetrails.analytics.PlayAnalytics.DISABLED, mapOf("goal" to goal))
+        updatePlay { it.copy(enabled = on, everToggled = true) }
+        if (on) analytics?.track(com.bainbridgetrails.analytics.PlayAnalytics.ENABLED, mapOf("source" to source, "goal" to goal))
+    }
 
     override suspend fun awaitStartBalance(): Int? = withTimeoutOrNull(timeoutMs) {
         var current = repo()

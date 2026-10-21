@@ -1,5 +1,7 @@
 package com.bainbridgetrails.ui.play.map
 
+import com.bainbridgetrails.data.LocalGoal
+
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -55,7 +57,7 @@ fun rememberEncounterCopy(): EncounterCopy = EncounterCopy(
     gateTideUnknown = stringResource(Res.string.play_gate_tide_unknown), tagHistory = stringResource(Res.string.play_tag_history),
     tagTallTale = stringResource(Res.string.play_tag_tall_tale), tagRemembrance = stringResource(Res.string.play_tag_remembrance),
     safetyShore = stringResource(Res.string.play_safety_shore), krakenTitle = stringResource(Res.string.play_kraken_title),
-    krakenBody = stringResource(Res.string.play_kraken_body), krakenRule = stringResource(Res.string.play_kraken_rule),
+    krakenBody = stringResource(LocalGoal.current.s(Res.string.play_kraken_body)), krakenRule = stringResource(Res.string.play_kraken_rule),
     krakenUntil = stringResource(Res.string.play_kraken_until), krakenReward = stringResource(Res.string.play_kraken_reward),
     stretchProgress = stringResource(Res.string.play_kraken_stretch_progress), repelledYou = stringResource(Res.string.play_kraken_repelled_you),
     findTitleEgg = stringResource(Res.string.play_find_title_egg),

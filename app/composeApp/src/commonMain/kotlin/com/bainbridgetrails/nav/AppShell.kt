@@ -36,6 +36,18 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.bainbridgetrails.analytics.AnalyticsEvents
+import com.bainbridgetrails.analytics.PlayAnalytics
+import com.bainbridgetrails.data.DatasetProfile
+import com.bainbridgetrails.play.playGoal
+import com.bainbridgetrails.ui.play.components.rememberPlay
+import com.bainbridgetrails.ui.play.map.PlayMapFocus
+import com.bainbridgetrails.ui.play.sheets.PlayOfferSheet
+import com.bainbridgetrails.ui.play.sheets.PlayOfferWatcher
+import com.bainbridgetrails.ui.play.sheets.PlayOptInGraph
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.input.pointer.pointerInput
 import com.bainbridgetrails.data.AppSettings
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.auth.isSignedIn
@@ -159,6 +171,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
         if (launch == null && !settings.onboardingDone) nav.navigate(OnboardingRoute)
     }
     LaunchedEffect(destination) {
+        if (destination?.hasRoute(LogbookRoute::class) == true) graph.playAnalytics.track(PlayAnalytics.LOGBOOK_OPENED)
         destination?.route?.let { AppGraph.analytics.track(AnalyticsEvents.SCREEN_VIEW, mapOf("route" to it.substringAfterLast('.').substringBefore('/').substringBefore('?'))) }
     }
     // F6: a walk that completes trails (or a debug tool) opens the celebration once per key. A finished walk's
@@ -197,6 +210,41 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
     val barPadding = if (showBar) BtTheme.spacing.bottomBarHeight + navInset else 0.dp
     val playSnackbar = remember { androidx.compose.material3.SnackbarHostState() }
     val playScope = androidx.compose.runtime.rememberCoroutineScope()
+    // Play (ux.md § 2.11, § 3.1, § 3.3): the wake over the Map, then the start-balance snackbar; the one-time offer.
+    var wake by remember { mutableStateOf(false) }
+    var pendingBalance by remember { mutableStateOf<Int?>(null) }
+    var showOffer by remember { mutableStateOf(false) }
+    var offerStarting by remember { mutableStateOf(false) }
+    val play = rememberPlay(graph, settings.play.enabled)
+    val quietDay = play?.agenda?.collectAsState()?.value?.day?.quietDay == true
+    fun showBalance(marks: Int?) {
+        if (marks == null) return
+        graph.playAnalytics.track(PlayAnalytics.START_BALANCE, mapOf("marks" to marks.toString()))
+        playScope.launch { playSnackbar.showSnackbar(org.jetbrains.compose.resources.getString(Res.string.play_start_balance, com.bainbridgetrails.ui.play.components.PlayFormat.marks(marks))) }
+    }
+    /** Start / replay: the Map tab, then the wake (MapTab skips it on a quiet day), then the snackbar. */
+    fun startWake(marks: Int?) {
+        nav.selectTab(MapRoute)
+        pendingBalance = marks
+        wake = true
+    }
+    LaunchedEffect(controller) {
+        val c = controller ?: return@LaunchedEffect
+        val watcher = PlayOfferWatcher()
+        c.state.collect { st ->
+            val closed = watcher.onState(st) ?: return@collect
+            playScope.launch {
+                delay(PlayOfferWatcher.DELAY_MS)
+                val p = graph.settings.settings.value?.play ?: return@launch
+                val d = nav.currentDestination
+                val blocking = d.isTab(RecordRoute) || d.isTab(OnboardingRoute) || d?.hasRoute(CelebrationRoute::class) == true
+                if (PlayOfferWatcher.shouldShow(p, closed, c.state.value is RecordingState.Recording, blocking)) {
+                    graph.settings.update { it.copy(play = it.play.copy(offerShown = true)) } // once per install, ever (PF2-3)
+                    showOffer = true
+                }
+            }
+        }
+    }
     Box(Modifier.fillMaxSize()) {
         NavHost(
             nav,
@@ -210,6 +258,14 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     onLeaderboard = { nav.navigate(LeaderboardRoute) },
                     onSearch = { nav.selectTab(TrailsRoute) },
                     onRecord = { nav.openRecord() },
+                    onPlayLogbook = { nav.navigate(LogbookRoute) },
+                    onPlayChallenges = { nav.navigate(ChallengesRoute) },
+                    wake = wake,
+                    onWakeDone = {
+                        wake = false
+                        showBalance(pendingBalance)
+                        pendingBalance = null
+                    },
                 )
             }
             composable<TrailsRoute> { TrailsScreen(graph, settings, onTrail = { nav.navigate(TrailDetailRoute(it)) }, onLeaderboard = { nav.navigate(LeaderboardRoute) }) }
@@ -267,14 +323,11 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     onAccount = { nav.navigate(ProfileRoute) },
                     onAttribution = { nav.navigate(AttributionRoute) },
                     onPrivacy = { nav.navigate(PrivacyRoute) },
-                    // Play (ux.md § 3.1): Start lands on the Map (Settings stays in the Me stack); L2-10 adds the wake.
-                    onPlayStarted = { marks ->
-                        nav.selectTab(MapRoute)
-                        if (marks != null) playScope.launch { playSnackbar.showSnackbar(org.jetbrains.compose.resources.getString(Res.string.play_start_balance, com.bainbridgetrails.ui.play.components.PlayFormat.marks(marks))) }
-                    },
+                    // Play (ux.md § 3.1): Start lands on the Map (Settings stays in the Me stack), the wake plays, then the snackbar.
+                    onPlayStarted = { marks -> startWake(marks) },
                     onRanks = { nav.navigate(RanksRoute) },
                     onLogbook = { nav.navigate(LogbookRoute) },
-                    // L2-10: onReplayWake = { select Map + replay PlayWake } (the row stays hidden until then).
+                    onReplayWake = if (quietDay) null else ({ startWake(null) }),
                     onPlayClock = { nav.navigate(PlayClockDebugRoute) },
                 )
             }
@@ -309,13 +362,42 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             composable<WhatsOnRoute> {
                 com.bainbridgetrails.ui.play.screens.WhatsOnScreen(
                     graph, settings, onBack = { nav.popBackStack() }, onChallenges = { nav.navigate(ChallengesRoute) },
-                    onLore = { nav.navigate(LoreCardRoute(it)) }, onShowOnMap = { nav.selectTab(MapRoute) },
+                    onLore = { nav.navigate(LoreCardRoute(it)) }, onShowOnMap = { key -> showOnMap(nav, key) },
                 )
             }
-            composable<ChallengesRoute> { com.bainbridgetrails.ui.play.screens.ChallengesScreen(graph, settings, onBack = { nav.popBackStack() }, onShowOnMap = { nav.selectTab(MapRoute) }) }
+            composable<ChallengesRoute> { com.bainbridgetrails.ui.play.screens.ChallengesScreen(graph, settings, onBack = { nav.popBackStack() }, onShowOnMap = { key -> showOnMap(nav, key) }) }
             composable<IslandStoriesRoute> { com.bainbridgetrails.ui.play.screens.IslandStoriesScreen(graph, settings, onBack = { nav.popBackStack() }, onLore = { nav.navigate(LoreCardRoute(it)) }) }
             composable<LoreCardRoute> { entry -> com.bainbridgetrails.ui.play.screens.LoreCardScreen(graph, settings, entry.toRoute<LoreCardRoute>().itemId, onBack = { nav.popBackStack() }) }
             composable<PlayClockDebugRoute> { com.bainbridgetrails.ui.play.screens.PlayClockDebugScreen(graph, settings, onBack = { nav.popBackStack() }) }
+        }
+        if (showOffer) {
+            PlayOfferSheet(
+                starting = offerStarting,
+                onStart = {
+                    playScope.launch {
+                        offerStarting = true
+                        val optIn = PlayOptInGraph(
+                            updatePlay = { change -> graph.settings.updateNow { it.copy(play = change(it.play)) } },
+                            repo = { graph.playOrNull },
+                            analytics = graph.playAnalytics, source = "offer", goal = DatasetProfile.current.playGoal.name,
+                        )
+                        optIn.setEnabled(true)
+                        val marks = optIn.awaitStartBalance()
+                        offerStarting = false
+                        showOffer = false
+                        startWake(marks)
+                    }
+                },
+                onDismiss = { showOffer = false },
+            )
+        }
+        // ux.md § 2.11: the bar stays visible but inert while the wake plays over the Map.
+        if (wake && showBar) {
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(barPadding).pointerInput(Unit) {
+                    awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } }
+                },
+            )
         }
         androidx.compose.material3.SnackbarHost(playSnackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = barPadding + 24.dp))
         if (showBar) {
@@ -349,6 +431,12 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
             )
         }
     }
+}
+
+/** "Show on map" for a Play occurrence (ux.md § 2.8): the Map tab selects it and opens its sheet ([PlayMapFocus]). */
+private fun showOnMap(nav: NavController, key: String?) {
+    key?.let(PlayMapFocus::request)
+    nav.selectTab(MapRoute)
 }
 
 /** What [AppShell] reads from the recording state; equal values skip recomposition. */

@@ -68,6 +68,7 @@ import com.bainbridgetrails.ui.components.IslandGeometry
 import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PlayDark
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource

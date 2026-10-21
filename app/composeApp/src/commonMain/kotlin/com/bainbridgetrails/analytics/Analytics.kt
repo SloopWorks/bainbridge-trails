@@ -30,3 +30,26 @@ object AnalyticsEvents {
     const val WALK_FINISHED = "walk_finished"
     const val TRAIL_COMPLETED = "trail_completed"
 }
+
+/**
+ * Play's analytics events (docs/play/product.md § 7.4) behind the Play gate: [track] drops every event unless Play is
+ * on at that moment ([playOn], read per call), so a never-enabled or turned-off install emits no `play_*` event
+ * (PF0-4, PP-2). The offer events are not emitted: the offer only ever shows while Play is off, and PF0-4 wins over
+ * § 7.4's `play_offer_*` rows (an accepted offer is `play_enabled` with `source=offer`).
+ */
+class PlayAnalytics(private val sink: () -> Analytics, private val playOn: () -> Boolean) {
+    fun track(event: String, props: Map<String, String> = emptyMap()) {
+        require(event.startsWith(PREFIX)) { "not a Play event: $event" }
+        if (playOn()) sink().track(event, props)
+    }
+
+    companion object {
+        const val PREFIX = "play_"
+        const val ENABLED = "play_enabled"
+        const val DISABLED = "play_disabled"
+        const val START_BALANCE = "play_start_balance"
+        const val LOGBOOK_OPENED = "play_logbook_opened"
+        const val QUIET_DAY = "play_quiet_day"
+        const val CONTENT_OPENED = "play_content_opened"
+    }
+}

@@ -378,6 +378,9 @@ Only when signed in **and** Play is on. Two optional body fields next to the cov
 
 - One element per walk, tied by `walkId` to a `walks[]` entry of the **same** upload; at most 50 claims per upload
   (`400 too_many_claims`). Walks over the walk cap keep their element queued for the next upload.
+- An element may have `claims: []` and no `dayKey`: the app sends one for a walk that earned only walk-derived
+  marks (W-COV / W-DONE / W-SQUARE) so the server derives them now and answers with `play.total`; until that answer
+  the phone shows those Logbook lines as provisional.
 - `kind` ∈ `treasure`, `egg`, `riddle`, `ink` (kraken stretch), `lore`, `challenge`; `band` (60 / 80 / 95) only on
   `ink`. `weekId` = the week id the claim belongs to. `dayKey` = the week id, sent once per island day on the walk
   that earned W-DAY (server: ≤ 7 per week). `hints` = hints used per riddle item claimed on this walk (0–2 count).

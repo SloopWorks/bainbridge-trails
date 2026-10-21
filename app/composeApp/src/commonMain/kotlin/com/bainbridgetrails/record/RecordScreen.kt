@@ -325,13 +325,17 @@ private fun RecordContent(
         }
     }
 
+    // The record map draws the same live Play scene (fog, ink, finds) as the Map tab (product § 5.3 Record row).
+    val recordFerry = com.bainbridgetrails.ui.play.map.rememberFerryTimetable(play)
+    val recordRegistry = remember(recordFerry) { com.bainbridgetrails.ui.play.map.playLiveRegistry(null, recordFerry) { AppGraph.playClock.now() } }
     Box(modifier.fillMaxSize()) {
         RecordMap(
             controller, style, launch,
             follow = follow && state !is RecordingState.Done,
             fitWalkAbove = if (state is RecordingState.Done) resultsSheetH else null,
             // Play gate (engine PF-8/PF-9): null when Play is off; ambient effects rest while a walk records.
-            fxInputs = fxHostInputs(settings.play, recording = recording != null),
+            fxInputs = fxHostInputs(settings.play, recording = recording != null, renderers = recordRegistry),
+            play = play,
         )
 
         val busy = state is RecordingState.Finalizing || state is RecordingState.Stopped
@@ -680,6 +684,7 @@ private fun RecordMap(
     follow: Boolean,
     fitWalkAbove: Dp? = null,
     fxInputs: FxHostInputs? = null,
+    play: com.bainbridgetrails.play.PlayRepository? = null,
 ) {
     val track by controller.track.collectAsState()
     val drawn = rememberThrottledTrack(track)
@@ -699,6 +704,7 @@ private fun RecordMap(
     val extra = if (style.isDark) BtExtraDark else BtExtraLight
     val fx = if (fxInputs != null) rememberFxHost(fxInputs, mapController) else null
     val fxOverlay: (@Composable MapOverlayScope.() -> Unit)? = remember(fx) { if (fx != null) ({ FxOverlay(fx) }) else null }
+    if (fx != null) com.bainbridgetrails.ui.play.map.PlayMapEffectsSync(fx, play, buckets, ferry = false)
     // Taps reset FX's 20 s ambient idle stop (PF-2) like camera moves do; no Play = today's interactions.
     val interactions = remember(fx) { if (fx != null) chartInteractions(onTap = { fx.noteInteraction() }) else chartInteractions() }
     WithFxRenderOptions(fx) { renderOptions ->

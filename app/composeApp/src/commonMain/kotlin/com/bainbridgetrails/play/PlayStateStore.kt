@@ -30,6 +30,8 @@ data class PlayState(
     val solved: Map<String, String> = emptyMap(),
     val hints: Map<String, Int> = emptyMap(),
     val logbook: Logbook = Logbook(),
+    /** The walk-derived snapshot the Logbook was last brought up to (start balance, each finished walk); see [WalkMarks]. */
+    val derivedBase: DerivedBase? = null,
 ) {
     /** The scheduler's view (salt is v2). A solve counts from the start of its island day. */
     fun userState(): PlayUserState = PlayUserState(

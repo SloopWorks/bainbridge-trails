@@ -54,6 +54,8 @@ import com.bainbridgetrails.play.DatasetPlaceIndex
 import com.bainbridgetrails.play.PlayClaimQueue
 import com.bainbridgetrails.play.PlayClock
 import com.bainbridgetrails.play.PlayContentRepository
+import com.bainbridgetrails.play.PlayDerived
+import com.bainbridgetrails.play.WalkContext
 import com.bainbridgetrails.play.PlayGate
 import com.bainbridgetrails.play.PlayRepository
 import com.bainbridgetrails.play.PlayStateStore
@@ -218,6 +220,9 @@ object AppGraph {
 
         // --- Play (docs/play/plan.md L2-3; PD-1: nothing exists while Play is off)
 
+        /** Play's analytics events, dropped unless Play is on at the moment of the event (PF0-4). */
+        val playAnalytics = com.bainbridgetrails.analytics.PlayAnalytics({ analytics }, { settings.settings.value?.play?.enabled == true })
+
         private val playGate = PlayGate(scope, settings.settings.map { it?.play }) { createPlay() }
 
         /**
@@ -255,11 +260,20 @@ object AppGraph {
                     emitAll(controller.track)
                 },
                 api = api,
-                // Beside the sync queue: per goal, per install, not backed up.
-                claims = PlayClaimQueue("$privateDir/${DatasetProfile.current.storeName("play-claims.json")}", Dispatchers.IO),
+                claims = playClaims,
                 signedIn = { auth.state.value is AuthState.SignedIn },
                 walkDerived = { snapshotMarks(goal) },
+                walkContext = {
+                    val d = PlayDerived.parse(derived())
+                    WalkContext(d.quietZones, d.quietFeatures, datasets.await().dataset.trails.associate { it.id to it.name })
+                },
+                derivedSource = { PlayDerived.parse(derived()) },
             )
+        }
+
+        /** Play's claim queue: beside the sync queue, per goal, per install, not backed up. A file handle only (PD-1). */
+        private val playClaims: PlayClaimQueue by lazy {
+            PlayClaimQueue("$privateDir/${DatasetProfile.current.storeName("play-claims.json")}", Dispatchers.IO)
         }
 
         /** The opt-in starting balance's input: walk-derived marks of the current local coverage (product § 3.6.4). */
@@ -290,6 +304,8 @@ object AppGraph {
          */
         internal suspend fun wipeLocalProgress() {
             RecordingGraph.wipeLocal(context)
+            // The account is gone: queued Play claims of its walks must never be sent (to it or the next account).
+            playClaims.clear()
             coverageChanged()
         }
 

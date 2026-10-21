@@ -1,5 +1,7 @@
 package com.bainbridgetrails.ui
 
+import com.bainbridgetrails.play.playGoal
+
 import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -158,7 +160,7 @@ fun SettingsScreen(
     onPlayStarted: (Int?) -> Unit = {},
     onRanks: () -> Unit = {},
     onLogbook: () -> Unit = {},
-    /** "Replay the island waking up": null hides the row (L2-10 wires PlayWake; until then there is nothing to replay). */
+    /** "Replay the island waking up": null hides the row (the quiet day hides it, ux § 3.1). */
     onReplayWake: (() -> Unit)? = null,
     onPlayClock: () -> Unit = {},
 ) {
@@ -279,6 +281,8 @@ private fun rememberPlayToggle(graph: AppGraph.Installed, enabled: Boolean): Pla
             PlayOptInGraph(
                 updatePlay = { change -> graph.settings.updateNow { it.copy(play = change(it.play)) } },
                 repo = { graph.playOrNull },
+                analytics = graph.playAnalytics,
+                goal = com.bainbridgetrails.data.DatasetProfile.current.playGoal.name,
             ),
             enabled,
         )
@@ -322,7 +326,6 @@ private fun LazyListScope.playSection(
                 NavRow(stringResource(Res.string.play_settings_ranks), onRanks)
                 NavRow(stringResource(Res.string.play_settings_logbook), onLogbook)
                 NavRow(stringResource(Res.string.play_settings_about), onAbout)
-                // L2-10: AppShell passes onReplayWake once PlayWake replays (ux § 3.1; hidden on the quiet day).
                 if (onReplayWake != null) NavRow(stringResource(Res.string.play_settings_replay), onReplayWake, trailingIcon = null)
                 if (onPlayClock != null) NavRow(stringResource(Res.string.play_settings_clock_debug), onPlayClock)
             }
