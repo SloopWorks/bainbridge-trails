@@ -32,5 +32,8 @@ sealed interface Route
 /** Debug spike: the map style comparison screen (`screen=style` launch option). */
 @Serializable data object StyleSpikeRoute : Route
 
+/** Debug spike: MapFx Stage 0 spikes (`screen=fx` launch option / `-btScreen fx`; docs/play/spikes/fx.md). */
+@Serializable data object FxSpikeRoute : Route
+
 /** Debug: design-system showcase (`screen=showcase` launch option). */
 @Serializable data object ShowcaseRoute : Route

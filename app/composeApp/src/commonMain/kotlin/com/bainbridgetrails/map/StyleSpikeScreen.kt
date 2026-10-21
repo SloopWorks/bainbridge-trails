@@ -51,12 +51,20 @@ data class SpikeLaunch(
     val switchAfterMs: Long = 4000,
     /** Showcase page (`section=tokens|components|states`). */
     val section: String? = null,
+    /** FX spike (`screen=fx`): run the scripted MapFx Stage 0 sequence once (`fxAuto=1`). */
+    val fxAuto: Boolean = false,
+    /** FX spike, Android: `fxTexture=1` uses AndroidRenderMode.Texture. */
+    val fxTexture: Boolean = false,
+    /** FX spike: `fxNoTween=1` sets a zero paint transition on the animated S1/R8 properties. */
+    val fxNoTween: Boolean = false,
+    /** FX spike: `fxMaxFps=30` caps MapLibre rendering (RenderOptions.maximumFps). */
+    val fxMaxFps: Int? = null,
 ) {
-    enum class Screen { RECORD, STYLE, SHOWCASE }
+    enum class Screen { RECORD, STYLE, SHOWCASE, FX }
 
     companion object {
         /**
-         * Parses `key=value` options: screen=record|style|showcase, section, style=TOPO|MINIMAL_LIGHT|DARK, lat, lon, zoom, switchTo,
+         * Parses `key=value` options: screen=record|style|showcase|fx, fxAuto, section, style=TOPO|MINIMAL_LIGHT|DARK, lat, lon, zoom, switchTo,
          * switchAfterMs. Without `screen`, a `style` or `switchTo` option still opens the style spike (older scripts).
          */
         fun parse(options: Map<String, String>): SpikeLaunch {
@@ -68,6 +76,7 @@ data class SpikeLaunch(
                 "style" -> Screen.STYLE
                 "record" -> Screen.RECORD
                 "showcase" -> Screen.SHOWCASE
+                "fx" -> Screen.FX
                 else -> if ("style" in options || "switchTo" in options) Screen.STYLE else Screen.RECORD
             }
             return SpikeLaunch(
@@ -80,6 +89,10 @@ data class SpikeLaunch(
                 switchTo = style(options["switchTo"]),
                 switchAfterMs = options["switchAfterMs"]?.toLongOrNull() ?: 4000,
                 section = options["section"],
+                fxAuto = options["fxAuto"] == "1",
+                fxTexture = options["fxTexture"] == "1",
+                fxNoTween = options["fxNoTween"] == "1",
+                fxMaxFps = options["fxMaxFps"]?.toIntOrNull(),
             )
         }
     }

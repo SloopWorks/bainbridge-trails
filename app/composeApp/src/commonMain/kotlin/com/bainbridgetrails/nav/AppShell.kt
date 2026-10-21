@@ -41,6 +41,7 @@ import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.auth.isSignedIn
 import com.bainbridgetrails.map.SpikeLaunch
 import com.bainbridgetrails.map.StyleSpikeScreen
+import com.bainbridgetrails.play.spike.FxSpikeScreen
 import com.bainbridgetrails.record.RecordScreen
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.nav_map
@@ -100,6 +101,7 @@ internal fun startRouteFor(launch: SpikeLaunch?): Route = when (launch?.screen) 
     SpikeLaunch.Screen.RECORD -> RecordRoute
     SpikeLaunch.Screen.STYLE -> StyleSpikeRoute
     SpikeLaunch.Screen.SHOWCASE -> ShowcaseRoute
+    SpikeLaunch.Screen.FX -> FxSpikeRoute
 }
 
 /** Opens the Record flow as a full-screen layer over the current screen (ux.md §2.5); never a tab of its own. */
@@ -283,6 +285,7 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                 )
             }
             composable<StyleSpikeRoute> { StyleSpikeScreen(launch ?: SpikeLaunch(), Modifier.fillMaxSize()) }
+            composable<FxSpikeRoute> { FxSpikeScreen(launch ?: SpikeLaunch(), Modifier.fillMaxSize()) }
             composable<ShowcaseRoute> { ShowcaseScreen(section = launch?.section) }
         }
         if (showBar) {
@@ -361,6 +364,7 @@ private suspend fun openDebugScreen(nav: NavController, graph: AppGraph.Installe
         "attribution" -> nav.navigate(AttributionRoute)
         "privacy" -> nav.navigate(PrivacyRoute)
         "onboarding" -> nav.navigate(OnboardingRoute)
+        "fx" -> nav.navigate(FxSpikeRoute) // MapFx Stage 0 spike (docs/play/spikes/fx.md)
         "celebrate-island" -> AppGraph.requestCelebration(AppGraph.Celebration("debug-island-${nowMs()}", emptyList(), island = true, preview = true))
         "walk" -> graph.walks.refreshNow().walks.firstOrNull()?.let { nav.navigate(WalkDetailRoute(it.sessionId)) } // newest walk
         else -> when {
