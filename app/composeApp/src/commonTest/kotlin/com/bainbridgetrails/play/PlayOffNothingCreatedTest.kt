@@ -8,6 +8,8 @@ import com.bainbridgetrails.net.Reply
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.fx.fxHostInputs
 import com.bainbridgetrails.play.schedule.DerivedGoal
+import com.bainbridgetrails.ui.PlayMapAlloc
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -51,6 +53,7 @@ class PlayOffNothingCreatedTest {
     @Test
     fun playOffPlayOrNullNullNoFxClockNoPlaySensingNoPlayRequest() = runTest {
         val sensingBefore = PlaySensing.created
+        val markersBefore = PlayMapAlloc.markersCreated
         val g = gate()
         g.start()
         settings.value = PlaySettings() // loaded: off (the default)
@@ -64,6 +67,9 @@ class PlayOffNothingCreatedTest {
         assertNull(fxHostInputs(PlaySettings(), recording = false), "no FxHost, so no FxClock")
         assertNull(fxHostInputs(PlaySettings(), recording = true))
         assertEquals(0, playRequests(), "no /v1/play request (PF0-2)")
+        // Round 1 P2-10: the Map's Play marker renderer (and so its registry) is not built while off.
+        assertNull(PlayMapAlloc.markersOrNull(settings.value?.enabled == true))
+        assertEquals(markersBefore, PlayMapAlloc.markersCreated, "no PlayMarkers constructed while off")
 
         // Turning Play on creates it once and starts it; the content check is the first Play request.
         settings.value = PlaySettings(enabled = true)
@@ -72,6 +78,8 @@ class PlayOffNothingCreatedTest {
         assertEquals(1, created)
         assertEquals(sensingBefore + 1, PlaySensing.created)
         assertTrue(playRequests() >= 1)
+        assertNotNull(PlayMapAlloc.markersOrNull(settings.value?.enabled == true))
+        assertEquals(markersBefore + 1, PlayMapAlloc.markersCreated)
 
         // Off again: hidden and stopped, nothing deleted, no further request; on again reuses the same instance.
         settings.value = PlaySettings(enabled = false)
@@ -85,5 +93,23 @@ class PlayOffNothingCreatedTest {
         runCurrent()
         assertSame(repo, g.current)
         assertEquals(1, created)
+    }
+
+    /**
+     * Branch review round 1 P1-6: launch-time finalization awaits the gate, which settles once the loaded settings were
+     * applied (Play on: the repository exists and runs, so its hook is there for the stopped walks).
+     */
+    @Test
+    fun awaitSettledReturnsOnceLoadedSettingsWereApplied() = runTest {
+        val g = gate()
+        g.start()
+        runCurrent()
+        val waiting = backgroundScope.async { g.awaitSettled(timeoutMs = 60_000) }
+        runCurrent()
+        assertTrue(waiting.isActive, "settings not loaded yet")
+        settings.value = PlaySettings(enabled = true)
+        runCurrent()
+        assertTrue(waiting.isCompleted)
+        assertTrue(assertNotNull(g.current).running)
     }
 }

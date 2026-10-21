@@ -66,6 +66,7 @@ class SyncRepositoryTest {
         dataset: String = "trails",
         uploadable: ((String) -> Boolean)? = null,
         playPart: (suspend (Map<String, String>, Set<String>) -> PlayPart?)? = null,
+        playInFlight: suspend () -> Set<String> = { emptySet() },
     ) = SyncRepository(
         scope = scope,
         api = server.client(token = { user?.let { "tok-$it" } }, dataset = dataset),
@@ -79,6 +80,7 @@ class SyncRepositoryTest {
         backoffMs = emptyList(),
         newWalkId = { "00000000-0000-4000-8000-${(++ids).toString().padStart(12, '0')}" },
         playPart = playPart,
+        playInFlight = playInFlight,
     )
 
     private fun uploads() = server.requests.filter { it.method == "PUT" && it.path == "/v1/coverage" }
@@ -368,6 +370,32 @@ class SyncRepositoryTest {
         assertEquals(setOf("kept@2026-10-26#0"), settled.single { it.sessionId == "s200" }.accepted)
         assertEquals(mapOf("dropped@2026-10-26#0" to PlayClaimQueue.OVER_CAP), settled.single { it.sessionId == "s0" }.localOnly)
         assertEquals(listOf("s-unknown"), queue.queued().map { it.sessionId })
+    }
+
+    /**
+     * Branch review round 1 P1-6: a sync between the walk's merge and the end of its Play hook leaves the walk out (its
+     * marker is up), so the walk goes later together with its element instead of without it (→ `over_cap`).
+     */
+    @Test
+    fun `a walk whose play hook has not finished waits for its element`() = runTest {
+        local.state = cov("""{"seg-000001":"Aw=="}""")
+        walks += LocalWalk("s1", 600)
+        val inFlight = mutableSetOf("s1")
+        server.on("PUT /v1/coverage", Reply.json(playResult(listOf("a@2026-10-26#0"))))
+        server.on("GET /v1/coverage", Reply.json(Fixtures.coverage()))
+        val r = repo(playPart = playProvider, playInFlight = { inFlight.toSet() })
+        r.syncOnce()
+        assertTrue(uploads().all { walkIds(it).isEmpty() }, "the in-flight walk is not uploaded")
+
+        // The hook finishes: its element is queued, then the marker clears.
+        queue.add(QueuedPlay("s1", "2026.11.0", listOf(claim("a@2026-10-26#0"))))
+        inFlight.clear()
+        r.syncOnce()
+        val up = uploads().last()
+        assertEquals(1, walkIds(up).size)
+        assertEquals(walkIds(up), assertNotNull(play(up)).map { it["walkId"]!!.jsonPrimitive.content })
+        assertEquals(setOf("a@2026-10-26#0"), settled.single().accepted)
+        assertTrue(queue.queued().isEmpty())
     }
 
     @Test

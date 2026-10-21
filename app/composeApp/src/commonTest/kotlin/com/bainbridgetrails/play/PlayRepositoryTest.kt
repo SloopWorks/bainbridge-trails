@@ -5,6 +5,8 @@ import com.bainbridgetrails.data.DataFixtures
 import com.bainbridgetrails.net.FakeServer
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.ItemType
+import com.bainbridgetrails.play.claim.ClaimKind
+import com.bainbridgetrails.play.claim.GatedSummary
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.WalkDerived
 import com.bainbridgetrails.play.schedule.ActiveItem
@@ -52,6 +54,8 @@ class PlayRepositoryTest {
         pack: String = PlayFixtures.pack,
         tideYears: IntRange = 2026..2029,
         walkDerived: suspend () -> WalkDerived? = { null },
+        claims: PlayClaimQueue? = null,
+        quietFeatures: Set<String> = emptySet(),
     ): PlayRepository {
         val d = StandardTestDispatcher(testScheduler)
         val content = PlayContentRepository(
@@ -63,7 +67,8 @@ class PlayRepositoryTest {
             scope = backgroundScope, goal = Goal.roads, clock = { clock }, content = content,
             places = { PlayFixtures.EmptyPlaces }, derived = { DerivedGoal.decode(PlayFixtures.read("derived-roads.json")) },
             store = PlayStateStore("$dir/roads-state.json", d), track = track, sink = sink, compute = d,
-            walkDerived = walkDerived, newId = { "id-${ids++}" },
+            walkDerived = walkDerived, newId = { "id-${ids++}" }, claims = claims,
+            walkContext = { WalkContext(quietFeatures = quietFeatures) },
         )
     }
 
@@ -176,6 +181,44 @@ class PlayRepositoryTest {
         assertNull(r.awaitStartBalance())
         assertEquals(1, r.store.state.value.logbook.entries.count { it.kind == LogKind.start_balance })
         r.stop()
+    }
+
+    private fun summary(id: String, start: String, end: String, completed: List<String>) = GatedSummary(
+        sessionId = id, startedAtMs = PlayFixtures.island(start).toEpochMilliseconds(), endedAtMs = PlayFixtures.island(end).toEpochMilliseconds(),
+        distanceM = 3_000.0, matchedM = 2_000.0, newlyCompleted = completed, verified = true, droppedVehicle = 0,
+    )
+
+    /**
+     * Branch review round 1 P0-1: `ch-sweep` (roads: 5 completions Sat–Sun) is claimed by the walk whose completions
+     * reach the target, counting the earlier walks of the window kept in the no-backup state; quiet features never
+     * count, and a re-run walk never counts itself.
+     */
+    @Test
+    fun weekendCompletionsOverTwoWalksClaimTheSweepOnce() = runTest {
+        clock.set(PlayClockMode.Fixed(PlayFixtures.island("2026-11-01T12:00")))
+        val q = PlayClaimQueue("$dir/claims-sweep.json", StandardTestDispatcher(testScheduler))
+        val r = repo(claims = q, quietFeatures = setOf("road-quiet"))
+        val sat = assertNotNull(r.claimWalk("s1", emptyList(), summary("s1", "2026-10-31T10:00", "2026-10-31T11:00", listOf("r1", "r2", "r3", "road-quiet"))))
+        assertTrue(sat.claims.none { it.kind == ClaimKind.challenge }, "3 of 5")
+        assertEquals(listOf(WalkDone("s1", PlayFixtures.island("2026-10-31T11:00").toEpochMilliseconds(), 3)), r.store.state.value.walks)
+
+        val sun = assertNotNull(r.claimWalk("s2", emptyList(), summary("s2", "2026-11-01T10:00", "2026-11-01T11:00", listOf("r4", "r5"))))
+        val ch = sun.claims.single { it.kind == ClaimKind.challenge }
+        assertEquals("ch-sweep@2026-10-31", ch.key)
+        assertEquals(LocalDate(2026, 10, 26), ch.weekId)
+        val element = q.queued().single { it.sessionId == "s2" }
+        assertEquals(listOf("ch-sweep@2026-10-31"), element.claims.filter { it.kind == "challenge" }.map { it.id }, "queued for the upload")
+        val entry = r.store.state.value.logbook.entries.single { it.kind == LogKind.challenge }
+        assertEquals(Triple("ch-sweep@2026-10-31", 100, "s2"), Triple(entry.contentId, entry.marks, entry.walkId))
+        assertTrue("ch-sweep@2026-10-31" in r.store.state.value.found)
+
+        // The hook re-runs for s2 (launch replay) and a third walk completes more: nothing claims twice.
+        val again = assertNotNull(r.claimWalk("s2", emptyList(), summary("s2", "2026-11-01T10:00", "2026-11-01T11:00", listOf("r4", "r5"))))
+        assertTrue(again.claims.none { it.kind == ClaimKind.challenge })
+        val third = assertNotNull(r.claimWalk("s3", emptyList(), summary("s3", "2026-11-01T14:00", "2026-11-01T15:00", listOf("r6"))))
+        assertTrue(third.claims.none { it.kind == ClaimKind.challenge })
+        assertEquals(1, r.store.state.value.logbook.entries.count { it.kind == LogKind.challenge })
+        assertEquals(listOf("s1", "s2", "s3"), r.store.state.value.walks.map { it.walkId })
     }
 
     /** The walk-derived input not ready yet (dataset still loading): the repository retries, Play stays usable. */

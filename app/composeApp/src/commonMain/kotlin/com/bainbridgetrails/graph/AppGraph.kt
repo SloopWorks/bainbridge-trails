@@ -196,6 +196,11 @@ object AppGraph {
                 io = Dispatchers.IO,
                 // Play claims ride the upload only while Play is on (PF0-2: off = null = the pure body).
                 playPart = { walkIdBySession, walks -> playOrNull?.claimPart(walkIdBySession, walks) },
+                // Walks whose Play hook has not finished stay out of the upload (P1-6); Play off: none.
+                playInFlight = {
+                    if (settings.settings.value?.play?.enabled != true) emptySet()
+                    else withContext(Dispatchers.IO) { com.bainbridgetrails.tracking.PlayPendingMarkers(trackingDir).ids() }
+                },
             )
         }
 
@@ -232,6 +237,9 @@ object AppGraph {
         val playOrNull: PlayRepository? get() = playGate.current
 
         internal fun startPlayGate() = playGate.start()
+
+        /** Until the loaded settings were applied to Play (bounded): launch-time finalization waits on it (P1-6). */
+        suspend fun awaitPlaySettled() = playGate.awaitSettled()
 
         private fun createPlay(): PlayRepository {
             val goal = DatasetProfile.current.playGoal

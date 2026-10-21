@@ -14,6 +14,7 @@ import com.bainbridgetrails.tracking.Finalizer
 import com.bainbridgetrails.tracking.Geofences
 import com.bainbridgetrails.tracking.LocalProgress
 import com.bainbridgetrails.tracking.Perm
+import com.bainbridgetrails.tracking.PlayPendingMarkers
 import com.bainbridgetrails.tracking.RecordingState
 import com.bainbridgetrails.tracking.SessionSummary
 import kotlinx.coroutines.CancellationException
@@ -86,9 +87,16 @@ internal object RecordingGraph {
             override fun start(sessionId: String, resume: Boolean) = startRecordingService(context, sessionId, resume)
             override fun stop() = stopRecordingService(context)
         }
-        val finalizer = Finalizer(ds, index, store, coverage, walks = WalkIndex(dir), onGated = playGatedProvider { AppGraph.installedOrNull()?.playOrNull })
+        val finalizer = Finalizer(
+            ds, index, store, coverage, walks = WalkIndex(dir),
+            onGated = playGatedProvider { AppGraph.installedOrNull()?.playOrNull },
+            playPending = withContext(Dispatchers.Default) { PlayPendingMarkers(dir) },
+        )
         RecordingController(store, finalizer, { Clock.System.now().toEpochMilliseconds() }, recorder, scope).also {
             it.bind(RecordingBus.events, RecordingBus.lost)
+            // Launch-time finalization runs the Play hook only if Play is already up (P1-6): wait for the loaded
+            // settings to be applied (bounded; Play off returns as soon as the settings are read).
+            AppGraph.installedOrNull()?.awaitPlaySettled()
             it.onLaunch()
             // Raw-track retention: tracks of walks finalized 30+ days ago are deleted (their ids stay finalized).
             scope.launch(Dispatchers.IO) {

@@ -3,6 +3,7 @@ package com.bainbridgetrails.play
 import com.bainbridgetrails.data.DatasetProfile
 import com.bainbridgetrails.net.JsonFile
 import com.bainbridgetrails.play.config.Goal
+import com.bainbridgetrails.play.rules.BoardState
 import com.bainbridgetrails.play.rules.Logbook
 import com.bainbridgetrails.play.schedule.PlayUserState
 import com.bainbridgetrails.play.time.IslandTime
@@ -36,6 +37,11 @@ data class PlayState(
     val logbook: Logbook = Logbook(),
     /** The walk-derived snapshot the Logbook was last brought up to (start balance, each finished walk); see [WalkMarks]. */
     val derivedBase: DerivedBase? = null,
+    /**
+     * Recent finished Play walks that completed counted, non-quiet features (branch review round 1 P0-1): the `earlier`
+     * input of solo `completed` challenges (`ch-sweep`). Kept [WalkDone.KEEP_MS]; the walk id is opaque on disk.
+     */
+    val walks: List<WalkDone> = emptyList(),
 ) {
     /** The scheduler's view (salt is v2). A solve counts from the start of its island day. */
     fun userState(): PlayUserState = PlayUserState(
@@ -45,6 +51,19 @@ data class PlayState(
         }.toMap(),
         foundOcc = found,
     )
+}
+
+/**
+ * One finished walk for solo challenge windows: [walkId] (the session in memory, opaque on disk like Logbook walk ids),
+ * when it ended ([endedAt], epoch ms; no-backup dir only, pruned after [KEEP_MS]) and how many counted, non-quiet
+ * features it completed first.
+ */
+@Serializable
+data class WalkDone(val walkId: String, val endedAt: Long, val completed: Int) {
+    companion object {
+        /** Longer than any challenge window (a week) plus its late days. */
+        const val KEEP_MS = 15L * 24 * 60 * 60 * 1000
+    }
 }
 
 /** `<privateDir>/play/<goal>-walk-ids.json`: session id → opaque walk id of the Logbook's walks (never backed up). */
@@ -78,8 +97,11 @@ class PlayStateStore(
     private val mutex = Mutex()
     private var loaded = false
 
-    /** Session id → opaque walk id (loaded with the state). */
+    /** Session id → opaque walk id (loaded with the state): only walks with a `pending` Logbook entry (P2-11). */
     private var walkIds: Map<String, String> = emptyMap()
+
+    /** Walks pruned from the map in this process: the same opaque id on every later write (memory only). */
+    private val retired = HashMap<String, String>()
 
     suspend fun load(): PlayState = mutex.withLock { loadLocked() }
 
@@ -122,6 +144,7 @@ class PlayStateStore(
     suspend fun clear() = mutex.withLock {
         loaded = true
         walkIds = emptyMap()
+        retired.clear()
         _state.value = PlayState()
         withContext(io) {
             file.delete()
@@ -133,21 +156,28 @@ class PlayStateStore(
     /** Debug "simulate user state": forget finds, solves and hints (the Logbook and start-balance flag stay). */
     suspend fun clearFinds() = update { it.copy(found = emptySet(), solved = emptyMap(), hints = emptyMap()) }
 
-    /** Writes [s] with opaque walk ids (map first, so a crash between the two never leaves an unmapped id). */
+    /**
+     * Writes [s] with opaque walk ids (map first, so a crash between the two never leaves an unmapped id). The map keeps
+     * only walks that still have a `pending` Logbook entry (branch review round 1 P2-11: the settle needs the session;
+     * nothing else does), so a session id (a walk's start time) leaves the no-backup map once its walk is settled.
+     */
     private fun persist(s: PlayState) {
         val ids = walkIdsFile ?: return file.write(s)
         val opaque = walkIds.values.toHashSet()
-        val used = LinkedHashMap<String, String>()
-        for (e in s.logbook.entries) {
-            val w = e.walkId ?: continue
-            if (w in used || w in opaque || w.startsWith(OPAQUE_PREFIX)) continue
-            used[w] = walkIds[w] ?: newWalkId()
+        val pendingWalks = s.logbook.entries.mapNotNullTo(HashSet()) { e -> e.walkId?.takeIf { e.board == BoardState.pending } }
+        val keep = LinkedHashMap<String, String>()
+        fun opaqueOf(w: String): String {
+            if (w in opaque || w.startsWith(OPAQUE_PREFIX)) return w
+            val id = keep[w] ?: walkIds[w] ?: retired[w] ?: newWalkId()
+            if (w in pendingWalks) keep[w] = id else retired[w] = id
+            return id
         }
-        if (used != walkIds) {
-            walkIds = used
-            if (used.isEmpty()) ids.delete() else ids.write(PlayWalkIds(bySession = used))
+        val mapped = s.mapWalkIds(::opaqueOf)
+        if (keep != walkIds) {
+            walkIds = keep
+            if (keep.isEmpty()) ids.delete() else ids.write(PlayWalkIds(bySession = keep))
         }
-        file.write(s.mapWalkIds { w -> used[w] ?: w })
+        file.write(mapped)
     }
 
     private fun decode(s: PlayState): PlayState {
@@ -157,8 +187,11 @@ class PlayStateStore(
     }
 
     private fun PlayState.mapWalkIds(f: (String) -> String): PlayState =
-        if (logbook.entries.none { it.walkId != null }) this
-        else copy(logbook = Logbook(logbook.entries.map { e -> e.walkId?.let { e.copy(walkId = f(it)) } ?: e }))
+        if (logbook.entries.none { it.walkId != null } && walks.isEmpty()) this
+        else copy(
+            logbook = Logbook(logbook.entries.map { e -> e.walkId?.let { e.copy(walkId = f(it)) } ?: e }),
+            walks = walks.map { it.copy(walkId = f(it.walkId)) },
+        )
 
     companion object {
         /** Opaque walk ids on disk start with this (never a session id, which starts with `s`). */

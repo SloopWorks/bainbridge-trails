@@ -45,6 +45,7 @@ class PlayClaimQueueTest {
                     // PF15-3: an id the server doesn't know; PF15-6: a pack version it no longer keeps
                     rejected = listOf(PlayRejectedClaimDto("b@2026-10-26#1", "unknown_item"), PlayRejectedClaimDto("c@2026-10-26#2", "stale_config")),
                     total = 25,
+                    dayAccepted = listOf("W1"),
                 ),
                 stillPending = emptySet(),
             ),
@@ -148,7 +149,60 @@ class PlayClaimQueueTest {
         val part = assertNotNull(q.part(mapOf("s1" to "W1", "s2" to "W2"), setOf("W1", "W2")) { settled += it })
         assertEquals(listOf("W1"), part.elements.map { it.walkId })
         part.settle(PlayOutcome.Answered(PlayUploadResultDto(accepted = List(30) { "a$it@2026-10-26#0" }), emptySet()))
-        assertEquals(PlayClaimQueue.OVER_CAP, settled.single { it.sessionId == "s2" }.localOnly.values.distinct().single())
+        // Round 1 P2-13: W2 went up with this upload, only its element did not fit: `too_many_claims`, not `over_cap`.
+        assertEquals(PlayClaimQueue.TOO_MANY_CLAIMS, settled.single { it.sessionId == "s2" }.localOnly.values.distinct().single())
+        assertTrue(q.queued().isEmpty())
+    }
+
+    /** Branch review round 1 P1-3: W-DAY is accepted only when the server lists the walk in `dayAccepted`. */
+    @Test
+    fun `day settles from dayAccepted else local_only`() = runTest {
+        val q = PlayClaimQueue(path)
+        q.add(element("s1", dayKey = week))
+        q.add(element("s2", dayKey = week))
+        val settled = mutableListOf<PlaySettled>()
+        val part = assertNotNull(q.part(mapOf("s1" to "W1", "s2" to "W2"), setOf("W1", "W2")) { settled += it })
+        assertEquals(listOf("W1", "W2"), part.elements.map { it.walkId })
+        part.settle(PlayOutcome.Answered(PlayUploadResultDto(dayAccepted = listOf("W1")), emptySet()))
+        assertEquals(BoardState.accepted, settled.single { it.sessionId == "s1" }.day)
+        assertEquals(BoardState.local_only, settled.single { it.sessionId == "s2" }.day, "the server ignored this dayKey")
+    }
+
+    /** Branch review round 1 P1-9: a retried upload's repeat listed only under `capped` settles accepted at 0 marks. */
+    @Test
+    fun `repeat listed under capped settles as 0-mark accepted`() = runTest {
+        val q = PlayClaimQueue(path)
+        q.add(element("s1", claim("a@2026-10-26#0"), claim("b@2026-10-26#1")))
+        val settled = mutableListOf<PlaySettled>()
+        val part = assertNotNull(q.part(mapOf("s1" to "W1"), setOf("W1")) { settled += it })
+        part.settle(PlayOutcome.Answered(PlayUploadResultDto(accepted = listOf("b@2026-10-26#1"), capped = listOf("a@2026-10-26#0")), emptySet()))
+        val s1 = settled.single()
+        assertEquals(setOf("a@2026-10-26#0", "b@2026-10-26#1"), s1.accepted)
+        assertEquals(setOf("a@2026-10-26#0"), s1.capped)
+        assertTrue(s1.localOnly.isEmpty())
+
+        val at = Instant.parse("2026-10-27T20:00:00Z")
+        val claims = listOf("a@2026-10-26#0", "b@2026-10-26#1").map { Claim(it, it.substringBefore('@'), ClaimKind.treasure, LocalDate(2026, 10, 26), 60, null, at) }
+        var n = 0
+        val st = PlayClaims.record(PlayState(), "s1", claims, null, 400, { it }) { "e${++n}" }
+        val lb = PlayClaims.settle(st.logbook, settled)
+        val a = lb.entries.single { it.contentId == "a@2026-10-26#0" }
+        assertEquals(Triple(BoardState.accepted, 0, true), Triple(a.board, a.marks, a.capped))
+        assertEquals(60, lb.entries.single { it.contentId == "b@2026-10-26#1" }.marks)
+    }
+
+    /** Branch review round 1 P1-4 (PD-23): finds over the daily cap go up with `capped: true`; the rest without it. */
+    @Test
+    fun `daily-capped finds are sent capped`() {
+        val at = Instant.parse("2026-10-27T20:00:00Z")
+        val claims = (0 until 3).map { Claim("t$it@2026-10-26#0", "t$it", ClaimKind.treasure, LocalDate(2026, 10, 26), 150, null, at) }
+        val keys = PlayClaims.cappedKeys(PlayState(), "s1", claims, foundPerDay = 400)
+        assertEquals(setOf("t2@2026-10-26#0"), keys, "150 + 150 fit, the third would cross 400")
+        val el = PlayClaims.element("s1", "2026.11.0", claims, capped = keys)
+        assertEquals(listOf(null, null, true), el.claims.map { it.capped })
+        val body = com.bainbridgetrails.net.ApiClient.json.encodeToString(QueuedPlay.serializer(), el)
+        assertEquals(1, Regex("\"capped\":true").findAll(body).count(), body)
+        assertTrue("\"capped\":null" !in body && "\"capped\":false" !in body, "omitted when not capped")
     }
 
     @Test

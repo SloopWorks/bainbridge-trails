@@ -273,10 +273,11 @@ fun MapTab(
     val playAgenda = play?.agenda?.collectAsStateWithLifecycle()?.value
     val playState = play?.store?.state?.collectAsStateWithLifecycle()?.value
     val playConfig = play?.config?.collectAsStateWithLifecycle()?.value?.config
-    val playMarkerArt = remember { PlayMarkers() }
+    // P2-10: the marker renderer, its registry and the sheet copy exist only while Play is on.
+    val playMarkerArt = remember(playOn) { PlayMapAlloc.markersOrNull(playOn) }
     val ferry = rememberFerryTimetable(play)
     // One renderer per kind (KrakenAttack carries the ink casing, FrogRock the stamp + hop); rebuilt only with the timetable.
-    val playRegistry = remember(playMarkerArt, ferry) { playLiveRegistry(playMarkerArt, ferry) { AppGraph.playClock.now() } }
+    val playRegistry = remember(playMarkerArt, ferry) { playMarkerArt?.let { art -> playLiveRegistry(art, ferry) { AppGraph.playClock.now() } } }
     val playMarkers = remember(playAgenda, playState?.solved, playConfig, data) {
         if (playAgenda == null || playConfig == null) emptyList()
         else PlayMarkerLogic.markers(
@@ -296,13 +297,13 @@ fun MapTab(
     // Each wrong answer bumps this: the EncounterSheet's lantern shake + reject haptic (ux.md §3.5.4; reset per selection).
     var riddleShake by remember(playSelected) { mutableStateOf(0) }
     // Play gate (engine PF-9, plan L2-2): Play off → no FX host, scene, clock, sources or layers are created.
-    val fxInputs = fxHostInputs(settings.play, recording, playRegistry)
+    val fxInputs = if (playRegistry != null) fxHostInputs(settings.play, recording, playRegistry) else fxHostInputs(settings.play, recording)
     val fx = if (fxInputs != null) rememberFxHost(fxInputs, controller) else null
     val fxOverlay: (@Composable MapOverlayScope.() -> Unit)? = remember(fx) { if (fx != null) ({ FxOverlay(fx) }) else null }
     val krakenStretches = playAgenda?.active?.firstOrNull { it.occurrence.type == com.bainbridgetrails.play.config.ItemType.obstacle }?.occurrence?.placements?.map { it.ref }.orEmpty()
     val coast = remember(krakenStretches, playConfig) { playConfig?.let { c -> PlayMarkerLogic.coastOf(krakenStretches, c.pools.mapValues { it.value.members }) } }
     val coastLabel = coast?.let { stringResource(Res.string.play_kraken_coast, it) }
-    if (playOn) {
+    if (playMarkerArt != null) {
         PlayMapSync(fx, playMarkerArt, playMarkers, playSelected, coastLabel)
         PlayMapEffectsSync(fx, play, snapshot?.segmentBuckets.orEmpty(), ferry = ferry != null)
     }
@@ -594,11 +595,12 @@ fun MapTab(
             }
         },
     )
-    val encounterCopy = rememberEncounterCopy()
-    val riddleCopy = rememberRiddleCopy()
+    val encounterCopy = if (playOn) rememberEncounterCopy() else null
+    val riddleCopy = if (playOn) rememberRiddleCopy() else null
     val claimResults = play?.claimResults?.collectAsStateWithLifecycle()?.value
     val encounter: EncounterModel? = remember(playSelected, playAgenda, playConfig, playState, claimResults, data, coast, encounterCopy) {
         val key = playSelected ?: return@remember null
+        val copy = encounterCopy ?: return@remember null
         val agenda = playAgenda ?: return@remember null
         val active = agenda.active.firstOrNull { a -> a.occurrence.key == key || a.occurrence.placements.any { it.key == key } } ?: return@remember null
         val item = playConfig?.items?.firstOrNull { it.id == active.occurrence.itemId } ?: return@remember null
@@ -608,7 +610,7 @@ fun MapTab(
         claimResults?.values?.forEach { cr -> cr.stretchShares.forEach { (k, v) -> shares[k] = maxOf(shares[k] ?: 0.0, v) } }
         val foundOn = playState?.logbook?.entries?.firstOrNull { it.contentId == key }?.date
         EncounterLogic.model(
-            item, active, key, now, agenda.day.sun, encounterCopy,
+            item, active, key, now, agenda.day.sun, copy,
             names = { id -> data?.dataset?.trails?.firstOrNull { it.id == id }?.name }, shares = shares, foundOn = foundOn, coast = coast,
         )
     }
@@ -766,7 +768,7 @@ fun MapTab(
                             minShare = item?.resolve?.minShare ?: 0.6,
                             announce = remember(fx) { fx?.announcer?.let { a -> { text: String -> a.say(text) } } },
                             shake = riddleShake,
-                            riddle = if (m.variant == EncounterVariant.RIDDLE && item != null && playState != null) {
+                            riddle = if (m.variant == EncounterVariant.RIDDLE && item != null && playState != null && riddleCopy != null) {
                                 {
                                     val claimed = playMarkers.firstOrNull { it.key == m.key }?.found == true
                                     val stars = item.stars ?: 1
@@ -892,4 +894,15 @@ private fun PlayWakeOnMap(controller: TrailMapController, agenda: PlayAgenda?, m
         value = PlayWakeArt.load(items, com.bainbridgetrails.play.fx.GeoPoint(lon = cam.center.longitude, lat = cam.center.latitude), cam.zoom)
     }
     art?.let { PlayWake(it, onDone = { done() }) }
+}
+
+/**
+ * The map's Play-only allocations (branch review round 1 P2-10, PD-1): with Play off no [PlayMarkers] renderer (nor its
+ * registry, nor the sheet copy) is built. [markersCreated] counts constructions for `PlayOffNothingCreatedTest`.
+ */
+internal object PlayMapAlloc {
+    var markersCreated = 0
+        private set
+
+    fun markersOrNull(playOn: Boolean): PlayMarkers? = if (playOn) PlayMarkers().also { markersCreated++ } else null
 }

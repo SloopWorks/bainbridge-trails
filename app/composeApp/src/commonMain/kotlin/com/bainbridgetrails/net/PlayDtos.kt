@@ -31,7 +31,17 @@ data class PlayMeDto(
     val perKind: Map<String, Int> = emptyMap(),
     /** Every claimed occurrence key, sorted: re-mark them found, never claim them again. */
     val occ: List<String> = emptyList(),
+    /**
+     * Server-only credits of closed weeks (branch review round 1 P0-2): W-WEEK (`week`), the kraken's retreat
+     * (`retreat`) and the island challenge (`island_challenge`), one row per kind and week. The Logbook mirrors each
+     * row once (`"<kind>@<week>"`), so its total meets [total].
+     */
+    val log: List<PlayLogDto> = emptyList(),
 )
+
+/** One server-only credit: [week] = the week id (its Monday), [kind] = `week` | `retreat` | `island_challenge`. */
+@Serializable
+data class PlayLogDto(val week: String = "", val kind: String = "", val marks: Int = 0)
 
 /** `GET /v1/play/challenges?dataset=` (schedule.md § 7.3, PD-4): `{band, count}` standings only. */
 @Serializable
@@ -78,10 +88,11 @@ data class PlayIslandProgressDto(val stretches: Int = 0, val repelled: Int = 0)
 
 /**
  * One claim. [kind] ∈ `treasure`, `egg`, `riddle`, `ink`, `lore`, `challenge`; [band] (60 / 80 / 95) only on `ink`.
- * Never a mark, a time, a day of the walk or a coordinate (PF15-4).
+ * [capped] `true` = the client's daily found cap paid it 0 (PD-23): the server books the key with 0 marks; omitted
+ * otherwise. Never a mark, a time, a day of the walk or a coordinate (PF15-4).
  */
 @Serializable
-data class PlayClaimDto(val id: String, val kind: String, val weekId: String, val band: Int? = null)
+data class PlayClaimDto(val id: String, val kind: String, val weekId: String, val band: Int? = null, val capped: Boolean? = null)
 
 /** One walk's claims, tied by [walkId] to a `walks[]` entry of the same upload. [hints]: riddle item id → 0..2. */
 @Serializable
@@ -92,12 +103,16 @@ data class PlayWalkClaimsDto(
     val hints: Map<String, Int>? = null,
 )
 
-/** The `play` block of the coverage response. */
+/**
+ * The `play` block of the coverage response. [capped]: accepted with 0 marks (the weekly cap, a `capped:true` claim, or
+ * a repeat whose stored marks are 0); [dayAccepted]: walk ids whose `dayKey` earned W-DAY (absent = none did).
+ */
 @Serializable
 data class PlayUploadResultDto(
     val accepted: List<String> = emptyList(),
     val rejected: List<PlayRejectedClaimDto> = emptyList(),
     val capped: List<String> = emptyList(),
+    val dayAccepted: List<String> = emptyList(),
     val total: Int = 0,
     val week: Int = 0,
 )

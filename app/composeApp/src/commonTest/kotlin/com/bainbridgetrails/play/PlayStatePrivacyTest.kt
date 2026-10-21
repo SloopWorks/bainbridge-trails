@@ -3,6 +3,7 @@ package com.bainbridgetrails.play
 import com.bainbridgetrails.data.DataFixtures
 import com.bainbridgetrails.net.JsonFile
 import com.bainbridgetrails.play.config.Goal
+import com.bainbridgetrails.play.rules.BoardState
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Logbook
@@ -92,5 +93,38 @@ class PlayStatePrivacyTest {
 
         // A second launch reads the new file only.
         assertEquals(loaded, PlayFiles.store(privateDir, legacyDir, Goal.trails).load())
+    }
+
+    /**
+     * Branch review round 1 P2-11: the session ↔ walk map keeps a walk only while one of its entries is `pending`; once
+     * settled the walk leaves the map (the file stays opaque and stable). The challenge walk list is opaque as well.
+     */
+    @Test
+    fun `settled walks leave the walk-id map`() = runTest {
+        val other = "s1761595200000-cd34"
+        val store = PlayFiles.store(privateDir, legacyDir, Goal.roads)
+        store.update { it.copy(logbook = entries(session), walks = listOf(WalkDone(session, 1761595200000L, 2))) }
+        val mapPath = PlayFiles.walkIdsPath(privateDir, Goal.roads)
+        val map = JsonFile(mapPath, PlayWalkIds.serializer())
+        assertEquals(setOf(session), map.read()!!.bySession.keys, "pending: mapped")
+        assertFalse(sessionPattern.containsMatchIn(text(PlayFiles.statePath(privateDir, Goal.roads))))
+
+        // The upload settles the walk; another walk is still pending.
+        store.update { st ->
+            st.copy(logbook = Logbook(st.logbook.entries.map { it.copy(board = BoardState.accepted) } + entries(other).entries.map { it.copy(id = it.id + "o") }))
+        }
+        assertEquals(setOf(other), map.read()!!.bySession.keys, "the settled walk left the map")
+        val onDisk = JsonFile(PlayFiles.statePath(privateDir, Goal.roads), PlayState.serializer()).read()!!
+        assertFalse(sessionPattern.containsMatchIn(text(PlayFiles.statePath(privateDir, Goal.roads))))
+        val settledId = onDisk.logbook.entries.first().walkId!!
+        assertTrue(settledId.startsWith(PlayStateStore.OPAQUE_PREFIX))
+        assertEquals(settledId, onDisk.walks.single().walkId, "one opaque id per walk")
+
+        // A later write keeps the same opaque id; all settled → no map file at all.
+        store.update { st -> st.copy(logbook = Logbook(st.logbook.entries.map { it.copy(board = BoardState.accepted) })) }
+        assertEquals(settledId, JsonFile(PlayFiles.statePath(privateDir, Goal.roads), PlayState.serializer()).read()!!.logbook.entries.first().walkId)
+        assertFalse(SystemFileSystem.exists(Path(mapPath)))
+        val reread = PlayFiles.store(privateDir, legacyDir, Goal.roads).load()
+        assertTrue(reread.logbook.entries.all { it.walkId!!.startsWith(PlayStateStore.OPAQUE_PREFIX) })
     }
 }

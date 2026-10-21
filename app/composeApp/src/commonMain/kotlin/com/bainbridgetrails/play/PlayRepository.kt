@@ -5,6 +5,7 @@ import com.bainbridgetrails.log.AppLog
 import com.bainbridgetrails.net.ApiClient
 import com.bainbridgetrails.net.ApiResult
 import com.bainbridgetrails.net.PlayChallengesDto
+import com.bainbridgetrails.net.PlayLogDto
 import com.bainbridgetrails.net.PlayMeDto
 import com.bainbridgetrails.play.claim.ClaimEvaluator
 import com.bainbridgetrails.play.claim.ClaimKind
@@ -12,12 +13,14 @@ import com.bainbridgetrails.play.claim.ClaimResult
 import com.bainbridgetrails.play.claim.GatedFix
 import com.bainbridgetrails.play.claim.GatedSummary
 import com.bainbridgetrails.play.claim.PlayGatedHook
+import com.bainbridgetrails.play.claim.WalkCompletions
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.rules.BoardState
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
+import com.bainbridgetrails.play.rules.Logbook
 import com.bainbridgetrails.play.rules.Marks
 import com.bainbridgetrails.play.rules.StartBalance
 import com.bainbridgetrails.play.rules.WalkDerived
@@ -62,6 +65,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -271,11 +275,16 @@ class PlayRepository(
         _sensed.value = emptySet()
     }
 
-    /** App foreground with Play on: the hourly pack check, then a fresh agenda. */
+    /**
+     * App foreground with Play on: the hourly pack check, then a fresh agenda, then (signed in, at most every
+     * [ACCOUNT_SYNC_MS]) the account summary: server-only credits into the Logbook (P0-2) and found keys.
+     */
     suspend fun onForeground() {
         if (!running) return
         content.refreshIfDue()
         refresh()
+        val last = lastAccountSync
+        if (last == null || Clock.System.now() - last >= ACCOUNT_SYNC_MS.milliseconds) restore()
     }
 
     private var derivedMemo: PlayDerived? = null
@@ -353,8 +362,11 @@ class PlayRepository(
     /**
      * The claim pass at Finish (product § 3.6.2): every item active during the walk is re-checked against the [kept]
      * fixes over the day plans of each island date the walk touched. Claims become `pending` Logbook entries (daily
-     * found cap applied), their keys are found, and one element is queued for the walk's coverage upload, with the
-     * week id as `dayKey` when the walk earned W-DAY. Idempotent per (session, content): found keys never claim again.
+     * found cap applied; capped finds are sent `capped: true`, PD-23), their keys are found, and one element is queued
+     * for the walk's coverage upload, with the week id as `dayKey` when the walk earned W-DAY. Solo `completed`
+     * challenges (`ch-sweep`, branch review round 1 P0-1) are counted over this walk's newly completed, non-quiet
+     * features plus the earlier walks of [PlayState.walks]. Idempotent per (session, content): found keys never claim
+     * again, and a re-run walk never counts itself as an earlier one.
      */
     suspend fun claimWalk(sessionId: String, kept: List<GatedFix>, summary: GatedSummary): ClaimResult? {
         val queue = claims ?: return null
@@ -370,28 +382,47 @@ class PlayRepository(
             val salt = user.userState().salt ?: 0uL
             val plans = dates.map { sched.dayPlan(it, goal, salt) }
             val ev = finishEvaluator?.takeIf { it.config === config } ?: ClaimEvaluator(config, ensurePlaces()).also { finishEvaluator = it }
-            val result = ev.evaluate(kept, plans, user.found, user.hints, _sensed.value, summary.droppedVehicle)
-            val endDate = IslandTime.dateOf(Instant.fromEpochMilliseconds(to))
+            val found = ev.evaluate(kept, plans, user.found, user.hints, _sensed.value, summary.droppedVehicle)
+            // Solo `completed` challenges (P0-1): this walk's completions minus quiet features, over the earlier walks.
+            val quiet = walkContext().quietFeatures
+            val completed = summary.newlyCompleted.distinct().count { it !in quiet }
+            val walkEnd = Instant.fromEpochMilliseconds(to)
+            val earlier = user.walks.filter { it.walkId != sessionId }.map { WalkCompletions(Instant.fromEpochMilliseconds(it.endedAt), it.completed) }
+            val known = found.claims.mapTo(HashSet()) { it.key }
+            val challenges = ev.challenges(plans, walkEnd, completed, earlier, user.found).filter { it.key !in known }
+            val result = if (challenges.isEmpty()) found else found.copy(claims = (found.claims + challenges).sortedBy { it.key })
+            val endDate = IslandTime.dateOf(walkEnd)
             val day = endDate.takeIf { Marks.isWalkingDay(to - from, summary.matchedM) && !user.logbook.hasDay(it) }
-            Pass(config, result, day, user.hints)
+            Pass(config, result, day, user.hints, WalkDone(sessionId, to, completed).takeIf { completed > 0 })
         } ?: return null
         val claimed = pass.result.claims
         if (claimed.isNotEmpty() || pass.day != null) {
             val hints = claimed.filter { it.kind == ClaimKind.riddle }.mapNotNull { c -> pass.hints[c.itemId]?.takeIf { it > 0 }?.let { c.itemId to it } }.toMap()
+            val foundPerDay = pass.config.caps.foundPerDay
+            // The daily found cap pays these 0 here; the server books them at 0 too (PD-23, P1-4).
+            val capped = PlayClaims.cappedKeys(store.load(), sessionId, claimed, foundPerDay)
             // Queue first: a crash before the Logbook write re-runs the pass, which merges into the same element.
-            val expired = queue.add(PlayClaims.element(sessionId, pass.config.version, claimed, pass.day?.let { IslandTime.weekId(it) }, hints))
+            val expired = queue.add(PlayClaims.element(sessionId, pass.config.version, claimed, pass.day?.let { IslandTime.weekId(it) }, hints, capped))
             val items = pass.config.items.associateBy { it.id }
             store.update { st ->
-                val next = PlayClaims.record(st, sessionId, claimed, pass.day, pass.config.caps.foundPerDay, { items[it]?.copy?.title ?: it }, newId)
-                next.copy(logbook = PlayClaims.settle(next.logbook, expired))
+                val next = PlayClaims.record(st, sessionId, claimed, pass.day, foundPerDay, { items[it]?.copy?.title ?: it }, newId)
+                next.copy(logbook = PlayClaims.settle(next.logbook, expired), walks = withWalk(next.walks, pass.walk))
             }
             AppLog.i(TAG, "walk claimed ${claimed.size} items${if (pass.day != null) " + walking day" else ""} (pending)")
+        } else if (pass.walk != null) {
+            store.update { st -> st.copy(walks = withWalk(st.walks, pass.walk)) }
         }
         _claimResults.update { it + (sessionId to pass.result) }
         return pass.result
     }
 
-    private class Pass(val config: PlayConfig, val result: ClaimResult, val day: LocalDate?, val hints: Map<String, Int>)
+    private class Pass(val config: PlayConfig, val result: ClaimResult, val day: LocalDate?, val hints: Map<String, Int>, val walk: WalkDone?)
+
+    /** [walks] with [walk] (replacing the same walk's record), minus records older than [WalkDone.KEEP_MS] before it. */
+    private fun withWalk(walks: List<WalkDone>, walk: WalkDone?): List<WalkDone> {
+        if (walk == null) return walks
+        return (walks.filter { it.walkId != walk.walkId && walk.endedAt - it.endedAt <= WalkDone.KEEP_MS } + walk).sortedBy { it.endedAt }
+    }
 
     /**
      * This upload's Play part (SyncRepository `playPart`): the queued elements of the walks it carries; the outcome
@@ -412,20 +443,43 @@ class PlayRepository(
         if (!running || !signedIn()) return false
         val client = api ?: return false
         val me = (client.playMe() as? ApiResult.Ok)?.value ?: return false
+        lastAccountSync = Clock.System.now()
         val today = IslandTime.dateOf(clock().now())
         var wrote = false
         store.update { st ->
             val lb = st.logbook
-            val owed = me.total - lb.total
-            val restorable = !lb.hasRestore && owed > 0 && lb.entries.all { it.kind == LogKind.start_balance }
-            wrote = restorable
+            val restorable = !lb.hasRestore && lb.entries.all { it.kind == LogKind.start_balance }
+            // Server-only credits first (P0-2): a restore then owes only what the account holds beyond them.
+            val credited = serverCredits(lb, me.log)
+            val owed = me.total - credited.total
+            wrote = restorable && owed > 0
             st.copy(
                 found = st.found + me.occ,
-                logbook = if (!restorable) lb else lb.add(LogEntry(newId(), LogKind.restored, RESTORED_WHAT, RESTORED_WHY, today, owed, board = BoardState.accepted)),
+                logbook = if (!wrote) credited else credited.add(LogEntry(newId(), LogKind.restored, RESTORED_WHAT, RESTORED_WHY, today, owed, board = BoardState.accepted)),
             )
         }
         if (wrote) AppLog.i(TAG, "Logbook restored from the account")
         return wrote
+    }
+
+    /** When the account summary was last applied ([restore]); the foreground re-fetch waits [ACCOUNT_SYNC_MS]. */
+    @Volatile private var lastAccountSync: Instant? = null
+
+    /**
+     * Branch review round 1 P0-2: the server-only credits of closed weeks (W-WEEK, the kraken's retreat, the island
+     * challenge; `GET /v1/play/me` `log`) as `accepted` entries keyed `"<kind>@<week>"` (idempotent: a row already in
+     * the Logbook adds nothing), logged on the week's Sunday (product § 3.8 "week close entries … on Sunday").
+     */
+    private fun serverCredits(lb: Logbook, log: List<PlayLogDto>): Logbook {
+        var out = lb
+        for (row in log) {
+            val kind = SERVER_KINDS[row.kind] ?: continue
+            val week = runCatching { LocalDate.parse(row.week) }.getOrNull() ?: continue
+            if (row.marks < 0) continue
+            val (what, why) = SERVER_COPY.getValue(kind)
+            out = out.add(LogEntry(newId(), kind, what, why, IslandTime.weekId(week).plus(6, DateTimeUnit.DAY), row.marks, contentId = "${row.kind}@${row.week}", board = BoardState.accepted))
+        }
+        return out
     }
 
     /**
@@ -581,6 +635,17 @@ class PlayRepository(
         /** Start-balance retries on one start while its input is unavailable (PF1-1). */
         private val START_BALANCE_RETRY_MS = longArrayOf(2_000L, 5_000L, 15_000L)
 
+        /** The foreground account re-fetch's minimum interval (P0-2). */
+        const val ACCOUNT_SYNC_MS = 10 * 60_000L
+
+        /** `GET /v1/play/me` `log` kinds the Logbook mirrors (server-only credits, P0-2). */
+        private val SERVER_KINDS = mapOf("week" to LogKind.week, "retreat" to LogKind.retreat, "island_challenge" to LogKind.island_challenge)
+        private val SERVER_COPY = mapOf(
+            LogKind.week to ("Kept week" to "Walking days on 2 or more days this week"),
+            LogKind.retreat to ("The kraken retreats" to "Islanders sent it back"),
+            LogKind.island_challenge to ("Kraken week" to "Island challenge complete"),
+        )
+
         const val RESTORED_WHAT = "Restored from your account"
         const val RESTORED_WHY = "Your marks so far; earlier detail is not on this phone"
 
@@ -616,9 +681,21 @@ class PlayGate(
     private val enabled: Flow<com.bainbridgetrails.data.PlaySettings?>,
     private val create: () -> PlayRepository,
 ) {
-    private var repo: PlayRepository? = null
-    private var on = false
+    // Written on the gate's collector, read from any dispatcher (Finalizer, sync, UI): P2-12.
+    @Volatile private var repo: PlayRepository? = null
+    @Volatile private var on = false
     private var job: Job? = null
+
+    /** Completes once the first loaded settings were applied (Play built and started when on). */
+    private val settled = CompletableDeferred<Unit>()
+
+    /**
+     * Waits (at most [timeoutMs]) until the loaded settings were applied, so launch-time finalization sees the running
+     * repository's hook when Play is on (branch review round 1 P1-6). Returns at once once settled.
+     */
+    suspend fun awaitSettled(timeoutMs: Long = 10_000L) {
+        kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { settled.await() }
+    }
 
     /** The running repository, or null while Play is off. */
     val current: PlayRepository? get() = repo.takeIf { on }
@@ -631,13 +708,15 @@ class PlayGate(
         job = scope.launch {
             enabled.collect { s ->
                 val next = s?.enabled == true
-                if (next == on) return@collect
-                on = next
-                if (next) {
-                    (repo ?: create().also { repo = it }).start()
-                } else {
-                    repo?.stop()
+                if (next != on) {
+                    if (next) {
+                        (repo ?: create().also { repo = it }).start()
+                    } else {
+                        repo?.stop()
+                    }
+                    on = next
                 }
+                if (s != null) settled.complete(Unit)
             }
         }
     }

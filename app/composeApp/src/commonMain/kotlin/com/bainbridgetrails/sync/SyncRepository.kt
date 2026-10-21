@@ -148,6 +148,12 @@ class SyncRepository(
      * upload carries; null provider (or a null answer) = today's code path and a byte-identical body (PF0-2).
      */
     private val playPart: (suspend (walkIdBySession: Map<String, String>, walksInThisUpload: Set<String>) -> PlayPart?)? = null,
+    /**
+     * Sessions whose Play hook has not finished (Finalizer's play-pending markers; empty with Play off): their walks are
+     * left out of the pass until it has, so a walk never goes up before its Play element exists (branch review round 1
+     * P1-6). Read after the snapshot: a marker is written before the walk record and cleared after the hook.
+     */
+    private val playInFlight: suspend () -> Set<String> = { emptySet() },
 ) {
     private val file = JsonFile(queuePath, SyncFile.serializer())
     private val _state = MutableStateFlow<SyncState>(SyncState.SignedOut)
@@ -224,7 +230,15 @@ class SyncRepository(
     suspend fun syncOnce(): SyncState = runLock.withLock {
         val userId = currentUserId() ?: return@withLock SyncState.SignedOut.also { _state.value = it }
         val snapshot = coverage.snapshot()
-        var f = prepare(userId, snapshot.walks)
+        val inFlight = try {
+            playInFlight()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.e(TAG, "play in-flight unavailable: ${e.message}")
+            emptySet()
+        }
+        var f = prepare(userId, if (inFlight.isEmpty()) snapshot.walks else snapshot.walks.filter { it.sessionId !in inFlight })
         val backfill = f.lastSuccessAt == null
         _state.value = SyncState.Syncing(backfill)
         f = f.copy(lastAttemptAt = now())

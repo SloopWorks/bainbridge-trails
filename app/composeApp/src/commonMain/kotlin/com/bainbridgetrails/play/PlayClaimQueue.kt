@@ -45,8 +45,10 @@ internal data class PlayClaimFile(val v: Int = 1, val walks: List<QueuedPlay> = 
 
 /**
  * What one upload decided for one queued walk: [accepted] claim ids ([capped] among them: accepted with 0 marks over the
- * server's weekly cap), [localOnly] claim id → code (`unknown_item`, `stale_config`, `implausible`, [PlayClaimQueue.OVER_CAP]
- * …), and [day] for the walk's W-DAY (`dayKey`), null when it had none.
+ * server's weekly cap, sent `capped`, or a repeat whose stored marks are 0), [localOnly] claim id → code
+ * (`unknown_item`, `stale_config`, `implausible`, [PlayClaimQueue.OVER_CAP], [PlayClaimQueue.TOO_MANY_CLAIMS] …), and
+ * [day] for the walk's W-DAY (`dayKey`): accepted only when the server lists the walk in `dayAccepted`, else
+ * `local_only`; null when it had none.
  */
 data class PlaySettled(
     val sessionId: String,
@@ -65,8 +67,10 @@ data class PlaySettled(
  * - an element sent with the upload: accepted / capped / rejected per the response (rejected → `local_only`), all
  *   `local_only` when the upload was refused (422, PF15-2) or the server sent no `play` answer;
  * - an element whose walk is still in sync's queue (retryable failure, or not credited yet): stays queued;
- * - an element whose walk left sync's queue without carrying it (dropped over the per-upload walk cap, plan RISKS 4, or
- *   over the server's 50-claims-per-upload limit): `local_only` ([OVER_CAP]);
+ * - an element whose walk left sync's queue without carrying it (dropped over the per-upload walk cap, plan RISKS 4):
+ *   `local_only` ([OVER_CAP]);
+ * - an element left out of an upload that carried its walk because the upload already held [MAX_CLAIMS] claims:
+ *   `local_only` ([TOO_MANY_CLAIMS]; known limitation, PD-24: the walk is credited, so a later upload cannot carry it);
  * - an element whose session has no walk id yet: stays queued.
  * Settled elements leave the queue after `onSettled` has recorded them (so a crash between the two resends, which the
  * server treats as an idempotent repeat).
@@ -133,22 +137,27 @@ class PlayClaimQueue(
         val queued = queued()
         if (queued.isEmpty()) return null
         val included = LinkedHashMap<String, PlayWalkClaimsDto>()
+        val overClaims = HashSet<String>()
         var claims = 0
         for (e in queued) {
             val walkId = walkIdBySession[e.sessionId] ?: continue
             if (walkId !in walksInThisUpload || (e.claims.isEmpty() && e.dayKey == null && !e.walkMarks)) continue
-            if (claims + e.claims.size > MAX_CLAIMS) continue
+            if (claims + e.claims.size > MAX_CLAIMS) {
+                overClaims += e.sessionId
+                continue
+            }
             claims += e.claims.size
             included[e.sessionId] = PlayWalkClaimsDto(walkId, e.claims, e.dayKey, e.hints?.ifEmpty { null })
         }
         // One pack version per upload: the newest element's (the Worker keeps the last 8, product §3.5).
         val config = queued.lastOrNull { it.sessionId in included }?.playConfig ?: queued.last().playConfig
-        return PlayPart(config, included.values.toList()) { outcome -> settle(walkIdBySession, included.keys, outcome, onSettled) }
+        return PlayPart(config, included.values.toList()) { outcome -> settle(walkIdBySession, included.keys, overClaims, outcome, onSettled) }
     }
 
     private suspend fun settle(
         walkIdBySession: Map<String, String>,
         included: Set<String>,
+        overClaims: Set<String>,
         outcome: PlayOutcome,
         onSettled: suspend (List<PlaySettled>) -> Unit,
     ) = mutex.withLock {
@@ -161,8 +170,10 @@ class PlayClaimQueue(
             when {
                 walkId == null && e.addedAt != 0L && t - e.addedAt > EXPIRE_MS -> out += allLocalOnly(e, EXPIRED)
                 walkId == null -> keep += e
-                e.sessionId in included -> out += resolve(e, outcome)
+                e.sessionId in included -> out += resolve(e, walkId, outcome)
                 walkId in outcome.stillPending -> keep += e
+                // The upload carried the walk but not its element (claim limit): it can never ride a later upload.
+                e.sessionId in overClaims && outcome is PlayOutcome.Answered -> out += allLocalOnly(e, TOO_MANY_CLAIMS)
                 else -> out += allLocalOnly(e, OVER_CAP)
             }
         }
@@ -174,22 +185,25 @@ class PlayClaimQueue(
         }
     }
 
-    private fun resolve(e: QueuedPlay, outcome: PlayOutcome): PlaySettled = when (outcome) {
+    private fun resolve(e: QueuedPlay, walkId: String, outcome: PlayOutcome): PlaySettled = when (outcome) {
         is PlayOutcome.Refused -> allLocalOnly(e, outcome.code)
         is PlayOutcome.Answered -> {
             val r = outcome.result
             if (r == null) {
                 allLocalOnly(e, NO_ANSWER)
             } else {
-                val accepted = r.accepted.toSet()
                 val rejected = r.rejected.associate { it.id to it.code }
+                // `capped` is accepted with 0 marks (weekly cap, a `capped` claim, or a repeat stored at 0: P1-9).
+                val capped = r.capped.toSet() - rejected.keys
+                val accepted = r.accepted.toSet() - rejected.keys + capped
                 val ids = e.claims.map { it.id }
                 PlaySettled(
                     sessionId = e.sessionId,
-                    accepted = ids.filterTo(LinkedHashSet()) { it in accepted && it !in rejected },
-                    capped = ids.filterTo(LinkedHashSet()) { it in r.capped },
-                    localOnly = ids.filter { it in rejected || it !in accepted }.associateWith { rejected[it] ?: NO_ANSWER },
-                    day = e.dayKey?.let { BoardState.accepted },
+                    accepted = ids.filterTo(LinkedHashSet()) { it in accepted },
+                    capped = ids.filterTo(LinkedHashSet()) { it in capped },
+                    localOnly = ids.filter { it !in accepted }.associateWith { rejected[it] ?: NO_ANSWER },
+                    // W-DAY only when the server says so (P1-3); an ignored dayKey (short walk, older server) is local.
+                    day = e.dayKey?.let { if (walkId in r.dayAccepted) BoardState.accepted else BoardState.local_only },
                     walk = BoardState.accepted.takeIf { e.walkMarks },
                 )
             }
@@ -213,8 +227,11 @@ class PlayClaimQueue(
         /** Server limit (`backend/src/play/claims.ts` MAX_CLAIMS_PER_UPLOAD): more is a 400 for the whole upload. */
         const val MAX_CLAIMS = 50
 
-        /** The walk left sync's queue without its Play element (per-upload walk cap or claim limit). */
+        /** The walk left sync's queue without its Play element (per-upload walk cap). */
         const val OVER_CAP = "over_cap"
+
+        /** The upload carried the walk but its element did not fit under [MAX_CLAIMS] (PD-24 limitation). */
+        const val TOO_MANY_CLAIMS = "too_many_claims"
 
         /** A 200 without a `play` answer (an older server, or a claim it did not mention). */
         const val NO_ANSWER = "no_answer"
@@ -236,17 +253,23 @@ class PlayClaimQueue(
  * rejects (`local_only`) them. Marks shown are local until the server answers; the server derives its own (PD-3).
  */
 object PlayClaims {
-    /** The wire element of one walk: claims as `{id, kind, weekId, band?}` (never marks or [Claim.at]). */
+    /**
+     * The wire element of one walk: claims as `{id, kind, weekId, band?, capped?}` (never marks or [Claim.at]);
+     * [capped] = keys the daily found cap pays 0 ([cappedKeys]), sent `capped: true` so the server books 0 (PD-23).
+     */
     fun element(
         sessionId: String,
         playConfig: String,
         claims: List<Claim>,
         dayKey: LocalDate? = null,
         hints: Map<String, Int>? = null,
+        capped: Set<String> = emptySet(),
     ): QueuedPlay = QueuedPlay(
         sessionId = sessionId,
         playConfig = playConfig,
-        claims = claims.map { PlayClaimDto(it.key, it.kind.name, it.weekId.toString(), if (it.kind == ClaimKind.ink) it.band else null) },
+        claims = claims.map {
+            PlayClaimDto(it.key, it.kind.name, it.weekId.toString(), if (it.kind == ClaimKind.ink) it.band else null, capped = if (it.key in capped) true else null)
+        },
         dayKey = dayKey?.toString(),
         hints = hints?.ifEmpty { null },
     )
@@ -277,6 +300,18 @@ object PlayClaims {
             lb = lb.add(LogEntry(newId(), LogKind.day, DAY_WHAT, DAY_WHY, walkingDay, Marks.DAY, walkId = sessionId))
         }
         return state.copy(found = state.found + claims.map { it.key }, logbook = lb)
+    }
+
+    /**
+     * The keys of [claims] that [record] would log `capped` (the daily found cap, PF5-7) on top of [state]: the claims
+     * the element sends with `capped: true` (PD-23). Keys already in the Logbook are not new and never capped here.
+     */
+    fun cappedKeys(state: PlayState, sessionId: String, claims: List<Claim>, foundPerDay: Int): Set<String> {
+        val before = state.logbook.entries.size
+        var n = 0
+        val after = record(state, sessionId, claims, null, foundPerDay, { it }, { "capped-probe-${n++}" }).logbook.entries
+        val keys = claims.mapTo(HashSet()) { it.key }
+        return after.drop(before).filter { it.capped && it.contentId in keys }.mapNotNullTo(LinkedHashSet()) { it.contentId }
     }
 
     /** Applies upload outcomes to the walk's `pending` entries (never touches other walks or non-pending entries). */

@@ -318,13 +318,20 @@ class PlayScheduler(
 
     // --- placements -------------------------------------------------------------------------------------------------
 
-    /** A drawn placement before keys and tiers. */
-    private data class Pick(val ref: String, val featureId: String?, val segmentIds: List<String>, val point: GeoPoint?)
+    /**
+     * A drawn placement before keys and tiers. [index]: its position in the unfiltered pool (kraken rotation), so a
+     * stretch that does not resolve on this device leaves a gap instead of shifting the later keys (`#n` = the n-th
+     * stretch of the coast in pack order, as the Worker's `rotationStretches`; branch review round 1 P1-8).
+     */
+    private data class Pick(val ref: String, val featureId: String?, val segmentIds: List<String>, val point: GeoPoint?, val index: Int? = null)
 
     private fun placements(item: Item, goal: Goal, pl: Placement, occDate: LocalDate, seed: ULong, occKey: String): List<ResolvedPlacement> {
+        var poolSize = 0
         val picks: List<Pick> = when {
             pl.at != null -> listOfNotNull(placePick(pl.at))
-            pl.rotate != null -> KrakenRotation.pool(pl, occDate)?.let { members(it, goal) }.orEmpty().mapNotNull { whole(it, goal) }
+            pl.rotate != null -> KrakenRotation.pool(pl, occDate)?.let { members(it, goal) }.orEmpty()
+                .also { poolSize = it.size }
+                .mapIndexedNotNull { i, ref -> whole(ref, goal)?.copy(index = i) }
             pl.segments != null -> refsOf(pl.segments, goal).mapNotNull { whole(it, goal) }
             pl.along != null -> along(pl.along, pl.pick ?: 1, goal, seed)
             pl.from != null && item.type == ItemType.treasure -> treasureDraw(item, goal, pl, occDate)
@@ -335,13 +342,14 @@ class PlayScheduler(
             else -> emptyList()
         }
         val multi = item.repeat == Repeat.weekly_set || item.repeat == Repeat.per_attack
-        val width = (maxOf(picks.size, pl.pick ?: 0, item.count) - 1).coerceAtLeast(0).toString().length
+        val width = (maxOf(picks.size, poolSize, pl.pick ?: 0, item.count) - 1).coerceAtLeast(0).toString().length
         val tiers = if (item.tiers.isNotEmpty()) tiersFor(item, occDate) else emptyList()
         return picks.mapIndexed { i, p ->
             val tier = tiers.getOrNull(i)
+            val n = p.index ?: i
             ResolvedPlacement(
-                key = if (multi) "$occKey#${i.toString().padStart(width, '0')}" else occKey,
-                index = i,
+                key = if (multi) "$occKey#${n.toString().padStart(width, '0')}" else occKey,
+                index = n,
                 ref = p.ref,
                 featureId = p.featureId,
                 segmentIds = p.segmentIds,

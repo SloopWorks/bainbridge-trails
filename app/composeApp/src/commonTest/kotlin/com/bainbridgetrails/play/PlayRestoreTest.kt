@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -99,5 +100,43 @@ class PlayRestoreTest {
         val lb = r.store.state.value.logbook
         assertEquals(listOf(LogKind.start_balance, LogKind.restored), lb.entries.map { it.kind })
         assertEquals(2410, lb.total)
+    }
+
+    private fun meWithLog(total: Int, log: String) =
+        Reply.json("""{"dataset":"roads","weekId":"2026-10-26","total":$total,"week":0,"occ":[],"log":$log}""")
+
+    /**
+     * Branch review round 1 P0-2: the server-only credits (W-WEEK, kraken retreat, island challenge) reach the Logbook
+     * as one accepted entry per row keyed `"<kind>@<week>"`, logged on the week's Sunday; a re-fetch adds nothing and
+     * the Logbook total stays equal to the server's.
+     */
+    @Test
+    fun `server-only credits one entry per row and a re-fetch adds nothing`() = runTest {
+        val rows = """[{"week":"2026-10-19","kind":"week","marks":70},{"week":"2026-10-26","kind":"retreat","marks":50},""" +
+            """{"week":"2026-10-26","kind":"island_challenge","marks":75},{"week":"2026-10-26","kind":"future_kind","marks":5}]"""
+        server.on("GET /v1/play/me", meWithLog(2410, rows))
+        val r = repo()
+        r.start() // reinstall, signed in: the credits, then a restore line for the rest
+        runCurrent()
+        val lb = r.store.state.value.logbook
+        val credits = lb.entries.filter { it.kind in setOf(LogKind.week, LogKind.retreat, LogKind.island_challenge) }
+        assertEquals(listOf("week@2026-10-19", "retreat@2026-10-26", "island_challenge@2026-10-26"), credits.map { it.contentId })
+        assertTrue(credits.all { it.board == BoardState.accepted })
+        assertEquals(listOf(LocalDate(2026, 10, 25), LocalDate(2026, 11, 1), LocalDate(2026, 11, 1)), credits.map { it.date }, "on the week's Sunday")
+        assertEquals(2410 - 195, lb.entries.single { it.kind == LogKind.restored }.marks)
+        assertEquals(2410, lb.total, "the Logbook total equals the server total")
+
+        // Re-fetch (foreground, sign-in): nothing new.
+        r.restore()
+        assertEquals(lb, r.store.state.value.logbook)
+
+        // The cron closes another week: exactly one new entry, totals equal again.
+        server.on("GET /v1/play/me", meWithLog(2480, rows.dropLast(1) + """,{"week":"2026-10-26","kind":"week","marks":70}]"""))
+        r.restore()
+        val after = r.store.state.value.logbook
+        assertEquals(lb.entries.size + 1, after.entries.size)
+        assertEquals("week@2026-10-26", after.entries.last().contentId)
+        assertEquals(2480, after.total)
+        r.stop()
     }
 }

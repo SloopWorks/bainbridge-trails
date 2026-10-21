@@ -318,6 +318,40 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
   `PlayStatePrivacyTest`, `PlayBackupRulesTest`, `PlayContentRepositoryTest` (oversize), `PlayClaimQueueTest`
   (retention).
 
+## PD-23 The daily found cap travels as `capped: true` (branch review round 1 P1-4)
+- **Context.** `reviews/2026-10-21-branch-round1.md` P1-4: the daily found cap (400 per island day, product § 3.5,
+  PF5-7) was client-only: the phone logged an over-cap find at 0 marks, the server (which never learns days) paid it
+  in full, so the Logbook total drifted below `/v1/play/me`. Retried uploads after a lost response showed the same
+  drift for weekly-capped finds (P1-9).
+- **Decision.** (a) of the review: a claim the client's daily cap pays 0 is sent with `"capped": true` (omitted
+  otherwise, so a body without capped finds is unchanged); the server books the occurrence key with 0 marks and lists
+  it under `capped`. A repeat of a key whose stored marks are 0 is listed under `capped` as well; the client treats
+  every `capped` id as accepted with 0 marks. The server still never learns a day: the flag is the client's verdict.
+- **Consequence.** An edited client can only lower its own marks with the flag. The weekly cap stays server-only.
+  Proof: `PlayClaimQueueTest` (`daily-capped finds are sent capped`, `repeat listed under capped …`).
+
+## PD-24 Play-pending marker, in-flight guard, and the claim-limit limitation (branch review round 1 P1-5, P1-6, P2-13)
+- **Context.** P1-5: a process death between the coverage merge and the end of the Finalizer's Play hook lost the
+  walk's claims (launch skips finalized sessions). P1-6: a sync in that window uploaded the walk without its Play
+  element, which later settled `local_only over_cap`; at launch `playOrNull` could still be null while stopped walks
+  were finalized. P2-13: an element left out of an upload that carried its walk (≤ 50 claims per upload) settled as
+  `over_cap`.
+- **Decision.** (1) When a Play hook will run, the Finalizer writes the session id to `play-pending.json` in the
+  tracking dir **before** the merge and removes it once the hook returned or failed (a failure is not retried; a
+  death is). On launch `RecordingController.onLaunch` first calls `Finalizer.resumePlay()`: every finalized, still
+  marked session gets the hook again from its walk record and raw track (claims are idempotent through `found`; the
+  challenge walk list is keyed by walk). Play off at launch keeps the markers for a later launch. (2) While Play is on,
+  sync leaves marked sessions out of the walks it queues (`playInFlight`), so a walk goes up with its element; its bits
+  may go earlier (the server's claim checks read cumulative coverage). (3) `RecordingGraph` awaits the Play gate's
+  first applied settings (≤ 10 s) before the launch-time finalization. (4) An element that does not fit under the
+  50-claim limit of an upload carrying its walk settles `local_only` with `too_many_claims`: the walk is credited, so
+  no later upload can carry it. **Known limitation**: only a backlog of more than 50 claims across the walks of one
+  upload (a long offline period) hits it; those finds stay on the phone, marked.
+- **Consequence.** The marker file holds a session id only while a hook is outstanding (normally milliseconds; until
+  the next launch after a death). Proof: `FinalizerTest` (crash replay, markers), `RecordingControllerTest`
+  (`onLaunch replays …`), `SyncRepositoryTest` (`a walk whose play hook has not finished …`),
+  `PlayOffNothingCreatedTest` (`awaitSettled…`), `PlayClaimQueueTest` (`at most 50 claims per upload`).
+
 ## Status
 
 | doc | status |

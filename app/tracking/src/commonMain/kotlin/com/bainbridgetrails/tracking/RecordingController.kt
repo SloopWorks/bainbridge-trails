@@ -108,6 +108,13 @@ class RecordingController(
      */
     suspend fun onLaunch() {
         if (_state.value !is RecordingState.Idle) return
+        // Play claims of walks merged just before a process death (P1-5): re-run their hook first. Never fails a launch.
+        try {
+            finalizer.resumePlay()
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+        }
+        if (_state.value !is RecordingState.Idle) return
         val (pending, shown, unfinished) = withContext(io) {
             val done = finalizer.finalizedIds()
             Triple(store.finished().filter { it !in done }.sortedBy { startOf(it) }, finalizer.shownIds(), store.unfinished().firstOrNull())
