@@ -1,22 +1,33 @@
 # Play — AC 8 e2e walkthrough screenshots (2026-10-21)
 
-Run of [`../plan.md` § 3](../plan.md#3-ac-8-e2e-script-opt-in--treasure--kraken--riddle--challenge--logbook) on branch
-`gamification/v1`. **Result: the walkthrough does not pass.** Opt-in, sheets, the armchair riddle solve, walk-derived
-marks, sync and the Logbook/server totals work, but **no content item can be claimed under the debug Play clock**
-(finding F1), so the treasure, kraken and riddle steps (§ 3.2–3.4) are blocked on both platforms, and iOS crashes when
-Play turns on (F2). Android command sequence as a script: [`../../../scripts/play-e2e.sh`](../../../scripts/play-e2e.sh).
+Runs of [`../plan.md` § 3](../plan.md#3-ac-8-e2e-script-opt-in--treasure--kraken--riddle--challenge--logbook) on branch
+`gamification/v1`. Android command sequence as a script: [`../../../scripts/play-e2e.sh`](../../../scripts/play-e2e.sh).
+
+**Result, e2e run 2 (HEAD `9e954f9`, 2026-10-21 02:36–03:32 PDT): the claim steps pass.** With the run-1 blockers fixed,
+every content item claims under the debug Play clock on a fresh local D1: Android (roads) claimed the weekly treasure
+(+25), the Manitou kraken stretch (band 80, +70, "You sent it back") and the armchair-solved Frog Rock riddle (+40, plus
+the Frog Rock lore +15 and the ladybug egg +20 on the same walk); iOS (trails) turned Play on without crashing and claimed
+its weekly treasure (+25). Logbook totals equal D1 `play_totals` on both platforms (453 roads, 155 trails), and walks are
+now filed under Thu, Oct 29. Open: the treasure line's title is the raw template `{tier} on {place}` (F11, both
+platforms), the iOS record chips wrap one letter per line (F12), and `ch-krakenweek` shows "0 of 2" with no band line,
+which is the server's design with one walker (F9, plan wording). Steps not re-run in run 2: the pure-* baseline,
+Play off (e2e-18), the iOS kraken and riddle walks, Me (e2e-17); their run-1 screenshots stay.
+
+Run 1 (2026-10-21 00:27–01:55, tree ≈ `5929e68`/`ee30cfb` + uncommitted work) did not pass: no item could be claimed
+under the Play clock (F1) and iOS crashed on Start playing (F2). Its findings are below with their run-2 status.
 
 ## Builds and setup
 
-| | |
-|---|---|
-| Date | 2026-10-21, 00:27–01:55 PDT (real clock); Play clock Thu 2026-10-29 14:00 island time |
-| Android | emulator-5554, API 37, `com.bainbridgetrails.roads.dev`, `assembleRoadsDebug` built 00:27 from `5929e68` + the working tree of that moment (uncommitted L2 work present) |
-| iOS | iPhone 17 Pro simulator (`DBA472DD-…`), `com.bainbridgetrails.app` Debug, `linkDebugFrameworkIosSimulatorArm64` + `xcodebuild` at 00:51 (tree ≈ `ee30cfb` + uncommitted work) |
-| HEAD at write-up | `a2edb45` (the F1 code path is unchanged there: `PlaySensing.kt:94`, `ClaimEvaluator.kt:257`) |
-| Backend | `backend/` `npm install`, `cp .dev.vars.example .dev.vars`, `DEV_CLOCK_OFFSET_MS=739793320` appended (node one-liner of § 3), `npm run dev` (fresh local D1; the previous `.wrangler/state` was moved aside, not deleted) |
+| | run 2 | run 1 |
+|---|---|---|
+| Date (real clock) | 2026-10-21, 02:36–03:32 PDT | 2026-10-21, 00:27–01:55 PDT |
+| Play clock | Thu 2026-10-29 14:00 island time, tide low | same |
+| Android | emulator-5554, API 37, `com.bainbridgetrails.roads.dev`, old `.dev` uninstalled, `:androidApp:installRoadsDebug` at HEAD `9e954f9` (clean tree) | `assembleRoadsDebug` from `5929e68` + uncommitted work |
+| iOS | iPhone 17 Pro (`DBA472DD-365C-42E1-9C3E-DCAFFCF47882`), app uninstalled first, `linkDebugFrameworkIosSimulatorArm64` + `xcodebuild` at `9e954f9`, `BainbridgeTrails.app` | Debug build, tree ≈ `ee30cfb` + uncommitted work |
+| Backend | run 1's `backend/.dev.vars` with `DEV_CLOCK_OFFSET_MS` replaced by `732248581` (2026-10-29T21:00Z − now); previous `.wrangler/state` moved aside (not deleted); fresh local D1, migrations 0001–0005 applied by `npm run dev` | `.dev.vars.example` + `DEV_CLOCK_OFFSET_MS=739793320`, fresh local D1 |
+| HEAD during the run | `980a48e` landed mid-run (docs only: `README.md`, `docs/play/README.md`); the binaries are `9e954f9` code | `a2edb45` at write-up |
 
-Commands, in order (Android; `scripts/play-e2e.sh` is the reproducible form):
+Commands, in order (Android; `scripts/play-e2e.sh` is the reproducible form; run 2 followed the same sequence):
 
 ```sh
 cd backend && npm install && cp .dev.vars.example .dev.vars
@@ -31,19 +42,24 @@ adb shell am start -n …/com.bainbridgetrails.app.MainActivity --es playClock 2
 #   shared_prefs/com.sloopworks.debugdrawer.xml  <string name="backend_override">local</string>  (run-as), relaunch
 # allow ACCESS_LOCAL_NETWORK; Me › Sign in › Dev sign-in; Settings › Play on › Start playing
 DIST=data/roads/dist scripts/emu-route.sh "$E2E_TREASURE_ROAD" 2            # walk 1 (road-northeast-morgan-road-2, 242 m)
-DIST=data/roads/dist scripts/emu-route.sh road-manitou-beach-drive-northeast 2   # walk 2 (whole road, 3580 m)
-# What's on › Riddle ★ › Pick the place on the map › Frog Rock → solved
+DIST=data/roads/dist scripts/emu-route.sh road-manitou-beach-drive-northeast 2 900   # walk 2 (run 2: first 900 s, 1170 m)
+# run 2: Map › tap the riddle pin at Frog Rock › Pick the place on the map › Frog Rock → solved (run 1: via What's on)
 DIST=data/roads/dist scripts/emu-route.sh road-northeast-spargur-loop-road 2     # walk 3 (1630 m)
 # Map › Challenges › Kraken week; Play chip › Logbook; Me; Settings › Play off › Turn off → Map
 ```
 
 iOS: `xcrun simctl launch <udid> com.bainbridgetrails.app -btDevSignIn 1 -apiBaseUrl http://localhost:8787
--btPlayClock 2026-10-29T14:00 -btPlayTide low -btScreen settings`, then (after F2) relaunches with
-`-acceptSimulatedLocations 1` (F4) and `-btScreen trail:<id>|whats-on|logbook|challenges|me`;
+-btPlayClock 2026-10-29T14:00 -btPlayTide low -acceptSimulatedLocations 1 -btScreen settings` (run 2: no crash; run 1
+relaunched after F2), then `-btScreen trail:<id>|whats-on|logbook|challenges|me`;
 `SIM=<udid> scripts/sim-route.sh trail-farm-trail-north` ($E2E_TREASURE_TRAIL), `trail-fairy-dell-trail`,
 `trail-grand-forest-west`. Two simulators were booted, so `booted` is ambiguous: always pass the UDID.
 
+D1 checks: `cd backend && npx wrangler d1 execute bainbridge-trails --local --command "select occ, marks from play_claims"`
+(and `play_totals`, `play_attack_stretches`, `play_progress`).
+
 ## Screenshots
+
+Rows marked **(run 2)** were re-taken at `9e954f9`; the rest are run 1.
 
 | file | what it shows |
 |---|---|
@@ -53,95 +69,112 @@ iOS: `xcrun simctl launch <udid> com.bainbridgetrails.app -btDevSignIn 1 -apiBas
 | `pure-settings-android.png` / `-ios.png` | Settings with the Play switch off |
 | `e2e-01-settings-play-android.png` / `-ios.png` | Settings › Play row (signed in, before the switch) |
 | `e2e-02-intro-android.png` / `-ios.png` | "Play on the island" intro sheet |
-| `e2e-03-wake-android.png` | Start playing pressed: button spinner, map fading in behind (the wake itself was not caught) |
-| `e2e-03-wake-ios.png` | first wake frame, ~0.3 s before the crash (F2) |
-| `e2e-04-map-play-android.png` | Map with Play: `0 · Walk-on` + challenge chips, pins, kraken label, start-balance snackbar |
-| `e2e-04-map-play-ios.png` | Map with Play after relaunch (130 · Walk-on), pins, fog squares, "The kraken is at the west shore" |
-| `e2e-05-treasure-sheet-android.png` | Sea glass · Northeast Morgan Road · 25 marks · "Washes away Sunday night" |
-| `e2e-05-treasure-sheet-ios.png` | Sea glass · Farm Trail North · 25 marks — still unfound after walking the trail 99 % (F1) |
-| `e2e-06-record-find-ios.png` | recording on Farm Trail North (0 → 99 %), **no find moment** (F1). No Android counterpart: no find happened |
-| `e2e-07-results-treasure-android.png` | walk 1 results: 58 marks (New ground +8, Road complete +25, Fog lifted +25), **no treasure line** |
-| `e2e-07-results-treasure-ios.png` | iOS walk results: 130 marks (+5, Farm Trail North +100, Fog +25), no treasure line |
-| `e2e-08-kraken-sheet-android.png` | "The kraken is ashore · Until Sunday, 8 pm", 60–80 marks a stretch, Manitou + Gertie Johnson stretches |
-| `e2e-08-kraken-sheet-ios.png` | same for trails: "inking the west shore", Fairy Dell + Schel Chelb |
-| `e2e-09-record-kraken-android.png` | walk 2 mid-way: 25:38, 1.2 mi, Manitou Beach Dr 0 → 69 % |
-| `e2e-09-record-kraken-ios.png` | Fairy Dell replay mid-way (first attempt: 0.0 mi, every fix dropped as mock, F4) |
-| `e2e-10-results-kraken-android.png` | walk 2 results: 209 marks (New ground +94, Road complete +25, Fog +75, Walking day +15), Manitou 0 → 98 %, **no kraken line** |
-| `e2e-10-results-kraken-ios.png` | Fairy Dell 0 → 85 %: 196 marks, rank Dock Walker, **no kraken line** |
-| `e2e-11-riddle-sheet-android.png` / `-ios.png` | riddle sheet (riddle-frog ★ / riddle-bond ★★) — chip reads **"0 marks"** (F7) |
-| `e2e-12-riddle-solved-android.png` / `-ios.png` | "Solved. Walk there to claim it." after the armchair pick (Frog Rock on the map / Grand Forest West from the list) |
-| `e2e-13-results-riddle-ios.png` | Grand Forest West walk: 0.0 mi recorded (replay never moved the dot; harness, F8) — no claim |
-| `e2e-14-challenges-android.png` / `-ios.png` | Challenges: Weekend sweep (just you), Kraken week (whole island) |
-| `e2e-15-challenge-krakenweek-android.png` / `-ios.png` | Kraken week sheet: "0 of 2 stretches sent back by islanders", 75 marks, no names, no countdown; no band line (nothing claimed) |
-| `e2e-16-logbook-android.png` | Logbook after walk 3: 382 marks · 0 this week · Dock Walker · 368 to Beachcomber; walks filed under **Wed, Oct 21**, start balance under Thu, Oct 29 (F1) |
-| `e2e-16-logbook-ios.png` | Logbook 326 marks; "Riddle · Riddle solved · Stamped" (no number) under Thu Oct 29; walks under Wed Oct 21 |
-| `e2e-17-me-playcard-android.png` / `-ios.png` | Me › Play card: 267 / 326 marks, Dock Walker, "483 / 424 to Beachcomber" |
-| `e2e-18-play-off-map-ios.png` | Map after Turn off Play: pure again |
-| `e2e-13-results-riddle-android.png` | walk 3 (Spargur Loop, 1630 m) results: 115 marks (New ground +40, Road complete +25, Fog +50), **no riddle +40, no Frog Rock lore** (F1) |
-| `e2e-18-play-off-map-android.png` | Map after Turn off Play: no chips/pins/fog; walked roads violet as in the pure build; logcat `fx: host stop`; wrangler only `GET /v1/leaderboard` afterwards |
+| `e2e-03-wake-android.png` | **(run 2)** the wake, +3.8 s after Start: "The island is awake", subtitle, island outline and pins (burst of 8 frames at ~0.6 s) |
+| `e2e-03-wake-ios.png` | **(run 2)** the wake mid-way: "The island is awake" over the outline; no crash (F2 fixed) |
+| `e2e-04-map-play-android.png` | **(run 2)** Map with Play zoomed to Murden Cove: `0 · Walk-on` + challenge chips, the inked Manitou stretch, kraken ripple ring and "The kraken is at Manitou" on the water just off the stretch (F6 fixed) |
+| `e2e-04-map-play-ios.png` | **(run 2)** Map with Play after the wake: `0 · Walk-on`, pins, fog squares, "The kraken is at the west shore" (zoomed in, the ring sits on the shoreline at Lynwood Center) |
+| `e2e-05-treasure-sheet-android.png` | **(run 2)** Sea glass · Northeast Morgan Road · 25 marks · "Washes away Sunday night", opened by tapping the pin |
+| `e2e-05-treasure-sheet-ios.png` | Sea glass · Farm Trail North · 25 marks — run 1, still unfound after walking the trail 99 % (F1) |
+| `e2e-06-record-find-android.png` | **(run 2)** recording Morgan Road 0 → 97 %, chip "1 find" (the find moment fired at the start point, before the first frame) |
+| `e2e-06-record-find-ios.png` | **(run 2)** recording Farm Trail North 0 → 58 %, treasure pin on the trail, chip "1 find" wrapped one letter per line (F12) |
+| `e2e-07-results-treasure-android.png` | **(run 2)** walk 1 results: 82 marks (New ground +7, Road complete +25, Fog lifted +25, **treasure +25** titled `{tier} on {place}` (F11)) |
+| `e2e-07-results-treasure-ios.png` | **(run 2)** Farm Trail North results: 155 marks (+5, +100, Fog +25, **treasure +25**, same F11 title) |
+| `e2e-08-kraken-sheet-android.png` | **(run 2)** "The kraken is ashore · Until Sunday, 8 pm", 60–80 marks a stretch, Manitou + Gertie Johnson stretches (before walk 2) |
+| `e2e-08-kraken-sheet-ios.png` | same for trails: "inking the west shore", Fairy Dell + Schel Chelb (run 1) |
+| `e2e-09-record-kraken-android.png` | **(run 2)** walk 2 at 4:47, 0.2 mi, Manitou Beach Dr 0 → 13 % |
+| `e2e-09-record-kraken-ios.png` | Fairy Dell replay mid-way (run 1; first attempt: 0.0 mi, every fix dropped as mock, F4) |
+| `e2e-10-results-kraken-android.png` | **(run 2)** walk 2 results: 181 marks (New ground +46, Fog +50, Walking day +15, **Kraken sent back +70**), Manitou 0 → 52 %, new rank Dock Walker |
+| `e2e-10-results-kraken-ios.png` | Fairy Dell 0 → 85 %: 196 marks, no kraken line (run 1, F1) |
+| `e2e-11-riddle-sheet-android.png` | **(run 2)** riddle-frog sheet opened by tapping its pin on the map (F5 fixed): Riddle ★, **40 marks** (F7 fixed), Pick the place on the map / Choose from a list |
+| `e2e-11-riddle-sheet-ios.png` | riddle-bond ★★ sheet, chip "0 marks" (run 1, F7) |
+| `e2e-12-riddle-solved-android.png` | **(run 2)** "Solved. Walk there to claim it." after picking Frog Rock on the map |
+| `e2e-12-riddle-solved-ios.png` | same after Grand Forest West from the list (run 1) |
+| `e2e-13-results-riddle-android.png` | **(run 2)** walk 3 (Spargur Loop, 1630 m) results: 190 marks (New ground +40, Road complete +25, Fog +50, Frog Rock's ladybug egg +20, **Riddle walked to +40**, Frog Rock island story +15) |
+| `e2e-13-results-riddle-ios.png` | Grand Forest West walk: 0.0 mi recorded (run 1, harness F8) — no claim |
+| `e2e-14-challenges-android.png` / `-ios.png` | Challenges: Weekend sweep (just you), Kraken week (whole island) (run 1) |
+| `e2e-15-challenge-krakenweek-android.png` | **(run 2)** Kraken week after the repel: "0 of 2 stretches sent back by islanders", 75 marks, no names, no countdown, no band line (F9) |
+| `e2e-15-challenge-krakenweek-ios.png` | Kraken week sheet, "0 of 2" (run 1) |
+| `e2e-16-logbook-android.png` | **(run 2)** Logbook after walk 3: 453 marks · 453 this week · Dock Walker · 297 to Beachcomber; every row under **Thu, Oct 29**; riddle stamp "Stamped" with no number |
+| `e2e-16-logbook-ios.png` | **(run 2)** Logbook 155 marks · 155 this week; Thu, Oct 29: treasure +25 (F11 title), Farm Trail North +100, New ground +5, Fog +25, start balance +0 |
+| `e2e-17-me-playcard-android.png` / `-ios.png` | Me › Play card: 267 / 326 marks, Dock Walker (run 1) |
+| `e2e-18-play-off-map-ios.png` | Map after Turn off Play: pure again (run 1) |
+| `e2e-18-play-off-map-android.png` | Map after Turn off Play: no chips/pins/fog; walked roads violet as in the pure build (run 1) |
 
-Not taken: `e2e-06-record-find-android` (no find happened), the § 2 `fx-*` set (unchanged from earlier commits).
+Not taken in run 2: the pure-* set, e2e-01/02/14/17/18, the iOS kraken/riddle walks (e2e-05/08–13 `-ios`).
 
-## Assertions (§ 3)
+## Assertions (§ 3), run 2 (HEAD `9e954f9`)
 
-| # | assertion | Android | iOS | evidence |
+| # | assertion | Android (roads) | iOS (trails) | evidence |
 |---|---|---|---|---|
-| 1 | pure-* and e2e-18 show no Play chrome; no `/v1/play/*` while off | PASS (visual, pure-* and e2e-18); wrangler PASS while signed in with Play off before opt-in (`POST /v1/auth/dev`, `GET /v1/coverage`, `GET /v1/me` only) and after Turn off (`GET /v1/leaderboard` only); logcat `fx: host stop`. Pure shots were on the Prod backend (drawer default) so they say nothing about wrangler | PASS: pure launches on local backend made no request at all | wrangler log |
-| 2 | walk 1: treasure `+25…`, `play.accepted` has `treasure-weekly-roads@2026-10-26#00` | **FAIL/BLOCKED** (F1): no find, no claim; `play_claims` empty | **FAIL/BLOCKED** (F1) | results shots; D1 `select count(*) from play_claims` = 0 |
-| 3 | walk 2: `kraken-roads@2026-10-29#0`, band 95, +80, "You sent it back" | **FAIL/BLOCKED** (F1): Manitou 98 % covered, no kraken line, `play_attack_stretches` empty | **FAIL/BLOCKED** (F1) | e2e-10 shots |
-| 4 | riddle claimed +40/+80; armchair solve = stamp, no number | solve PASS; claim FAIL/BLOCKED (F1): walk 3 Spargur Loop 0 → ≥ 85 %, no riddle line | solve stamp PASS (e2e-16-ios); claim BLOCKED | e2e-12, e2e-16-ios |
-| 5 | `ch-krakenweek` shared progress + `{band,count}`, no names, no countdown | PARTIAL: "0 of 2", no names, no countdown; band line absent (nothing claimed) | PARTIAL: "0 of 2" (plan expects trails "of 3", F9) | e2e-15 |
-| 6 | Logbook total = Σ rows = `GET /v1/play/me`; no time of day | PASS: after walk 2 0+15+25+94+75+25+8+25 = 267 = D1 `play_totals` roads 267; after walk 3 382 = 267+115 = D1 382 | PASS: 326 = 100+46+50+100+5+25 = D1 trails 326 | e2e-16; D1 `play_totals`; `GET /v1/play/me` (curl, dev sign-in) answers `{"weekId":"2026-10-26","total":0,…}` for a fresh user |
-| 7 | chip marks = Logbook total; rank matches ladder | PASS: chip "267 · Dock Walker"; 483 to Beachcomber (750) | PASS: "326 · Dock Walker", 424 to Beachcomber | e2e-16/17 |
+| 1 | no `/v1/play/*` while Play is off | **PASS**: signed in with Play off the app made `POST /v1/auth/dev`, `GET /v1/coverage`, `GET /v1/me`, `GET /v1/leaderboard` only; the first `/v1/play/*` (`GET /v1/play/me`) came after Start playing. Pure-* / e2e-18 not re-taken | **PASS**: `POST /v1/auth/dev`, `GET /v1/coverage` only until Start playing | wrangler request log (no bodies) |
+| 2 | walk 1: treasure `+25/40/60/150` by tier; `treasure-weekly-<goal>@2026-10-26#NN` accepted | **PASS**: results "+25" (Sea glass tier); D1 `treasure-weekly-roads@2026-10-26#00` marks 25; Logbook row not local-only. Title text wrong (F11) | **PASS**: "+25"; D1 `treasure-weekly-trails@2026-10-26#00` marks 25; same F11 title | e2e-07 both; D1 `play_claims` |
+| 3 | walk 2: `kraken-roads@2026-10-29#0` band ≥ 60 with matching marks; "You sent it back" | **PASS**: D1 `kraken-roads@2026-10-29#0` kind `ink` marks 70 = band 80 of the pack's bands (60→60, 80→70, 95→80); `play_attack_stretches` repelled_by 1; kraken sheet row "Manitou Beach Drive Northeast, You sent it back". (900 s covered the stretch to band 80, not § 3's band 95/+80) | not run | e2e-10; D1 |
+| 4 | walk 3: riddle claimed +40 (roads); armchair solve = stamp, no number | **PASS**: pin tap opened the sheet (F5), solve on the map → "Solved"; walk 3 "Riddle walked to +40"; D1 `riddle-frog@2026-10-26` marks 40; Logbook "Riddle solved · Stamped" without a number. Bonus seen: `lore-frog@2026-10-26` +15, `egg-ladybug@2026-10-26` +20 | not run | e2e-11/12/13/16 |
+| 5 | `ch-krakenweek`: shared progress + `{band, count}`, no names, no countdown | **PARTIAL (by design)**: "0 of 2 stretches sent back by islanders", no names, no countdown; no band line. Server: a stretch counts as sent back at ≥ 3 distinct walkers (`minPlayersPerStretch`), and the client shows the band only when its count is known (≥ 5); D1 `play_progress` `ch-krakenweek@2026-10-29` = 1 (band `middle`, count hidden). See F9 | not run | e2e-15; D1 `play_progress` |
+| 6 | Logbook total = Σ rows = server total; no time of day | **PASS**: 453 = 82 + 181 + 190 = D1 `play_totals` roads 453 (cov 93 + derived 175 + found 170 + week 15); rows dated, no times | **PASS**: 155 = 25 + 100 + 5 + 25 + 0 = D1 trails 155 (5 + 125 + 25) | e2e-16 both; D1 `play_totals` |
+| 7 | chip marks = Logbook total; rank matches ladder | **PASS**: chip "263 · Dock Walker" after walk 2, Play card "453 marks. Dock Walker. 297 to Beachcomber" (750) | **PASS**: chip "155 · Walk-on", Logbook "95 to Dock Walker" (250) | map / Logbook shots |
 | 8 | verify.full + verify.api green | not run here (kmp-verifier owns it) | — | — |
 
-`play.accepted` keys could not be read from the wrangler log: wrangler logs request lines only (no bodies) and the
-Worker logs nothing per upload; with no claims the accepted list would be empty anyway. Logbook rows have no time of
-day; What's on shows schedule times ("Daylight 7:17 am – 6:28 pm · Next ferry arrives 3:10 pm", "Thu 6 am – Sun 8 pm"),
-which are content times, not the walker's.
+D1 `play_claims` after run 2 (`select dataset, occ, kind, marks`):
+
+```
+roads   egg-ladybug@2026-10-26               egg       20
+roads   kraken-roads@2026-10-29#0            ink       70
+roads   lore-frog@2026-10-26                 lore      15
+roads   riddle-frog@2026-10-26               riddle    40
+roads   treasure-weekly-roads@2026-10-26#00  treasure  25
+trails  treasure-weekly-trails@2026-10-26#00 treasure  25
+```
+
+`play.accepted` keys still cannot be read from the wrangler log (request lines only); the D1 rows above are the
+accepted claims.
 
 ## Findings
 
-- **F1 (blocker, both platforms): claims use the fix's real timestamp, not the Play clock.** `Fix.toGated()`
-  (`PlaySensing.kt:94`) passes `timeMs` (system clock) and `ClaimEvaluator.Walk.add` checks activity/daylight at
-  `f.instant` (`ClaimEvaluator.kt:257`); `PlayRepository.claimWalk` builds the day plans from the walk's real start/end.
-  With the debug clock at Thu 2026-10-29 14:00 and the device at Wed 2026-10-21 ~01:00 PDT (night, before the week),
-  nothing is active at any fix: walking Morgan Road (treasure), Manitou 98 % (kraken stretch) and Farm Trail North 99 %
-  (iOS treasure) claimed nothing; `play_claims`, `play_progress`, `play_attack_stretches` stay empty; the Logbook files
-  every walk under **Wed, Oct 21** while the start balance and the riddle stamp sit under Thu, Oct 29. § 3's
-  `playClock` launch argument therefore cannot drive the e2e. Fix: shift fix times by the debug clock's offset before
-  sensing/claiming (debug only), or run the e2e at a real Thursday afternoon / with the device clock set.
-- **F2 (blocker, iOS): crash on Start playing and on launch with Play on into the island map.**
-  `Uncaught Kotlin exception: kotlin.IllegalArgumentException: Can't represent a width of 89917 and height of 89917 in
-  Constraints` from `SizeNode.measure` under `org.maplibre.compose.overlay.GeographicLayout…measure` (a map-overlay
-  composable sized in geographic units, i.e. one of the FX overlays). Reports
-  `~/Library/Logs/DiagnosticReports/BainbridgeTrails-2026-10-21-005352.ips` and `-005415.ips`. Map with Play works when
-  reached through a sheet or after the wake (zoomed in), and the non-map screens (`-btScreen logbook|challenges|me`) work.
-- **F3: debug drawer Apply & Restart did not stick** (known race): after the confirm dialog the app restarted on Prod
-  (`debug tools installed; backend https://bainbridge-trails-api.patjackson52.workers.dev`, no
-  `com.sloopworks.debugdrawer.xml`). Writing `backend_override=local` into that prefs file via `run-as` and relaunching
-  works (`backend http://10.0.2.2:8787`); then the ACCESS_LOCAL_NETWORK prompt appears as documented.
-- **F4 (plan doc): iOS § 3 launch args lack `-acceptSimulatedLocations 1`.** Without it every `simctl location` fix is
-  `isSimulatedBySoftware` and dropped as mock (`IosRecorder.kt:44`): the first Fairy Dell walk recorded 0.0 mi. Also the
-  built product is `BainbridgeTrails.app`, not `iosApp.app` as § 3's `simctl install` line says.
-- **F5: map pins lose the tap to roads/trails.** Android: the kraken label/marker ("The kraken is at Manitou", drawn
-  inland over Falk Road NE) and the Frog Rock riddle pin open "Roads on this section" / the road sheet instead; iOS: the
-  Grand Forest pins open "Trails on this section". The treasure pin at street zoom did open its sheet. Workaround used:
-  Challenges › Kraken week › Show on map, and Me › What's on › Riddle.
-- **F6: the roads kraken label sits inland** (Falk Road NE, ~1 km from the Manitou shore stretch) — screenshot
-  `e2e-04-map-play-android.png`.
-- **F7: riddle sheets show "0 marks"** (riddle-frog ★ roads, riddle-bond ★★ trails); § 3 expects +40 / +80 on claim.
-- **F8 (harness): `sim-route.sh trail-grand-forest-west` (4.3 km) never moved the simulator dot** after a
-  `location clear` + `set` + relaunch; the walk saved 0.0 mi. Fairy Dell and Farm Trail North replays in the same session
-  worked. Also `emu-route.sh` replays a whole road (Manitou 3580 m = 46 min), not the 1158 m stretch § 3 names.
-- **F9 (plan/content): trails Kraken week reads "0 of 2 stretches"**; § 3 expects "1 of 3" for trails (after one repel).
-- **F10: Android wake not observed.** `e2e-03-wake-android.png` at +1.2 s shows the intro button spinner; at +7 s the
-  map is already up with the "Your walks so far: 0 marks" snackbar.
-- Concurrency note: other agents committed `ee30cfb`, `1b99fa7`, `a2edb45` and edited `PlayRepository.kt`,
-  `Finalizer.kt`, `RecordingController.kt`, `MapTab.kt` during the run (wrangler hot-reloaded twice at ~00:46), so the two
-  apps were built from different trees; F1's code path is unchanged at `a2edb45`.
-- Operator slip: one stray `adb emu geo fix -122.5 47.6` (a 6 km jump) was sent during walk 2; the coverage/plausibility
-  pipeline absorbed it (walk 2 synced, Manitou 98 %).
+Status after run 2 in brackets.
+
+- **F1 [fixed] (blocker, both platforms): claims use the fix's real timestamp, not the Play clock.** Run 1: `Fix.toGated()`
+  (`PlaySensing.kt:94`) passed `timeMs` (system clock) and `ClaimEvaluator.Walk.add` checked activity/daylight at
+  `f.instant` (`ClaimEvaluator.kt:257`); nothing was active at any fix, `play_claims` stayed empty and the Logbook filed
+  walks under Wed, Oct 21. Run 2: treasure, kraken, riddle, lore and egg all claimed on Android and the treasure on iOS;
+  every Logbook row is under Thu, Oct 29.
+- **F2 [fixed] (blocker, iOS): crash on Start playing and on launch with Play on into the island map**
+  (`IllegalArgumentException: Can't represent a width of 89917 and height of 89917 in Constraints` under
+  `org.maplibre.compose.overlay.GeographicLayout`). Run 2: Start playing ran the wake into the map and later launches
+  into the map worked; no new `BainbridgeTrails-*.ips` in `~/Library/Logs/DiagnosticReports`.
+- **F3 [still open] debug drawer Apply & Restart did not stick** (known race in the external drawer). Run 2 used the
+  prefs-file workaround directly (`debug tools installed; backend http://10.0.2.2:8787`).
+- **F4 [fixed in plan] iOS § 3 launch args lacked `-acceptSimulatedLocations 1`; product is `BainbridgeTrails.app`.**
+  § 3 now has both; run 2 used them and the Farm Trail North replay recorded normally.
+- **F5 [fixed] map pins lost the tap to roads/trails.** Run 2: tapping the Frog Rock riddle pin on the map opened the
+  riddle sheet; the treasure pin opened its sheet.
+- **F6 [fixed] the roads kraken label sat inland** (Falk Road NE). Run 2: the ripple ring and "The kraken is at Manitou"
+  sit on the water of Murden Cove just off the inked stretch (`e2e-04-map-play-android.png`). Trails, zoomed in: the
+  ring sits on the shoreline at Lynwood Center (scratch evidence only; at island zoom the label overlaps land).
+- **F7 [fixed] riddle sheets showed "0 marks".** Run 2: riddle-frog shows "40 marks" and claimed +40.
+- **F8 [not re-tested] (harness) `sim-route.sh trail-grand-forest-west` never moved the simulator dot**; the iOS riddle
+  walk was not part of run 2. `emu-route.sh … 2 900` (plan § 3) bounds walk 2 to 1170 m: band 80 (+70), not 95.
+- **F9 [still open, plan wording] Kraken week "of N" and the band line.** The server counts a stretch as sent back only
+  when ≥ `minPlayersPerStretch` (3) distinct walkers repelled it (`backend/src/play/challenges.ts`), and the band line
+  needs a known count (≥ 5, `ChallengesLogic.kt`); a single-walker local e2e therefore shows "0 of 2" and no band line
+  even after a repel (D1 `play_attack_stretches` repelled_by 1, `play_progress` 1). § 3's "1 of 2/3 + your band" cannot
+  appear without 3 (stretch) and 5 (band) seeded walkers; trails still reads "of 2" vs § 3's "1 of 3".
+- **F10 [fixed] Android wake not observed.** Run 2 caught it with a ~0.6 s screencap burst: title at +2.6 s, subtitle and
+  island outline at +3.2–3.8 s, pins filling in at +4.4 s (`e2e-03-wake-android.png`).
+- **F11 [new] (both platforms): the treasure Logbook/results line shows the raw template `{tier} on {place}`.** The
+  walk results and Logbook rows read "{tier} on {place} · Weekly treasure · +25" (Android and iOS; the a11y text is
+  "Treasure. {tier} on {place}. Weekly treasure."). `PlayRepository.kt:394` passes `items[it]?.copy?.title` (the pack's
+  unfilled `"{tier} on {place}"`) as the Logbook title into `PlayClaims.record` (`PlayClaimQueue.kt:296`); the find
+  moment fills it (`PlayNearbyStrip.kt:71`, `PlayFormat.fill`), the claim path does not. Entries are stored as written
+  (`LogCopy` contract), so already-written rows keep the template.
+- **F12 [new] (iOS): record-screen chips wrap one letter per line.** With "GPS ok" + "Unverified" + the Play find chip,
+  the "1 find" chip renders as `1 / fi / n / d` and "Unverified" wraps to `Unverifie / d` once "Waiting for GPS" shows
+  (`e2e-06-record-find-ios.png`). Android lays out the same three chips on one line.
+- Note (run 2): the treasure find on Android fired at the very first fix (the walk started on the treasure's point), so
+  the find moment itself was not captured; the chip and results show it.
+- Concurrency note (run 1): other agents committed and edited Play sources during run 1, so its two apps were built from
+  different trees. Run 2 built both apps from the clean `9e954f9` tree; `980a48e` (docs only) landed mid-run.
+- Operator slip (run 1): one stray `adb emu geo fix -122.5 47.6` during walk 2; absorbed by the pipeline.
 
 ## Showcase captures (run 2)
 
