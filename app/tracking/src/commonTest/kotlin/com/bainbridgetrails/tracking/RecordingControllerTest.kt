@@ -573,4 +573,45 @@ class RecordingControllerTest {
         runCurrent() // dismiss() would launch the held-back onLaunch on backgroundScope (advanceUntilIdle skips it)
         assertIs<RecordingState.Idle>(r.controller.state.value, "the held-back recovery belonged to the earlier sheet")
     }
+
+    /**
+     * Branch review round 1 P1-5 (compose host: `RecordingGraph` builds this controller with the markers and calls
+     * [RecordingController.onLaunch] after the Play gate settled): a walk merged just before the process died inside its
+     * Play hook gets the hook again on the next launch, and no results sheet is shown again for it.
+     */
+    @Test
+    fun `onLaunch replays the play hook of a walk merged before a death`() = runTest {
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        store.begin("s1", t0)
+        var x = 0.0
+        var s = 0
+        while (x <= 200.0) {
+            val (lon, lat) = proj.toLonLat(Xy(x, 0.0))
+            store.append(SessionEvent.FixEvent(t0 + s * 1000L, lon, lat, 5.0, false))
+            s += 2
+            x += 3.0
+        }
+        store.end(t0 + s * 1000L)
+        val died = object : kotlinx.coroutines.CancellationException("process died") {}
+        runCatching {
+            Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir), playPending = PlayPendingMarkers(dir), onGated = { { _, _, _ -> throw died } })
+                .finalize("s1")
+        }
+        WalkIndex(dir).markShown("s1") // its sheet was on screen when the process went
+        assertEquals(setOf("s1"), PlayPendingMarkers(dir).ids())
+
+        val replayed = mutableListOf<String>()
+        val fin = Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir), playPending = PlayPendingMarkers(dir), onGated = { { id, _, _ -> replayed += id } })
+        val clock = FakeClock(t0 + 3_600_000)
+        val recorder = FakeRecorder(store, clock)
+        val controller = RecordingController(store, fin, { clock.now }, recorder, backgroundScope)
+        recorder.controller = controller
+        controller.onLaunch()
+        assertEquals(listOf("s1"), replayed)
+        assertTrue(PlayPendingMarkers(dir).ids().isEmpty())
+        assertEquals(RecordingState.Idle, controller.state.value, "nothing re-shown")
+        controller.onLaunch()
+        assertEquals(1, replayed.size)
+    }
 }

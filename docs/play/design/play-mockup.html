@@ -1,0 +1,551 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bainbridge Play — mockup (light + dark)</title><style>
+
+:root{--frau:'Fraunces','Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;--sys:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sys);background:#D9D7CF;color:#1E2A24;padding:32px 24px 64px}
+.page-h{font-family:var(--frau);font-weight:600;font-size:32px;margin-bottom:6px}
+.page-sub{font-size:14px;color:#4A554E;max-width:980px;line-height:20px;margin-bottom:20px}
+.tokens{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px}
+.tok{background:#F7F5EF;border-radius:12px;padding:10px 12px;font-size:12px;line-height:16px;width:220px}
+.tok b{display:block;font-size:13px;margin-bottom:4px}
+.sw{display:inline-block;width:28px;height:28px;border-radius:8px;vertical-align:middle;margin-right:6px;border:1px solid rgba(0,0,0,.12)}
+section.row{margin:28px 0 8px}
+section.row h2{font-family:var(--frau);font-weight:600;font-size:22px;margin-bottom:4px}
+section.row p{font-size:13px;color:#4A554E;margin-bottom:12px;max-width:900px}
+.pair{display:flex;gap:28px;flex-wrap:wrap}
+.cap{font-size:12px;font-weight:600;letter-spacing:.5px;color:#4A554E;margin-bottom:6px;text-transform:uppercase}
+
+.light{--surface:#F7F5EF;--scl:#F2F0EA;--sc:#ECEBE4;--sch:#E6E5DE;--schst:#E0DFD8;--sb:#FBFAF6;--onS:#1E2A24;--onSV:#4A554E;--outline:#75807A;--outlineV:#C5CBC3;--primary:#2E5E4E;--onPrimary:#FFFFFF;--secC:#D3E7EB;--onSecC:#0F2E35;--terC:#F1E3C8;--onTerC:#2A1E0A;--tertiary:#6E5A3A;--mapChrome:rgba(251,250,246,.95);--onMapChrome:#26302B;--waterLine:#6F97A2;--ink:#22323C;--glass:#037245;--lamp:#FFF1C9;--fog:rgba(244,246,245,.55);--wash:#D1DED3;--land:#ECEFE6;--water:#9EBFC7;--woods:#D4E0C6;--road:#FFFFFF;--roadCase:#C3C7BC;--coast:#7FA2AB;--contour:rgba(150,128,96,.45);--ns:#6E6A64;--pw:#C98A00;--nd:#E2562A;--cp:#9B1FA8;--ndCase:#5A1F0C;--halo:#ECEFE6;--scrim:rgba(0,0,0,.32);--shadow:rgba(30,42,36,.28);--labelHalo:#FBFAF6}
+.dark{--surface:#101A16;--scl:#17221E;--sc:#1B2722;--sch:#25312C;--schst:#303C37;--sb:#35403B;--onS:#DCE6E1;--onSV:#BCC8C1;--outline:#87938C;--outlineV:#3F4A44;--primary:#93D3B6;--onPrimary:#003827;--secC:#224D56;--onSecC:#C6EAF2;--terC:#554525;--onTerC:#F7E0B8;--tertiary:#DCC39A;--mapChrome:rgba(19,32,27,.95);--onMapChrome:#DCE6E1;--waterLine:#2E5564;--ink:#CFE0E6;--glass:#45E0AE;--lamp:#FFF0CF;--fog:rgba(125,144,149,.25);--wash:#1F4438;--land:#1D2925;--water:#0E1F27;--woods:#21312A;--road:#34413B;--roadCase:#2A3631;--coast:#2C4450;--contour:rgba(120,140,120,.35);--ns:#A9A49B;--pw:#F0B43C;--nd:#FF7B47;--cp:#D45CFF;--ndCase:#0B1410;--halo:#1D2925;--scrim:rgba(0,0,0,.5);--shadow:rgba(0,0,0,.6);--labelHalo:#0B1410}
+
+.phone{position:relative;width:360px;height:760px;border-radius:32px;overflow:hidden;background:var(--surface);color:var(--onS);box-shadow:0 8px 28px rgba(0,0,0,.25);outline:6px solid #1b1f1d}
+.map{position:absolute;inset:0}
+.sbar{position:absolute;top:0;left:0;right:0;height:28px;padding:6px 22px;font-size:13px;font-weight:600;display:flex;justify-content:space-between;color:var(--onS);z-index:5}
+.sbar.onsurf{background:var(--surface)}
+.fr{font-family:var(--frau);font-weight:600}
+.mc{background:var(--mapChrome);box-shadow:0 1px 4px var(--shadow)}
+.search{position:absolute;top:36px;left:16px;width:272px;height:48px;border-radius:24px;display:flex;align-items:center;gap:10px;padding:0 16px;font-size:16px;color:var(--onMapChrome)}
+.search span{opacity:.8}
+.iconbtn{position:absolute;width:48px;height:48px;border-radius:24px;display:flex;align-items:center;justify-content:center;color:var(--onMapChrome)}
+.row2{position:absolute;top:96px;left:16px;display:flex;gap:8px}
+.pill{height:40px;border-radius:20px;display:flex;align-items:center;gap:6px;padding:0 14px 0 12px;font-size:14px;font-weight:500;color:var(--onMapChrome);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill .rk{opacity:.85}
+.bbar{position:absolute;left:0;right:0;bottom:0;height:80px;background:var(--sc);display:flex}
+.bslot{flex:1;display:flex;flex-direction:column;align-items:center;padding-top:14px;gap:4px;font-size:12px;font-weight:500;color:var(--onSV)}
+.bslot .ind{width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.bslot.sel .ind{background:var(--secC);color:var(--onSecC)}
+.bslot.sel{color:var(--onS)}
+.bslot.rec{flex:1.2;position:relative;padding-top:0}
+.disc{position:absolute;top:-16px;width:64px;height:64px;border-radius:32px;background:var(--primary);color:var(--onPrimary);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px var(--shadow)}
+.bslot.rec .lbl{position:absolute;top:52px;color:var(--onS)}
+.sheet{position:absolute;left:0;right:0;bottom:80px;background:var(--scl);border-radius:28px 28px 0 0;box-shadow:0 -2px 12px var(--shadow);padding:0 16px 16px;z-index:4}
+.handle{height:24px;display:flex;align-items:center;justify-content:center}
+.handle i{width:32px;height:4px;border-radius:2px;background:var(--onSV);opacity:.4}
+.ehead{display:flex;gap:16px;align-items:flex-start}
+.tile{width:56px;height:56px;border-radius:12px;background:var(--sb);border:1px solid var(--ink);display:flex;align-items:center;justify-content:center;flex:none}
+.tile.wash{background:var(--wash)}
+.dark .tile{background:var(--sch)}
+.dark .tile.wash{background:var(--wash)}
+.t-title{font-family:var(--frau);font-weight:600;font-size:22px;line-height:28px}
+.t-meta{font-size:14px;line-height:20px;color:var(--onSV)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{height:32px;border-radius:16px;background:var(--sch);display:inline-flex;align-items:center;gap:6px;padding:0 12px;font-size:13px;font-weight:500;color:var(--onS);font-variant-numeric:tabular-nums}
+.chip.meta{color:var(--onSV);font-size:12px}
+.chip.out{background:transparent;border:1px solid var(--outline);color:var(--onSV);font-size:12px}
+.body{font-size:16px;line-height:24px;margin-top:12px}
+.small{font-size:12px;line-height:16px;color:var(--onSV)}
+.stamp{display:inline-block;transform:rotate(-4deg);border:1.5px solid var(--ink);color:var(--ink);opacity:.85;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;letter-spacing:1.2px;margin-top:6px}
+.btn{height:56px;border-radius:28px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:500}
+.btn.pri{background:var(--primary);color:var(--onPrimary)}
+.btn.txt{color:var(--primary);height:48px}
+.scrim{position:absolute;inset:0;background:var(--scrim);z-index:3}
+.modal{position:absolute;left:0;right:0;bottom:0;background:var(--scl);border-radius:28px 28px 0 0;padding:0 24px 24px;z-index:6}
+.topbar{position:absolute;top:28px;left:0;right:0;height:64px;display:flex;align-items:center;gap:12px;padding:0 8px 0 4px}
+.topbar .ib{width:48px;height:48px;display:flex;align-items:center;justify-content:center}
+.topbar .fr{font-size:24px}
+.content{position:absolute;top:92px;left:0;right:0;bottom:80px;overflow:hidden}
+.card{background:var(--scl);border-radius:12px;padding:16px;margin:0 16px}
+.big{font-family:var(--frau);font-weight:600;font-size:32px;line-height:36px}
+.bar{height:6px;border-radius:3px;background:var(--schst);position:relative;overflow:visible}
+.bar b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--glass)}
+.bar .tick{position:absolute;top:-2px;width:2px;height:10px;background:var(--outline)}
+.rank{display:inline-flex;align-items:center;gap:6px;height:28px;border-radius:14px;background:var(--terC);color:var(--onTerC);padding:0 10px 0 8px;font-size:12px;font-weight:500;white-space:nowrap}
+.dayh{font-size:14px;font-weight:500;color:var(--onSV);padding:14px 16px 4px}
+.subh{display:flex;justify-content:space-between;align-items:center;height:40px;padding:0 16px;font-size:14px;font-weight:500}
+.lrow{display:flex;align-items:center;gap:12px;min-height:56px;padding:4px 16px}
+.lrow .ic{width:32px;height:32px;border-radius:16px;background:var(--sch);display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink)}
+.lrow .w{flex:1}
+.lrow .what{font-size:14px;font-weight:500;line-height:20px}
+.lrow .why{font-size:12px;line-height:16px;color:var(--onSV)}
+.delta{font-size:14px;font-weight:600;color:var(--glass);font-variant-numeric:tabular-nums}
+.sech{font-size:16px;font-weight:500;padding:16px 16px 8px}
+.ccard{background:var(--scl);border-radius:12px;padding:16px;margin:0 16px 12px}
+.ccard.done{background:var(--wash)}
+.ccard .top{display:flex;justify-content:space-between;align-items:center}
+.kind{height:28px;border-radius:14px;border:1px solid var(--outlineV);display:inline-flex;align-items:center;padding:0 10px;font-size:12px;font-weight:500;color:var(--onSV)}
+.ccard.done .kind{border-color:var(--outline)}
+.ctitle{font-size:16px;font-weight:500;margin-top:10px}
+.cbody{font-size:14px;line-height:20px;color:var(--onSV);margin-top:2px}
+.prog{display:flex;align-items:center;gap:12px;margin-top:12px}
+.prog .bar{flex:1}
+.prog span{font-size:14px;font-variant-numeric:tabular-nums}
+.cfoot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:14px;font-weight:500}
+.krow{padding:10px 0;border-top:1px solid var(--outlineV)}
+.krow .n{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:500}
+.krow .s{font-size:12px;color:var(--onSV);margin-top:6px;display:flex;gap:6px;align-items:center}
+.walkbtn{width:40px;height:40px;border-radius:20px;border:1px solid var(--outline);display:flex;align-items:center;justify-content:center;color:var(--primary)}
+.dots{display:flex;gap:6px;align-items:center}
+.dots i{width:10px;height:10px;border-radius:5px;border:1.5px solid var(--ink)}
+.dots i.f{background:var(--ink)}
+.note{font-size:11px;color:#4A554E;margin-top:8px;max-width:360px;line-height:15px}
+
+</style></head><body>
+
+<svg width="0" height="0" style="position:absolute">
+ <defs>
+  <symbol id="mark" viewBox="0 0 24 24"><path d="M12 3.5 L21 19.5 H3 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="14.2" r="2.2" fill="currentColor"/></symbol>
+  <symbol id="pebble" viewBox="0 0 24 24"><path d="M5 13.5 C4 9 8 5.5 12.5 5.8 C17.5 6 20.5 9.5 19.6 13.6 C18.8 17.4 15 19 11 18.6 C7.4 18.2 5.6 16.4 5 13.5Z" style="fill:var(--glass);fill-opacity:.85;stroke:var(--ink)" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.6 10.6 L11 8.6" style="stroke:var(--sb)" stroke-width="1.6" stroke-linecap="round"/><path d="M14.5 9 L16.2 10.6" style="stroke:var(--sb)" stroke-width="1.2" stroke-linecap="round" opacity=".8"/></symbol>
+  <symbol id="shell" viewBox="0 0 24 24"><path d="M4.5 15.5 C5.5 9 9 6.5 12 6.5 C15 6.5 18.5 9 19.5 15.5 Z" fill="none" style="stroke:var(--ink)" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.8 V15.3 M8.4 8.6 L9.6 15.3 M15.6 8.6 L14.4 15.3" style="stroke:var(--ink)" stroke-width="1.1"/><path d="M10 15.5 h4 v1.6 h-4z" style="fill:var(--ink)"/></symbol>
+  <symbol id="lantern" viewBox="0 0 24 24"><path d="M9 4.5 h6 M12 2.5 v2" style="stroke:var(--ink)" stroke-width="1.6" stroke-linecap="round"/><path d="M8 7 h8 l-1 11 h-6 z" style="fill:var(--sb);stroke:var(--ink)" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 7 h10 M7.5 18.5 h9" style="stroke:var(--ink)" stroke-width="1.8" stroke-linecap="round"/><text x="12" y="16" text-anchor="middle" font-family="Georgia,serif" font-size="8" font-weight="700" style="fill:var(--ink)">?</text></symbol>
+  <symbol id="pennant" viewBox="0 0 24 24"><path d="M6 3.5 V21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 4.5 L19 8.5 L7 12.5 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="eye" viewBox="0 0 24 24"><path d="M3 12 C7 6.5 17 6.5 21 12 C17 17.5 7 17.5 3 12Z" style="fill:var(--sb);stroke:var(--ink)" stroke-width="1.6"/><circle cx="12.6" cy="12" r="3" style="fill:var(--ink)"/><path d="M4.5 10.2 C8 7.4 16 7.4 19.5 10.2" fill="none" style="stroke:var(--tertiary)" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="curl" viewBox="0 0 24 24"><path d="M4 20 C6 12 13 9 16 12 C18.5 14.5 15.5 17.5 13.5 15.5 C12.5 14.5 13.5 13 14.5 13.5" fill="none" style="stroke:var(--ink)" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="15.6" r="1" style="fill:var(--ink)"/><circle cx="10.6" cy="12.8" r="1" style="fill:var(--ink)"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5 12.5 L10 17.5 L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="walk" viewBox="0 0 24 24"><circle cx="13.5" cy="4.5" r="2" fill="currentColor"/><path d="M10 21 L12 14 L14.5 16.5 V21 M12 14 L13 9 L10 10.5 L8.5 13.5 M13 9 L15.5 12 L18 12.5 M12 14 L9 21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="trophy" viewBox="0 0 24 24"><path d="M7 4 h10 v4 a5 5 0 0 1 -10 0 z M7 6 H4 a3 3 0 0 0 3 4 M17 6 h3 a3 3 0 0 1 -3 4 M12 13 v4 M8.5 20 h7 M10 17 h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 15 L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="layers" viewBox="0 0 24 24"><path d="M12 4 L21 9 L12 14 L3 9 Z M5 13 L12 17 L19 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="map" viewBox="0 0 24 24"><path d="M4 6 L9 4 L15 6 L20 4 V18 L15 20 L9 18 L4 20 Z" fill="currentColor"/></symbol>
+  <symbol id="hike" viewBox="0 0 24 24"><circle cx="11" cy="4" r="2" fill="currentColor"/><path d="M9 21 L11 13 L13 15 V21 M11 13 L12 8 L9 9.5 L8 13 M12 8 L14.5 11 M17 9 V21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M5 20 C5 15.5 19 15.5 19 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="back" viewBox="0 0 24 24"><path d="M20 12 H5 M11 6 L5 12 L11 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="M9 6 L15 12 L9 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="foot" viewBox="0 0 24 24"><path d="M5 17 C8 12 12 13 13 9 C14 6 17 6 19 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2 2.6"/></symbol>
+  <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="door" viewBox="0 0 24 24"><path d="M7 20 V8 a5 5 0 0 1 10 0 V20 Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="14.3" cy="14" r="1" fill="currentColor"/></symbol>
+  <symbol id="square" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.4"/></symbol>
+  <symbol id="park" viewBox="0 0 24 24"><path d="M12 3 L18 13 H14.5 L19 20 H5 L9.5 13 H6 Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="float" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" style="fill:var(--glass);fill-opacity:.55;stroke:var(--ink)" stroke-width="1.5"/><path d="M7 9.5 L17 14.5 M7 14.5 L17 9.5" style="stroke:var(--ink)" stroke-width=".9" opacity=".7"/></symbol>
+ </defs>
+</svg>
+
+<div class="page-h">Bainbridge Play — surfaces mockup</div>
+<div class="page-sub">Spec: docs/play/ux.md (wins on layout/color/motion); words: docs/play/product.md keys. Phone width 360dp, Bainbridge Trails (trails goal). Exact BtColors.kt tokens + the four Play roles. Fraunces is referenced by name with a system-serif fallback; no external assets. Map art is schematic (real map = MapLibre Topo / Dark styles).</div>
+<div class="tokens"><div class="tok"><b>playInk</b><span class="sw" style="background:#22323C"></span>#22323C<br><span class="sw" style="background:#CFE0E6"></span>#CFE0E6<br>art only · ≥6.8:1 on every map & chrome surface</div><div class="tok"><b>playSeaGlass</b><span class="sw" style="background:#037245"></span>#037245<br><span class="sw" style="background:#45E0AE"></span>#45E0AE<br>marks accent · text only for +n on surface/scl/mapChrome (5.3–5.7 / 9.8–10.6)</div><div class="tok"><b>playLamp</b><span class="sw" style="background:#FFF1C9"></span>#FFF1C9<br><span class="sw" style="background:#FFF0CF"></span>#FFF0CF<br>light only · 11.8:1 vs ink (light); dark on dark backing</div><div class="tok"><b>playFog</b><span class="sw" style="background:#F4F6F5"></span>#F4F6F5 @.55<br><span class="sw" style="background:#7D9095"></span>#7D9095 @.25<br>below status halos only</div></div>
+<section class="row"><h2>Map with Play on: HUD, two pins, encounter sheet (treasure found)</h2><p>HUD top-left on row 2 (marks · rank) + compact Challenges chip; trophy column stays clear. Lifted pins: the found sea glass (selected: sea-glass ring, figure 1.15×, open shell on wash) and a riddle lantern dimmed to 50 %. Status lines keep full color through the fog patch (top right). Sheet = non-modal MapSheet; legend/locate rise with it.</p><div class="pair">
+<div><div class="cap">light</div><div class="phone light"><svg class="map" viewBox="0 0 360 760" preserveAspectRatio="xMidYMid slice">
+ <rect width="360" height="760" style="fill:var(--land)"/>
+ <path d="M-10 120 C60 90 140 140 210 110 C280 80 330 150 370 130 V560 C300 600 220 540 150 580 C90 610 30 560 -10 590 Z" style="fill:var(--woods)"/>
+ <g fill="none" style="stroke:var(--contour)" stroke-width="1">
+  <path d="M-10 260 C80 230 150 300 250 250 S370 260 370 260"/><path d="M-10 300 C70 280 160 340 260 290 S370 300 370 300"/>
+  <path d="M-10 470 C90 440 170 500 270 460 S370 480 370 480"/><path d="M-10 640 C100 620 180 670 300 630 S370 650 370 650"/>
+ </g>
+ <g fill="none">
+  <path d="M120 330 C150 300 210 305 225 340 C240 380 200 410 160 400 C120 392 100 360 120 330Z" style="stroke:var(--waterLine)" stroke-width="1" transform="translate(-10 -8) scale(1.04)" opacity=".6"/>
+  <path d="M120 330 C150 300 210 305 225 340 C240 380 200 410 160 400 C120 392 100 360 120 330Z" style="stroke:var(--waterLine)" stroke-width="1" opacity=".8" transform="translate(-4 -3) scale(1.015)"/>
+ </g>
+ <path d="M120 330 C150 300 210 305 225 340 C240 380 200 410 160 400 C120 392 100 360 120 330Z" style="fill:var(--water);stroke:var(--coast)" stroke-width="1.2"/>
+ <g style="filter:blur(6px)"><path d="M210 150 h170 v190 h-170z" style="fill:var(--fog)"/><path d="M230 170 h150 v150 h-150z" style="fill:var(--fog)"/></g>
+ <g fill="none" stroke-linecap="round">
+  <path d="M-10 455 C80 445 190 470 370 440" style="stroke:var(--roadCase)" stroke-width="9"/><path d="M-10 455 C80 445 190 470 370 440" style="stroke:var(--road)" stroke-width="7"/>
+  <path d="M300 -10 C290 120 320 260 300 460" style="stroke:var(--roadCase)" stroke-width="8"/><path d="M300 -10 C290 120 320 260 300 460" style="stroke:var(--road)" stroke-width="6"/>
+ </g>
+ <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M30 200 C70 220 90 260 105 300 C115 330 100 380 140 420 C170 445 230 430 260 445" style="stroke:var(--halo)" stroke-width="7"/>
+  <path d="M30 200 C70 220 90 260 105 300 C115 330 100 380 140 420 C170 445 230 430 260 445" style="stroke:var(--cp)" stroke-width="5"/>
+  <path d="M140 170 C180 190 230 200 250 240 C265 270 280 300 300 320" style="stroke:var(--halo)" stroke-width="6"/>
+  <path d="M140 170 C180 190 230 200 250 240 C265 270 280 300 300 320" style="stroke:var(--pw)" stroke-width="3.5" stroke-dasharray="8 5"/>
+  <path d="M30 200 C80 180 110 160 140 170" style="stroke:var(--ns)" stroke-width="3" stroke-dasharray="0.1 6"/>
+  <path d="M230 345 C250 370 255 395 262 430" style="stroke:var(--ns)" stroke-width="3" stroke-dasharray="0.1 6"/>
+  <path d="M40 520 C80 500 120 530 150 515 C185 500 210 520 240 505" style="stroke:var(--ndCase)" stroke-width="6.5"/>
+  <path d="M40 520 C80 500 120 530 150 515 C185 500 210 520 240 505" style="stroke:var(--nd)" stroke-width="4"/>
+ </g>
+ <text x="168" y="360" text-anchor="middle" font-family="var(--sys)" font-style="italic" font-size="11" style="fill:var(--waterLine);paint-order:stroke;stroke:var(--labelHalo)" stroke-width="2.5">Lost Lake</text>
+ <text x="70" y="250" font-family="var(--sys)" font-size="11" style="fill:var(--onMapChrome);paint-order:stroke;stroke:var(--labelHalo)" stroke-width="2.5" opacity=".9">Grand Forest West</text>
+ <g>
+ <ellipse cx="223.5" cy="215.5" rx="5" ry="2.2" style="fill:var(--shadow)" opacity=".5"/>
+ <line x1="222" y1="214" x2="222" y2="198.0" style="stroke:var(--ink)" stroke-width="1.25"/>
+ <circle cx="222" cy="214" r="2.2" style="fill:var(--ink)"/>
+ <g transform="translate(222 184) scale(1.15) translate(-222 -184)">
+  <ellipse cx="223.5" cy="186" rx="14.0" ry="14.0" style="fill:var(--shadow)" opacity=".35"/>
+  <circle cx="222" cy="184" r="14.0" style="fill:var(--wash);stroke:var(--ink)" stroke-width="1.5"/>
+  <use href="#shell" x="212" y="174" width="20" height="20"/>
+ </g><circle cx="222" cy="184" r="18.0" fill="none" style="stroke:var(--glass)" stroke-width="2.2"/></g>
+ <g opacity=".5">
+ <ellipse cx="77.5" cy="215.5" rx="5" ry="2.2" style="fill:var(--shadow)" opacity=".5"/>
+ <line x1="76" y1="214" x2="76" y2="198.0" style="stroke:var(--ink)" stroke-width="1.25"/>
+ <circle cx="76" cy="214" r="2.2" style="fill:var(--ink)"/>
+ <g transform="translate(76 184) scale(1) translate(-76 -184)">
+  <ellipse cx="77.5" cy="186" rx="14.0" ry="14.0" style="fill:var(--shadow)" opacity=".35"/>
+  <circle cx="76" cy="184" r="14.0" style="fill:var(--sb);stroke:var(--ink)" stroke-width="1.5"/>
+  <use href="#lantern" x="66" y="174" width="20" height="20"/>
+ </g></g>
+</svg><div class="sbar"><span>9:41</span><span>▮▮▮ ◔</span></div><div class="search mc"><svg width="20" height="20"  ><use href="#search"/></svg><span>Find a trail</span></div>
+<div class="iconbtn mc" style="top:36px;right:16px"><svg width="24" height="24"  ><use href="#trophy"/></svg></div><div class="row2" aria-label="Play row">
+ <div class="pill mc" role="button" aria-label="Play. 1,240 marks. Rank Salal Scout. Opens your logbook."><svg width="18" height="18" style="color:var(--glass)" ><use href="#mark"/></svg><span>1,240</span><span class="rk">· Salal Scout</span></div>
+ <div class="pill mc" role="button" aria-label="2 challenges this week" style="padding:0 14px 0 12px"><svg width="18" height="18" style="color:var(--ink)" ><use href="#pennant"/></svg><span>2</span></div>
+</div><div class="iconbtn mc" style="top:340px;left:16px"><svg width="24" height="24"  ><use href="#layers"/></svg></div>
+<div class="iconbtn mc" style="top:340px;right:16px"><svg width="24" height="24"  ><use href="#locate"/></svg></div>
+<div class="sheet" style="height:268px" role="dialog" aria-label="Sea glass. Found 20 October.">
+ <div class="handle"><i></i></div>
+ <div class="ehead">
+  <div class="tile wash"><svg width="40" height="40"  ><use href="#shell"/></svg></div>
+  <div style="flex:1">
+   <div class="t-title" role="heading">Sea glass</div>
+   <div class="t-meta">Grand Forest West · 240 m away</div>
+   <span class="stamp">FOUND · 20 OCT</span>
+  </div>
+ </div>
+ <div class="chips"><span class="chip"><svg width="16" height="16" style="color:var(--glass)" ><use href="#check"/></svg>Found</span><span class="chip"><svg width="16" height="16" style="color:var(--glass)" ><use href="#mark"/></svg>+25 marks</span><span class="chip meta">Washes away Sunday night</span></div>
+ <div class="body">Frosted green and worn smooth by the Sound. It's in your logbook now.</div>
+</div><div class="bbar"><div class="bslot sel"><div class="ind"><svg width="24" height="24"  ><use href="#map"/></svg></div>Map</div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#hike"/></svg></div>Trails</div>
+ <div class="bslot rec"><div class="disc"><svg width="28" height="28"  ><use href="#walk"/></svg></div><span class="lbl">Record</span></div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#person"/></svg></div>Me</div></div></div></div>
+<div><div class="cap">dark</div><div class="phone dark"><svg class="map" viewBox="0 0 360 760" preserveAspectRatio="xMidYMid slice">
+ <rect width="360" height="760" style="fill:var(--land)"/>
+ <path d="M-10 120 C60 90 140 140 210 110 C280 80 330 150 370 130 V560 C300 600 220 540 150 580 C90 610 30 560 -10 590 Z" style="fill:var(--woods)"/>
+ <g fill="none" style="stroke:var(--contour)" stroke-width="1">
+  <path d="M-10 260 C80 230 150 300 250 250 S370 260 370 260"/><path d="M-10 300 C70 280 160 340 260 290 S370 300 370 300"/>
+  <path d="M-10 470 C90 440 170 500 270 460 S370 480 370 480"/><path d="M-10 640 C100 620 180 670 300 630 S370 650 370 650"/>
+ </g>
+ <g fill="none">
+  <path d="M120 330 C150 300 210 305 225 340 C240 380 200 410 160 400 C120 392 100 360 120 330Z" style="stroke:var(--waterLine)" stroke-width="1" transform="translate(-10 -8) scale(1.04)" opacity=".6"/>
+  <path d="M120 330 C150 300 210 305 225 340 C240 380 200 410 160 400 C120 392 100 360 120 330Z" style="stroke:var(--waterLine)" stroke-width="1" opacity=".8" transform="translate(-4 -3) scale(1.015)"/>
+ </g>
+ <path d="M120 330 C150 300 210 305 225 340 C240 380 200 410 160 400 C120 392 100 360 120 330Z" style="fill:var(--water);stroke:var(--coast)" stroke-width="1.2"/>
+ <g style="filter:blur(6px)"><path d="M210 150 h170 v190 h-170z" style="fill:var(--fog)"/><path d="M230 170 h150 v150 h-150z" style="fill:var(--fog)"/></g>
+ <g fill="none" stroke-linecap="round">
+  <path d="M-10 455 C80 445 190 470 370 440" style="stroke:var(--roadCase)" stroke-width="9"/><path d="M-10 455 C80 445 190 470 370 440" style="stroke:var(--road)" stroke-width="7"/>
+  <path d="M300 -10 C290 120 320 260 300 460" style="stroke:var(--roadCase)" stroke-width="8"/><path d="M300 -10 C290 120 320 260 300 460" style="stroke:var(--road)" stroke-width="6"/>
+ </g>
+ <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M30 200 C70 220 90 260 105 300 C115 330 100 380 140 420 C170 445 230 430 260 445" style="stroke:var(--halo)" stroke-width="7"/>
+  <path d="M30 200 C70 220 90 260 105 300 C115 330 100 380 140 420 C170 445 230 430 260 445" style="stroke:var(--cp)" stroke-width="5"/>
+  <path d="M140 170 C180 190 230 200 250 240 C265 270 280 300 300 320" style="stroke:var(--halo)" stroke-width="6"/>
+  <path d="M140 170 C180 190 230 200 250 240 C265 270 280 300 300 320" style="stroke:var(--pw)" stroke-width="3.5" stroke-dasharray="8 5"/>
+  <path d="M30 200 C80 180 110 160 140 170" style="stroke:var(--ns)" stroke-width="3" stroke-dasharray="0.1 6"/>
+  <path d="M230 345 C250 370 255 395 262 430" style="stroke:var(--ns)" stroke-width="3" stroke-dasharray="0.1 6"/>
+  <path d="M40 520 C80 500 120 530 150 515 C185 500 210 520 240 505" style="stroke:var(--ndCase)" stroke-width="6.5"/>
+  <path d="M40 520 C80 500 120 530 150 515 C185 500 210 520 240 505" style="stroke:var(--nd)" stroke-width="4"/>
+ </g>
+ <text x="168" y="360" text-anchor="middle" font-family="var(--sys)" font-style="italic" font-size="11" style="fill:var(--waterLine);paint-order:stroke;stroke:var(--labelHalo)" stroke-width="2.5">Lost Lake</text>
+ <text x="70" y="250" font-family="var(--sys)" font-size="11" style="fill:var(--onMapChrome);paint-order:stroke;stroke:var(--labelHalo)" stroke-width="2.5" opacity=".9">Grand Forest West</text>
+ <g>
+ <ellipse cx="223.5" cy="215.5" rx="5" ry="2.2" style="fill:var(--shadow)" opacity=".5"/>
+ <line x1="222" y1="214" x2="222" y2="198.0" style="stroke:var(--ink)" stroke-width="1.25"/>
+ <circle cx="222" cy="214" r="2.2" style="fill:var(--ink)"/>
+ <g transform="translate(222 184) scale(1.15) translate(-222 -184)">
+  <ellipse cx="223.5" cy="186" rx="14.0" ry="14.0" style="fill:var(--shadow)" opacity=".35"/>
+  <circle cx="222" cy="184" r="14.0" style="fill:var(--wash);stroke:var(--ink)" stroke-width="1.5"/>
+  <use href="#shell" x="212" y="174" width="20" height="20"/>
+ </g><circle cx="222" cy="184" r="18.0" fill="none" style="stroke:var(--glass)" stroke-width="2.2"/></g>
+ <g opacity=".5">
+ <ellipse cx="77.5" cy="215.5" rx="5" ry="2.2" style="fill:var(--shadow)" opacity=".5"/>
+ <line x1="76" y1="214" x2="76" y2="198.0" style="stroke:var(--ink)" stroke-width="1.25"/>
+ <circle cx="76" cy="214" r="2.2" style="fill:var(--ink)"/>
+ <g transform="translate(76 184) scale(1) translate(-76 -184)">
+  <ellipse cx="77.5" cy="186" rx="14.0" ry="14.0" style="fill:var(--shadow)" opacity=".35"/>
+  <circle cx="76" cy="184" r="14.0" style="fill:var(--sb);stroke:var(--ink)" stroke-width="1.5"/>
+  <use href="#lantern" x="66" y="174" width="20" height="20"/>
+ </g></g>
+</svg><div class="sbar"><span>9:41</span><span>▮▮▮ ◔</span></div><div class="search mc"><svg width="20" height="20"  ><use href="#search"/></svg><span>Find a trail</span></div>
+<div class="iconbtn mc" style="top:36px;right:16px"><svg width="24" height="24"  ><use href="#trophy"/></svg></div><div class="row2" aria-label="Play row">
+ <div class="pill mc" role="button" aria-label="Play. 1,240 marks. Rank Salal Scout. Opens your logbook."><svg width="18" height="18" style="color:var(--glass)" ><use href="#mark"/></svg><span>1,240</span><span class="rk">· Salal Scout</span></div>
+ <div class="pill mc" role="button" aria-label="2 challenges this week" style="padding:0 14px 0 12px"><svg width="18" height="18" style="color:var(--ink)" ><use href="#pennant"/></svg><span>2</span></div>
+</div><div class="iconbtn mc" style="top:340px;left:16px"><svg width="24" height="24"  ><use href="#layers"/></svg></div>
+<div class="iconbtn mc" style="top:340px;right:16px"><svg width="24" height="24"  ><use href="#locate"/></svg></div>
+<div class="sheet" style="height:268px" role="dialog" aria-label="Sea glass. Found 20 October.">
+ <div class="handle"><i></i></div>
+ <div class="ehead">
+  <div class="tile wash"><svg width="40" height="40"  ><use href="#shell"/></svg></div>
+  <div style="flex:1">
+   <div class="t-title" role="heading">Sea glass</div>
+   <div class="t-meta">Grand Forest West · 240 m away</div>
+   <span class="stamp">FOUND · 20 OCT</span>
+  </div>
+ </div>
+ <div class="chips"><span class="chip"><svg width="16" height="16" style="color:var(--glass)" ><use href="#check"/></svg>Found</span><span class="chip"><svg width="16" height="16" style="color:var(--glass)" ><use href="#mark"/></svg>+25 marks</span><span class="chip meta">Washes away Sunday night</span></div>
+ <div class="body">Frosted green and worn smooth by the Sound. It's in your logbook now.</div>
+</div><div class="bbar"><div class="bslot sel"><div class="ind"><svg width="24" height="24"  ><use href="#map"/></svg></div>Map</div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#hike"/></svg></div>Trails</div>
+ <div class="bslot rec"><div class="disc"><svg width="28" height="28"  ><use href="#walk"/></svg></div><span class="lbl">Record</span></div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#person"/></svg></div>Me</div></div></div></div>
+</div></section>
+<section class="row"><h2>One-time Offer (after the first walk's results close)</h2><p>Modal sheet over the pure map (Play still off: no HUD). Accept morphs this sheet into the Intro bullets.</p><div class="pair">
+<div><div class="cap">light</div><div class="phone light"><svg class="map" viewBox="0 0 360 760" preserveAspectRatio="xMidYMid slice">
+ <rect width="360" height="760" style="fill:var(--water)"/>
+ <g fill="none" style="stroke:var(--waterLine)" stroke-width="1">
+  <path d="M120 40 C200 30 230 120 250 220 C270 330 300 420 260 560 C230 660 160 720 110 700 C60 670 90 560 70 470 C50 380 40 280 70 170 C85 100 95 50 120 40Z" transform="translate(180 380) scale(1.08) translate(-180 -380)" opacity=".7"/>
+  <path d="M120 40 C200 30 230 120 250 220 C270 330 300 420 260 560 C230 660 160 720 110 700 C60 670 90 560 70 470 C50 380 40 280 70 170 C85 100 95 50 120 40Z" transform="translate(180 380) scale(1.16) translate(-180 -380)" opacity=".45"/>
+ </g>
+ <path d="M120 40 C200 30 230 120 250 220 C270 330 300 420 260 560 C230 660 160 720 110 700 C60 670 90 560 70 470 C50 380 40 280 70 170 C85 100 95 50 120 40Z" style="fill:var(--land);stroke:var(--coast)" stroke-width="1.2"/>
+ <path d="M100 220 C150 200 200 260 230 300 C240 380 200 420 150 430 C110 420 90 330 100 220Z" style="fill:var(--woods)"/>
+ <g fill="none" stroke-linecap="round"><path d="M90 160 C140 200 150 300 180 360 C200 420 190 520 170 640" style="stroke:var(--road)" stroke-width="4"/>
+ <path d="M110 260 C140 270 160 300 170 340" style="stroke:var(--cp)" stroke-width="3"/>
+ <path d="M150 460 C180 470 200 500 210 540" style="stroke:var(--pw)" stroke-width="2.5" stroke-dasharray="6 4"/>
+ <path d="M120 520 C130 560 150 590 160 620" style="stroke:var(--ns)" stroke-width="2.5" stroke-dasharray="0.1 5"/></g>
+</svg><div class="sbar"><span>9:41</span><span>▮▮▮ ◔</span></div><div class="search mc"><svg width="20" height="20"  ><use href="#search"/></svg><span>Find a trail</span></div>
+<div class="iconbtn mc" style="top:36px;right:16px"><svg width="24" height="24"  ><use href="#trophy"/></svg></div><div class="scrim"></div><div class="bbar"><div class="bslot sel"><div class="ind"><svg width="24" height="24"  ><use href="#map"/></svg></div>Map</div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#hike"/></svg></div>Trails</div>
+ <div class="bslot rec"><div class="disc"><svg width="28" height="28"  ><use href="#walk"/></svg></div><span class="lbl">Record</span></div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#person"/></svg></div>Me</div></div>
+<div class="modal" role="dialog" aria-label="Want a little more island in your walks?">
+ <div class="handle"><i></i></div>
+ <div style="display:flex;justify-content:center;margin:4px 0 12px"><svg width="312" height="150" viewBox="0 0 312 150">
+ <g fill="none" style="stroke:var(--waterLine)" stroke-width="1.2">
+  <path d="M150 12 C185 10 196 40 200 70 C204 100 214 118 196 136 C178 150 140 148 126 130 C112 112 124 90 116 70 C108 48 118 14 150 12Z" transform="translate(160 76) scale(1.25) translate(-160 -76)" opacity=".45"/>
+  <path d="M150 12 C185 10 196 40 200 70 C204 100 214 118 196 136 C178 150 140 148 126 130 C112 112 124 90 116 70 C108 48 118 14 150 12Z" transform="translate(160 76) scale(1.12) translate(-160 -76)" opacity=".75"/>
+ </g>
+ <path d="M150 12 C185 10 196 40 200 70 C204 100 214 118 196 136 C178 150 140 148 126 130 C112 112 124 90 116 70 C108 48 118 14 150 12Z" style="fill:var(--schst);stroke:var(--ink)" stroke-width="1.6"/>
+ <use href="#pebble" x="140" y="38" width="20" height="20"/><use href="#pebble" x="160" y="86" width="16" height="16"/><use href="#lantern" x="132" y="96" width="20" height="20"/>
+ <path d="M150 34 l3 -6 l3 6 l-3 6z" style="fill:var(--lamp);stroke:var(--ink)" stroke-width=".8"/>
+ <path d="M236 120 C226 100 240 82 252 92 C260 99 252 110 246 104" fill="none" style="stroke:var(--ink)" stroke-width="2.4" stroke-linecap="round"/>
+ <circle cx="238" cy="110" r="1.4" style="fill:var(--ink)"/><circle cx="240" cy="100" r="1.4" style="fill:var(--ink)"/>
+</svg></div>
+ <div class="fr" style="font-size:24px;line-height:32px" role="heading">Want a little more island in your walks?</div>
+ <div style="font-size:16px;line-height:24px;color:var(--onSV);margin-top:8px">Play adds treasures, riddles, the odd kraken and island stories to the map. It's optional, and your progress stays exactly the same.</div>
+ <div class="btn pri" style="margin-top:20px" role="button">Try Play</div>
+ <div class="btn txt" role="button">Not now</div>
+</div></div></div>
+<div><div class="cap">dark</div><div class="phone dark"><svg class="map" viewBox="0 0 360 760" preserveAspectRatio="xMidYMid slice">
+ <rect width="360" height="760" style="fill:var(--water)"/>
+ <g fill="none" style="stroke:var(--waterLine)" stroke-width="1">
+  <path d="M120 40 C200 30 230 120 250 220 C270 330 300 420 260 560 C230 660 160 720 110 700 C60 670 90 560 70 470 C50 380 40 280 70 170 C85 100 95 50 120 40Z" transform="translate(180 380) scale(1.08) translate(-180 -380)" opacity=".7"/>
+  <path d="M120 40 C200 30 230 120 250 220 C270 330 300 420 260 560 C230 660 160 720 110 700 C60 670 90 560 70 470 C50 380 40 280 70 170 C85 100 95 50 120 40Z" transform="translate(180 380) scale(1.16) translate(-180 -380)" opacity=".45"/>
+ </g>
+ <path d="M120 40 C200 30 230 120 250 220 C270 330 300 420 260 560 C230 660 160 720 110 700 C60 670 90 560 70 470 C50 380 40 280 70 170 C85 100 95 50 120 40Z" style="fill:var(--land);stroke:var(--coast)" stroke-width="1.2"/>
+ <path d="M100 220 C150 200 200 260 230 300 C240 380 200 420 150 430 C110 420 90 330 100 220Z" style="fill:var(--woods)"/>
+ <g fill="none" stroke-linecap="round"><path d="M90 160 C140 200 150 300 180 360 C200 420 190 520 170 640" style="stroke:var(--road)" stroke-width="4"/>
+ <path d="M110 260 C140 270 160 300 170 340" style="stroke:var(--cp)" stroke-width="3"/>
+ <path d="M150 460 C180 470 200 500 210 540" style="stroke:var(--pw)" stroke-width="2.5" stroke-dasharray="6 4"/>
+ <path d="M120 520 C130 560 150 590 160 620" style="stroke:var(--ns)" stroke-width="2.5" stroke-dasharray="0.1 5"/></g>
+</svg><div class="sbar"><span>9:41</span><span>▮▮▮ ◔</span></div><div class="search mc"><svg width="20" height="20"  ><use href="#search"/></svg><span>Find a trail</span></div>
+<div class="iconbtn mc" style="top:36px;right:16px"><svg width="24" height="24"  ><use href="#trophy"/></svg></div><div class="scrim"></div><div class="bbar"><div class="bslot sel"><div class="ind"><svg width="24" height="24"  ><use href="#map"/></svg></div>Map</div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#hike"/></svg></div>Trails</div>
+ <div class="bslot rec"><div class="disc"><svg width="28" height="28"  ><use href="#walk"/></svg></div><span class="lbl">Record</span></div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#person"/></svg></div>Me</div></div>
+<div class="modal" role="dialog" aria-label="Want a little more island in your walks?">
+ <div class="handle"><i></i></div>
+ <div style="display:flex;justify-content:center;margin:4px 0 12px"><svg width="312" height="150" viewBox="0 0 312 150">
+ <g fill="none" style="stroke:var(--waterLine)" stroke-width="1.2">
+  <path d="M150 12 C185 10 196 40 200 70 C204 100 214 118 196 136 C178 150 140 148 126 130 C112 112 124 90 116 70 C108 48 118 14 150 12Z" transform="translate(160 76) scale(1.25) translate(-160 -76)" opacity=".45"/>
+  <path d="M150 12 C185 10 196 40 200 70 C204 100 214 118 196 136 C178 150 140 148 126 130 C112 112 124 90 116 70 C108 48 118 14 150 12Z" transform="translate(160 76) scale(1.12) translate(-160 -76)" opacity=".75"/>
+ </g>
+ <path d="M150 12 C185 10 196 40 200 70 C204 100 214 118 196 136 C178 150 140 148 126 130 C112 112 124 90 116 70 C108 48 118 14 150 12Z" style="fill:var(--schst);stroke:var(--ink)" stroke-width="1.6"/>
+ <use href="#pebble" x="140" y="38" width="20" height="20"/><use href="#pebble" x="160" y="86" width="16" height="16"/><use href="#lantern" x="132" y="96" width="20" height="20"/>
+ <path d="M150 34 l3 -6 l3 6 l-3 6z" style="fill:var(--lamp);stroke:var(--ink)" stroke-width=".8"/>
+ <path d="M236 120 C226 100 240 82 252 92 C260 99 252 110 246 104" fill="none" style="stroke:var(--ink)" stroke-width="2.4" stroke-linecap="round"/>
+ <circle cx="238" cy="110" r="1.4" style="fill:var(--ink)"/><circle cx="240" cy="100" r="1.4" style="fill:var(--ink)"/>
+</svg></div>
+ <div class="fr" style="font-size:24px;line-height:32px" role="heading">Want a little more island in your walks?</div>
+ <div style="font-size:16px;line-height:24px;color:var(--onSV);margin-top:8px">Play adds treasures, riddles, the odd kraken and island stories to the map. It's optional, and your progress stays exactly the same.</div>
+ <div class="btn pri" style="margin-top:20px" role="button">Try Play</div>
+ <div class="btn txt" role="button">Not now</div>
+</div></div></div>
+</div></section>
+<section class="row"><h2>Logbook</h2><p>Totals card (static Fraunces total; tabular numbers elsewhere), rank chip + Play bar, kept-week float line, egg count. Groups by day → week close / walk. +n in sea glass on surface only.</p><div class="pair">
+<div><div class="cap">light</div><div class="phone light"><div class="sbar onsurf"><span>9:41</span><span>▮▮▮ ◔</span></div>
+<div class="topbar"><div class="ib"><svg width="24" height="24"  ><use href="#back"/></svg></div><div class="fr" role="heading">Logbook</div></div>
+<div class="content">
+ <div class="card" aria-label="2,291 marks. 995 this season. Rank Salal Scout, 709 to Madrona Wanderer.">
+  <div style="display:flex;align-items:baseline;gap:8px"><span class="big">2,291</span><span style="font-size:14px;color:var(--onSV)">marks</span></div>
+  <div style="font-size:14px;color:var(--onSV);margin-top:2px">995 this season · Kraken season</div>
+  <div style="display:flex;align-items:center;gap:10px;margin-top:12px"><span class="rank"><svg width="14" height="14"  ><use href="#mark"/></svg>Salal Scout</span><div class="bar" style="flex:1"><b style="width:53%"></b></div></div>
+  <div style="font-size:13px;color:var(--onSV);margin-top:6px;font-variant-numeric:tabular-nums">709 to Madrona Wanderer</div>
+  <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+   <svg width="64" height="22" viewBox="0 0 64 22" aria-hidden="true"><path d="M2 6 Q32 12 62 6" fill="none" style="stroke:var(--ink)" stroke-width="1.4"/><line x1="16" y1="8.5" x2="16" y2="12" style="stroke:var(--ink)" stroke-width="1"/><use href="#float" x="8" y="9" width="16" height="16"/></svg>
+   <span style="font-size:13px">Kept week</span><span class="small" style="margin-left:auto">Easter eggs: 2 of 40 found</span>
+  </div>
+ </div>
+ <div class="dayh" role="heading">Sun, Oct 18</div>
+ <div class="subh"><span>Week close</span></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#float"/></svg></div><div class="w"><div class="what">Kept week</div><div class="why">2 walking days this week</div></div><span class="delta">+40</span></div>
+ <div class="subh"><span>Walk · 2.0 km</span><svg width="20" height="20" style="color:var(--onSV)" ><use href="#chev"/></svg></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#check"/></svg></div><div class="w"><div class="what">Trail complete</div><div class="why">Fairy Dell Trail</div></div><span class="delta">+100</span></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#pennant"/></svg></div><div class="w"><div class="what">Weekend sweep</div><div class="why">Challenge, 3 trails this weekend</div></div><span class="delta">+100</span></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#park"/></svg></div><div class="w"><div class="what">First steps in a park</div><div class="why">Battle Point Park</div></div><span class="delta">+50</span></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#door"/></svg></div><div class="w"><div class="what">Fairy door</div><div class="why">Easter egg</div></div><span class="delta">+20</span></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#square"/></svg></div><div class="w"><div class="what">Fog lifted</div><div class="why">A new chart square</div></div><span class="delta">+25</span></div>
+</div><div class="bbar"><div class="bslot sel"><div class="ind"><svg width="24" height="24"  ><use href="#map"/></svg></div>Map</div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#hike"/></svg></div>Trails</div>
+ <div class="bslot rec"><div class="disc"><svg width="28" height="28"  ><use href="#walk"/></svg></div><span class="lbl">Record</span></div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#person"/></svg></div>Me</div></div></div></div>
+<div><div class="cap">dark</div><div class="phone dark"><div class="sbar onsurf"><span>9:41</span><span>▮▮▮ ◔</span></div>
+<div class="topbar"><div class="ib"><svg width="24" height="24"  ><use href="#back"/></svg></div><div class="fr" role="heading">Logbook</div></div>
+<div class="content">
+ <div class="card" aria-label="2,291 marks. 995 this season. Rank Salal Scout, 709 to Madrona Wanderer.">
+  <div style="display:flex;align-items:baseline;gap:8px"><span class="big">2,291</span><span style="font-size:14px;color:var(--onSV)">marks</span></div>
+  <div style="font-size:14px;color:var(--onSV);margin-top:2px">995 this season · Kraken season</div>
+  <div style="display:flex;align-items:center;gap:10px;margin-top:12px"><span class="rank"><svg width="14" height="14"  ><use href="#mark"/></svg>Salal Scout</span><div class="bar" style="flex:1"><b style="width:53%"></b></div></div>
+  <div style="font-size:13px;color:var(--onSV);margin-top:6px;font-variant-numeric:tabular-nums">709 to Madrona Wanderer</div>
+  <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+   <svg width="64" height="22" viewBox="0 0 64 22" aria-hidden="true"><path d="M2 6 Q32 12 62 6" fill="none" style="stroke:var(--ink)" stroke-width="1.4"/><line x1="16" y1="8.5" x2="16" y2="12" style="stroke:var(--ink)" stroke-width="1"/><use href="#float" x="8" y="9" width="16" height="16"/></svg>
+   <span style="font-size:13px">Kept week</span><span class="small" style="margin-left:auto">Easter eggs: 2 of 40 found</span>
+  </div>
+ </div>
+ <div class="dayh" role="heading">Sun, Oct 18</div>
+ <div class="subh"><span>Week close</span></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#float"/></svg></div><div class="w"><div class="what">Kept week</div><div class="why">2 walking days this week</div></div><span class="delta">+40</span></div>
+ <div class="subh"><span>Walk · 2.0 km</span><svg width="20" height="20" style="color:var(--onSV)" ><use href="#chev"/></svg></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#check"/></svg></div><div class="w"><div class="what">Trail complete</div><div class="why">Fairy Dell Trail</div></div><span class="delta">+100</span></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#pennant"/></svg></div><div class="w"><div class="what">Weekend sweep</div><div class="why">Challenge, 3 trails this weekend</div></div><span class="delta">+100</span></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#park"/></svg></div><div class="w"><div class="what">First steps in a park</div><div class="why">Battle Point Park</div></div><span class="delta">+50</span></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#door"/></svg></div><div class="w"><div class="what">Fairy door</div><div class="why">Easter egg</div></div><span class="delta">+20</span></div>
+ <div class="lrow" role="listitem"><div class="ic"><svg width="18" height="18" style="color:var(--ink)" ><use href="#square"/></svg></div><div class="w"><div class="what">Fog lifted</div><div class="why">A new chart square</div></div><span class="delta">+25</span></div>
+</div><div class="bbar"><div class="bslot sel"><div class="ind"><svg width="24" height="24"  ><use href="#map"/></svg></div>Map</div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#hike"/></svg></div>Trails</div>
+ <div class="bslot rec"><div class="disc"><svg width="28" height="28"  ><use href="#walk"/></svg></div><span class="lbl">Record</span></div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#person"/></svg></div>Me</div></div></div></div>
+</div></section>
+<section class="row"><h2>Challenges (ChallengeCard)</h2><p>Solo active, solo done (sea-glass wash, numbers in onSurface), island challenge with a band. Dates only: no countdown, no clock.</p><div class="pair">
+<div><div class="cap">light</div><div class="phone light"><div class="sbar onsurf"><span>9:41</span><span>▮▮▮ ◔</span></div>
+<div class="topbar"><div class="ib"><svg width="24" height="24"  ><use href="#back"/></svg></div><div class="fr" role="heading">Challenges</div></div>
+<div class="content">
+ <div class="sech" role="heading">Just you</div>
+ <div class="ccard" role="button">
+ <div class="top"><span class="kind">Just you</span><span class="small">Sat – Sun</span></div>
+ <div class="ctitle">Weekend sweep</div><div class="cbody">Finish 3 trails this weekend. Short ones count.</div>
+ <div class="prog"><div class="bar"><b style="width:33%"></b></div><span>1 of 3</span></div>
+ <div class="cfoot"><span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" style="color:var(--glass)" ><use href="#mark"/></svg>100 marks</span><svg width="20" height="20" style="color:var(--onSV)" ><use href="#chev"/></svg></div>
+</div>
+ <div class="ccard done" role="button">
+ <div class="top"><span class="kind">Just you</span><span class="small">October</span></div>
+ <div class="ctitle">Fog lifter</div><div class="cbody">Lift the fog over 3 new squares this month.</div>
+ <div class="prog"><div class="bar"><b style="width:100%"></b></div><span>3 of 3</span></div>
+ <div class="cfoot"><span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" style="color:var(--onS)" ><use href="#mark"/></svg>+150 marks</span><span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" style="color:var(--onS)" ><use href="#check"/></svg>Done</span></div>
+</div>
+ <div class="sech" role="heading">Whole island</div>
+ <div class="ccard" role="button">
+ <div class="top"><span class="kind">Whole island</span><span class="small">Thu – Sun</span></div>
+ <div class="ctitle">Kraken week</div><div class="cbody">Islanders send the kraken back from every inked stretch.</div>
+ <div class="prog"><div class="bar"><b style="width:50%"></b></div><span>1 of 2</span></div><div class="small" style="margin-top:6px">You were in the top band</div>
+ <div class="cfoot"><span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" style="color:var(--glass)" ><use href="#mark"/></svg>75 marks</span><svg width="20" height="20" style="color:var(--onSV)" ><use href="#chev"/></svg></div>
+</div>
+</div><div class="bbar"><div class="bslot sel"><div class="ind"><svg width="24" height="24"  ><use href="#map"/></svg></div>Map</div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#hike"/></svg></div>Trails</div>
+ <div class="bslot rec"><div class="disc"><svg width="28" height="28"  ><use href="#walk"/></svg></div><span class="lbl">Record</span></div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#person"/></svg></div>Me</div></div></div></div>
+<div><div class="cap">dark</div><div class="phone dark"><div class="sbar onsurf"><span>9:41</span><span>▮▮▮ ◔</span></div>
+<div class="topbar"><div class="ib"><svg width="24" height="24"  ><use href="#back"/></svg></div><div class="fr" role="heading">Challenges</div></div>
+<div class="content">
+ <div class="sech" role="heading">Just you</div>
+ <div class="ccard" role="button">
+ <div class="top"><span class="kind">Just you</span><span class="small">Sat – Sun</span></div>
+ <div class="ctitle">Weekend sweep</div><div class="cbody">Finish 3 trails this weekend. Short ones count.</div>
+ <div class="prog"><div class="bar"><b style="width:33%"></b></div><span>1 of 3</span></div>
+ <div class="cfoot"><span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" style="color:var(--glass)" ><use href="#mark"/></svg>100 marks</span><svg width="20" height="20" style="color:var(--onSV)" ><use href="#chev"/></svg></div>
+</div>
+ <div class="ccard done" role="button">
+ <div class="top"><span class="kind">Just you</span><span class="small">October</span></div>
+ <div class="ctitle">Fog lifter</div><div class="cbody">Lift the fog over 3 new squares this month.</div>
+ <div class="prog"><div class="bar"><b style="width:100%"></b></div><span>3 of 3</span></div>
+ <div class="cfoot"><span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" style="color:var(--onS)" ><use href="#mark"/></svg>+150 marks</span><span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" style="color:var(--onS)" ><use href="#check"/></svg>Done</span></div>
+</div>
+ <div class="sech" role="heading">Whole island</div>
+ <div class="ccard" role="button">
+ <div class="top"><span class="kind">Whole island</span><span class="small">Thu – Sun</span></div>
+ <div class="ctitle">Kraken week</div><div class="cbody">Islanders send the kraken back from every inked stretch.</div>
+ <div class="prog"><div class="bar"><b style="width:50%"></b></div><span>1 of 2</span></div><div class="small" style="margin-top:6px">You were in the top band</div>
+ <div class="cfoot"><span style="display:flex;align-items:center;gap:6px"><svg width="16" height="16" style="color:var(--glass)" ><use href="#mark"/></svg>75 marks</span><svg width="20" height="20" style="color:var(--onSV)" ><use href="#chev"/></svg></div>
+</div>
+</div><div class="bbar"><div class="bslot sel"><div class="ind"><svg width="24" height="24"  ><use href="#map"/></svg></div>Map</div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#hike"/></svg></div>Trails</div>
+ <div class="bslot rec"><div class="disc"><svg width="28" height="28"  ><use href="#walk"/></svg></div><span class="lbl">Record</span></div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#person"/></svg></div>Me</div></div></div></div>
+</div></section>
+<section class="row"><h2>Kraken encounter sheet</h2><p>Ink rope draws under the status line (status color untouched); kraken eye + coast label in the water is the tap target (selected ring). Stretch rows: 60 % tick, progress text, walk button; island progress as dots.</p><div class="pair">
+<div><div class="cap">light</div><div class="phone light"><svg class="map" viewBox="0 0 360 760" preserveAspectRatio="xMidYMid slice">
+ <rect width="360" height="760" style="fill:var(--water)"/>
+ <g transform="translate(0 -90)">
+ <g fill="none" style="stroke:var(--waterLine)" stroke-width="1">
+  <path d="M-10 330 C60 300 120 350 190 310 C250 275 300 300 370 270" transform="translate(0 -12)" opacity=".8"/>
+  <path d="M-10 330 C60 300 120 350 190 310 C250 275 300 300 370 270" transform="translate(0 -24)" opacity=".55"/>
+  <path d="M-10 330 C60 300 120 350 190 310 C250 275 300 300 370 270" transform="translate(0 -36)" opacity=".3"/>
+ </g>
+ <path d="M-10 330 C60 300 120 350 190 310 C250 275 300 300 370 270 V770 H-10 Z" style="fill:var(--land);stroke:var(--coast)" stroke-width="1.2"/>
+ <path d="M-10 420 C80 400 170 450 260 400 C300 380 330 390 370 380 V770 H-10Z" style="fill:var(--woods)"/>
+ <g fill="none" style="stroke:var(--contour)" stroke-width="1"><path d="M-10 470 C90 450 170 500 270 455 S370 470 370 470"/><path d="M-10 560 C90 540 200 590 300 545 S370 560 370 560"/></g>
+ <path d="M-10 610 C100 590 220 640 370 600" fill="none" style="stroke:var(--roadCase)" stroke-width="9"/><path d="M-10 610 C100 590 220 640 370 600" fill="none" style="stroke:var(--road)" stroke-width="7"/>
+ <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M10 355 C60 335 120 375 185 345 C230 325 280 320 350 300" style="stroke:var(--ink)" stroke-width="13" stroke-dasharray="2 3" opacity=".85"/>
+  <path d="M10 355 C60 335 120 375 185 345 C230 325 280 320 350 300" style="stroke:var(--halo)" stroke-width="6"/>
+  <path d="M10 355 C60 335 120 375 185 345 C230 325 280 320 350 300" style="stroke:var(--pw)" stroke-width="3.5" stroke-dasharray="8 5"/>
+  <path d="M185 345 C200 400 170 450 190 520" style="stroke:var(--halo)" stroke-width="7"/>
+  <path d="M185 345 C200 400 170 450 190 520" style="stroke:var(--cp)" stroke-width="5"/>
+  <path d="M60 345 C80 420 60 480 90 600" style="stroke:var(--ns)" stroke-width="3" stroke-dasharray="0.1 6"/>
+ </g>
+ </g>
+ <g fill="none" style="stroke:var(--waterLine)" stroke-width="1.4" opacity=".9"><circle cx="196" cy="186" r="26" opacity=".5"/><circle cx="196" cy="186" r="16"/></g>
+ <ellipse cx="196" cy="186" rx="38" ry="22" style="fill:var(--ink)" opacity=".14"/>
+ <circle cx="196" cy="186" r="18" style="fill:var(--sb);stroke:var(--ink)" stroke-width="1.5"/>
+ <use href="#eye" x="183" y="173" width="26" height="26"/>
+ <circle cx="196" cy="186" r="22.5" fill="none" style="stroke:var(--glass)" stroke-width="2.2"/>
+ <use href="#curl" x="236" y="188" width="22" height="22"/><use href="#curl" x="138" y="192" width="18" height="18" transform="scale(-1 1) translate(-314 0)"/>
+ <text x="196" y="226" text-anchor="middle" font-family="var(--sys)" font-style="italic" font-weight="500" font-size="13" style="fill:var(--ink);paint-order:stroke;stroke:var(--labelHalo)" stroke-width="3">The kraken is at Blakely Harbor</text>
+ 
+</svg><div class="sbar"><span>9:41</span><span>▮▮▮ ◔</span></div><div class="search mc"><svg width="20" height="20"  ><use href="#search"/></svg><span>Find a trail</span></div>
+<div class="iconbtn mc" style="top:36px;right:16px"><svg width="24" height="24"  ><use href="#trophy"/></svg></div><div class="row2" aria-label="Play row">
+ <div class="pill mc" role="button" aria-label="Play. 1,240 marks. Rank Salal Scout. Opens your logbook."><svg width="18" height="18" style="color:var(--glass)" ><use href="#mark"/></svg><span>1,240</span><span class="rk">· Salal Scout</span></div>
+ <div class="pill mc" role="button" aria-label="2 challenges this week" style="padding:0 14px 0 12px"><svg width="18" height="18" style="color:var(--ink)" ><use href="#pennant"/></svg><span>2</span></div>
+</div><div class="iconbtn mc" style="top:204px;left:16px"><svg width="24" height="24"  ><use href="#layers"/></svg></div>
+<div class="iconbtn mc" style="top:204px;right:16px"><svg width="24" height="24"  ><use href="#locate"/></svg></div>
+<div class="sheet" style="height:404px" role="dialog" aria-label="The kraken is ashore">
+ <div class="handle"><i></i></div>
+ <div class="ehead">
+  <div class="tile" style="background:var(--secC)"><svg width="40" height="40"  ><use href="#eye"/></svg></div>
+  <div style="flex:1"><div class="t-title" role="heading">The kraken is ashore</div><div class="t-meta">Until Sunday, 8 pm</div></div>
+ </div>
+ <div class="chips"><span class="chip out">Island tall tale, made up for this app</span><span class="chip"><svg width="16" height="16" style="color:var(--glass)" ><use href="#mark"/></svg>60–150 marks a stretch</span></div>
+ <div style="font-size:15px;line-height:22px;margin-top:10px">It's inking Blakely Harbor. Walk most of an inked stretch to send it back.</div>
+ <div class="small" style="margin:4px 0 6px">Walk 60% of a stretch in one walk</div>
+ <div class="krow"><div class="n"><span>Blakely Harbor Trail</span><span class="walkbtn" role="button" aria-label="Walk there"><svg width="20" height="20"  ><use href="#walk"/></svg></span></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-top:4px"><div class="bar" style="flex:1"><b style="width:50%"></b><i class="tick" style="left:60%"></i></div></div>
+  <div class="s">50% walked. 60% sends it back.</div></div>
+ <div class="krow"><div class="n"><span>Blakely Trail</span><span class="walkbtn" role="button" aria-label="Walk there"><svg width="20" height="20"  ><use href="#walk"/></svg></span></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-top:4px"><div class="bar" style="flex:1"><b style="width:100%"></b><i class="tick" style="left:60%"></i></div></div>
+  <div class="s"><svg width="14" height="14" style="color:var(--glass)" ><use href="#check"/></svg>You sent it back</div></div>
+ <div class="krow" style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px">1 of 2 stretches sent back by islanders</span><span class="dots" aria-hidden="true"><i class="f"></i><i></i></span></div>
+</div><div class="bbar"><div class="bslot sel"><div class="ind"><svg width="24" height="24"  ><use href="#map"/></svg></div>Map</div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#hike"/></svg></div>Trails</div>
+ <div class="bslot rec"><div class="disc"><svg width="28" height="28"  ><use href="#walk"/></svg></div><span class="lbl">Record</span></div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#person"/></svg></div>Me</div></div></div></div>
+<div><div class="cap">dark</div><div class="phone dark"><svg class="map" viewBox="0 0 360 760" preserveAspectRatio="xMidYMid slice">
+ <rect width="360" height="760" style="fill:var(--water)"/>
+ <g transform="translate(0 -90)">
+ <g fill="none" style="stroke:var(--waterLine)" stroke-width="1">
+  <path d="M-10 330 C60 300 120 350 190 310 C250 275 300 300 370 270" transform="translate(0 -12)" opacity=".8"/>
+  <path d="M-10 330 C60 300 120 350 190 310 C250 275 300 300 370 270" transform="translate(0 -24)" opacity=".55"/>
+  <path d="M-10 330 C60 300 120 350 190 310 C250 275 300 300 370 270" transform="translate(0 -36)" opacity=".3"/>
+ </g>
+ <path d="M-10 330 C60 300 120 350 190 310 C250 275 300 300 370 270 V770 H-10 Z" style="fill:var(--land);stroke:var(--coast)" stroke-width="1.2"/>
+ <path d="M-10 420 C80 400 170 450 260 400 C300 380 330 390 370 380 V770 H-10Z" style="fill:var(--woods)"/>
+ <g fill="none" style="stroke:var(--contour)" stroke-width="1"><path d="M-10 470 C90 450 170 500 270 455 S370 470 370 470"/><path d="M-10 560 C90 540 200 590 300 545 S370 560 370 560"/></g>
+ <path d="M-10 610 C100 590 220 640 370 600" fill="none" style="stroke:var(--roadCase)" stroke-width="9"/><path d="M-10 610 C100 590 220 640 370 600" fill="none" style="stroke:var(--road)" stroke-width="7"/>
+ <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M10 355 C60 335 120 375 185 345 C230 325 280 320 350 300" style="stroke:var(--ink)" stroke-width="13" stroke-dasharray="2 3" opacity=".85"/>
+  <path d="M10 355 C60 335 120 375 185 345 C230 325 280 320 350 300" style="stroke:var(--halo)" stroke-width="6"/>
+  <path d="M10 355 C60 335 120 375 185 345 C230 325 280 320 350 300" style="stroke:var(--pw)" stroke-width="3.5" stroke-dasharray="8 5"/>
+  <path d="M185 345 C200 400 170 450 190 520" style="stroke:var(--halo)" stroke-width="7"/>
+  <path d="M185 345 C200 400 170 450 190 520" style="stroke:var(--cp)" stroke-width="5"/>
+  <path d="M60 345 C80 420 60 480 90 600" style="stroke:var(--ns)" stroke-width="3" stroke-dasharray="0.1 6"/>
+ </g>
+ </g>
+ <g fill="none" style="stroke:var(--waterLine)" stroke-width="1.4" opacity=".9"><circle cx="196" cy="186" r="26" opacity=".5"/><circle cx="196" cy="186" r="16"/></g>
+ <ellipse cx="196" cy="186" rx="38" ry="22" style="fill:var(--ink)" opacity=".14"/>
+ <circle cx="196" cy="186" r="18" style="fill:var(--sb);stroke:var(--ink)" stroke-width="1.5"/>
+ <use href="#eye" x="183" y="173" width="26" height="26"/>
+ <circle cx="196" cy="186" r="22.5" fill="none" style="stroke:var(--glass)" stroke-width="2.2"/>
+ <use href="#curl" x="236" y="188" width="22" height="22"/><use href="#curl" x="138" y="192" width="18" height="18" transform="scale(-1 1) translate(-314 0)"/>
+ <text x="196" y="226" text-anchor="middle" font-family="var(--sys)" font-style="italic" font-weight="500" font-size="13" style="fill:var(--ink);paint-order:stroke;stroke:var(--labelHalo)" stroke-width="3">The kraken is at Blakely Harbor</text>
+ 
+</svg><div class="sbar"><span>9:41</span><span>▮▮▮ ◔</span></div><div class="search mc"><svg width="20" height="20"  ><use href="#search"/></svg><span>Find a trail</span></div>
+<div class="iconbtn mc" style="top:36px;right:16px"><svg width="24" height="24"  ><use href="#trophy"/></svg></div><div class="row2" aria-label="Play row">
+ <div class="pill mc" role="button" aria-label="Play. 1,240 marks. Rank Salal Scout. Opens your logbook."><svg width="18" height="18" style="color:var(--glass)" ><use href="#mark"/></svg><span>1,240</span><span class="rk">· Salal Scout</span></div>
+ <div class="pill mc" role="button" aria-label="2 challenges this week" style="padding:0 14px 0 12px"><svg width="18" height="18" style="color:var(--ink)" ><use href="#pennant"/></svg><span>2</span></div>
+</div><div class="iconbtn mc" style="top:204px;left:16px"><svg width="24" height="24"  ><use href="#layers"/></svg></div>
+<div class="iconbtn mc" style="top:204px;right:16px"><svg width="24" height="24"  ><use href="#locate"/></svg></div>
+<div class="sheet" style="height:404px" role="dialog" aria-label="The kraken is ashore">
+ <div class="handle"><i></i></div>
+ <div class="ehead">
+  <div class="tile" style="background:var(--secC)"><svg width="40" height="40"  ><use href="#eye"/></svg></div>
+  <div style="flex:1"><div class="t-title" role="heading">The kraken is ashore</div><div class="t-meta">Until Sunday, 8 pm</div></div>
+ </div>
+ <div class="chips"><span class="chip out">Island tall tale, made up for this app</span><span class="chip"><svg width="16" height="16" style="color:var(--glass)" ><use href="#mark"/></svg>60–150 marks a stretch</span></div>
+ <div style="font-size:15px;line-height:22px;margin-top:10px">It's inking Blakely Harbor. Walk most of an inked stretch to send it back.</div>
+ <div class="small" style="margin:4px 0 6px">Walk 60% of a stretch in one walk</div>
+ <div class="krow"><div class="n"><span>Blakely Harbor Trail</span><span class="walkbtn" role="button" aria-label="Walk there"><svg width="20" height="20"  ><use href="#walk"/></svg></span></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-top:4px"><div class="bar" style="flex:1"><b style="width:50%"></b><i class="tick" style="left:60%"></i></div></div>
+  <div class="s">50% walked. 60% sends it back.</div></div>
+ <div class="krow"><div class="n"><span>Blakely Trail</span><span class="walkbtn" role="button" aria-label="Walk there"><svg width="20" height="20"  ><use href="#walk"/></svg></span></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-top:4px"><div class="bar" style="flex:1"><b style="width:100%"></b><i class="tick" style="left:60%"></i></div></div>
+  <div class="s"><svg width="14" height="14" style="color:var(--glass)" ><use href="#check"/></svg>You sent it back</div></div>
+ <div class="krow" style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px">1 of 2 stretches sent back by islanders</span><span class="dots" aria-hidden="true"><i class="f"></i><i></i></span></div>
+</div><div class="bbar"><div class="bslot sel"><div class="ind"><svg width="24" height="24"  ><use href="#map"/></svg></div>Map</div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#hike"/></svg></div>Trails</div>
+ <div class="bslot rec"><div class="disc"><svg width="28" height="28"  ><use href="#walk"/></svg></div><span class="lbl">Record</span></div><div class="bslot"><div class="ind"><svg width="24" height="24"  ><use href="#person"/></svg></div>Me</div></div></div></div>
+</div></section>
+<div class="note">Generated mockup. Every hex here is from ui/theme/BtColors.kt, docs/spikes/map-render/styles.md (map) or docs/play/ux.md §1.1 (Play roles).</div></body></html>

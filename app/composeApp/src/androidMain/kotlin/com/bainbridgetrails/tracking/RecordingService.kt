@@ -25,6 +25,12 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import com.bainbridgetrails.resources.Res
+import com.bainbridgetrails.resources.play_notif_finds
+import com.bainbridgetrails.ui.play.record.PlayRecordLogic
+import org.jetbrains.compose.resources.getPluralString
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -53,6 +59,7 @@ class RecordingService : Service() {
     private var steps: AndroidStepSource? = null
     private var diagJob: Job? = null
     private var stepJob: Job? = null
+    private var findsJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -98,6 +105,8 @@ class RecordingService : Service() {
         events = channel
         this.sessionId = sessionId
         stopping = false
+        findsJob?.cancel()
+        findsJob = watchFinds()
         val dir = com.bainbridgetrails.record.trackingDir(this)
         val startMs = System.currentTimeMillis()
 
@@ -191,6 +200,8 @@ class RecordingService : Service() {
         diagJob = null
         stepJob?.cancel()
         stepJob = null
+        findsJob?.cancel()
+        findsJob = null
         location?.stop()
         activity?.stop()
         location = null
@@ -250,6 +261,24 @@ class RecordingService : Service() {
         super.onDestroy()
     }
 
+    /**
+     * Play on (ux.md §3.8): the ongoing notification's text gains `play_notif_finds` ("· 2 finds") for this walk's
+     * provisional finds (PlayRepository.sensed since the start). Play off: null, the text stays as it was.
+     */
+    private fun watchFinds(): Job? {
+        val play = com.bainbridgetrails.graph.AppGraph.installedOrNull()?.playOrNull ?: return null
+        val atStart = play.sensed.value
+        val nm = getSystemService(NotificationManager::class.java)
+        return scope.launch {
+            play.sensed.map { (it - atStart).size }.distinctUntilChanged().collect { finds ->
+                if (finds <= 0 || stopping) return@collect
+                val suffix = getPluralString(Res.plurals.play_notif_finds, finds, finds)
+                val text = PlayRecordLogic.notificationText(getString(R.string.notif_recording_tap), finds) { suffix }
+                runCatching { nm.notify(NOTIFICATION_ID, notification(text)) }
+            }
+        }
+    }
+
     private fun goForeground() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
@@ -257,6 +286,15 @@ class RecordingService : Service() {
                 description = getString(R.string.notif_channel_recording_desc)
             },
         )
+        val notification = notification(getString(R.string.notif_recording_tap))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+    }
+
+    private fun notification(text: String): Notification {
         val stopIntent = PendingIntent.getService(
             this,
             REQUEST_STOP,
@@ -269,10 +307,10 @@ class RecordingService : Service() {
             it.removeCategory(Intent.CATEGORY_LAUNCHER)
             PendingIntent.getActivity(this, REQUEST_OPEN, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
-        val notification = Notification.Builder(this, CHANNEL_ID)
+        return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle(getString(R.string.notif_recording_title))
-            .setContentText(getString(R.string.notif_recording_tap))
+            .setContentText(text)
             .setOngoing(true)
             .setContentIntent(openIntent)
             .addAction(
@@ -283,11 +321,6 @@ class RecordingService : Service() {
                 ).build(),
             )
             .build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
     }
 
     companion object {

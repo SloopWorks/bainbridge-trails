@@ -5,7 +5,18 @@ import com.bainbridgetrails.data.DataFixtures
 import com.bainbridgetrails.net.ApiError
 import com.bainbridgetrails.net.FakeServer
 import com.bainbridgetrails.net.Fixtures
+import com.bainbridgetrails.net.PlayClaimDto
 import com.bainbridgetrails.net.Reply
+import com.bainbridgetrails.play.PlayClaimQueue
+import com.bainbridgetrails.play.PlayClaims
+import com.bainbridgetrails.play.PlaySettled
+import com.bainbridgetrails.play.QueuedPlay
+import com.bainbridgetrails.play.claim.Claim
+import com.bainbridgetrails.play.claim.ClaimKind
+import kotlinx.datetime.LocalDate
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -18,6 +29,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SyncRepositoryTest {
@@ -53,6 +65,8 @@ class SyncRepositoryTest {
         scope: CoroutineScope = backgroundScope,
         dataset: String = "trails",
         uploadable: ((String) -> Boolean)? = null,
+        playPart: (suspend (Map<String, String>, Set<String>) -> PlayPart?)? = null,
+        playInFlight: suspend () -> Set<String> = { emptySet() },
     ) = SyncRepository(
         scope = scope,
         api = server.client(token = { user?.let { "tok-$it" } }, dataset = dataset),
@@ -65,6 +79,8 @@ class SyncRepositoryTest {
         now = { 1_000_000L },
         backoffMs = emptyList(),
         newWalkId = { "00000000-0000-4000-8000-${(++ids).toString().padStart(12, '0')}" },
+        playPart = playPart,
+        playInFlight = playInFlight,
     )
 
     private fun uploads() = server.requests.filter { it.method == "PUT" && it.path == "/v1/coverage" }
@@ -315,5 +331,162 @@ class SyncRepositoryTest {
         repo.syncOnce()
         assertEquals(1, uploads().size)
         assertFalse(repo.rejectedNotice.value)
+    }
+
+    // --- Play claims on the coverage upload (docs/play/plan.md L2-9; product §3.10, PD-3) ------------------------------
+
+    private val playPath = DataFixtures.tmpDir("sync-play") + "/play-claims.json"
+    private val settled = mutableListOf<PlaySettled>()
+    private val queue = PlayClaimQueue(playPath)
+    private val playProvider: suspend (Map<String, String>, Set<String>) -> PlayPart? = { ids, walks -> queue.part(ids, walks) { settled += it } }
+
+    private fun claim(id: String, kind: String = "treasure", band: Int? = null) = PlayClaimDto(id, kind, "2026-10-26", band)
+
+    private fun play(upload: JsonObject) = upload["play"]?.jsonArray?.map { it.jsonObject }
+
+    private fun playResult(accepted: List<String>, rejected: String = "[]") =
+        Fixtures.coverage().trimEnd().removeSuffix("}") + ""","play":{"accepted":${accepted.joinToString(",", "[", "]") { "\"$it\"" }},"rejected":$rejected,"capped":[],"total":85,"week":85}}"""
+
+    @Test
+    fun `play elements only for walks in walks`() = runTest {
+        // 201 queued walks after a first accepted upload elsewhere: the one upload carries the 200 longest.
+        local.state = cov("""{"seg-000001":"Aw=="}""")
+        repeat(201) { walks += LocalWalk("s$it", 600L + it) }
+        queue.add(QueuedPlay("s200", "2026.11.0", listOf(claim("kept@2026-10-26#0")), dayKey = "2026-10-26"))
+        queue.add(QueuedPlay("s0", "2026.11.0", listOf(claim("dropped@2026-10-26#0")))) // the shortest walk: over the cap
+        queue.add(QueuedPlay("s-unknown", "2026.11.0", listOf(claim("later@2026-10-26#0")))) // no local walk yet
+        server.on("PUT /v1/coverage") {
+            val n = (Json.parseToJsonElement(it.body).jsonObject["walks"] as JsonArray).size
+            if (n > 200) Reply.error(400, "too_many_walks") else Reply.json(playResult(listOf("kept@2026-10-26#0")))
+        }
+        assertIs<SyncState.Idle>(repo(playPart = playProvider).syncOnce())
+
+        val up = uploads().last()
+        val sent = walkIds(up).toSet()
+        val elements = assertNotNull(play(up))
+        assertEquals(1, elements.size)
+        assertTrue(elements.all { it["walkId"]!!.jsonPrimitive.content in sent }, "every element is tied to walks[]")
+        assertEquals("2026.11.0", up["playConfig"]!!.jsonPrimitive.content)
+        assertEquals(setOf("kept@2026-10-26#0"), settled.single { it.sessionId == "s200" }.accepted)
+        assertEquals(mapOf("dropped@2026-10-26#0" to PlayClaimQueue.OVER_CAP), settled.single { it.sessionId == "s0" }.localOnly)
+        assertEquals(listOf("s-unknown"), queue.queued().map { it.sessionId })
+    }
+
+    /**
+     * Branch review round 1 P1-6: a sync between the walk's merge and the end of its Play hook leaves the walk out (its
+     * marker is up), so the walk goes later together with its element instead of without it (→ `over_cap`).
+     */
+    @Test
+    fun `a walk whose play hook has not finished waits for its element`() = runTest {
+        local.state = cov("""{"seg-000001":"Aw=="}""")
+        walks += LocalWalk("s1", 600)
+        val inFlight = mutableSetOf("s1")
+        server.on("PUT /v1/coverage", Reply.json(playResult(listOf("a@2026-10-26#0"))))
+        server.on("GET /v1/coverage", Reply.json(Fixtures.coverage()))
+        val r = repo(playPart = playProvider, playInFlight = { inFlight.toSet() })
+        r.syncOnce()
+        assertTrue(uploads().all { walkIds(it).isEmpty() }, "the in-flight walk is not uploaded")
+
+        // The hook finishes: its element is queued, then the marker clears.
+        queue.add(QueuedPlay("s1", "2026.11.0", listOf(claim("a@2026-10-26#0"))))
+        inFlight.clear()
+        r.syncOnce()
+        val up = uploads().last()
+        assertEquals(1, walkIds(up).size)
+        assertEquals(walkIds(up), assertNotNull(play(up)).map { it["walkId"]!!.jsonPrimitive.content })
+        assertEquals(setOf("a@2026-10-26#0"), settled.single().accepted)
+        assertTrue(queue.queued().isEmpty())
+    }
+
+    @Test
+    fun `fields absent and body byte-identical when play off`() = runTest {
+        // PF0-2: no provider (Play never on), a provider that answers null (Play off), and Play on with nothing for
+        // this upload's walks all send the pure upload byte for byte.
+        suspend fun body(provider: (suspend (Map<String, String>, Set<String>) -> PlayPart?)?): String {
+            val srv = FakeServer()
+            srv.on("PUT /v1/coverage", Reply.json(Fixtures.coverage()))
+            var n = 0
+            val cov = FakeCoverage { listOf(LocalWalk("s1", 900), LocalWalk("s2", 60)) }.also { it.state = cov("""{"seg-000001":"Aw=="}""") }
+            SyncRepository(
+                scope = backgroundScope, api = srv.client(token = { "tok-u1" }), queuePath = DataFixtures.tmpDir("sync-off") + "/sync.json",
+                currentUserId = { "u1" }, coverage = cov, datasetVersion = { "v1" }, now = { 1_000_000L }, backoffMs = emptyList(),
+                newWalkId = { "00000000-0000-4000-8000-${(++n).toString().padStart(12, '0')}" },
+                playPart = provider,
+            ).syncOnce()
+            return srv.last("PUT /v1/coverage").body
+        }
+
+        val pure = body(null)
+        assertEquals(setOf("datasetVersion", "tickM", "segments", "walks"), Json.parseToJsonElement(pure).jsonObject.keys)
+        assertEquals(pure, body { _, _ -> null })
+        val other = PlayClaimQueue(DataFixtures.tmpDir("sync-play-off") + "/play-claims.json")
+        other.add(QueuedPlay("s-other", "2026.11.0", listOf(claim("x@2026-10-26#0"))))
+        assertEquals(pure, body { ids, w -> other.part(ids, w) })
+        assertEquals(1, other.queued().size, "an element of a walk without an id stays queued")
+    }
+
+    @Test
+    fun `payload has no timestamps days marks or coordinates`() = runTest {
+        // PF15-4 (contract): from the evaluator's Claim (which carries marks and an instant) to the wire.
+        val at = Instant.parse("2026-10-29T20:13:07Z")
+        val claims = listOf(
+            Claim("treasure-weekly-roads@2026-10-26#07", "treasure-weekly-roads", ClaimKind.treasure, LocalDate(2026, 10, 26), marks = 60, at = at),
+            Claim("kraken-roads@2026-10-29#0", "kraken-roads", ClaimKind.ink, LocalDate(2026, 10, 26), marks = 80, band = 95, at = at),
+            Claim("riddle-bond@2026-10-26", "riddle-bond", ClaimKind.riddle, LocalDate(2026, 10, 26), marks = 60, at = at),
+        )
+        queue.add(PlayClaims.element("s1700000000000-a", "2026.11.0", claims, dayKey = LocalDate(2026, 10, 26), hints = mapOf("riddle-bond" to 1)))
+        walks += LocalWalk("s1700000000000-a", 900)
+        server.on("PUT /v1/coverage", Reply.json(playResult(claims.map { it.key })))
+        repo(playPart = playProvider).syncOnce()
+
+        val raw = server.last("PUT /v1/coverage").body
+        val up = Json.parseToJsonElement(raw).jsonObject
+        val el = assertNotNull(play(up)).single()
+        assertEquals(setOf("walkId", "claims", "dayKey", "hints"), el.keys)
+        for (c in el["claims"]!!.jsonArray.map { it.jsonObject }) {
+            assertTrue(c.keys.all { it in setOf("id", "kind", "weekId", "band") }, "claim keys ${c.keys}")
+            assertEquals(c["kind"]!!.jsonPrimitive.content == "ink", "band" in c, "band only on ink")
+            assertEquals("2026-10-26", c["weekId"]!!.jsonPrimitive.content, "a Monday, never the day")
+        }
+        assertEquals("2026-10-26", el["dayKey"]!!.jsonPrimitive.content, "dayKey is the week id, never the day")
+        assertEquals(JsonObject(mapOf("riddle-bond" to JsonPrimitive(1))), el["hints"])
+        for (banned in listOf("marks", "\"at\"", "time", "\"lat", "\"lon", "2026-10-29T", "20:13", "what", "why", "total", "s1700000000000")) {
+            assertFalse(banned in raw, "no $banned in the body")
+        }
+    }
+
+    @Test
+    fun `offline 2 claims sent on reconnect`() = runTest {
+        // PF15-1: a walk with 2 claims finishes offline; when connectivity returns, the upload carries both.
+        local.state = cov("""{"seg-000001":"AQ=="}""")
+        walks += LocalWalk("s1", 900)
+        queue.add(QueuedPlay("s1", "2026.11.0", listOf(claim("a@2026-10-26#0"), claim("k@2026-10-29#0", "ink", 80))))
+        server.online = false
+        val repo = repo(playPart = playProvider)
+        assertIs<SyncState.Pending>(repo.syncOnce())
+        assertTrue(settled.isEmpty(), "a retryable failure settles nothing")
+        assertEquals(1, queue.queued().size)
+
+        server.online = true
+        server.requests.clear()
+        server.on("PUT /v1/coverage", Reply.json(playResult(listOf("a@2026-10-26#0", "k@2026-10-29#0"))))
+        assertIs<SyncState.Idle>(repo.syncOnce())
+        val up = uploads().single()
+        val el = assertNotNull(play(up)).single()
+        assertEquals(walkIds(up).single(), el["walkId"]!!.jsonPrimitive.content)
+        assertEquals(listOf("a@2026-10-26#0", "k@2026-10-29#0"), el["claims"]!!.jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content })
+        assertEquals(setOf("a@2026-10-26#0", "k@2026-10-29#0"), settled.single().accepted)
+        assertTrue(queue.queued().isEmpty())
+    }
+
+    @Test
+    fun `invalid play never costs the walks`() = runTest {
+        // Play is optional: a 400 about the play fields alone resends the pure upload and settles Play local_only.
+        walks += LocalWalk("s1", 900)
+        queue.add(QueuedPlay("s1", "2026.11.0", listOf(claim("a@2026-10-26#0"))))
+        server.on("PUT /v1/coverage") { if ("\"play\"" in it.body) Reply.error(400, "invalid_play") else Reply.json(Fixtures.coverage()) }
+        assertIs<SyncState.Idle>(repo(playPart = playProvider).syncOnce())
+        assertEquals(listOf(true, false), uploads().map { "play" in it })
+        assertEquals(mapOf("a@2026-10-26#0" to "invalid_play"), settled.single().localOnly)
     }
 }

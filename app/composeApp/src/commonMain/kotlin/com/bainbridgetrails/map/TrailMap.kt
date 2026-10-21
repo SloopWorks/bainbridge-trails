@@ -61,8 +61,10 @@ import org.maplibre.compose.interaction.MapInteractions
 import org.maplibre.compose.map.CameraConstraints
 import org.maplibre.compose.map.MapState
 import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.map.RenderOptions
 import org.maplibre.compose.map.rememberMapState
 import org.maplibre.compose.overlay.DisappearingScaleBar
+import org.maplibre.compose.overlay.MapOverlayScope
 import org.maplibre.compose.overlay.MaplibreLogo
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.util.MaplibreComposable
@@ -147,7 +149,9 @@ fun chartInteractions(onTap: ((ClickEvent) -> Unit)? = null, onUserPan: (() -> U
  * `updateBaseStyle` on every recomposition, so only the initial *camera* is first-composition-only).
  * [content] adds sources/layers on top of the style; [follow] re-centres the camera whenever it changes.
  * [controller] exposes the live [MapState]; [interactions] default to a north-up chart; [chromePadding] keeps the
- * logo / credit clear of sheets and buttons drawn over the map.
+ * logo / credit clear of sheets and buttons drawn over the map. Play hooks (docs/play/engine.md PF-9, both default to
+ * today's map): [fxOverlay] draws Play's overlay effects before (under) the chrome; [renderOptions] lets FxHost cap
+ * `maximumFps` while a Layer-tier effect animates.
  */
 @Composable
 fun TrailMap(
@@ -161,6 +165,8 @@ fun TrailMap(
     attribution: AttributionMode = AttributionMode.Full,
     chromePadding: PaddingValues = PaddingValues(0.dp),
     showScaleBar: Boolean = true,
+    fxOverlay: (@Composable MapOverlayScope.() -> Unit)? = null,
+    renderOptions: RenderOptions = RenderOptions.Standard,
     content: @Composable @MaplibreComposable () -> Unit = {},
 ) {
     val dataDir = rememberMapDataDir()
@@ -209,7 +215,12 @@ fun TrailMap(
                     state = state,
                     cameraConstraints = IslandConstraints,
                     interactions = interactions,
-                    overlay = { TrailMapOverlay(state, controlsTopPadding, style.isDark, attribution, chromePadding, showScaleBar) },
+                    renderOptions = renderOptions,
+                    overlay = {
+                        // Play's OVERLAY band sits under the chrome (scale bar, logo, credit); null = pure mode.
+                        if (fxOverlay != null) fxOverlay(this)
+                        TrailMapOverlay(state, controlsTopPadding, style.isDark, attribution, chromePadding, showScaleBar)
+                    },
                 )
             }
         }

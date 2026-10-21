@@ -63,12 +63,21 @@ data class BtExtraType(
     val numeric: TextStyle,
     /** Small tabular label (ring %, pill timer). */
     val numericLabel: TextStyle,
+    /** Play `+25` marks deltas (claim pops, sheets, Logbook rows): system font + tabular figures (docs/play/ux.md §1.2). */
+    val marksDelta: TextStyle,
+    /** Play static marks totals only (Logbook header, Me card): Fraunces, never for a number that changes on screen. */
+    val marksTotal: TextStyle,
 )
 
-fun btExtraType(display: FontFamily, base: Typography) = BtExtraType(
-    statHero = TextStyle(fontFamily = display, fontWeight = FontWeight.Bold, fontSize = 64.sp, lineHeight = 68.sp, letterSpacing = (-1).sp),
-    statLarge = TextStyle(fontFamily = display, fontWeight = FontWeight.SemiBold, fontSize = 32.sp, lineHeight = 36.sp),
-    statLive = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp, fontFeatureSettings = "tnum"),
-    numeric = base.bodyMedium.copy(fontFeatureSettings = "tnum"),
-    numericLabel = base.labelMedium.copy(fontFeatureSettings = "tnum"),
-)
+fun btExtraType(display: FontFamily, base: Typography): BtExtraType {
+    val statLarge = TextStyle(fontFamily = display, fontWeight = FontWeight.SemiBold, fontSize = 32.sp, lineHeight = 36.sp)
+    return BtExtraType(
+        statHero = TextStyle(fontFamily = display, fontWeight = FontWeight.Bold, fontSize = 64.sp, lineHeight = 68.sp, letterSpacing = (-1).sp),
+        statLarge = statLarge,
+        statLive = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp, fontFeatureSettings = "tnum"),
+        numeric = base.bodyMedium.copy(fontFeatureSettings = "tnum"),
+        numericLabel = base.labelMedium.copy(fontFeatureSettings = "tnum"),
+        marksDelta = base.labelLarge.copy(fontFeatureSettings = "tnum"),
+        marksTotal = statLarge,
+    )
+}

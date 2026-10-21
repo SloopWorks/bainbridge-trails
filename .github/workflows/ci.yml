@@ -43,7 +43,7 @@ jobs:
         # No signing secrets in CI: release builds androidApp-release-unsigned.apk, which still runs R8/shrinking.
         run: >-
           ./gradlew --stacktrace -PdebugDrawer=off
-          :coverage:jvmTest :tracking:jvmTest :composeApp:testAndroidHostTest
+          :coverage:jvmTest :tracking:jvmTest :play:jvmTest :composeApp:testAndroidHostTest
           :androidApp:assembleTrailsDebug :androidApp:assembleRoadsDebug
           :androidApp:assembleTrailsRelease :androidApp:assembleRoadsRelease
       - name: Upload test reports
@@ -70,6 +70,9 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      # Play pack build script tests (docs/play/plan.md L2-10), from the repo root.
+      - run: node --test scripts/*.test.mjs
+        working-directory: .
       - run: npm test
       - run: npx tsc --noEmit
       - name: Store metadata limits

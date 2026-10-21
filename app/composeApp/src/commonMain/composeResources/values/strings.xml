@@ -109,4 +109,306 @@
     <!-- Errors -->
     <string name="error_dataset_title">Trails didn’t load</string>
     <string name="error_dataset_body">Something went wrong reading the trail data. Try again, or reinstall if it keeps happening.</string>
+
+    <!--
+      Play (docs/play/product.md §7.3 + ux.md §6.2; PD-15/PD-16). Every v1 play_ key lands here at once (plan L2-1);
+      (v2) keys that are not Play board keys are kept so later stages do not reopen this file; Play board keys (v2)
+      come with the board. Tone: sentence case, no exclamation, no race/run/fast/speed/sprint/beat/points
+      (PlayCopyTest). Keys tagged (goal) have a roads_ twin in strings_roads.xml (GoalVocabularyGuardTest).
+    -->
+    <string name="common_not_now">Not now</string>
+
+    <!-- Play: settings, intro, offer, off, about -->
+    <string name="play_settings_section">Play</string>
+    <string name="play_settings_toggle">Play</string>
+    <string name="play_settings_toggle_body">Add treasures, riddles, challenges and island stories to your walks. Your progress and the leaderboard stay exactly as they are.</string>
+    <string name="play_settings_sounds">Play sounds</string>
+    <string name="play_settings_sounds_body">Ferry horns and small chimes. Off by default.</string>
+    <string name="play_settings_ranks">Ranks</string>
+    <string name="play_settings_logbook">Logbook</string>
+    <string name="play_settings_about">How Play works</string>
+    <string name="play_settings_ambient">Moving map effects</string>
+    <string name="play_settings_ambient_body">Glints, ripples and the ferry’s wake. Turn off to save battery.</string>
+    <string name="play_settings_replay">Replay the island waking up</string>
+    <string name="play_settings_clock_debug">Play clock (debug)</string>
+    <string name="play_intro_title">Play on the island</string>
+    <string name="play_intro_1">Find treasures, easter eggs and riddles hidden around the island.</string>
+    <string name="play_intro_2">Earn marks for every walk. Walking there is what counts.</string>
+    <string name="play_intro_3">Your map, your progress and the leaderboard don’t change. Turn Play off any time.</string>
+    <string name="play_intro_start">Start playing</string>
+    <string name="play_start_balance">Your walks so far: %1$s marks</string>
+    <string name="play_offer_title">Want a little more island in your walks?</string>
+    <string name="play_offer_body">Play adds treasures, riddles, the odd kraken and island stories to the map. It’s optional, and your progress stays exactly the same.</string>
+    <string name="play_offer_accept">Try Play</string>
+    <string name="play_off_title">Turn off Play?</string>
+    <string name="play_off_body">Your marks and logbook are kept, just hidden. Turn Play back on any time and they’ll be here.</string>
+    <string name="play_off_confirm">Turn off</string>
+    <string name="play_about_title">How Play works</string>
+    <string name="play_about_marks">Marks come from your walks: new ground, finished trails, walking days and things you find.</string>
+    <string name="play_about_claim">You can spot and solve things from home. You claim them by walking there.</string>
+    <string name="play_about_safety">Finds only happen in daylight, never on private land or busy roads, and the kraken waits for the tide to drop.</string>
+    <string name="play_about_privacy">Play syncs which island things you found and in which week. Finding something at a fixed place tells us you were near it that week. Your GPS track and walk times stay on this phone.</string>
+
+    <!-- Play: wake -->
+    <string name="play_wake_title">The island is awake</string>
+    <string name="play_wake_body">Treasures, riddles and island stories are on your map now.</string>
+    <string name="play_wake_skip">Skip</string>
+    <string name="play_wake_a11y">Play is on. Treasures, riddles, challenges and island stories are on your map. Your marks are at the top left.</string>
+
+    <!-- Play: map, legend, chips, lists -->
+    <string name="play_map_chip">%1$s · %2$s</string>
+    <string name="play_map_chip_a11y">Play. %1$s marks. Rank %2$s. Opens your logbook.</string>
+    <plurals name="play_challenges_chip">
+        <item quantity="one">1 challenge this week</item>
+        <item quantity="other">%1$d challenges this week</item>
+    </plurals>
+    <string name="play_legend_group">Play</string>
+    <string name="play_legend_fog">Fog: squares you haven’t walked yet</string>
+    <string name="play_legend_treasure">This week’s treasure</string>
+    <string name="play_legend_kraken">Kraken ink</string>
+    <string name="play_legend_riddle">Riddle</string>
+    <string name="play_legend_lore">Island story</string>
+    <string name="play_legend_challenge">Challenge area</string>
+    <string name="play_kraken_coast">The kraken is at %1$s</string>
+    <string name="play_ferry_a11y">Ferry crossing Eagle Harbor, by the timetable.</string>
+    <string name="play_quiet_banner">Today we remember March 30, 1942. Play is quiet today.</string>
+    <string name="play_quiet_banner_action">Read more</string>
+    <string name="play_marker_a11y">%1$s, %2$s marks, %3$s away</string>
+    <plurals name="play_marker_cluster_a11y">
+        <item quantity="one">1 Play item here. Zoom in to see it.</item>
+        <item quantity="other">%1$d Play items here. Zoom in to see them.</item>
+    </plurals>
+    <string name="play_map_action_nearby">Play nearby</string>
+    <string name="play_list_badge_treasure">Treasure</string>
+    <string name="play_list_badge_kraken">Kraken</string>
+    <string name="play_list_badge_riddle">Riddle</string>
+    <string name="play_list_filter">Play this week</string>
+    <string name="play_detail_section">Play on this trail</string>
+
+    <!-- Play: content sheets -->
+    <string name="play_walk_there">Walk there</string>
+    <string name="play_more">More</string>
+    <string name="play_reward">%1$s marks</string>
+    <string name="play_reward_none">Nothing to earn here. Just a place to visit.</string>
+    <string name="play_tier_sea_glass">Sea glass</string>
+    <string name="play_tier_agate">Agate</string>
+    <string name="play_tier_glass_float">Glass float</string>
+    <string name="play_tier_ships_bell">Ship’s bell</string>
+    <string name="play_treasure_expires">Washes away Sunday night</string>
+    <string name="play_treasure_collected">Found</string>
+    <string name="play_treasures_gone">This week’s treasures have washed away. New ones Monday.</string>
+    <string name="play_egg_count">Easter eggs: %1$d of %2$d found</string>
+    <string name="play_distance_away">%1$s away</string>
+    <string name="play_found_on">Found %1$s</string>
+    <string name="play_content_gone">This one’s gone for now.</string>
+    <string name="play_gate_dark">Back in daylight, from %1$s</string>
+    <string name="play_gate_tide">The tide is high here. The kraken can be sent back from %1$s</string>
+    <string name="play_gate_tide_unknown">The kraken is paused until tide times are updated.</string>
+    <string name="play_gate_quiet">A quiet place. Nothing to find here.</string>
+    <string name="play_tag_history">History</string>
+    <string name="play_tag_myth">Myth</string>
+    <string name="play_tag_tall_tale">Island tall tale, made up for this app</string>
+    <string name="play_tag_remembrance">Remembrance</string>
+    <string name="play_tag_creature">Island creature</string>
+    <string name="play_sources">Sources</string>
+    <string name="play_safety_owl">Give owls space, especially in spring.</string>
+    <string name="play_safety_coyote">Keep dogs leashed. Never feed wildlife.</string>
+    <string name="play_safety_newt">Look, don’t touch. Their skin is toxic.</string>
+    <string name="play_safety_shore">Stay off the beach when the tide is coming in.</string>
+    <string name="play_ferry_timetable_note">Times come from the published timetable. The real boat may be late.</string>
+
+    <!-- Play: kraken (a literal percent sign is a bare "%") -->
+    <string name="play_kraken_title">The kraken is ashore</string>
+    <string name="play_kraken_body">It’s inking %1$s. Walk most of an inked stretch to send it back.</string>
+    <string name="play_kraken_rule">Walk %1$d% of a stretch in one walk</string>
+    <string name="play_kraken_stretch_progress">%1$d% walked. %2$d% sends it back.</string>
+    <string name="play_kraken_stretch_progress_a11y">%1$d percent walked, %2$d percent sends it back</string>
+    <string name="play_kraken_repelled_you">You sent it back</string>
+    <string name="play_kraken_island_progress">%1$d of %2$d stretches sent back by islanders</string>
+    <string name="play_kraken_until">Until Sunday, 8 pm</string>
+    <string name="play_kraken_retreat">The kraken has slipped back into the deep. Thanks, islanders.</string>
+    <string name="play_kraken_slipped">The kraken slipped away. It’ll be back next week.</string>
+    <string name="play_kraken_a11y">Kraken sent back on %1$s. %2$d marks.</string>
+    <string name="play_kraken_reward">%1$s–%2$s marks a stretch</string>
+
+    <!-- Play: riddles -->
+    <string name="play_riddle_title">Riddle</string>
+    <plurals name="play_riddle_stars_a11y">
+        <item quantity="one">Difficulty 1 star</item>
+        <item quantity="other">Difficulty %1$d stars</item>
+    </plurals>
+    <string name="play_riddle_answer">Answer</string>
+    <string name="play_riddle_pick_on_map">Pick the place on the map</string>
+    <string name="play_riddle_pick_list">Choose from a list</string>
+    <string name="play_riddle_list_search">Search places</string>
+    <string name="play_riddle_count_hint">Count it when you’re there</string>
+    <string name="play_riddle_count_field">Your count</string>
+    <string name="play_riddle_hint">Hint</string>
+    <string name="play_riddle_hint_cost">A hint lowers the reward to %1$s marks</string>
+    <string name="play_riddle_wrong">Not quite. Try again any time.</string>
+    <string name="play_riddle_solved_stamp">Solved. Walk there to claim it.</string>
+    <string name="play_riddle_claimed">Claimed. %1$s marks.</string>
+    <string name="play_riddle_count_near">Get within 30 m to answer this one.</string>
+
+    <!-- Play: challenges -->
+    <string name="play_challenges_title">Challenges</string>
+    <string name="play_challenges_empty">No challenges this week.</string>
+    <string name="play_challenges_ended">Ended</string>
+    <string name="play_show_on_map">Show on map</string>
+    <string name="play_challenge_solo">Just you</string>
+    <!-- (goal) the pack's {goal.item} / {goal.items} copy tokens (schedule.md §4.7) -->
+    <string name="play_goal_item">trail</string>
+    <string name="play_goal_items">trails</string>
+    <string name="play_challenge_island">Whole island</string>
+    <string name="play_challenge_window">%1$s – %2$s</string>
+    <string name="play_challenge_progress">%1$s of %2$s</string>
+    <string name="play_challenge_done">Done</string>
+    <string name="play_challenge_ended">Challenge ended</string>
+    <string name="play_challenge_sweep_title">Weekend sweep</string>
+    <string name="play_challenge_sweep_body">Finish %1$d trails this weekend. Short ones count.</string>
+    <string name="play_challenge_crossing_title">While the boat crosses</string>
+    <string name="play_challenge_crossing_body">In the %1$d minutes after a ferry leaves, walk %2$s of new trail.</string>
+    <string name="play_challenge_next_departures">Next departures: %1$s</string>
+    <string name="play_challenge_foglifter_title">Fog lifter</string>
+    <string name="play_challenge_foglifter_body">Lift the fog over %1$d new squares this month.</string>
+    <string name="play_challenge_bestweek_title">Your best week</string>
+    <string name="play_challenge_bestweek_body">Walk more new ground than your best week of the last four.</string>
+    <string name="play_challenge_strawberry_title">Strawberry month</string>
+    <string name="play_challenge_strawberry_body">Together, islanders walk %1$s of new ground this June.</string>
+    <string name="play_challenge_band">You were in the %1$s band, with %2$d others</string>
+    <string name="play_challenge_band_top">top</string>
+    <string name="play_challenge_band_middle">middle</string>
+    <string name="play_challenge_band_starting">starting</string>
+    <string name="play_challenge_first_wave">First wave</string>
+    <string name="play_challenge_first_wave_body">You helped in the first two days.</string>
+
+    <!-- Play: record and find moments -->
+    <string name="play_nearby_header">Nearby</string>
+    <string name="play_nearby_row">%1$s · %2$s</string>
+    <string name="play_nearby_found">Found</string>
+    <plurals name="play_record_finds">
+        <item quantity="one">1 find</item>
+        <item quantity="other">%1$d finds</item>
+    </plurals>
+    <string name="play_find_title_treasure">%1$s, found</string>
+    <string name="play_find_title_egg">An easter egg</string>
+    <string name="play_find_title_lore">%1$s</string>
+    <string name="play_find_title_horn">The ferry’s leaving</string>
+    <string name="play_find_provisional">Found on this walk. Confirmed when you finish.</string>
+    <string name="play_find_a11y">Found %1$s. %2$s marks when you finish.</string>
+    <string name="play_fog_lifted_a11y">Fog lifted over a new square. %1$d of %2$d squares explored.</string>
+    <plurals name="play_notif_finds">
+        <item quantity="one">· 1 find</item>
+        <item quantity="other">· %1$d finds</item>
+    </plurals>
+
+    <!-- Play: results, celebration -->
+    <string name="play_results_header">Play</string>
+    <string name="play_results_total">%1$s marks this walk</string>
+    <string name="play_results_none">No marks this walk. Walking days need 10 minutes and half a kilometre.</string>
+    <string name="play_unclaimed_header">Not claimed</string>
+    <string name="play_unclaimed_vehicle">Looked like a ride, not a walk</string>
+    <string name="play_unclaimed_accuracy">GPS wasn’t precise enough there</string>
+    <string name="play_unclaimed_window">It had already washed away</string>
+    <string name="play_unclaimed_dark">It was after dark</string>
+    <string name="play_unclaimed_tide">The tide was in</string>
+    <string name="play_rank_up">New rank: %1$s</string>
+    <string name="play_rank_up_a11y">New rank, %1$s.</string>
+    <string name="play_celebrate_marks">+%1$s marks</string>
+    <string name="play_claim_pop_a11y">Plus %1$s marks. %2$s marks.</string>
+
+    <!-- Play: logbook -->
+    <string name="play_log_title">Logbook</string>
+    <string name="play_log_total">%1$s marks</string>
+    <string name="play_log_week">%1$s this week</string>
+    <string name="play_log_season">%1$s this season</string>
+    <string name="play_log_restored">Restored from your account. Earlier details stay on your old phone.</string>
+    <string name="play_log_next_rank">%1$s to %2$s</string>
+    <string name="play_log_line">+%1$s</string>
+    <string name="play_log_cap">Daily limit reached. Found, no marks.</string>
+    <string name="play_log_local_only">Not on the Play board (couldn’t be confirmed)</string>
+    <string name="play_log_stamp">Stamped</string>
+    <string name="play_log_empty">Your logbook fills in as you walk.</string>
+    <string name="play_log_more">Show older entries</string>
+    <string name="play_log_walk_group">Walk · %1$s</string>
+    <string name="play_log_week_close">Week close</string>
+    <string name="play_kind_coverage">New ground</string>
+    <string name="play_kind_complete">Trail complete</string>
+    <string name="play_kind_park_first">First steps in a park</string>
+    <string name="play_kind_park_complete">Every trail in a park</string>
+    <string name="play_kind_milestone">Milestone</string>
+    <string name="play_kind_island">The whole island</string>
+    <string name="play_kind_square">Fog lifted</string>
+    <string name="play_kind_day">Walking day</string>
+    <string name="play_kind_week">Kept week</string>
+    <plurals name="play_kind_week_run">
+        <item quantity="one">Kept week</item>
+        <item quantity="other">Kept week, %1$d in a row</item>
+    </plurals>
+    <string name="play_kind_treasure">Treasure</string>
+    <string name="play_kind_egg">Easter egg</string>
+    <string name="play_kind_riddle">Riddle</string>
+    <string name="play_kind_ink">Kraken sent back</string>
+    <string name="play_kind_retreat">Kraken retreat</string>
+    <string name="play_kind_bramble">Bramble cleared</string>
+    <string name="play_kind_lore">Island story</string>
+    <string name="play_kind_horn">Ferry horn</string>
+    <string name="play_kind_challenge">Challenge</string>
+    <string name="play_kind_island_challenge">Island challenge</string>
+    <string name="play_kind_wave">First wave</string>
+    <string name="play_kind_start_balance">Your walks so far</string>
+    <string name="play_kind_restored">Restored from your account</string>
+    <string name="play_kind_visit">Visited</string>
+
+    <!-- Play: ranks (product §3.7.1) -->
+    <string name="play_ranks_title">Ranks</string>
+    <string name="play_ranks_current">You’re a %1$s</string>
+    <string name="play_ranks_next">%1$s marks to %2$s</string>
+    <string name="play_rank_row_a11y">%1$s, from %2$s marks. %3$s</string>
+    <string name="play_rank_earned">Earned</string>
+    <string name="play_rank_from">from %1$s marks</string>
+    <string name="play_rank_1">Walk-on</string>
+    <string name="play_rank_2">Dock Walker</string>
+    <string name="play_rank_3">Beachcomber</string>
+    <string name="play_rank_4">Salal Scout</string>
+    <string name="play_rank_5">Madrona Wanderer</string>
+    <string name="play_rank_6">Heron Watcher</string>
+    <string name="play_rank_7">Fog Navigator</string>
+    <string name="play_rank_8">Tide Reader</string>
+    <string name="play_rank_9">Kraken Tamer</string>
+    <string name="play_rank_10">Island Cartographer</string>
+    <string name="play_rank_11">Keeper of the Chart</string>
+    <string name="play_rank_1_flavour">Every islander starts as a walk-on passenger.</string>
+    <string name="play_rank_2_flavour">You know where the boats come in.</string>
+    <string name="play_rank_3_flavour">Sea glass in your pockets.</string>
+    <string name="play_rank_4_flavour">Through the understory, off the main path.</string>
+    <string name="play_rank_5_flavour">Red bark, long views.</string>
+    <string name="play_rank_6_flavour">Patient at the water’s edge.</string>
+    <string name="play_rank_7_flavour">You walk where the chart is still blank.</string>
+    <string name="play_rank_8_flavour">You know when the beach is safe.</string>
+    <string name="play_rank_9_flavour">The kraken knows your name.</string>
+    <string name="play_rank_10_flavour">Most of the chart is yours.</string>
+    <string name="play_rank_11_flavour">The island, walked and known.</string>
+
+    <!-- Play: stories, Me, What's On -->
+    <string name="play_stories_title">Island stories</string>
+    <string name="play_stories_count">%1$d of %2$d met</string>
+    <string name="play_screen_off">Play is off. You can turn it on in Settings.</string>
+    <string name="play_me_card_title">Play</string>
+    <string name="play_me_marks">%1$s marks</string>
+    <string name="play_me_logbook">Logbook</string>
+    <string name="play_me_stories">Island stories</string>
+    <string name="play_me_whats_on">What’s on</string>
+    <string name="play_island_time">%1$s island time</string>
+    <string name="play_whats_on_title">What’s on</string>
+    <string name="play_whats_on_week_of">Week of %1$s</string>
+    <string name="play_whats_on_daylight">Daylight %1$s – %2$s</string>
+    <string name="play_whats_on_ferry">Next ferry arrives %1$s</string>
+    <plurals name="play_whats_on_treasures">
+        <item quantity="one">1 treasure this week · %2$d found</item>
+        <item quantity="other">%1$d treasures this week · %2$d found</item>
+    </plurals>
+    <string name="play_whats_on_today">Today</string>
+    <string name="play_whats_on_coming">Coming up</string>
+    <string name="play_whats_on_empty">A quiet day on the island.</string>
 </resources>

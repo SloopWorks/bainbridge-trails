@@ -77,6 +77,24 @@ import com.bainbridgetrails.resources.results_approx_warning
 import com.bainbridgetrails.resources.results_no_progress
 import com.bainbridgetrails.resources.results_no_progress_hint
 import com.bainbridgetrails.resources.results_trails_header
+import com.bainbridgetrails.resources.play_intro_1
+import com.bainbridgetrails.resources.roads_play_intro_1
+import com.bainbridgetrails.resources.play_about_marks
+import com.bainbridgetrails.resources.roads_play_about_marks
+import com.bainbridgetrails.resources.play_detail_section
+import com.bainbridgetrails.resources.roads_play_detail_section
+import com.bainbridgetrails.resources.play_kraken_body
+import com.bainbridgetrails.resources.roads_play_kraken_body
+import com.bainbridgetrails.resources.play_challenge_sweep_body
+import com.bainbridgetrails.resources.roads_play_challenge_sweep_body
+import com.bainbridgetrails.resources.play_challenge_crossing_body
+import com.bainbridgetrails.resources.roads_play_challenge_crossing_body
+import com.bainbridgetrails.resources.play_kind_complete
+import com.bainbridgetrails.resources.roads_play_kind_complete
+import com.bainbridgetrails.resources.play_goal_item
+import com.bainbridgetrails.resources.roads_play_goal_item
+import com.bainbridgetrails.resources.play_goal_items
+import com.bainbridgetrails.resources.roads_play_goal_items
 import com.bainbridgetrails.resources.roads_app_name
 import com.bainbridgetrails.resources.roads_board_col_trails
 import com.bainbridgetrails.resources.roads_board_empty_body
@@ -328,6 +346,16 @@ class GoalVocabulary private constructor(
             Res.string.privacy_lead to Res.string.roads_privacy_lead,
             Res.string.privacy_account_body to Res.string.roads_privacy_account_body,
             Res.string.privacy_board_body to Res.string.roads_privacy_board_body,
+            // Play (docs/play/product.md §7.3, keys tagged (goal))
+            Res.string.play_intro_1 to Res.string.roads_play_intro_1,
+            Res.string.play_about_marks to Res.string.roads_play_about_marks,
+            Res.string.play_detail_section to Res.string.roads_play_detail_section,
+            Res.string.play_kraken_body to Res.string.roads_play_kraken_body,
+            Res.string.play_challenge_sweep_body to Res.string.roads_play_challenge_sweep_body,
+            Res.string.play_challenge_crossing_body to Res.string.roads_play_challenge_crossing_body,
+            Res.string.play_kind_complete to Res.string.roads_play_kind_complete,
+            Res.string.play_goal_item to Res.string.roads_play_goal_item,
+            Res.string.play_goal_items to Res.string.roads_play_goal_items,
             ),
             plurals = mapOf(
             Res.plurals.detail_community_completed to Res.plurals.roads_detail_community_completed,

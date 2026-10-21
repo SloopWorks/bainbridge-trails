@@ -8,6 +8,8 @@ import com.bainbridgetrails.net.ApiResult
 import com.bainbridgetrails.net.CoverageResponse
 import com.bainbridgetrails.net.CoverageUpload
 import com.bainbridgetrails.net.JsonFile
+import com.bainbridgetrails.net.PlayUploadResultDto
+import com.bainbridgetrails.net.PlayWalkClaimsDto
 import com.bainbridgetrails.net.WalkDto
 import com.bainbridgetrails.net.isRetryable
 import kotlinx.coroutines.CancellationException
@@ -60,6 +62,28 @@ interface LocalCoverage {
 
     /** Unions [state] and sticky [completed] into the store; true when anything changed. */
     suspend fun mergeRemote(state: CoverageState, completed: Set<String>): Boolean
+}
+
+/**
+ * Play's share of one coverage upload (docs/play/product.md §3.10, PD-3): [playConfig] + one element per walk of the
+ * upload's `walks[]` ([elements]; empty = both fields omitted, the pure body). [settle] is called once with the
+ * outcome, unless the failure is retryable (then everything stays queued for the next pass).
+ */
+class PlayPart(
+    val playConfig: String,
+    val elements: List<PlayWalkClaimsDto>,
+    val settle: suspend (PlayOutcome) -> Unit,
+)
+
+/** How an upload carrying a [PlayPart] ended. [stillPending]: walk ids still in sync's queue after this pass. */
+sealed interface PlayOutcome {
+    val stillPending: Set<String>
+
+    /** 200: [result] is the response's `play` (null when the server sent none). */
+    data class Answered(val result: PlayUploadResultDto?, override val stillPending: Set<String>) : PlayOutcome
+
+    /** Not retried (422 implausible, walk limit, another 4xx): the sent claims are `local_only` with [code]. */
+    data class Refused(val code: String, override val stillPending: Set<String>) : PlayOutcome
 }
 
 @Serializable
@@ -119,6 +143,17 @@ class SyncRepository(
      * delta, so a segment that never goes up never forces an upload either.
      */
     private val uploadable: suspend () -> ((String) -> Boolean)? = { null },
+    /**
+     * Play claims for an upload (docs/play/plan.md L2-9): called with local session id → walk id and the walk ids this
+     * upload carries; null provider (or a null answer) = today's code path and a byte-identical body (PF0-2).
+     */
+    private val playPart: (suspend (walkIdBySession: Map<String, String>, walksInThisUpload: Set<String>) -> PlayPart?)? = null,
+    /**
+     * Sessions whose Play hook has not finished (Finalizer's play-pending markers; empty with Play off): their walks are
+     * left out of the pass until it has, so a walk never goes up before its Play element exists (branch review round 1
+     * P1-6). Read after the snapshot: a marker is written before the walk record and cleared after the hook.
+     */
+    private val playInFlight: suspend () -> Set<String> = { emptySet() },
 ) {
     private val file = JsonFile(queuePath, SyncFile.serializer())
     private val _state = MutableStateFlow<SyncState>(SyncState.SignedOut)
@@ -195,7 +230,15 @@ class SyncRepository(
     suspend fun syncOnce(): SyncState = runLock.withLock {
         val userId = currentUserId() ?: return@withLock SyncState.SignedOut.also { _state.value = it }
         val snapshot = coverage.snapshot()
-        var f = prepare(userId, snapshot.walks)
+        val inFlight = try {
+            playInFlight()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.e(TAG, "play in-flight unavailable: ${e.message}")
+            emptySet()
+        }
+        var f = prepare(userId, if (inFlight.isEmpty()) snapshot.walks else snapshot.walks.filter { it.sessionId !in inFlight })
         val backfill = f.lastSuccessAt == null
         _state.value = SyncState.Syncing(backfill)
         f = f.copy(lastAttemptAt = now())
@@ -254,10 +297,13 @@ class SyncRepository(
             }
         }
         var cap = if (f.acceptedOnce) MAX_WALKS_AFTER_FIRST else MAX_WALKS_FIRST
+        var withPlay = true
         while (true) {
             // One upload only (see class doc): over the cap, keep the longest walks (largest allowance).
             val walks = if (f.pending.size <= cap) f.pending else f.pending.sortedByDescending { it.durationS }.take(cap)
-            val upload = CoverageUpload(version, TICK_M, delta, walks)
+            val play = if (withPlay) playPartFor(f, walks) else null
+            val sendPlay = play?.takeIf { it.elements.isNotEmpty() }
+            val upload = CoverageUpload(version, TICK_M, delta, walks, playConfig = sendPlay?.playConfig, play = sendPlay?.elements)
             when (val r = api.putCoverage(upload)) {
                 is ApiResult.Ok -> {
                     val dropped = f.pending.size - walks.size
@@ -265,6 +311,7 @@ class SyncRepository(
                     f = merge(f, r.value, sent = delta).copy(pending = emptyList(), acceptedOnce = true, lastSuccessAt = now())
                     write(f)
                     AppLog.i(TAG, "uploaded ${walks.size} walks, ${delta.size} segments; +${r.value.newlyCoveredM ?: 0.0} m")
+                    play?.let { settlePlay(it, PlayOutcome.Answered(r.value.play, stillPending = emptySet())) }
                     return SyncState.Idle(now(), 0)
                 }
                 is ApiResult.Failure -> {
@@ -272,9 +319,46 @@ class SyncRepository(
                         cap = MAX_WALKS_AFTER_FIRST
                         continue
                     }
-                    return failure(f, r.error, delta, walks)
+                    val e = r.error
+                    if (sendPlay != null && e is ApiError.Http && e.code in PLAY_ONLY_ERRORS) {
+                        // Play is optional (PF0-3): its own 400 never costs the walks; resend the pure upload.
+                        AppLog.w(TAG, "play part refused (${e.code}); resending without it")
+                        settlePlay(play, PlayOutcome.Refused(e.code, stillPending = f.pending.mapTo(HashSet()) { it.id }))
+                        withPlay = false
+                        continue
+                    }
+                    val result = failure(f, e, delta, walks)
+                    if (play != null && walks.isNotEmpty()) {
+                        // The walks left the queue uncredited (422, walk limit, another 4xx): so do their claims.
+                        val left = readFile().pending.mapTo(HashSet()) { it.id }
+                        if (walks.none { it.id in left }) settlePlay(play, PlayOutcome.Refused(e.code, stillPending = left))
+                    }
+                    return result
                 }
             }
+        }
+    }
+
+    private suspend fun playPartFor(f: SyncFile, walks: List<WalkDto>): PlayPart? {
+        val provider = playPart ?: return null
+        return try {
+            provider(f.walkIds.mapValues { it.value.id }, walks.mapTo(HashSet()) { it.id })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.e(TAG, "play part failed: ${e.message}") // claims stay queued; the pure upload goes
+            null
+        }
+    }
+
+    /** Play is optional: a failure while recording its outcome never changes the sync result (PF0-3). */
+    private suspend fun settlePlay(play: PlayPart, outcome: PlayOutcome) {
+        try {
+            play.settle(outcome)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.e(TAG, "play settle failed: ${e.message}")
         }
     }
 
@@ -340,6 +424,15 @@ class SyncRepository(
         retryJob?.cancel()
     }
 
+    private val ApiError.code: String
+        get() = when (this) {
+            is ApiError.Implausible -> "implausible"
+            is ApiError.WalkLimit -> "walk_limit"
+            is ApiError.TooManyWalks -> "too_many_walks"
+            is ApiError.Http -> code
+            else -> "error"
+        }
+
     private suspend fun readFile(): SyncFile = withContext(io) { readFileNow() }
 
     private fun readFileNow(): SyncFile = file.read() ?: SyncFile()
@@ -356,5 +449,8 @@ class SyncRepository(
         /** api.md: walks per upload before the account's first accepted upload / after it. */
         const val MAX_WALKS_FIRST = 2000
         const val MAX_WALKS_AFTER_FIRST = 200
+
+        /** 400s about the Play fields alone (`backend/src/play/claims.ts`): the coverage part was fine. */
+        private val PLAY_ONLY_ERRORS = setOf("invalid_play", "too_many_claims")
     }
 }

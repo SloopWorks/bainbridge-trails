@@ -13,7 +13,7 @@ export default defineConfig(async () => {
         main: "./src/index.ts",
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
-          d1Databases: { MIGRATION_DB: "migration-test-db" },
+          d1Databases: { MIGRATION_DB: "migration-test-db", MIGRATION_DB_PLAY: "migration-play-test-db" },
           bindings: {
             TEST_MIGRATIONS: migrations,
             CLEANUP_QUERIES: cleanup,
@@ -21,6 +21,8 @@ export default defineConfig(async () => {
             APPLE_CLIENT_IDS: "com.sloopworks.bainbridgetrails",
             ALLOW_DEV_AUTH: "true",
             ADMIN_TOKEN: "test-admin-token-0123456789",
+            // a local .dev.vars may carry an e2e clock offset; tests run on the real (injected) clock
+            DEV_CLOCK_OFFSET_MS: "0",
           },
         },
       }),

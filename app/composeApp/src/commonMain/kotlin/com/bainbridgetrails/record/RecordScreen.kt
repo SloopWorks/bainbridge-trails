@@ -1,11 +1,31 @@
 package com.bainbridgetrails.record
 
+import com.bainbridgetrails.play.geo.GeoPoint
+import com.bainbridgetrails.ui.play.components.rememberPlay
+import com.bainbridgetrails.ui.play.map.PlayMarkerLogic
+import com.bainbridgetrails.ui.play.record.FindMoment
+import com.bainbridgetrails.ui.play.record.FindMomentModel
+import com.bainbridgetrails.ui.play.record.FindsChip
+import com.bainbridgetrails.ui.play.record.PlayNearbyStrip
+import com.bainbridgetrails.ui.play.record.PlayRecordLogic
+import com.bainbridgetrails.ui.play.record.ResultsPlayLogic
+import com.bainbridgetrails.ui.play.record.ResultsPlaySectionView
+import com.bainbridgetrails.ui.play.record.itemsById
+import com.bainbridgetrails.play.config.TierName
+import com.bainbridgetrails.resources.play_find_title_egg
+import com.bainbridgetrails.resources.play_find_title_treasure
+import com.bainbridgetrails.resources.play_kraken_repelled_you
+import com.bainbridgetrails.resources.play_tier_agate
+import com.bainbridgetrails.resources.play_tier_glass_float
+import com.bainbridgetrails.resources.play_tier_sea_glass
+import com.bainbridgetrails.resources.play_tier_ships_bell
 import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -65,6 +85,12 @@ import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.data.AppSettings
 import com.bainbridgetrails.data.Loadable
 import com.bainbridgetrails.graph.AppGraph
+import com.bainbridgetrails.play.fx.FxHostInputs
+import com.bainbridgetrails.play.fx.FxOverlay
+import com.bainbridgetrails.play.fx.PlayMapContent
+import com.bainbridgetrails.play.fx.WithFxRenderOptions
+import com.bainbridgetrails.play.fx.fxHostInputs
+import com.bainbridgetrails.play.fx.rememberFxHost
 import com.bainbridgetrails.map.MapStyle
 import com.bainbridgetrails.map.SpikeLaunch
 import com.bainbridgetrails.map.StatusLayers
@@ -138,6 +164,7 @@ import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PillShape
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.maplibre.spatialk.geojson.Position
@@ -148,8 +175,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import com.bainbridgetrails.map.boundsOf
+import com.bainbridgetrails.map.chartInteractions
 import com.bainbridgetrails.map.fitTo
 import com.bainbridgetrails.map.rememberTrailMapController
+import org.maplibre.compose.overlay.MapOverlayScope
 import org.maplibre.compose.util.DpPadding
 
 private sealed interface Load {
@@ -230,6 +259,27 @@ private fun RecordContent(
     val density = LocalDensity.current
 
     val recording = state as? RecordingState.Recording
+    // Play (ux.md §3.8): null while off; finds are provisional and sensed by the graph-level PlaySensing observer.
+    val installed = remember { AppGraph.installedOrNull() }
+    val play = if (installed != null) rememberPlay(installed, settings.play.enabled) else null
+    val sensed = play?.sensed?.collectAsState()?.value.orEmpty()
+    val sensedAtStart = remember(recording?.sessionId) { sensed }
+    val findsThisWalk = if (recording != null) (sensed - sensedAtStart).size else 0
+    var moment by remember { mutableStateOf<FindMomentModel?>(null) }
+    val titles = PlayRecordLogic.FindTitles(
+        stringResource(Res.string.play_find_title_treasure), stringResource(Res.string.play_find_title_egg), stringResource(Res.string.play_kraken_repelled_you),
+    )
+    val tierNames = mapOf(
+        TierName.sea_glass to stringResource(Res.string.play_tier_sea_glass), TierName.agate to stringResource(Res.string.play_tier_agate),
+        TierName.glass_float to stringResource(Res.string.play_tier_glass_float), TierName.ships_bell to stringResource(Res.string.play_tier_ships_bell),
+    )
+    LaunchedEffect(play) {
+        play?.finds?.collectLatest { f ->
+            moment = PlayRecordLogic.moment(f, play.itemsById()[f.occurrence.itemId], { tierNames[it] ?: it.name }, titles)
+            delay(4_000)
+            moment = null
+        }
+    }
     LaunchedEffect(recording != null) {
         while (recording != null) {
             controller.tick()
@@ -277,8 +327,19 @@ private fun RecordContent(
         }
     }
 
+    // The record map draws the same live Play scene (fog, ink, finds) as the Map tab (product § 5.3 Record row).
+    val recordFerry = com.bainbridgetrails.ui.play.map.rememberFerryTimetable(play)
+    // Play gate (AC 9 P2): no registry while Play is off.
+    val recordRegistry = remember(settings.play.enabled, recordFerry) { com.bainbridgetrails.ui.PlayMapAlloc.recordRegistryOrNull(settings.play.enabled, recordFerry) }
     Box(modifier.fillMaxSize()) {
-        RecordMap(controller, style, launch, follow = follow && state !is RecordingState.Done, fitWalkAbove = if (state is RecordingState.Done) resultsSheetH else null)
+        RecordMap(
+            controller, style, launch,
+            follow = follow && state !is RecordingState.Done,
+            fitWalkAbove = if (state is RecordingState.Done) resultsSheetH else null,
+            // Play gate (engine PF-8/PF-9): null when Play is off; ambient effects rest while a walk records.
+            fxInputs = recordRegistry?.let { fxHostInputs(settings.play, recording = recording != null, renderers = it) },
+            play = play,
+        )
 
         val busy = state is RecordingState.Finalizing || state is RecordingState.Stopped
         TopControls(
@@ -286,6 +347,7 @@ private fun RecordContent(
             onClose = if (busy) null else if (state is RecordingState.Done) ::done else onClose,
             chips = {
                 recording?.let { r -> RecordingChips(r) }
+                FindsChip(findsThisWalk)
                 notice?.let { StateChip(it) }
             },
             locate = if (recording != null || state == RecordingState.Idle) ({
@@ -321,6 +383,17 @@ private fun RecordContent(
                     onDone = ::done,
                     milestones = milestones,
                     islandTotalM = data?.value?.dataset?.islandTotalM ?: 0.0,
+                    play = play?.let { repo ->
+                        {
+                            val st by repo.store.state.collectAsStateWithLifecycle()
+                            val results by repo.claimResults.collectAsStateWithLifecycle()
+                            val section = remember(st, results, s.summary.sessionId) {
+                                val items = repo.itemsById()
+                                ResultsPlayLogic.section(s.summary.sessionId, st.logbook, results[s.summary.sessionId], { items[it]?.copy?.title ?: it }, summaryShown = false)
+                            }
+                            section?.let { ResultsPlaySectionView(it) }
+                        }
+                    },
                 )
             }
             is RecordingState.Recover -> AlertDialog(
@@ -349,7 +422,24 @@ private fun RecordContent(
                 }
             }
             is RecordingState.Recording -> BottomSheetSurface(bottom, maxFraction = 0.7f) {
-                RecordingSheet(s, controller, settings, context, onFinish = { confirmFinish = true })
+                RecordingSheet(s, controller, settings, context, onFinish = { confirmFinish = true }, nearby = play?.let { repo ->
+                    {
+                        val agenda by repo.agenda.collectAsState()
+                        val config by repo.config.collectAsState()
+                        val track by controller.track.collectAsState()
+                        val here = track.lastOrNull()
+                        val items = config?.config?.items
+                        val rows = remember(agenda, here?.lat, here?.lon, sensed) {
+                            val a = agenda
+                            if (a == null || here == null || items == null || a.day.quietDay) emptyList()
+                            else PlayRecordLogic.nearby(
+                                PlayMarkerLogic.markers(a, items.associate { it.id to it.lore }, emptySet()),
+                                GeoPoint(lat = here.lat, lon = here.lon), sensed,
+                            ) { m -> m.tier?.let { tierNames[it] } ?: items.firstOrNull { it.id == m.itemId }?.copy?.title ?: m.itemId }
+                        }
+                        PlayNearbyStrip(rows, { Format.distance(it, settings.units) })
+                    }
+                })
             }
             RecordingState.Idle, is RecordingState.NeedsPermission -> BottomCard(bottom) {
                 if (s is RecordingState.NeedsPermission) {
@@ -373,6 +463,12 @@ private fun RecordContent(
                     }
                 }
                 IdleContent(onStart = ::onStartTapped, onSettings = if (geofences.supported) ({ showSettings = true }) else null)
+            }
+        }
+
+        moment?.let { m ->
+            Box(Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 56.dp, start = 16.dp, end = 16.dp)) {
+                FindMoment(m, onDismiss = { moment = null })
             }
         }
 
@@ -434,7 +530,8 @@ private fun TopControls(
             )
         }
         Row(
-            Modifier.align(Alignment.TopCenter).padding(horizontal = 56.dp).heightIn(min = 48.dp),
+            // One line always (e2e F12: the narrower iOS width wrapped "1 find" letter by letter); scrolls when crowded.
+            Modifier.align(Alignment.TopCenter).padding(horizontal = 56.dp).heightIn(min = 48.dp).horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) { chips() }
@@ -490,6 +587,7 @@ private fun RecordingSheet(
     settings: AppSettings,
     context: PlatformContext,
     onFinish: () -> Unit,
+    nearby: (@Composable () -> Unit)? = null,
 ) {
     val live = remember(r.sessionId) { RecordingGraph.liveCoverage(context, r.sessionId) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -537,7 +635,8 @@ private fun RecordingSheet(
             }
         }
         // Section header: tap to expand the sheet (peek shows the top two rows).
-        val canExpand = rows.size > 2
+        // Nearby (ux.md §3.8) lives in the expanded sheet only, so a short list with Nearby can still expand.
+        val canExpand = rows.size > 2 || nearby != null
         Row(
             Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 .then(if (canExpand) Modifier.clickable { expanded = !expanded } else Modifier)
@@ -567,6 +666,8 @@ private fun RecordingSheet(
                     LiveTrailRow(row.name, row.before, row.after, row.status)
                 }
             }
+            // Play Nearby (ux.md §3.8): after the pure live list, expanded sheet only.
+            if (expanded) nearby?.invoke()
         }
         PrimaryButton(
             stringResource(Res.string.record_finish),
@@ -581,7 +682,15 @@ private fun RecordingSheet(
  * it only changes when [rememberThrottledTrack] hands it a new list (≤ every 5 s or 10 m).
  */
 @Composable
-private fun RecordMap(controller: RecordingController, style: MapStyle, launch: SpikeLaunch, follow: Boolean, fitWalkAbove: Dp? = null) {
+private fun RecordMap(
+    controller: RecordingController,
+    style: MapStyle,
+    launch: SpikeLaunch,
+    follow: Boolean,
+    fitWalkAbove: Dp? = null,
+    fxInputs: FxHostInputs? = null,
+    play: com.bainbridgetrails.play.PlayRepository? = null,
+) {
     val track by controller.track.collectAsState()
     val drawn = rememberThrottledTrack(track)
     val at = if (follow) drawn.lastOrNull()?.let { Position(longitude = it.lon, latitude = it.lat) } else null
@@ -598,9 +707,25 @@ private fun RecordMap(controller: RecordingController, style: MapStyle, launch: 
     val buckets = AppGraph.installedOrNull()?.progress?.snapshot?.collectAsState()?.value?.segmentBuckets.orEmpty()
     // Track colours follow the map style (a dark map in a light app still gets the dark-map track).
     val extra = if (style.isDark) BtExtraDark else BtExtraLight
-    TrailMap(style, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 56.dp, follow = at, controller = mapController) {
-        StatusLayers(buckets, dark = style.isDark)
-        TrackLayer(drawn, extra.userTrack, extra.userTrackCasing)
+    val fx = if (fxInputs != null) rememberFxHost(fxInputs, mapController) else null
+    val fxOverlay: (@Composable MapOverlayScope.() -> Unit)? = remember(fx) { if (fx != null) ({ FxOverlay(fx) }) else null }
+    if (fx != null) com.bainbridgetrails.ui.play.map.PlayMapEffectsSync(fx, play, buckets, ferry = false)
+    // Taps reset FX's 20 s ambient idle stop (PF-2) like camera moves do; no Play = today's interactions.
+    val interactions = remember(fx) { if (fx != null) chartInteractions(onTap = { fx.noteInteraction() }) else chartInteractions() }
+    WithFxRenderOptions(fx) { renderOptions ->
+        TrailMap(
+            style, Modifier.fillMaxSize(), initialCamera = launch.camera, controlsTopPadding = 56.dp, follow = at, controller = mapController,
+            interactions = interactions,
+            fxOverlay = fxOverlay,
+            renderOptions = renderOptions,
+        ) {
+            // Composition order = z-order (mapContentOrder); the live track stays above every FX layer.
+            PlayMapContent(
+                fx,
+                status = { casingFx -> StatusLayers(buckets, dark = style.isDark, casingFx = casingFx) },
+                location = { TrackLayer(drawn, extra.userTrack, extra.userTrackCasing) },
+            )
+        }
     }
 }
 

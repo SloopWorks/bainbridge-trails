@@ -32,9 +32,28 @@ data class AppSettings(
     val matchDark: Boolean = true,
     val units: Units = Units.MILES,
     val onboardingDone: Boolean = false,
+    /** Play (docs/play/product.md § 5.1); absent in settings written before Play → [PlaySettings] defaults (off). */
+    val play: PlaySettings = PlaySettings(),
 ) {
     fun effectiveMapStyle(systemDark: Boolean): MapStyle = if (systemDark && matchDark) MapStyle.DARK else mapStyle
 }
+
+/**
+ * Play's opt-in and preferences (docs/play/plan.md L2-2, ux.md § 3.1). Off by default; every Play path is gated on
+ * [enabled]. [everToggled]: the Play toggle was used at least once; [offerShown]: the one-time offer was shown
+ * (their UI rules land with the offer, L2-7/L2-10); [sounds]: optional effect sounds (off); [ambient]: ambient
+ * effects (on; reduced motion and battery saver still override). [quietAnnouncedOn]: the island date (ISO) the quiet-day
+ * banner was last announced (ux.md § 5.4: once per island day, a restart on that day stays silent).
+ */
+@Serializable
+data class PlaySettings(
+    val enabled: Boolean = false,
+    val everToggled: Boolean = false,
+    val offerShown: Boolean = false,
+    val sounds: Boolean = false,
+    val ambient: Boolean = true,
+    val quietAnnouncedOn: String? = null,
+)
 
 /**
  * Settings persisted as a small JSON file ([path], in the platform data dir). Loaded once off Main at construction;

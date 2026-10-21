@@ -1,0 +1,39 @@
+# .agents/profile.yml — the ONE file this repo owns for the SloopWorks agent pack.
+# Roles never hard-code paths or commands; they resolve these keys.
+
+repo:
+  kind: app
+  brand: bainbridge-trails
+  stack: [kmp, compose-mp, maplibre-compose, cloudflare]
+
+paths:
+  agent_doc: app/AGENTS.md          # build flags, verify set, devices; repo root README.md for layout
+  adr_index: docs/mvp/decisions.md  # plus docs/roads/decisions.md (roads goal) and docs/play/decisions.md (gamification)
+  designs: docs/play/design/        # gamification design briefs, specs, mockups
+  specs: docs/play/
+  plans: docs/superpowers/plans/
+  backlog_now: docs/mvp/STATUS.md
+  backlog_next: docs/mvp/STATUS.md
+  client_module: app/composeApp
+  ui_module: app/composeApp/src/commonMain/kotlin/com/bainbridgetrails/ui
+  api_module: backend
+  worker_module: backend
+
+verify:
+  full: cd app && ./gradlew :coverage:jvmTest :tracking:jvmTest :play:jvmTest :composeApp:testAndroidHostTest :androidApp:assembleTrailsDebug :androidApp:assembleRoadsDebug :androidApp:assembleTrailsRelease :androidApp:assembleRoadsRelease :composeApp:linkDebugFrameworkIosSimulatorArm64
+  kmp: cd app && ./gradlew :play:jvmTest :composeApp:testAndroidHostTest
+  api: cd backend && npm test && npx tsc --noEmit
+  ui_snapshot: none                 # no snapshot tooling; evidence = emulator/simulator screenshots in docs/*/screens/
+  lint: none
+
+factory:
+  swip: false
+  debug_drawer: true                # SloopWorks debug drawer (Android debug only, external checkout)
+  design_system: none               # app-local tokens in ui/theme (BtTheme); not sloopworks-ui
+  shipyard_project: bainbridge-trails
+  product_atlas: none
+  deploy: shipyard-deploy
+
+gates:
+  design_before_build: true
+  ui_change_requires_snapshot: false

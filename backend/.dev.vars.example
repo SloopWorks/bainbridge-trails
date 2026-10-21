@@ -6,3 +6,9 @@ ADMIN_TOKEN=local-admin-token-change-me
 # Optional: real client ids to test real sign-in against local wrangler dev.
 # GOOGLE_CLIENT_IDS=1234-abc.apps.googleusercontent.com
 # APPLE_CLIENT_IDS=com.sloopworks.bainbridgetrails
+# Optional, Play e2e only (docs/play/plan.md § 3): shifts the server clock by this many milliseconds so claims made
+# at a debug build's Play clock pass the server time rules. Honoured only with ALLOW_DEV_AUTH=true and on
+# localhost / 127.0.0.1 / 10.0.2.2 (ignored on any other host). An offset, not a fixed time: the coverage
+# plausibility rule still needs real elapsed time between walk uploads. Example (Thu 2026-10-29 14:00 island time):
+#   node -e 'console.log("DEV_CLOCK_OFFSET_MS="+(Date.parse("2026-10-29T21:00:00Z")-Date.now()))' >> .dev.vars
+# DEV_CLOCK_OFFSET_MS=0

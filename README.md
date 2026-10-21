@@ -10,6 +10,7 @@ trail sections you cover, and tracks completion per trail and for the whole isla
 | `pipeline/`, `data/` | Trail data pipeline (sources → canonical trails → PMTiles / dataset in `data/dist/`). |
 | `scripts/` | Asset sync, tile/terrain builds, emulator/simulator route replay, session summaries. |
 | `docs/` | Product/UX specs and decisions (`docs/mvp/`), spikes, research. |
+| `docs/play/`, `app/play/`, `data/play/` | **Play** — opt-in gamification of both goals (marks, Logbook, treasures, kraken, riddles, challenges, the MapFx effects engine, a scheduled content pack served by the Worker). Off by default; the pure app is unchanged when off. Start at [`docs/play/README.md`](docs/play/README.md). |
 | `data/roads/`, `pipeline/src/bitrails/roads/` | Second dataset for a **roads version** ("walk/bike every road"): 264.3 km / 164.2 mi of counted public road. Data only, no app work. See [`docs/roads/plan.md`](docs/roads/plan.md), [`docs/roads/data-spec.md`](docs/roads/data-spec.md). |
 
 ## MVP status

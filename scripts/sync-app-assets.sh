@@ -90,3 +90,10 @@ else
     echo "$(du -h "$DEST/roads_dataset.bin" | cut -f1)	roads_dataset.bin"
   fi
 fi
+
+# --- Play content pack (docs/play/plan.md L4-1) ---------------------------------------------------------------------
+# Last: re-derive data/play/derived/ from the data just synced (roadSafety, quiet zones, kraken stretches, chart
+# squares), re-validate data/play/play-content.json and re-copy the pack, derived tables and tide tables into
+# composeResources/files/play/ and backend/src/data/play/ (committed; CI runs the same script with --check).
+echo "== play content"
+node "$ROOT/scripts/build-play-content.mjs"

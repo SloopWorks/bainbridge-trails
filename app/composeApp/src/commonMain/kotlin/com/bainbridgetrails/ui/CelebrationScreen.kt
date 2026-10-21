@@ -1,5 +1,15 @@
 package com.bainbridgetrails.ui
 
+import com.bainbridgetrails.play.fx.FxGlyph
+import com.bainbridgetrails.play.fx.FxGlyphImage
+import com.bainbridgetrails.play.rules.Rank
+import com.bainbridgetrails.resources.play_celebrate_marks
+import com.bainbridgetrails.resources.play_rank_up_a11y
+import com.bainbridgetrails.ui.play.components.PlayFormat
+import com.bainbridgetrails.ui.play.components.RankUpLine
+import com.bainbridgetrails.ui.play.components.titleRes
+import com.bainbridgetrails.ui.play.record.ResultsPlayLogic
+import com.bainbridgetrails.ui.play.record.ResultsPlaySection
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -25,7 +35,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -198,12 +210,26 @@ fun CelebrationScreen(
             if (!goal.isRoads || preview || sum == null) emptyList()
             else walkMilestones(data, sum, units, islandReached = whole).filter { it != Milestone.Island }.take(2)
         }
+        // Play (ux.md §3.10): up to two lines (marks, rank-up) from this walk's Logbook entries; Play off: none.
+        val play = if (settings?.play?.enabled == true) graph.playOrNull else null
+        val playState = play?.store?.state?.collectAsStateWithLifecycle()?.value
+        // Frozen on the first non-empty section (AC 9 P2/P3): this walk's entries may land after the screen appears;
+        // once shown, later Logbook updates never change the lines or re-read the assertive text.
+        val logbook = playState?.logbook
+        val freshLines = remember(logbook, sessionId, preview) {
+            if (logbook == null || preview) emptyList()
+            else celebrationPlayLines(ResultsPlayLogic.section(sessionId, logbook, null, { it }, summaryShown = false))
+        }
+        val frozenLines = remember(sessionId, preview) { mutableStateOf(emptyList<CelebrationPlayLine>()) }
+        val playLines = frozenPlayLines(frozenLines.value, freshLines)
+        SideEffect { frozenLines.value = playLines }
         CelebrationContent(
             data, shown, trails.map { it.id to it.name }, if (preview) null else islandBefore, community, onContinue, onViewTrail,
             wholeIsland = whole,
             islandArt = if (whole) art else null,
             spec = if (goal.isRoads) CelebrationSpec.ROADS else CelebrationSpec.TRAILS,
             milestones = milestones,
+            playLines = playLines,
             units = units,
             style = settings?.effectiveMapStyle(androidx.compose.foundation.isSystemInDarkTheme()),
         )
@@ -223,6 +249,7 @@ private fun CelebrationContent(
     islandArt: IslandGeometry? = null,
     spec: CelebrationSpec = CelebrationSpec.TRAILS,
     milestones: List<Milestone> = emptyList(),
+    playLines: List<CelebrationPlayLine> = emptyList(),
     units: com.bainbridgetrails.data.Units = com.bainbridgetrails.data.Units.MILES,
     style: MapStyle? = null,
 ) {
@@ -273,6 +300,11 @@ private fun CelebrationContent(
         )
         communityLine?.let { append(' ').append(it) }
         for (m in milestoneLines) append(' ').append(stringResource(Res.string.roads_milestone_a11y, m))
+        // Play lines join the merged announcement (ux.md §3.10).
+        for (line in playLines) when (line) {
+            is CelebrationPlayLine.Marks -> append(' ').append(stringResource(Res.string.play_celebrate_marks, PlayFormat.marks(line.total)))
+            is CelebrationPlayLine.RankUp -> append(' ').append(stringResource(Res.string.play_rank_up_a11y, stringResource(line.rank.titleRes)))
+        }
     }
 
     val complete = BtTheme.colors.complete
@@ -340,6 +372,14 @@ private fun CelebrationContent(
                         Text(line, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 }
+                // Play lines (ux.md §3.10): under the milestone lines, before the button; at most two.
+                for (line in playLines) when (line) {
+                    is CelebrationPlayLine.Marks -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FxGlyphImage(FxGlyph.SeaGlass, size = 18.dp, ink = BtTheme.colors.play.seaGlass)
+                        Text(stringResource(Res.string.play_celebrate_marks, PlayFormat.marks(line.total)), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    is CelebrationPlayLine.RankUp -> RankUpLine(line.rank)
+                }
             }
             Spacer(Modifier.heightIn(min = 12.dp))
             Column(Modifier.clearAndSetSemantics {}, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -403,6 +443,25 @@ private fun IslandCounter(text: String, widest: String, align: Alignment = Align
         Text(text, style = style, color = MaterialTheme.colorScheme.onSurface)
     }
 }
+
+/** A Play line under the celebration body (ux.md §3.10). */
+internal sealed interface CelebrationPlayLine {
+    data class Marks(val total: Int) : CelebrationPlayLine
+    data class RankUp(val rank: Rank) : CelebrationPlayLine
+}
+
+/** The walk's Play lines: "+N marks" when it earned any, then the rank-up; never more than two, none with Play off. */
+internal fun celebrationPlayLines(section: ResultsPlaySection?): List<CelebrationPlayLine> {
+    if (section == null) return emptyList()
+    return listOfNotNull(
+        section.total.takeIf { it > 0 }?.let { CelebrationPlayLine.Marks(it) },
+        section.rankUp?.let { CelebrationPlayLine.RankUp(it) },
+    ).take(2)
+}
+
+/** The lines to show: [frozen] once it is non-empty, else [fresh] (the first non-empty section freezes them). */
+internal fun frozenPlayLines(frozen: List<CelebrationPlayLine>, fresh: List<CelebrationPlayLine>): List<CelebrationPlayLine> =
+    frozen.ifEmpty { fresh }
 
 /** The trails' segments as polylines in a unit-free local projection, chained so the draw runs along the trail. */
 private fun glyphLines(data: TrailData, trailIds: List<String>, origin: Pair<Double, Double>? = null): List<List<Offset>> {

@@ -1,0 +1,121 @@
+package com.bainbridgetrails.play
+
+import com.bainbridgetrails.coverage.Fix
+import com.bainbridgetrails.data.DataFixtures
+import com.bainbridgetrails.data.PlaySettings
+import com.bainbridgetrails.net.FakeServer
+import com.bainbridgetrails.net.Reply
+import com.bainbridgetrails.play.config.Goal
+import com.bainbridgetrails.play.fx.fxHostInputs
+import com.bainbridgetrails.play.schedule.DerivedGoal
+import com.bainbridgetrails.ui.PlayMapAlloc
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+/** PD-1, PF0-1 / PF0-2: with Play off nothing Play exists — no repository, no FxClock, no sensing, no `/v1/play` call. */
+class PlayOffNothingCreatedTest {
+    private val server = FakeServer()
+    private val dir = DataFixtures.tmpDir("play-off")
+    private val settings = MutableStateFlow<PlaySettings?>(null)
+    private val track = MutableStateFlow<List<Fix>>(emptyList())
+    private var created = 0
+
+    private fun TestScope.gate(): PlayGate {
+        val d = StandardTestDispatcher(testScheduler)
+        server.on("GET /v1/play/content", Reply(304, ""))
+        return PlayGate(backgroundScope, enabled = settings) {
+            created++
+            val content = PlayContentRepository(
+                api = server.client(dataset = "roads"), dir = dir, bundled = { PlayFixtures.pack },
+                bundledTides = { PlayFixtures.tideText(it) }, playOn = { settings.value?.enabled == true },
+                now = { 10_000_000L }, io = d, compute = d,
+            )
+            PlayRepository(
+                scope = backgroundScope, goal = Goal.roads, clock = { SystemPlayClock }, content = content,
+                places = { PlayFixtures.EmptyPlaces }, derived = { DerivedGoal.decode(PlayFixtures.read("derived-roads.json")) },
+                store = PlayStateStore("$dir/roads-state.json", d), track = track, compute = d,
+            )
+        }
+    }
+
+    private fun playRequests() = server.requests.count { it.path.startsWith("/v1/play") }
+
+    @Test
+    fun playOffPlayOrNullNullNoFxClockNoPlaySensingNoPlayRequest() = runTest {
+        val sensingBefore = PlaySensing.created
+        val markersBefore = PlayMapAlloc.markersCreated
+        val recordBefore = PlayMapAlloc.recordRegistriesCreated
+        val g = gate()
+        g.start()
+        settings.value = PlaySettings() // loaded: off (the default)
+        runCurrent()
+        track.value = listOf(Fix(1L, -122.52, 47.63, 5.0)) // a walk records with Play off
+        runCurrent()
+
+        assertNull(g.current, "playOrNull is null while off")
+        assertEquals(0, created, "PlayRepository never constructed while off")
+        assertEquals(sensingBefore, PlaySensing.created, "no PlaySensing observer")
+        assertNull(fxHostInputs(PlaySettings(), recording = false), "no FxHost, so no FxClock")
+        assertNull(fxHostInputs(PlaySettings(), recording = true))
+        assertEquals(0, playRequests(), "no /v1/play request (PF0-2)")
+        // Round 1 P2-10: the Map's Play marker renderer (and so its registry) is not built while off.
+        assertNull(PlayMapAlloc.markersOrNull(settings.value?.enabled == true))
+        assertEquals(markersBefore, PlayMapAlloc.markersCreated, "no PlayMarkers constructed while off")
+        // AC 9 P2: the Record map's live registry is not built while off either.
+        assertNull(PlayMapAlloc.recordRegistryOrNull(settings.value?.enabled == true, ferry = null))
+        assertEquals(recordBefore, PlayMapAlloc.recordRegistriesCreated, "no Record registry while off")
+
+        // Turning Play on creates it once and starts it; the content check is the first Play request.
+        settings.value = PlaySettings(enabled = true)
+        runCurrent()
+        val repo = assertNotNull(g.current)
+        assertEquals(1, created)
+        assertEquals(sensingBefore + 1, PlaySensing.created)
+        assertTrue(playRequests() >= 1)
+        assertNotNull(PlayMapAlloc.markersOrNull(settings.value?.enabled == true))
+        assertEquals(markersBefore + 1, PlayMapAlloc.markersCreated)
+        assertNotNull(PlayMapAlloc.recordRegistryOrNull(settings.value?.enabled == true, ferry = null))
+        assertEquals(recordBefore + 1, PlayMapAlloc.recordRegistriesCreated)
+
+        // Off again: hidden and stopped, nothing deleted, no further request; on again reuses the same instance.
+        settings.value = PlaySettings(enabled = false)
+        runCurrent()
+        assertNull(g.current)
+        val after = playRequests()
+        track.value = listOf(Fix(2L, -122.52, 47.63, 5.0))
+        runCurrent()
+        assertEquals(after, playRequests())
+        settings.value = PlaySettings(enabled = true)
+        runCurrent()
+        assertSame(repo, g.current)
+        assertEquals(1, created)
+    }
+
+    /**
+     * Branch review round 1 P1-6: launch-time finalization awaits the gate, which settles once the loaded settings were
+     * applied (Play on: the repository exists and runs, so its hook is there for the stopped walks).
+     */
+    @Test
+    fun awaitSettledReturnsOnceLoadedSettingsWereApplied() = runTest {
+        val g = gate()
+        g.start()
+        runCurrent()
+        val waiting = backgroundScope.async { g.awaitSettled(timeoutMs = 60_000) }
+        runCurrent()
+        assertTrue(waiting.isActive, "settings not loaded yet")
+        settings.value = PlaySettings(enabled = true)
+        runCurrent()
+        assertTrue(waiting.isCompleted)
+        assertTrue(assertNotNull(g.current).running)
+    }
+}

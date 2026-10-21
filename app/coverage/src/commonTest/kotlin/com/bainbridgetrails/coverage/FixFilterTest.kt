@@ -146,4 +146,40 @@ class FixFilterTest {
         assertEquals(10.0, params.smoothWindowS)
         assertEquals(filterFixes(fixes, params.copy(smoothWindowS = 0.0), proj), filterFixes(fixes, params, proj))
     }
+
+    /** Every rule at once: mock and inaccurate fixes, a spike, a drive, a gap, a lone fix between two gaps, unsorted input. */
+    private fun everyRule(): List<Fix> {
+        val a = walk(1.3, 100).mapIndexed { i, f ->
+            when (i) {
+                10, 11 -> f.copy(isMock = true)
+                20 -> f.copy(accuracyM = 50.0)
+                30 -> f.copy(accuracyM = -1.0)
+                else -> f.copy(accuracyM = 8.0)
+            }
+        }.toMutableList()
+        a[50] = fix(50_000, 1.3 * 50, 60.0) // single-fix spike
+        val x1 = 1.3 * 100
+        val drive = (1..60).map { s -> fix((100 + s) * 1000L, x1 + 13.0 * s, 0.0, 5.0) }
+        val x2 = x1 + 13.0 * 60
+        val after = walk(1.3, 60, t0 = 161_000, x0 = x2)
+        val lone = listOf(fix(320_000, x2 + 200.0, 0.0, 5.0)) // > maxGapS on both sides: a one-fix piece
+        val last = walk(1.3, 60, t0 = 420_000, x0 = x2 + 210.0)
+        return (a + drive + after + lone + last).shuffled(kotlin.random.Random(11))
+    }
+
+    @Test
+    fun `keptFixes equals the points filterFixes keeps`() {
+        val raw = everyRule()
+        val unsmoothed = params.copy(smoothWindowS = 0.0)
+        val kept = keptFixes(raw, unsmoothed, proj)
+        assertEquals(filterFixes(raw, unsmoothed, proj).flatten(), kept.map { proj.toXy(it.lon, it.lat) })
+        assertTrue(kept.zipWithNext().all { (p, q) -> p.timeMs < q.timeMs }, "time order")
+        assertTrue(kept.none { it.isMock || (it.accuracyM ?: 0.0) > params.maxAccuracyM || (it.accuracyM ?: 0.0) < 0.0 })
+        assertTrue(kept.none { it.timeMs == 320_000L }, "a one-fix piece is not kept")
+        assertTrue(kept.none { it.timeMs in 120_000L..160_000L }, "the drive is not kept")
+        // Smoothing moves points, never membership: the same fixes, unmoved (Play reads the raw positions).
+        assertEquals(kept, keptFixes(raw, params, proj))
+        assertEquals(filterFixes(raw, params, proj).sumOf { it.size }, kept.size)
+        assertEquals(filterFixes(walk(1.3, 299), params, proj).sumOf { it.size }, keptFixes(walk(1.3, 299), params, proj).size)
+    }
 }

@@ -51,12 +51,21 @@ data class SpikeLaunch(
     val switchAfterMs: Long = 4000,
     /** Showcase page (`section=tokens|components|states`). */
     val section: String? = null,
+    /** FX showcase (`screen=fx`): effect id (`fx=treasure_glint`), preset id, state, pause at `t` ms. */
+    val fx: String? = null,
+    val preset: String? = null,
+    val state: String? = null,
+    val t: Long? = null,
+    /** FX showcase: `theme=dark|light` (default light), `reduced=1`, `warp=60` (time-warp; default the preset's). */
+    val theme: String? = null,
+    val reduced: Boolean = false,
+    val warp: Double? = null,
 ) {
-    enum class Screen { RECORD, STYLE, SHOWCASE }
+    enum class Screen { RECORD, STYLE, SHOWCASE, FX }
 
     companion object {
         /**
-         * Parses `key=value` options: screen=record|style|showcase, section, style=TOPO|MINIMAL_LIGHT|DARK, lat, lon, zoom, switchTo,
+         * Parses `key=value` options: screen=record|style|showcase|fx, section, fx, preset, state, t, theme, reduced, warp, style=TOPO|MINIMAL_LIGHT|DARK, lat, lon, zoom, switchTo,
          * switchAfterMs. Without `screen`, a `style` or `switchTo` option still opens the style spike (older scripts).
          */
         fun parse(options: Map<String, String>): SpikeLaunch {
@@ -68,6 +77,7 @@ data class SpikeLaunch(
                 "style" -> Screen.STYLE
                 "record" -> Screen.RECORD
                 "showcase" -> Screen.SHOWCASE
+                "fx" -> Screen.FX
                 else -> if ("style" in options || "switchTo" in options) Screen.STYLE else Screen.RECORD
             }
             return SpikeLaunch(
@@ -80,6 +90,13 @@ data class SpikeLaunch(
                 switchTo = style(options["switchTo"]),
                 switchAfterMs = options["switchAfterMs"]?.toLongOrNull() ?: 4000,
                 section = options["section"],
+                fx = options["fx"],
+                preset = options["preset"],
+                state = options["state"],
+                t = options["t"]?.toLongOrNull(),
+                theme = options["theme"]?.lowercase(),
+                reduced = options["reduced"] == "1" || options["reduced"].equals("true", ignoreCase = true),
+                warp = options["warp"]?.toDoubleOrNull()?.takeIf { it > 0 },
             )
         }
     }

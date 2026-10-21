@@ -20,6 +20,7 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -237,5 +238,127 @@ class FinalizerTest {
         Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir), clock = { 42L }).finalize("s1")
         assertEquals(42L, WalkIndex(dir).all().single().finalizedAt)
     }
-}
 
+    @Test
+    fun `onGated null when provider returns null`() = runTest {
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        record(store, "s1", 0.0, 0.0, 200.0)
+        var asked = 0
+        val plain = Finalizer(ds, index, store, CoverageStore(dir)).finalize("s1")
+        val dir2 = tmpDir()
+        val store2 = SessionStore(dir2)
+        record(store2, "s1", 0.0, 0.0, 200.0)
+        val withNull = Finalizer(ds, index, store2, CoverageStore(dir2), onGated = { asked++; null }).finalize("s1")
+        assertEquals(1, asked, "the provider is read on every finalize")
+        assertEquals(plain, withNull, "Play off leaves the summary unchanged")
+        assertEquals(CoverageStore(dir).load(), CoverageStore(dir2).load())
+    }
+
+    @Test
+    fun `onGated receives kept fixes after mock and accuracy filter`() = runTest {
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        store.begin("s1", t0)
+        var s = 0
+        var x = 0.0
+        while (x <= 200.0) {
+            val (lon, lat) = proj.toLonLat(Xy(x, 0.0))
+            val acc = if (s % 10 == 4) 50.0 else 5.0 // every 5th fix too inaccurate
+            val mock = s % 10 == 8 // every 5th fix mocked
+            store.append(SessionEvent.FixEvent(t0 + s * 1000L, lon, lat, acc, mock))
+            s += 2
+            x += 3.0
+        }
+        store.end(t0 + s * 1000L)
+        val raw = store.load("s1").fixes
+        var calls = 0
+        var got: List<Fix>? = null
+        var summaryId: String? = null
+        var mergedFirst = false
+        var provided = 0
+        val f = Finalizer(ds, index, store, CoverageStore(dir), onGated = {
+            provided++
+            { id, kept, summary ->
+                calls++
+                got = kept
+                summaryId = summary.sessionId
+                mergedFirst = CoverageStore(dir).load() != CoverageState.EMPTY && id in CoverageStore(dir).finalizedIds()
+            }
+        })
+        val sum = f.finalize("s1")
+        assertEquals(1, provided)
+        assertEquals(1, calls)
+        assertEquals("s1", summaryId)
+        assertEquals(sum.sessionId, summaryId)
+        assertTrue(mergedFirst, "called after the merge")
+        val kept = got!!
+        assertTrue(kept.isNotEmpty())
+        assertTrue(kept.none { it.isMock }, "mock fixes filtered")
+        assertTrue(kept.none { (it.accuracyM ?: 0.0) > params.maxAccuracyM }, "inaccurate fixes filtered")
+        assertEquals(raw.count { !it.isMock && (it.accuracyM ?: 0.0) <= params.maxAccuracyM }, kept.size)
+        assertEquals(com.bainbridgetrails.coverage.keptFixes(raw, params, proj), kept)
+    }
+
+    /** The process dies inside the Play hook (modelled by a cancellation): the merge stands, the marker stays. */
+    private class Died : kotlinx.coroutines.CancellationException("process died")
+
+    /**
+     * Branch review round 1 P1-5: the play-pending marker is written before the merge and cleared after the hook; a
+     * death in between leaves it, and [Finalizer.resumePlay] on the next launch re-runs the hook for the finalized walk
+     * with the original summary (newly completed, times) and the kept fixes, once.
+     */
+    @Test
+    fun `crash between merge and play hook is replayed on launch`() = runTest {
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        record(store, "s1", 0.0, 0.0, 200.0)
+        val markers = PlayPendingMarkers(dir)
+        var markedDuringHook = false
+        val first = Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir), playPending = markers, onGated = {
+            { id, _, _ ->
+                markedDuringHook = id in markers.ids() && id in CoverageStore(dir).finalizedIds()
+                throw Died()
+            }
+        })
+        assertFailsWith<Died> { first.finalize("s1") }
+        assertTrue(markedDuringHook, "marker up while the hook runs, after the merge")
+        assertEquals(setOf("s1"), PlayPendingMarkers(dir).ids(), "the marker survives the death")
+        assertTrue("s1" in CoverageStore(dir).finalizedIds(), "the walk itself is kept")
+        val newly = WalkIndex(dir).all().single().newlyCompleted
+        assertEquals(listOf("A"), newly)
+
+        // Next launch (a new process): Play off first — nothing runs, the marker waits.
+        val off = Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir), playPending = PlayPendingMarkers(dir))
+        assertTrue(off.resumePlay().isEmpty())
+        assertEquals(setOf("s1"), PlayPendingMarkers(dir).ids())
+
+        // Play on: replayed once with the original summary.
+        val calls = mutableListOf<Pair<SessionSummary, Int>>()
+        val next = Finalizer(ds, index, store, CoverageStore(dir), walks = WalkIndex(dir), playPending = PlayPendingMarkers(dir), onGated = {
+            { _, kept, summary -> calls += summary to kept.size }
+        })
+        assertEquals(listOf("s1"), next.resumePlay())
+        val (summary, kept) = calls.single()
+        assertEquals("s1", summary.sessionId)
+        assertEquals(listOf("A"), summary.newlyCompleted, "this walk's completions, not a re-merge's (empty)")
+        assertEquals(t0, summary.startedAt)
+        assertTrue(summary.endedAt > t0)
+        assertTrue(kept > 0)
+        assertTrue(PlayPendingMarkers(dir).ids().isEmpty(), "done")
+        assertTrue(next.resumePlay().isEmpty(), "never twice")
+        assertEquals(1, calls.size)
+    }
+
+    @Test
+    fun `a finished hook leaves no marker and play off writes none`() = runTest {
+        val dir = tmpDir()
+        val store = SessionStore(dir)
+        record(store, "s1", 0.0, 0.0, 200.0)
+        record(store, "s2", 1000.0, 0.0, 200.0)
+        Finalizer(ds, index, store, CoverageStore(dir), playPending = PlayPendingMarkers(dir), onGated = { { _, _, _ -> error("play failed") } }).finalize("s1")
+        assertTrue(PlayPendingMarkers(dir).ids().isEmpty(), "a failing hook is not retried forever")
+        Finalizer(ds, index, store, CoverageStore(dir), playPending = PlayPendingMarkers(dir)).finalize("s2")
+        assertTrue(PlayPendingMarkers(dir).ids().isEmpty())
+    }
+}

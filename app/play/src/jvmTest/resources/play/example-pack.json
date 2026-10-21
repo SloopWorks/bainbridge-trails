@@ -1,0 +1,231 @@
+{
+  "schema": 1,
+  "version": "2026.11.0",
+  "minAppBuild": 0,
+  "tz": "America/Los_Angeles",
+  "islandSeed": "5eed1b1a2026c0de",
+  "kill": { "all": false, "types": [], "items": [] },
+  "rules": {
+    "playHours": { "from": "06:00", "to": "21:00" },
+    "ambientHours": { "from": "05:00", "to": "23:00" },
+    "heroMaxConcurrent": 1,
+    "maxPlacementsPerCell": 3,
+    "maxVisiblePlacements": 40,
+    "krakenMaxTideM": 2.44,
+    "roadSafety": { "categories": ["residential", "collector", "arterial"], "maxSpeedMph": 25,
+                    "nullSpeedOnly": ["residential"], "ownershipPrefix": "public_", "requirePublic": true }
+  },
+  "caps": { "foundPerDay": 400, "foundPerWeek": 2800, "weekLateDays": 7, "findGraceDays": 2,
+            "clockAheadMin": 60, "keptConfigs": 8 },
+  "climate": [
+    { "id": "wet", "from": "10-15", "to": "04-30" }, { "id": "dry", "from": "07-01", "to": "09-15" }
+  ],
+  "aggregates": { "asOf": "2026-11-02", "lowTrafficSquares": { "trails": [], "roads": [] },
+                  "_note": "filled by scripts/build-play-content.mjs from the Worker's per-square player counts at publish" },
+  "windows": {
+    "exclusion-remembrance": { "every": "year", "in": ["mar"], "on": [30], "from": "00:00", "to": "24:00" }
+  },
+  "places": {
+    "frog-rock": { "lat": 47.69594, "lon": -122.52357, "radiusM": 60,
+                   "landmark": { "lat": 47.69612, "lon": -122.52347 },
+                   "_note": "trigger snapped 21 m onto road-northeast-spargur-loop-road (25 mph); never Phelps Rd NE or N Madison Ave NE (35 mph)" },
+    "ladybug": { "lat": 47.69594, "lon": -122.52357, "radiusM": 15, "landmark": { "lat": 47.69612, "lon": -122.52347 } },
+    "fairy-door": { "lat": 47.66908, "lon": -122.57829, "radiusM": 25, "verify": true, "_note": "canopy; spot TBC on site" },
+    "helix-house": { "lat": 47.66609, "lon": -122.57720, "radiusM": 15, "verify": true, "_note": "observatory exact point TBC" },
+    "memorial-card": { "lat": 47.61560, "lon": -122.51019, "radiusM": 30 },
+    "mill-trailhead": { "lat": 47.59535, "lon": -122.51975, "radiusM": 30 },
+    "winslow-waterfront": { "lat": 47.62371, "lon": -122.51283, "radiusM": 800,
+                            "_note": "Bainbridge terminal reference point, the one coordinate in every Play doc" }
+  },
+  "pools": {
+    "coast-k2": { "goal": "roads", "members": ["stretch:road-crystal-springs-drive-northeast", "stretch:road-point-white-drive-northeast", "stretch:road-pleasant-beach-drive-northeast"] },
+    "coast-k3": { "goal": "roads", "members": ["stretch:road-shannon-drive-1", "stretch:road-lovell-avenue-southwest-2", "stretch:road-rose-loop"] },
+    "coast-k4": { "goal": "roads", "members": ["stretch:road-northeast-south-beach-drive-1", "stretch:road-rockaway-beach-road-northeast", "stretch:road-northeast-seaborn-road", "stretch:road-three-t-road-northeast"] },
+    "coast-k5": { "goal": "roads", "members": ["stretch:road-manitou-beach-drive-northeast", "stretch:road-northeast-gertie-johnson-road"] },
+    "coast-k6": { "goal": "roads", "members": ["stretch:road-point-monroe-drive-northeast", "stretch:road-reitan-road-northeast", "stretch:road-skogen-lane-northeast"] },
+    "coast-k7": { "goal": "roads", "members": ["stretch:road-olympus-beach-road-northeast", "stretch:road-northeast-monte-vista-drive"] },
+    "coast-t2": { "goal": "trails", "members": ["stretch:trail-fort-ward-trail-fort-ward-park", "stretch:trail-lower-fort-ward-trail"] },
+    "coast-t3": { "goal": "trails", "members": ["stretch:trail-west-loop-trail", "stretch:trail-west-loop-trail-3", "stretch:trail-waypoint-woods-trail"] },
+    "coast-t4": { "goal": "trails", "members": ["stretch:trail-fairy-dell-trail", "stretch:trail-woodland-drive-road-end", "stretch:trail-schel-chelb-trail"] },
+    "coast-t5": { "goal": "trails", "members": ["stretch:trail-hawley-cove-trail", "stretch:trail-tchookwop-park-trail"] },
+    "grand-forest-trails": { "goal": "trails", "members": ["park:Grand Forest"] },
+    "west-loop": { "goal": "trails", "members": ["trail:trail-west-loop-trail"] },
+    "winslow-way": { "goal": "roads", "members": ["road:road-winslow-way-east"] }
+  },
+  "quietZones": [
+    { "id": "exclusion-memorial", "feature": "trail:trail-bainbridge-island-japanese-american-memorial-trail", "bufferM": 200 },
+    { "id": "blakely-cemetery", "feature": "trail:trail-blakley-cemetary-trail", "bufferM": 100 }
+  ],
+  "excludedParks": ["Pritchard Park"],
+  "quietDays": ["exclusion-remembrance"],
+  "pauses": [],
+  "ferry": {
+    "route": "seattle-bainbridge", "crossingMin": 35,
+    "terminals": { "bainbridge": { "lat": 47.62371, "lon": -122.51283 }, "seattle": { "lat": 47.6026, "lon": -122.3393, "verify": true } },
+    "timetables": [
+      { "id": "2026-fall-ILLUSTRATIVE", "from": "2026-09-20", "to": "2026-12-26",
+        "weekday": { "fromSeattle": ["05:30","06:20","07:05","07:55","08:45","09:35","10:25","11:15","12:05","12:55","13:45","14:35","15:25","16:15","17:05","17:55","18:45","19:35","20:25","21:15","22:30","23:59"],
+                     "fromBainbridge": ["04:45","05:20","06:10","06:55","07:45","08:35","09:25","10:15","11:05","11:55","12:45","13:35","14:25","15:15","16:05","16:55","17:45","18:35","19:25","20:15","21:25","22:50"] },
+        "weekend": { "fromSeattle": ["06:10","07:55","09:35","11:15","12:55","14:35","16:15","17:55","19:35","21:15","22:30","23:59"],
+                     "fromBainbridge": ["05:20","06:55","08:35","10:15","11:55","13:35","15:15","16:55","18:35","20:15","21:25","22:50"] },
+        "weekendDates": ["2026-11-26", "2026-12-25"] }
+    ]
+  },
+  "tides": { "station": "9445882", "years": [2026, 2027, 2028, 2029] },
+  "items": [
+    {
+      "id": "treasure-weekly-trails", "type": "treasure", "lore": "treasure", "goals": ["trails"],
+      "when": { "every": "week", "on": ["mon"], "from": "05:00", "to": "24:00", "days": 7 },
+      "where": { "trails": { "pick": 12, "from": "pool:play-safe-trails" } }, "count": 12,
+      "tiers": [ { "tier": "sea_glass", "marks": 25, "count": 7 }, { "tier": "agate", "marks": 40, "count": 3 },
+                 { "tier": "glass_float", "marks": 60, "count": 1 },
+                 { "tier": "ships_bell", "marks": 150, "count": 1, "everyNthWeek": 4, "else": "glass_float" } ],
+      "spread": { "maxPerSquare": 1, "minApartM": 300, "lowTrafficShare": 0.4, "quadrants": 4 },
+      "spotCooldown": 4, "repeat": "weekly_set", "resolve": { "by": "proximity", "radiusM": 20 },
+      "copy": { "title": "{tier} on {place}", "body": "This week's treasure. Gone at the end of the week.", "found": "{tier}, found", "missed": "This week's treasures have washed away. New ones Monday." },
+      "a11y": { "label": "{tier}, {marks} marks", "announce": "Found {tier}. {marks} marks when you finish." },
+      "fx": "treasure_glint"
+    },
+    {
+      "id": "treasure-weekly-roads", "type": "treasure", "lore": "treasure", "goals": ["roads"],
+      "when": { "every": "week", "on": ["mon"], "from": "05:00", "to": "24:00", "days": 7 },
+      "where": { "roads": { "pick": 20, "from": "pool:play-safe-roads" } }, "count": 20,
+      "tiers": [ { "tier": "sea_glass", "marks": 25, "count": 12 }, { "tier": "agate", "marks": 40, "count": 5 },
+                 { "tier": "glass_float", "marks": 60, "count": 2 },
+                 { "tier": "ships_bell", "marks": 150, "count": 1, "everyNthWeek": 4, "else": "glass_float" } ],
+      "spread": { "maxPerSquare": 1, "minApartM": 300, "lowTrafficShare": 0.4, "quadrants": 4 },
+      "spotCooldown": 4, "repeat": "weekly_set", "resolve": { "by": "proximity", "radiusM": 25 },
+      "copy": { "title": "{tier} on {place}", "body": "This week's treasure. Gone at the end of the week.", "found": "{tier}, found", "missed": "This week's treasures have washed away. New ones Monday." },
+      "a11y": { "label": "{tier}, {marks} marks", "announce": "Found {tier}. {marks} marks when you finish." },
+      "fx": "treasure_glint"
+    },
+    {
+      "id": "egg-ladybug", "type": "egg", "lore": "frog", "hidden": true, "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:ladybug" }, "trails": { "at": "place:ladybug" } },
+      "marks": 20, "repeat": "once", "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": ["https://en.wikipedia.org/wiki/Frog_Rock_(Bainbridge_Island,_Washington)", "https://assets.atlasobscura.com/places/frog-rock-bainbridge-island"],
+      "copy": { "title": "Frog Rock's ladybug", "body": "", "found": "The year after the frog was painted, its painters also painted the small rock beside it as a ladybug." },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-fairydoor", "type": "egg", "lore": "forest", "goals": ["trails"], "hidden": true, "canopy": true,
+      "notBefore": "2026-10-26", "when": { "every": "always" },
+      "where": { "trails": { "at": "place:fairy-door" } },
+      "marks": 20, "repeat": "once", "resolve": { "by": "proximity", "radiusM": 25 },
+      "copy": { "title": "Fairy door", "body": "", "found": "A door too small for you. Knock anyway. (Made up for this app.)" },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "riddle-frog", "type": "riddle", "lore": "riddle", "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:frog-rock" }, "trails": { "at": "place:frog-rock" } },
+      "stars": 1, "repeat": "once", "resolve": { "by": "riddle", "answer": "place:frog-rock", "radiusM": 30 },
+      "sources": ["https://en.wikipedia.org/wiki/Frog_Rock_(Bainbridge_Island,_Washington)"],
+      "copy": { "title": "Riddle", "body": "I sit by the road but never hop. Two islanders painted me in 1971. Find me on the north end, by a quiet loop road.", "found": "Claimed. It was Frog Rock." },
+      "a11y": { "label": "Riddle, 1 star", "announce": "A riddle. Solve it at home, then walk there to claim it." }
+    },
+    {
+      "id": "riddle-bond", "type": "riddle", "lore": "riddle", "goals": ["trails"], "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "pool:grand-forest-trails", "pick": 1 } },
+      "stars": 2, "repeat": "once", "resolve": { "by": "riddle", "answer": "pool:grand-forest-trails", "minM": 100 },
+      "sources": ["https://www.bi-landtrust.org/grand-forest/"],
+      "copy": { "title": "Riddle", "body": "In 1991 islanders voted a bond to save a forest from sale. Walk a hundred metres of it.", "found": "Claimed. It was the Grand Forest." },
+      "a11y": { "label": "Riddle, 2 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." }
+    },
+    {
+      "id": "riddle-weekly-trails", "type": "riddle", "lore": "riddle", "goals": ["trails"], "enabled": false,
+      "_v2": "2 weekly riddles per goal (product § 4.4); text bank keyed by answer place",
+      "when": { "every": "week", "on": ["mon"], "from": "05:00", "to": "24:00", "days": 7 },
+      "where": { "trails": { "pick": 2, "from": "pool:play-safe-trails" } }, "count": 2,
+      "stars": 2, "repeat": "once", "resolve": { "by": "riddle", "answer": "pool:play-safe-trails", "radiusM": 30 },
+      "copy": { "title": "Riddle of the week", "body": "{riddle}", "found": "Claimed. It was {place}." },
+      "a11y": { "label": "Riddle", "announce": "A riddle. Solve it at home, then walk there to claim it." }
+    },
+    {
+      "id": "kraken-roads", "type": "obstacle", "lore": "kraken", "goals": ["roads"], "hero": true, "priority": 60,
+      "when": { "every": "week", "on": ["thu"], "from": "06:00", "to": "20:00", "days": 4 },
+      "where": { "roads": { "rotate": ["pool:coast-k5", "pool:coast-k2", "pool:coast-k6", "pool:coast-k4", "pool:coast-k7", "pool:coast-k3"], "epoch": "2026-10-29" } },
+      "bands": [ { "pct": 60, "marks": 60 }, { "pct": 80, "marks": 70 }, { "pct": 95, "marks": 80 } ],
+      "repeat": "per_attack", "resolve": { "by": "segments", "minShare": 0.6 },
+      "copy": { "title": "The kraken is ashore", "body": "It's inking {coast}. Walk most of an inked road to send it back.", "found": "You sent it back", "missed": "The kraken slipped away. It'll be back next week." },
+      "a11y": { "label": "Kraken at {coast}", "announce": "Kraken repelled on {place}. {marks} marks when you finish." },
+      "fx": "kraken_attack"
+    },
+    {
+      "id": "kraken-trails", "type": "obstacle", "lore": "kraken", "goals": ["trails"], "hero": true, "priority": 60,
+      "when": { "every": "week", "on": ["thu"], "from": "06:00", "to": "20:00", "days": 4 },
+      "where": { "trails": { "rotate": ["pool:coast-t4", "pool:coast-t2", "pool:coast-t3", "pool:coast-t5"], "epoch": "2026-10-29" } },
+      "bands": [ { "pct": 60, "marks": 60 }, { "pct": 80, "marks": 70 }, { "pct": 95, "marks": 80 } ],
+      "repeat": "per_attack", "resolve": { "by": "segments", "minShare": 0.6 },
+      "copy": { "title": "The kraken is ashore", "body": "It's inking {coast}. Walk most of an inked stretch to send it back.", "found": "You sent it back", "missed": "The kraken slipped away. It'll be back next week." },
+      "a11y": { "label": "Kraken at {coast}", "announce": "Kraken repelled on {place}. {marks} marks when you finish." },
+      "fx": "kraken_attack"
+    },
+    {
+      "id": "ch-sweep", "type": "challenge", "lore": "challenge",
+      "when": { "every": "week", "on": ["sat"], "from": "00:00", "to": "24:00", "days": 2 },
+      "marks": 100, "repeat": "once", "resolve": { "by": "challenge" },
+      "challenge": { "scope": "solo", "metric": "completed", "target": { "trails": 3, "roads": 5 } },
+      "copy": { "title": "Weekend sweep", "body": "Finish {target} {goal.items} this weekend. Short ones count." },
+      "a11y": { "label": "Weekend sweep", "announce": "Weekend sweep: {progress} of {target}." }
+    },
+    {
+      "id": "ch-krakenweek", "type": "challenge", "lore": "kraken",
+      "when": { "every": "week", "on": ["thu"], "from": "06:00", "to": "20:00", "days": 4 },
+      "marks": 75, "repeat": "once", "resolve": { "by": "challenge" },
+      "challenge": { "scope": "island", "metric": "stretches_repelled", "minPlayersPerStretch": 3, "retreatMarks": 50 },
+      "copy": { "title": "Kraken week", "body": "Will islanders repel every stretch before Sunday evening?" },
+      "a11y": { "label": "Kraken week", "announce": "{progress} of {target} stretches sent back by islanders." }
+    },
+    {
+      "id": "lore-frog", "type": "lore", "lore": "frog", "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:frog-rock" }, "trails": { "at": "place:frog-rock" } },
+      "marks": 15, "repeat": "once", "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": ["https://en.wikipedia.org/wiki/Frog_Rock_(Bainbridge_Island,_Washington)", "https://assets.atlasobscura.com/places/frog-rock-bainbridge-island"],
+      "copy": { "title": "Frog Rock", "body": "Two stacked granite boulders, painted as a frog by two residents in June 1971 (sources give June 6 and June 7)." },
+      "a11y": { "label": "Frog Rock, island story", "announce": "Frog Rock. 15 marks when you finish." },
+      "fx": "frog_rock"
+    },
+    {
+      "id": "lore-mill", "type": "lore", "lore": "history", "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:mill-trailhead" }, "roads": { "along": "road:road-blakely-hill-road-northeast", "pick": 1 } },
+      "marks": 15, "repeat": "once", "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": ["https://www.historylink.org/File/1053", "https://en.wikipedia.org/wiki/Blakely_Harbor"],
+      "copy": { "title": "Port Blakely mill", "body": "Captain William Renton's mill opened in 1864; by 1882 it was the largest on the Pacific Coast." },
+      "a11y": { "label": "Port Blakely mill, island story", "announce": "Port Blakely mill. 15 marks when you finish." }
+    },
+    {
+      "id": "lore-memorial", "type": "lore", "lore": "remembrance",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:memorial-card" }, "trails": { "at": "place:memorial-card" } },
+      "marks": 0, "repeat": "once", "resolve": { "by": "none" },
+      "sources": ["https://www.nps.gov/places/the-bainbridge-island-japanese-american-exclusion-memorial.htm"],
+      "copy": { "title": "Nidoto Nai Yoni", "body": "On March 30, 1942, 227 Japanese American islanders were forced from their homes and sent from the Eagledale ferry dock, the first removal under Executive Order 9066. Let it not happen again." },
+      "a11y": { "label": "Remembrance", "announce": "Remembrance: the Japanese American Exclusion Memorial.", "reducedMotion": "static_icon" },
+      "_note": "inside its own quiet zone by design: card marker only, a visit stamp with no number, no fx"
+    },
+    {
+      "id": "ferry-sprite", "type": "ambient", "lore": "ferry",
+      "when": { "every": "day", "from": "05:00", "to": "23:00", "anchor": { "at": "ferry.depart.bainbridge", "before": "0m", "after": "35m", "pick": "all" } },
+      "where": { "trails": { "at": "place:winslow-waterfront" }, "roads": { "at": "place:winslow-waterfront" } },
+      "resolve": { "by": "none" },
+      "copy": { "title": "Ferry crossing", "body": "" },
+      "a11y": { "label": "Ferry", "announce": "Ferry crossing Eagle Harbor, by the timetable.", "reducedMotion": "static_icon" },
+      "fx": "ferry_crossing"
+    },
+    {
+      "id": "lore-owl", "type": "creature", "scope": "personal", "lore": "forest", "goals": ["trails"], "enabled": false,
+      "_v2": "creatures: creature hours only, every fact sourced, safety line on the card",
+      "when": { "every": "day", "from": "sunrise+30m", "to": "sunset-30m" },
+      "where": { "trails": { "along": "pool:grand-forest-trails", "pick": 1 } },
+      "marks": 15, "repeat": "per_season", "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": ["https://www.bainbridgereview.com/2017/08/11/heads-up-owl-attacks-on-the-rise-round-bainbridge/"],
+      "copy": { "title": "Barred owl", "body": "Barred owls live in island woods. Give owls space, especially in spring." },
+      "a11y": { "label": "Barred owl", "announce": "A barred owl. 15 marks when you finish." }
+    }
+  ]
+}

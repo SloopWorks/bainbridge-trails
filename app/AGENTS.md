@@ -1,8 +1,8 @@
 <!-- shipyard-deploy:begin -->
 ## Shipyard Deploy
 
-This repository publishes development builds of `com.bainbridgetrails.app.dev` (Gradle variant `trailsDebug`)
-to the Shipyard Deploy project `bainbridge-trails`. Configuration lives in `.shipyard-deploy.yaml`;
+This repository publishes development builds of `com.bainbridgetrails.app.dev` (Gradle variant `trailsDebug`, the trails
+goal) and `com.bainbridgetrails.roads.dev` (`roadsDebug`, the roads goal) to the Shipyard Deploy project `bainbridge-trails`. Configuration lives in `.shipyard-deploy.yaml`;
 read it rather than hard-coding a project or a channel name.
 
 Which channel a build goes to is decided by the current git branch
@@ -26,7 +26,9 @@ shipyard-deploy publish <apk>                 # publish; the channel is created 
 That is the whole list. `login`, `logout`, `rollback`, `enroll-code`,
 `devices`, `channels create` and `resume` belong to a human.
 
-Build the APK first with `./gradlew :androidApp:assembleTrailsDebug` (from `app/`).
+Build the APK first (from `app/`, with the plugin repository property below): `./gradlew :androidApp:assembleTrailsDebug` for
+`com.bainbridgetrails.app.dev` or `./gradlew :androidApp:assembleRoadsDebug` for `com.bainbridgetrails.roads.dev` — the two
+goals are two packages of the one project, each with its own channel head; `publish <apk>` reads the application id from the APK.
 Every command takes `--json` and returns a single object; exit code 0 means it worked.
 
 ### Do not
@@ -59,8 +61,9 @@ Every command takes `--json` and returns a single object; exit code 0 means it w
 ## Building and testing (Gradle root is `app/`)
 
 Modules: `:composeApp` (shared KMP UI + platform glue), `:androidApp` (Android shell; the module is
-`:androidApp`, there is no `:app`), `:coverage` and `:tracking` (pure KMP logic), `iosApp/` (hand-maintained
-Xcode project), plus `:debugdrawer-shim` (in-repo no-op drawer).
+`:androidApp`, there is no `:app`), `:coverage` and `:tracking` (pure KMP logic), `:play` (pure KMP Play logic:
+RNG, effects scene/timelines, island time, tides, ferry, scheduling — no Compose, no `:coverage`; docs/play/),
+`iosApp/` (hand-maintained Xcode project), plus `:debugdrawer-shim` (in-repo no-op drawer).
 
 Before the first build, copy the map data and dataset (built by `pipeline/` into `data/dist/`, gitignored):
 
@@ -78,7 +81,7 @@ Full verification set (run all before handing back work):
 
 ```sh
 cd app
-./gradlew :coverage:jvmTest :tracking:jvmTest :composeApp:testAndroidHostTest \
+./gradlew :coverage:jvmTest :tracking:jvmTest :play:jvmTest :composeApp:testAndroidHostTest \
   :androidApp:assembleTrailsDebug :androidApp:assembleRoadsDebug :androidApp:assembleTrailsRelease \
   :androidApp:assembleRoadsRelease :composeApp:linkDebugFrameworkIosSimulatorArm64
 cd .. && xcodebuild -project app/iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator \
@@ -133,6 +136,26 @@ path. Simulator screenshots: launch arguments `-btScreen trails|me|leaderboard|p
 (`walk` = newest walk's detail; `celebrate-island` = the island 100% celebration with final numbers),
 `-btDevSignIn 1`, `-apiBaseUrl http://localhost:8787` (debug binaries only; `xcrun simctl launch <udid>
 com.bainbridgetrails.app -btScreen me`).
+
+## Play (opt-in gamification; docs/play/)
+
+Play is off by default (`AppSettings.play.enabled`); with it off nothing Play is created, composed, requested or
+tracked (PF0, `PureModeTest`). Specs: `docs/play/README.md`; build order and e2e: `docs/play/plan.md`.
+
+- **Content pack.** Source in `data/play/`; build and check with `node scripts/build-play-content.mjs` (writes the
+  generated copies into `backend/src/data/play/` and `composeApp/src/commonMain/composeResources/files/play/`:
+  `play-content.json`, `derived-{trails,roads}.json`, tides) and `node scripts/build-play-content.mjs --check` (what
+  `npm test` in `backend/` runs). Script tests: `node --test scripts/*.test.mjs` (CI runs them before `npm test`).
+- **Play clock (debug builds only).** Android: `adb shell am start -n <pkg>/com.bainbridgetrails.app.MainActivity --es
+  playClock 2026-10-29T14:00 --es playTide low|high|expired --es playConfig bundled`; the debug drawer's Play clock
+  plugin and Settings › Play clock (debug) do the same at run time. iOS: `-btPlayClock 2026-10-29T14:00 -btPlayTide low
+  -btPlayConfig bundled`. The clock is island time (America/Los_Angeles) and ticks from the given instant.
+- **Screens.** iOS `-btScreen logbook|whats-on|challenges|ranks|stories` (Play must be on). FX showcase: Android
+  `--es screen fx --es fx <effect id> --es preset <preset id>` (`--es reduced 1` = final frame, `--es t <ms>` = paused at a key frame, `--es theme dark`); iOS
+  `-btScreen fx` (iOS opens the first preset; pick others in the showcase controls). Effect ids and preset ids:
+  `docs/play/plan.md` § 2 (e.g. `treasure_glint`/`fay-5`, `kraken_attack`/`manitou`, `play_wake`/`island-home`).
+- **E2E (AC 8).** The opt-in → treasure → kraken → riddle → challenge → Logbook walkthrough, its fixed clock, the
+  local wrangler dev clock and the screenshot list are in `docs/play/plan.md` § 3 (`docs/play/e2e-ids.env` pins ids).
 
 ## Local backend
 

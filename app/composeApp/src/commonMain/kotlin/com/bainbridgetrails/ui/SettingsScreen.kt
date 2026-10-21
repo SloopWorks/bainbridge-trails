@@ -1,5 +1,7 @@
 package com.bainbridgetrails.ui
 
+import com.bainbridgetrails.play.playGoal
+
 import com.bainbridgetrails.data.LocalGoal
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -90,6 +92,39 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.bainbridgetrails.data.PlaySettings
+import com.bainbridgetrails.play.DebugPlayClock
+import com.bainbridgetrails.resources.play_settings_about
+import com.bainbridgetrails.resources.play_settings_ambient
+import com.bainbridgetrails.resources.play_settings_ambient_body
+import com.bainbridgetrails.resources.play_settings_clock_debug
+import com.bainbridgetrails.resources.play_settings_logbook
+import com.bainbridgetrails.resources.play_settings_ranks
+import com.bainbridgetrails.resources.play_settings_replay
+import com.bainbridgetrails.resources.play_settings_section
+import com.bainbridgetrails.resources.play_settings_sounds
+import com.bainbridgetrails.resources.play_settings_sounds_body
+import com.bainbridgetrails.resources.play_settings_toggle
+import com.bainbridgetrails.resources.play_settings_toggle_body
+import com.bainbridgetrails.ui.components.SettingSwitchRow
+import com.bainbridgetrails.ui.play.sheets.PlayAboutSheet
+import com.bainbridgetrails.ui.play.sheets.PlayIntroSheet
+import com.bainbridgetrails.ui.play.sheets.PlayOffSheet
+import com.bainbridgetrails.ui.play.sheets.PlayOptInGraph
+import com.bainbridgetrails.ui.play.sheets.PlaySheet
+import com.bainbridgetrails.ui.play.sheets.PlayToggleFlow
+import com.bainbridgetrails.ui.theme.BtDuration
+import com.bainbridgetrails.ui.theme.BtEasing
 
 /**
  * Map style choice (decisions.md TL-4): Auto = Topo in light mode, Dark in dark mode. Stored as the existing
@@ -121,6 +156,13 @@ fun SettingsScreen(
     onAccount: () -> Unit,
     onAttribution: () -> Unit,
     onPrivacy: () -> Unit,
+    /** Settings › Play rows (ux.md § 3.1). [onPlayStarted]: Start landed (marks of a new start balance, else null). */
+    onPlayStarted: (Int?) -> Unit = {},
+    onRanks: () -> Unit = {},
+    onLogbook: () -> Unit = {},
+    /** "Replay the island waking up": null hides the row (the quiet day hides it, ux § 3.1). */
+    onReplayWake: (() -> Unit)? = null,
+    onPlayClock: () -> Unit = {},
 ) {
     val auth by graph.auth.state.collectAsStateWithLifecycle()
     val profile by graph.profile.profile.collectAsStateWithLifecycle()
@@ -130,6 +172,19 @@ fun SettingsScreen(
     val uri = LocalUriHandler.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    val toggle = rememberPlayToggle(graph, settings.play.enabled)
+    val toggleState by toggle.state.collectAsStateWithLifecycle()
+    var aboutOpen by remember { mutableStateOf(false) }
+    when (toggleState.sheet) {
+        PlaySheet.Intro -> PlayIntroSheet(
+            starting = toggleState.starting,
+            onStart = { scope.launch { onPlayStarted(toggle.onStart()) } },
+            onDismiss = toggle::onIntroDismissed,
+        )
+        PlaySheet.Off -> PlayOffSheet(onConfirm = { scope.launch { toggle.onOffConfirmed() } }, onCancel = toggle::onOffCancelled)
+        null -> Unit
+    }
+    if (aboutOpen) PlayAboutSheet { aboutOpen = false }
     ListScreen(stringResource(Res.string.settings_title), onBack = onBack, snackbar = snackbar) {
         item { Group(stringResource(Res.string.settings_map)) }
         item {
@@ -171,6 +226,13 @@ fun SettingsScreen(
                 }
             }
         }
+        playSection(
+            settings.play, toggle,
+            onSounds = { on -> graph.settings.update { it.copy(play = it.play.copy(sounds = on)) } },
+            onAmbient = { on -> graph.settings.update { it.copy(play = it.play.copy(ambient = on)) } },
+            onRanks = onRanks, onLogbook = onLogbook, onAbout = { aboutOpen = true },
+            onReplayWake = onReplayWake, onPlayClock = onPlayClock.takeIf { AppGraph.playClock is DebugPlayClock },
+        )
         item { Group(stringResource(Res.string.settings_account)) }
         item {
             val signedIn = auth is AuthState.SignedIn
@@ -209,6 +271,86 @@ fun SettingsScreen(
             )
         }
     }
+}
+
+/** The Play toggle flow over this graph (production [PlayOptInGraph]); follows settings changed elsewhere. */
+@Composable
+private fun rememberPlayToggle(graph: AppGraph.Installed, enabled: Boolean): PlayToggleFlow {
+    val flow = remember(graph) {
+        PlayToggleFlow(
+            PlayOptInGraph(
+                updatePlay = { change -> graph.settings.updateNow { it.copy(play = change(it.play)) } },
+                repo = { graph.playOrNull },
+                analytics = graph.playAnalytics,
+                goal = com.bainbridgetrails.data.DatasetProfile.current.playGoal.name,
+            ),
+            enabled,
+        )
+    }
+    LaunchedEffect(enabled) { flow.sync(enabled) }
+    return flow
+}
+
+/** Settings › Play (ux.md § 3.1; product § 5.1): the switch, and when on the Play rows (revealed medium2, reduced: instant). */
+private fun LazyListScope.playSection(
+    play: PlaySettings,
+    toggle: PlayToggleFlow,
+    onSounds: (Boolean) -> Unit,
+    onAmbient: (Boolean) -> Unit,
+    onRanks: () -> Unit,
+    onLogbook: () -> Unit,
+    onAbout: () -> Unit,
+    onReplayWake: (() -> Unit)?,
+    onPlayClock: (() -> Unit)?,
+) {
+    // The switch shows in every dataset and build type; only the debug clock row is build-gated (DebugPlayClock).
+    val revealed = playSettingsRows(enabled = true, replay = onReplayWake != null, debugClock = onPlayClock != null)
+    item(key = "play-h") { Group(stringResource(Res.string.play_settings_section)) }
+    if (PlaySettingsRow.TOGGLE in playSettingsRows(play.enabled, replay = false, debugClock = false)) item(key = "play-toggle") {
+        val st by toggle.state.collectAsStateWithLifecycle()
+        SettingSwitchRow(
+            stringResource(Res.string.play_settings_toggle),
+            checked = st.switchOn,
+            onCheckedChange = toggle::onSwitch,
+            description = stringResource(Res.string.play_settings_toggle_body),
+        )
+    }
+    item(key = "play-rows") {
+        val reduced = BtTheme.motion.reduced
+        AnimatedVisibility(
+            play.enabled,
+            enter = if (reduced) EnterTransition.None else expandVertically(tween(BtDuration.medium2, easing = BtEasing.emphasizedDecelerate)),
+            exit = if (reduced) ExitTransition.None else shrinkVertically(tween(BtDuration.short4)),
+        ) {
+            Column {
+                for (row in revealed) when (row) {
+                    PlaySettingsRow.TOGGLE -> Unit
+                    PlaySettingsRow.SOUNDS -> SettingSwitchRow(stringResource(Res.string.play_settings_sounds), play.sounds, onSounds, description = stringResource(Res.string.play_settings_sounds_body))
+                    PlaySettingsRow.AMBIENT -> SettingSwitchRow(stringResource(Res.string.play_settings_ambient), play.ambient, onAmbient, description = stringResource(Res.string.play_settings_ambient_body))
+                    PlaySettingsRow.RANKS -> NavRow(stringResource(Res.string.play_settings_ranks), onRanks)
+                    PlaySettingsRow.LOGBOOK -> NavRow(stringResource(Res.string.play_settings_logbook), onLogbook)
+                    PlaySettingsRow.ABOUT -> NavRow(stringResource(Res.string.play_settings_about), onAbout)
+                    PlaySettingsRow.REPLAY -> onReplayWake?.let { NavRow(stringResource(Res.string.play_settings_replay), it, trailingIcon = null) }
+                    PlaySettingsRow.DEBUG_CLOCK -> onPlayClock?.let { NavRow(stringResource(Res.string.play_settings_clock_debug), it) }
+                }
+            }
+        }
+    }
+}
+
+/** Settings › Play rows (ux.md § 3.1), in order. */
+internal enum class PlaySettingsRow { TOGGLE, SOUNDS, AMBIENT, RANKS, LOGBOOK, ABOUT, REPLAY, DEBUG_CLOCK }
+
+/**
+ * The Play section's rows: the switch always (every dataset, debug and release); with Play on the Play rows, the
+ * replay row unless the quiet day hides it ([replay]) and the clock row on debug builds only ([debugClock]).
+ */
+internal fun playSettingsRows(enabled: Boolean, replay: Boolean, debugClock: Boolean): List<PlaySettingsRow> = buildList {
+    add(PlaySettingsRow.TOGGLE)
+    if (!enabled) return@buildList
+    addAll(listOf(PlaySettingsRow.SOUNDS, PlaySettingsRow.AMBIENT, PlaySettingsRow.RANKS, PlaySettingsRow.LOGBOOK, PlaySettingsRow.ABOUT))
+    if (replay) add(PlaySettingsRow.REPLAY)
+    if (debugClock) add(PlaySettingsRow.DEBUG_CLOCK)
 }
 
 @Composable

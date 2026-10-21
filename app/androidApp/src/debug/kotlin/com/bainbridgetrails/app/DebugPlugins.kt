@@ -1,10 +1,13 @@
 package com.bainbridgetrails.app
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +26,12 @@ import com.bainbridgetrails.data.Loadable
 import com.bainbridgetrails.data.TrailData
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.log.AppLog
+import com.bainbridgetrails.ui.play.screens.PlayClockDebugBody
+import com.bainbridgetrails.play.DebugPlayClock
+import com.bainbridgetrails.play.PlayClockMode
+import com.bainbridgetrails.play.PlayConfigSource
+import com.bainbridgetrails.play.PlayTideOverride
+import com.bainbridgetrails.play.SystemPlayClock
 import com.bainbridgetrails.tracking.CoverageStore
 import com.bainbridgetrails.tracking.SessionStore
 import com.bainbridgetrails.ui.Format
@@ -32,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.days
 
 /**
  * The roads prototype (docs/roads/plan.md P1): runs the whole app on `data/roads/dist` instead of the trail dataset.
@@ -206,6 +216,37 @@ class RecordingPlugin(private val context: Context) : DebugPlugin {
             counts?.let { (finished, open) -> Text("Session files: $finished finished, $open unfinished") }
             Text("Walks in history: ${history?.walks?.size ?: 0}")
             Text("Trail km walked: ${Format.oneDecimal((history?.trailMetresWalked ?: 0.0) / 1000)}")
+        }
+    }
+}
+
+/** Play time travel and pack tools: the shared [PlayClockDebugBody] (also Settings → Play clock in debug builds). */
+class PlayClockPlugin(private val context: Context) : DebugPlugin {
+    override val id = "bt-play-clock"
+    override val title = "Play clock"
+
+    @Composable
+    override fun Content(scope: DebugScope) {
+        val graph = remember { AppGraph.install(context) }
+        PlayClockDebugBody(graph, Modifier.padding(16.dp))
+    }
+}
+
+/** "Play FX" panel: opens the effects showcase (effects.md § 7, ux.md § 3.19) with its budget HUD. */
+class PlayFxPlugin(private val context: Context) : DebugPlugin {
+    override val id = "bt-play-fx"
+    override val title = "Play FX"
+
+    @Composable
+    override fun Content(scope: DebugScope) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Effects showcase: every v1 effect on its preset camera, with the budget HUD.")
+            Button(onClick = {
+                context.startActivity(
+                    Intent(context, MainActivity::class.java).putExtra("screen", "fx")
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                )
+            }) { Text("Open effects showcase") }
         }
     }
 }

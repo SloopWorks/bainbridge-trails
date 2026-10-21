@@ -3,16 +3,20 @@
   Android 12+ backup / device transfer. Account-linked state never leaves the device: the session token,
   sync queue + walk ids (sync.json), leaderboard cache and raw tracks live in noBackupFilesDir (never backed up);
   profile.json (server profile + unsent name change) is excluded here. settings.json may be restored.
+  Play: user state (Logbook, finds) lives in noBackupFilesDir/play; files/play/ (pack and tide caches, and the
+  pre-move state file of older builds) is excluded too (privacy review 2026-10-21 P1-2).
 -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="profile.json" />
         <exclude domain="file" path="sync.json" />
         <exclude domain="file" path="leaderboard.json" />
+        <exclude domain="file" path="play/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="profile.json" />
         <exclude domain="file" path="sync.json" />
         <exclude domain="file" path="leaderboard.json" />
+        <exclude domain="file" path="play/" />
     </device-transfer>
 </data-extraction-rules>

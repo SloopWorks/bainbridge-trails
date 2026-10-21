@@ -39,4 +39,23 @@ class SpikeLaunchTest {
     fun ignoresUnknownStyle() {
         assertEquals(MapStyle.Default, SpikeLaunch.parse(mapOf("style" to "neon")).style)
     }
+
+    @Test
+    fun screenFxParsesFxStateTOptions() {
+        val l = SpikeLaunch.parse(
+            mapOf("screen" to "fx", "fx" to "kraken_attack", "preset" to "manitou", "state" to "intro", "t" to "1100", "theme" to "Dark", "reduced" to "1", "warp" to "60"),
+        )
+        assertEquals(SpikeLaunch.Screen.FX, l.screen)
+        assertEquals("kraken_attack", l.fx)
+        assertEquals("manitou", l.preset)
+        assertEquals("intro", l.state)
+        assertEquals(1100L, l.t)
+        assertEquals("dark", l.theme)
+        assertEquals(true, l.reduced)
+        assertEquals(60.0, l.warp)
+        val bare = SpikeLaunch.parse(mapOf("screen" to "fx"))
+        assertNull(bare.fx); assertNull(bare.t); assertNull(bare.warp); assertEquals(false, bare.reduced)
+        assertNull(SpikeLaunch.parse(mapOf("screen" to "fx", "t" to "soon", "warp" to "-2")).t)
+        assertNull(SpikeLaunch.parse(mapOf("screen" to "fx", "warp" to "-2")).warp)
+    }
 }

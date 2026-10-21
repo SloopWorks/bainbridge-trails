@@ -102,6 +102,13 @@ migrated database). Steps:
    It copies walk ids the old Worker credited in the window into `walks_v2`, drops `walks` and the old snapshot
    tables, and zeroes the legacy `users` metric columns.
 
+### Migration 0005 (Play)
+
+`0005_play.sql` only creates `play_*` tables and references nothing 0004 drops or clears, so it is correct whether
+0004 is applied before or after it (`test/migrations.test.ts` runs both orders; wrangler applies any unapplied file
+by name, so a later 0004 rename still applies). `npm run deploy` applies it, then uploads the Worker. Rollback: revert
+the Worker; the tables are inert and old Workers ignore the Play fields.
+
 ## Public pages (privacy policy, terms, support)
 
 `GET /privacy`, `/terms`, `/support` and `/delete-account` (also `HEAD`) are static HTML with no scripts or external

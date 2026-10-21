@@ -21,6 +21,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import com.bainbridgetrails.ui.play.components.PlayCard
+import com.bainbridgetrails.ui.play.components.rememberPlay
+import com.bainbridgetrails.ui.play.screens.LogbookTotals
+import com.bainbridgetrails.ui.play.screens.StoriesLogic
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import com.bainbridgetrails.nav.DebugLaunch
@@ -136,6 +140,10 @@ fun MeScreen(
     modifier: Modifier = Modifier,
     /** Roads "By road type" row → the Roads list filtered to that group. */
     onRoadType: (RoadGroup) -> Unit = {},
+    /** Me › PlayCard rows (docs/play/ux.md § 3.12), Play on only. */
+    onPlayLogbook: () -> Unit = {},
+    onPlayWhatsOn: () -> Unit = {},
+    onPlayStories: () -> Unit = {},
 ) {
     val snapshot by graph.progress.snapshot.collectAsStateWithLifecycle()
     val history by graph.walks.history.collectAsStateWithLifecycle()
@@ -148,6 +156,7 @@ fun MeScreen(
     var info by remember { mutableStateOf<StatInfo?>(null) }
     var milestonesOpen by remember { mutableStateOf(false) }
     val goal = LocalGoal.current
+    val play = rememberPlay(graph, settings.play.enabled)
 
     Column(modifier.fillMaxSize()) {
         BtTopBar(stringResource(Res.string.me_title)) {
@@ -198,6 +207,15 @@ fun MeScreen(
                     item(key = "tiles") {
                         Spacer(Modifier.height(BtTheme.spacing.sm))
                         StatTiles(stats, settings.units, onInfo = { info = it }, modifier = m)
+                    }
+                    if (play != null) {
+                        item(key = "play-card") {
+                            val ps by play.store.state.collectAsStateWithLifecycle()
+                            val pc by play.config.collectAsStateWithLifecycle()
+                            val stories = remember(pc, ps.found) { StoriesLogic.model(pc?.config, play.goal, ps.found) }
+                            val totals = remember(ps.logbook) { LogbookTotals.of(ps.logbook.total, 0) }
+                            PlayCard(totals, stories.met, stories.total, onPlayLogbook, onPlayWhatsOn, onPlayStories, m.padding(top = BtTheme.spacing.md))
+                        }
                     }
                     if (roadsNumbers != null) {
                         // Roads retention (docs/roads/product.md §5.2, ux.md §5.3): next milestone, strip, by type.

@@ -4,6 +4,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import com.bainbridgetrails.coverage.TrailStatus
 
 /** Material 3 schemes, exactly docs/mvp/ux.md §1.1. No dynamic color (status hues must never clash with primary). */
@@ -92,6 +93,48 @@ val BtDarkScheme = darkColorScheme(
 @Immutable
 data class StatusColors(val line: Color, val accent: Color, val container: Color, val onContainer: Color)
 
+/**
+ * Play's colour roles (docs/play/ux.md §1.1): one ink for art, one accent for reward, one light, one veil. Never a
+ * status, recording, userTrack, error or positive hue (PlayColorsGuardTest: CIE76 ΔE ≥ 20, both themes).
+ * - [ink]: all Play line art, stamps, the kraken's ink casing, art-tile glyphs. Never body text; no fill > 24dp² at full α.
+ * - [seaGlass]: marks glyph △, treasure fill, Play bar fill, selected-pin ring; as **text** only for a `+n` marks
+ *   delta on surface / surfaceContainerLow / mapChrome (≥ 5.2:1). Never a line along the network.
+ * - [lamp]: light only (flame, glint core), inside an ink outline or as glow; on dark always on a dark backing.
+ * - [fog]: exploration fog / kraken spray; the alpha is part of the token. Never above status halos, lines or labels.
+ * - [seaGlassWash]: derived, not a role — sea glass over surfaceContainerLow, the background of a found / done
+ *   state. Text on it is `onSurface` only.
+ */
+@Immutable
+data class PlayColors(
+    val ink: Color,
+    val seaGlass: Color,
+    val lamp: Color,
+    val fog: Color,
+    val seaGlassWash: Color,
+)
+
+/** Light: fog `#F4F6F5` @ .55; wash = sea glass @ .14 over surfaceContainerLow (≈ `#D1DED3`). */
+val PlayLight = Color(0xFF037245).let { seaGlass ->
+    PlayColors(
+        ink = Color(0xFF22323C),
+        seaGlass = seaGlass,
+        lamp = Color(0xFFFFF1C9),
+        fog = Color(0x8CF4F6F5),
+        seaGlassWash = seaGlass.copy(alpha = 0.14f).compositeOver(BtLightScheme.surfaceContainerLow),
+    )
+}
+
+/** Dark: fog `#7D9095` @ .25; wash = sea glass @ .18 over surfaceContainerLow (≈ `#1F4438`). */
+val PlayDark = Color(0xFF45E0AE).let { seaGlass ->
+    PlayColors(
+        ink = Color(0xFFCFE0E6),
+        seaGlass = seaGlass,
+        lamp = Color(0xFFFFF0CF),
+        fog = Color(0x407D9095),
+        seaGlassWash = seaGlass.copy(alpha = 0.18f).compositeOver(BtDarkScheme.surfaceContainerLow),
+    )
+}
+
 /** App-specific colors (ux.md §1.2), read via `BtTheme.colors`. */
 @Immutable
 data class BtExtraColors(
@@ -110,6 +153,8 @@ data class BtExtraColors(
     val onMapChrome: Color,
     val waterLine: Color,
     val positive: Color,
+    /** Play's four roles (docs/play/ux.md §1.1); brand-independent. Only Play surfaces read them. */
+    val play: PlayColors,
 )
 
 val BtExtraLight = BtExtraColors(
@@ -128,6 +173,7 @@ val BtExtraLight = BtExtraColors(
     onMapChrome = Color(0xFF26302B),
     waterLine = Color(0xFF6F97A2),
     positive = Color(0xFF2E5E4E),
+    play = PlayLight,
 )
 
 val BtExtraDark = BtExtraColors(
@@ -146,6 +192,7 @@ val BtExtraDark = BtExtraColors(
     onMapChrome = Color(0xFFDCE6E1),
     waterLine = Color(0xFF2E5564),
     positive = Color(0xFF93D3B6),
+    play = PlayDark,
 )
 
 fun BtExtraColors.of(s: TrailStatus): StatusColors = when (s) {

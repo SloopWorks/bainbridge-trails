@@ -48,7 +48,7 @@ internal fun namedNotCountedLayerId(s: TrailStatus) = "app-trail-nc-${s.name.low
 const val ROAD_END_LAYER = "app-road-ends"
 
 /** The style layer the app's trail layers sit under, so trail names stay readable on top. */
-private const val LABEL_LAYER = "trail-label"
+internal const val LABEL_LAYER = "trail-label"
 
 /**
  * Categories that only the roads dataset uses (docs/roads/data-spec.md); mirrors ROAD_CATS in
@@ -71,7 +71,8 @@ data class SelectedTrail(val id: String, val lines: List<List<List<Double>>>, va
  * only progress gets a halo, and uncounted roads are the style's. With a [selected] trail every other line dims and
  * the selected one gets an outline + gap + its trail-level status line on top. [highlight] lines (e.g. the trails a
  * walk added to, P1-6) get the selection outline + gap under their own status lines, no dimming. [roadEnds] draw as
- * pins (roads).
+ * pins (roads). [casingFx] is Play's CASING band (engine PF-3, docs/play/plan.md L2-2): composed after the halos and
+ * before the casings and status lines; null (pure mode) composes exactly today's layers ([statusLayerPlan]).
  */
 @Composable
 @MaplibreComposable
@@ -83,6 +84,7 @@ fun StatusLayers(
     highlight: List<List<List<Double>>> = emptyList(),
     spec: StatusLayerSpec = StatusLayerSpec.current,
     roadEnds: List<RoadEnd> = emptyList(),
+    casingFx: (@Composable @MaplibreComposable () -> Unit)? = null,
 ) {
     val trails = getBaseSource<VectorSource>("trails") ?: return // style still loading
     val p = style.palette
@@ -103,14 +105,20 @@ fun StatusLayers(
             }
         }
     }
-    fun present(s: TrailStatus) = s == TrailStatus.NOT_STARTED || buckets[s].orEmpty().isNotEmpty()
+    val hasHighlight = highlight.isNotEmpty()
+    val hasSelection = selected != null
+    val hasRoadEnds = roadEnds.isNotEmpty()
+    val hasCasingFx = casingFx != null
+    val plan = remember(buckets, spec, p, hasHighlight, hasSelection, hasRoadEnds, hasCasingFx) {
+        statusLayerPlan(buckets, spec, p, hasHighlight, hasSelection, hasRoadEnds, hasCasingFx)
+    }
     fun minZoom(s: TrailStatus) = if (s == TrailStatus.NOT_STARTED) spec.notStartedMinZoom else 0f
     // Layer filters carry every covered segment id as a literal: build them once per coverage change, not per recomposition.
     val countedFilters = remember(filters) { filters.mapValues { (_, f) -> all(counted, f) } }
     val namedNcFilters = remember(filters) { filters.mapValues { (_, f) -> all(!counted, named, f) } }
 
     Anchor.Below(LABEL_LAYER) {
-        if (spec.drawUnnamedHairlines) {
+        if (plan.hairlines) {
             // Unnamed paths outside the island total: faint hairlines, by category (styles.md). Uncounted *roads*
             // are drawn by the style's own muted roads-ds-private / roads-ds-holdout layers instead.
             val hair = all(!counted, !named, !(const(RoadCategories).contains(feature["category"].asString(const("")))))
@@ -138,10 +146,9 @@ fun StatusLayers(
             )
         }
 
-        val order = TrailStatus.entries // not started (bottom) → complete (top)
         // Land-colored halo under counted lines (roads: under progress only; the halo gap is what separates a
         // complete line from the steel bed under CVD, docs/roads/ux.md §8.2).
-        for (s in order) if (present(s) && s in spec.haloStatuses) LineLayer(
+        for (s in plan.halos) LineLayer(
             id = "app-trail-halo-${s.name.lowercase()}",
             source = trails, sourceLayer = "segments", minZoom = minZoom(s),
             filter = countedFilters.getValue(s),
@@ -150,9 +157,11 @@ fun StatusLayers(
             width = width(spec, s, extra = spec.haloExtra),
             cap = const(LineCap.Round), join = const(LineJoin.Round),
         )
-        if (highlight.isNotEmpty()) HighlightLayers(highlight, p, spec)
+        if (plan.highlight) HighlightLayers(highlight, p, spec)
+        // Play's CASING band (engine PF-3): after the halos, under the casings and status lines. Null = pure mode.
+        if (casingFx != null) casingFx()
         // Dark casing under Partway and Nearly done.
-        for (s in order) if (present(s) && spec.hasCasing(s)) LineLayer(
+        for (s in plan.casings) LineLayer(
             id = "app-trail-casing-${s.name.lowercase()}",
             source = trails, sourceLayer = "segments",
             filter = countedFilters.getValue(s),
@@ -160,7 +169,7 @@ fun StatusLayers(
             width = width(spec, s, extra = spec.casingExtra),
             cap = const(LineCap.Butt), join = const(LineJoin.Round),
         )
-        if (p.completeGlow > 0f && present(TrailStatus.COMPLETE)) LineLayer(
+        if (plan.glow) LineLayer(
             id = "app-trail-glow",
             source = trails, sourceLayer = "segments",
             filter = countedFilters.getValue(TrailStatus.COMPLETE),
@@ -169,14 +178,14 @@ fun StatusLayers(
             width = width(spec, TrailStatus.COMPLETE, extra = spec.glowExtra), blur = const(3.dp),
             cap = const(LineCap.Round), join = const(LineJoin.Round),
         )
-        for (s in order) if (present(s)) StatusLine(
+        for (s in plan.lines) StatusLine(
             id = statusLayerId(s), source = trails, filter = countedFilters.getValue(s),
             status = s, color = p.of(s),
             opacity = const(dimF * if (s == TrailStatus.NOT_STARTED) spec.notStartedOpacity else 1f),
             fade = fade, spec = spec, minZoom = minZoom(s),
         )
         // TL-6: named trails that don't count toward the island: status colors, short even dash.
-        if (spec.drawNamedNotCounted) for (s in order) if (present(s)) LineLayer(
+        for (s in plan.namedNotCounted) LineLayer(
             id = namedNotCountedLayerId(s),
             source = trails, sourceLayer = "segments",
             filter = namedNcFilters.getValue(s),
@@ -188,15 +197,76 @@ fun StatusLayers(
 
         if (selected != null) SelectionLayers(selected, p, spec)
         // Pins on top of the selection: a road end sits on its road's last metres.
-        if (spec.drawRoadEnds && roadEnds.isNotEmpty()) RoadEndPins(roadEnds, style)
+        if (plan.roadEnds) RoadEndPins(roadEnds, style)
     }
 }
 
-/** Back-compat for the Record screen: Topo (or Dark) palette, no selection. */
+/** Back-compat for the Record screen: Topo (or Dark) palette, no selection; [casingFx] as above (null = pure). */
 @Composable
 @MaplibreComposable
-fun StatusLayers(buckets: Map<TrailStatus, List<String>>, dark: Boolean) =
-    StatusLayers(buckets, if (dark) MapStyle.DARK else MapStyle.TOPO)
+fun StatusLayers(
+    buckets: Map<TrailStatus, List<String>>,
+    dark: Boolean,
+    casingFx: (@Composable @MaplibreComposable () -> Unit)? = null,
+) = StatusLayers(buckets, if (dark) MapStyle.DARK else MapStyle.TOPO, casingFx = casingFx)
+
+/** Placeholder id for the `casingFx` slot in [StatusLayerPlan.layerIds] (the slot's own ids are `fx-…`). */
+internal const val CASING_FX_SLOT = "<casingFx>"
+
+/**
+ * What [StatusLayers] composes, in composition (= z) order, as plain data: the composable reads every "which layers"
+ * decision from here, so [layerIds] is the layer list a host test can pin (PlayGateTest: `casingFx = null` is today's
+ * list). Statuses run not started (bottom) → complete (top).
+ */
+internal data class StatusLayerPlan(
+    val hairlines: Boolean,
+    val halos: List<TrailStatus>,
+    val highlight: Boolean,
+    val casingFx: Boolean,
+    val casings: List<TrailStatus>,
+    val glow: Boolean,
+    val lines: List<TrailStatus>,
+    val namedNotCounted: List<TrailStatus>,
+    val selection: Boolean,
+    val roadEnds: Boolean,
+) {
+    fun layerIds(): List<String> = buildList {
+        if (hairlines) addAll(listOf("app-nc-hairline", "app-nc-closed", "app-nc-easement"))
+        halos.forEach { add("app-trail-halo-${it.name.lowercase()}") }
+        if (highlight) addAll(listOf("app-highlight-outline", "app-highlight-gap"))
+        if (casingFx) add(CASING_FX_SLOT)
+        casings.forEach { add("app-trail-casing-${it.name.lowercase()}") }
+        if (glow) add("app-trail-glow")
+        lines.forEach { add(statusLayerId(it)) }
+        namedNotCounted.forEach { add(namedNotCountedLayerId(it)) }
+        if (selection) addAll(listOf("app-selected-outline", "app-selected-gap", "app-selected-line"))
+        if (roadEnds) add(ROAD_END_LAYER)
+    }
+}
+
+internal fun statusLayerPlan(
+    buckets: Map<TrailStatus, List<String>>,
+    spec: StatusLayerSpec,
+    palette: MapPalette,
+    highlight: Boolean,
+    selection: Boolean,
+    roadEnds: Boolean,
+    casingFx: Boolean,
+): StatusLayerPlan {
+    val present = TrailStatus.entries.filter { it == TrailStatus.NOT_STARTED || buckets[it].orEmpty().isNotEmpty() }
+    return StatusLayerPlan(
+        hairlines = spec.drawUnnamedHairlines,
+        halos = present.filter { it in spec.haloStatuses },
+        highlight = highlight,
+        casingFx = casingFx,
+        casings = present.filter { spec.hasCasing(it) },
+        glow = palette.completeGlow > 0f && TrailStatus.COMPLETE in present,
+        lines = present,
+        namedNotCounted = if (spec.drawNamedNotCounted) present else emptyList(),
+        selection = selection,
+        roadEnds = spec.drawRoadEnds && roadEnds,
+    )
+}
 
 @Composable
 @MaplibreComposable

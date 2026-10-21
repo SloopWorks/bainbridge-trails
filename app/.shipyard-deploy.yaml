@@ -15,8 +15,8 @@ project: bainbridge-trails
 # the real signature against the fingerprints registered on the package.
 packages:
   com.bainbridgetrails.app.dev: { variant: trailsDebug, signer: dev }
-  # Roads goal (RD-1/RD-8): the package needs an admin registration first (owner action), then uncomment.
-  # com.bainbridgetrails.roads.dev: { variant: roadsDebug, signer: dev }
+  # Roads goal (RD-1): a second app with its own channel heads; both packages share the dev signing key.
+  com.bainbridgetrails.roads.dev: { variant: roadsDebug, signer: dev }
 
 # Branch to channel routing. An exact `branch` match wins; otherwise the
 # first `branch: "*"` rule does. {branch_slug} is the branch lowercased,

@@ -6,13 +6,17 @@ import com.bainbridgetrails.coverage.LocalProjection
 import com.bainbridgetrails.coverage.Progress
 import com.bainbridgetrails.coverage.SegmentIndex
 import com.bainbridgetrails.resources.Res
+import com.bainbridgetrails.coverage.Fix
+import com.bainbridgetrails.play.PlayRepository
 import com.bainbridgetrails.tracking.CoverageStore
 import com.bainbridgetrails.log.AppLog
 import com.bainbridgetrails.tracking.Finalizer
 import com.bainbridgetrails.tracking.Geofences
 import com.bainbridgetrails.tracking.LocalProgress
 import com.bainbridgetrails.tracking.Perm
+import com.bainbridgetrails.tracking.PlayPendingMarkers
 import com.bainbridgetrails.tracking.RecordingState
+import com.bainbridgetrails.tracking.SessionSummary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import com.bainbridgetrails.tracking.Recorder
@@ -83,8 +87,16 @@ internal object RecordingGraph {
             override fun start(sessionId: String, resume: Boolean) = startRecordingService(context, sessionId, resume)
             override fun stop() = stopRecordingService(context)
         }
-        RecordingController(store, Finalizer(ds, index, store, coverage, walks = WalkIndex(dir)), { Clock.System.now().toEpochMilliseconds() }, recorder, scope).also {
+        val finalizer = Finalizer(
+            ds, index, store, coverage, walks = WalkIndex(dir),
+            onGated = playGatedProvider { AppGraph.installedOrNull()?.playOrNull },
+            playPending = withContext(Dispatchers.Default) { PlayPendingMarkers(dir) },
+        )
+        RecordingController(store, finalizer, { Clock.System.now().toEpochMilliseconds() }, recorder, scope).also {
             it.bind(RecordingBus.events, RecordingBus.lost)
+            // Launch-time finalization runs the Play hook only if Play is already up (P1-6): wait for the loaded
+            // settings to be applied (bounded; Play off returns as soon as the settings are read).
+            AppGraph.installedOrNull()?.awaitPlaySettled()
             it.onLaunch()
             // Raw-track retention: tracks of walks finalized 30+ days ago are deleted (their ids stay finalized).
             scope.launch(Dispatchers.IO) {
@@ -139,3 +151,10 @@ internal object RecordingGraph {
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun Deferred<*>.failed(): Boolean = isCompleted && getCompletionExceptionOrNull() != null
 }
+
+/**
+ * The Finalizer's `onGated` provider (product § 3.6.2, PD-12), read on every finalize: the running [PlayRepository]'s
+ * hook, or null while Play is off (the Finalizer then does no Play work at all, PD-1).
+ */
+internal fun playGatedProvider(play: () -> PlayRepository?): () -> (suspend (String, List<Fix>, SessionSummary) -> Unit)? =
+    { play()?.gatedHook }

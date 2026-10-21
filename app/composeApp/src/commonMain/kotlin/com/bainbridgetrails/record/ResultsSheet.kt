@@ -109,6 +109,8 @@ internal fun ResultsSheet(
     /** Roads (docs/roads/product.md §5.2–5.3): milestones this walk crossed (highest first) and the island total. */
     milestones: List<Milestone> = emptyList(),
     islandTotalM: Double = 0.0,
+    /** Play on: the Play section, composed after all pure content (docs/play/ux.md §3.9, PF6-1). Null = pure results. */
+    play: (@Composable () -> Unit)? = null,
 ) {
     var showSignIn by remember(summary.sessionId) { mutableStateOf(true) }
     var details by remember(summary.sessionId) { mutableStateOf(false) }
@@ -207,6 +209,8 @@ internal fun ResultsSheet(
                     Text(stringResource(sync.label()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            // Play last, after every pure block (ResultsPlayLogic.order).
+            play?.invoke()
         }
         PrimaryButton(
             stringResource(Res.string.common_done),
