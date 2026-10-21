@@ -635,6 +635,7 @@ fun MapTab(
         EncounterLogic.model(
             item, active, key, now, agenda.day.sun, copy,
             names = { id -> data?.dataset?.trails?.firstOrNull { it.id == id }?.name }, shares = shares, foundOn = foundOn, coast = coast,
+            hintsUsed = playState?.hints?.get(active.occurrence.itemId) ?: 0,
         )
     }
 

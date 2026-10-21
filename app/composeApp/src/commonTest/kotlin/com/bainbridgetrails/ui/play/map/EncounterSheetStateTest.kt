@@ -106,4 +106,16 @@ class EncounterSheetStateTest {
         assertEquals("The kraken is paused until tide times are updated.", unknown.gate?.text)
         assertTrue(unknown.stretches.none { it.walkable })
     }
+
+    @Test
+    fun `riddle reward comes from stars and hints, never 0`() {
+        // e2e run-1 F7: riddle sheets showed "0 marks" because the item's flat marks field is 0 for riddles.
+        val p = ResolvedPlacement("riddle-frog@2026-10-26", 0, "place:frog-rock", null, emptyList(), GeoPoint(lat = 47.69591, lon = -122.52353), "11:3", null, 0)
+        val o = occ("riddle-frog@2026-10-26", "riddle-frog", ItemType.riddle, listOf(p))
+        val m = EncounterLogic.model(items.getValue("riddle-frog"), ActiveItem(o, Gate.OPEN), p.key, dawn + 1.hours, sun, copy, names = { null })
+        assertEquals(EncounterVariant.RIDDLE, m.variant)
+        assertEquals("40 marks", m.reward, "1 star × 40, no hints")
+        val hinted = EncounterLogic.model(items.getValue("riddle-frog"), ActiveItem(o, Gate.OPEN), p.key, dawn + 1.hours, sun, copy, names = { null }, hintsUsed = 1)
+        assertEquals("30 marks", hinted.reward, "one hint: −25 %")
+    }
 }

@@ -500,7 +500,7 @@ the draw changes).
 | treasure | `$E2E_TREASURE_ROAD` (week 2026-10-26 draw) | `$E2E_TREASURE_TRAIL` |
 | kraken | `road-manitou-beach-drive-northeast` (1,158 m stretch, ≥ 95 % → band 95, +80) | `trail-fairy-dell-trail` (T4 stretch, ≥ 95 % → +80) |
 | riddle | `riddle-frog`: solve armchair (pick Frog Rock), claim by walking `road-northeast-spargur-loop-road` (snapped point within 30 m, +40) | `riddle-bond`: solve armchair (Grand Forest), claim by walking ≥ 100 m of `trail-grand-forest-west` (★★ +80) |
-| challenge | `ch-krakenweek` sheet: progress "1 of 2 stretches", your band `{band, count}` | `ch-krakenweek`: "1 of 3", band |
+| challenge | `ch-krakenweek` sheet: progress "1 of 2 stretches", your band `{band, count}` | `ch-krakenweek`: "1 of 2" (T4 has two stretches ≥ 100 m), band |
 | bonus (seen, not asserted) | `lore-frog` hop at the same replay | — |
 
 **Backend (local wrangler, dev clock).**
@@ -523,7 +523,7 @@ adb shell am start -n com.bainbridgetrails.roads.dev/com.bainbridgetrails.app.Ma
 # debug drawer › Backend › Local wrangler dev (10.0.2.2:8787) › Apply & Restart; Profile › dev sign-in
 # Settings › Play on › Start  → wake → Map with Play
 scripts/emu-route.sh "$E2E_TREASURE_ROAD"                    # walk 1: treasure find moment, Finish
-scripts/emu-route.sh road-manitou-beach-drive-northeast      # walk 2: kraken recede, Finish
+scripts/emu-route.sh road-manitou-beach-drive-northeast 2 900   # walk 2 (whole road ≈ 46 min at 1.3 m/s; 900 s covers > 60 % of the stretch): kraken repel, Finish
 # Map › riddle pin › Pick on the map › Frog Rock → solved stamp
 scripts/emu-route.sh road-northeast-spargur-loop-road        # walk 3: riddle claimed (+ Frog Rock lore), Finish
 # Map › Challenges chip › Kraken week; Play chip › Logbook; Settings › Play off → pure map again
@@ -536,10 +536,10 @@ Finish (automatic; Me › sync status shows done) before the next replay.
 ```sh
 cd app && ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64 && cd .. && xcodebuild -project app/iosApp/iosApp.xcodeproj \
   -scheme iosApp -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/bt-dd build
-xcrun simctl install booted /tmp/bt-dd/Build/Products/Debug-iphonesimulator/iosApp.app
+xcrun simctl install <udid> /tmp/bt-dd/Build/Products/Debug-iphonesimulator/BainbridgeTrails.app   # pass the UDID: two simulators may be booted
 source docs/play/e2e-ids.env
-xcrun simctl launch booted com.bainbridgetrails.app -btDevSignIn 1 -apiBaseUrl http://localhost:8787 \
-  -btPlayClock 2026-10-29T14:00 -btPlayTide low -btScreen settings
+xcrun simctl launch <udid> com.bainbridgetrails.app -btDevSignIn 1 -apiBaseUrl http://localhost:8787 \
+  -btPlayClock 2026-10-29T14:00 -btPlayTide low -btScreen settings -acceptSimulatedLocations 1   # without it every simulated fix is dropped as mock
 scripts/sim-route.sh "$E2E_TREASURE_TRAIL"; scripts/sim-route.sh trail-fairy-dell-trail; scripts/sim-route.sh trail-grand-forest-west
 xcrun simctl launch booted com.bainbridgetrails.app -btPlayClock 2026-10-29T14:00 -btScreen logbook   # and challenges, me
 xcrun simctl io booted screenshot docs/play/screens/<name>-ios.png

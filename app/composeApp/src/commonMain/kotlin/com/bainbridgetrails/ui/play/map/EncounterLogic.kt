@@ -5,6 +5,7 @@ import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.ResolveBy
 import com.bainbridgetrails.play.config.TierName
 import com.bainbridgetrails.play.fx.FxGlyph
+import com.bainbridgetrails.play.rules.Marks
 import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.schedule.ActiveItem
 import com.bainbridgetrails.play.schedule.Gate
@@ -137,6 +138,8 @@ object EncounterLogic {
         distance: String? = null,
         foundOn: LocalDate? = null,
         coast: String? = null,
+        /** Hints already used on this riddle (product F-RIDDLE: −25 % each, floored at 50 %). */
+        hintsUsed: Int = 0,
     ): EncounterModel {
         val o = active.occurrence
         val placement = o.placements.firstOrNull { it.key == key } ?: o.placements.firstOrNull()
@@ -178,7 +181,7 @@ object EncounterLogic {
             )
             o.type == ItemType.riddle -> EncounterModel(
                 key, item.id, EncounterVariant.RIDDLE, FxGlyph.LanternUnlit, item.copy.title, meta = meta,
-                reward = PlayFormat.fill(copy.reward, PlayFormat.marks(item.marks.takeIf { it > 0 } ?: o.marks)), body = item.copy.body,
+                reward = PlayFormat.fill(copy.reward, PlayFormat.marks(Marks.riddle(item.stars ?: 1, hintsUsed))), body = item.copy.body,
                 sources = item.sources,
             )
             else -> {
