@@ -8,6 +8,7 @@ import { leaderboard, reportName, trailStats } from "./routes/board";
 import { getCoverage, putCoverage } from "./routes/coverage";
 import { deleteUser, getMe, meBody, putMe } from "./routes/me";
 import { deleteAccountPage, legalPage } from "./routes/pages";
+import { playContent, playTides } from "./routes/play";
 import { DATASETS, type Dataset, META, METAS, parseDataset } from "./segments";
 import { rebuildSnapshots } from "./snapshot";
 import { METRICS_COLS, type MetricsRow, recomputeMetrics } from "./users";
@@ -29,7 +30,11 @@ const ROUTES: Record<string, string[]> = {
   "/v1/trails/stats": ["GET"],
   "/v1/stats": ["GET"],
   "/v1/report-name": ["POST"],
+  "/v1/play/content": ["GET"],
 };
+
+/** Path prefixes with a parameter: `/v1/play/tides/{year}`. */
+const PREFIX_ROUTES: [prefix: string, methods: string[]][] = [["/v1/play/tides/", ["GET"]]];
 
 /** Dev auth answers only on hosts a local emulator/simulator uses (P2-13), on top of ALLOW_DEV_AUTH. */
 const DEV_HOSTS = new Set(["localhost", "127.0.0.1", "10.0.2.2"]);
@@ -47,7 +52,10 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const method = request.method;
-  const allowed = ROUTES[path] ?? (path.startsWith("/v1/admin/") ? [adminMethod(path) ?? ""] : null);
+  const allowed =
+    ROUTES[path] ??
+    PREFIX_ROUTES.find(([p]) => path.startsWith(p))?.[1] ??
+    (path.startsWith("/v1/admin/") ? [adminMethod(path) ?? ""] : null);
   if (!allowed || allowed[0] === "") throw new ApiError(404, "not_found", "no such endpoint");
   if (!allowed.includes(method)) {
     throw new ApiError(405, "method_not_allowed", `${method} not allowed`, undefined, { allow: allowed.join(", ") });
@@ -118,7 +126,14 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
       return trailStats(env, deps, parseDataset(url.searchParams.get("dataset") ?? undefined));
     case "/v1/report-name":
       return reportName(request, env, deps, await requireUser(request, env, deps));
+    case "/v1/play/content":
+      publicRateLimit(clientIp(request), deps.now());
+      return playContent(request, url);
     default:
+      if (path.startsWith("/v1/play/tides/")) {
+        publicRateLimit(clientIp(request), deps.now());
+        return playTides(path);
+      }
       return adminRoute(request, env, deps, path);
   }
 }
