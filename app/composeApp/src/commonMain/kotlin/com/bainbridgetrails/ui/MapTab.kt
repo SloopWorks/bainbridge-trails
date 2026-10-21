@@ -293,6 +293,8 @@ fun MapTab(
     var riddlePickFor by remember { mutableStateOf<String?>(null) }
     var riddleListFor by remember { mutableStateOf<String?>(null) }
     var riddleWrong by remember(playSelected) { mutableStateOf(false) }
+    // Each wrong answer bumps this: the EncounterSheet's lantern shake + reject haptic (ux.md §3.5.4; reset per selection).
+    var riddleShake by remember(playSelected) { mutableStateOf(0) }
     // Play gate (engine PF-9, plan L2-2): Play off → no FX host, scene, clock, sources or layers are created.
     val fxInputs = fxHostInputs(settings.play, recording, playRegistry)
     val fx = if (fxInputs != null) rememberFxHost(fxInputs, controller) else null
@@ -395,6 +397,7 @@ fun MapTab(
                 }
             }
             riddleWrong = wrong
+            if (wrong) riddleShake++
             playSelected = itemId.let { id -> playMarkers.firstOrNull { it.itemId == id }?.key }
         }
     }
@@ -761,6 +764,8 @@ fun MapTab(
                                 }
                             },
                             minShare = item?.resolve?.minShare ?: 0.6,
+                            announce = remember(fx) { fx?.announcer?.let { a -> { text: String -> a.say(text) } } },
+                            shake = riddleShake,
                             riddle = if (m.variant == EncounterVariant.RIDDLE && item != null && playState != null) {
                                 {
                                     val claimed = playMarkers.firstOrNull { it.key == m.key }?.found == true

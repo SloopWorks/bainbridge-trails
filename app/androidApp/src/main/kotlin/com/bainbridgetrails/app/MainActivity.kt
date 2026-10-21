@@ -47,8 +47,10 @@ class MainActivity : ComponentActivity() {
             DebugLaunch.playConfig = it.getString(PLAY_CONFIG_EXTRA)
         }
         val options = extras?.keySet()?.minus(NON_SPIKE_EXTRAS)?.associateWith { extras.getString(it).orEmpty() }.orEmpty()
-        // No options = normal launch (tab shell). Any option = spike launch (scripts): screen/style/camera.
-        val launch = if (options.isEmpty()) null else SpikeLaunch.parse(options)
+        // No options = normal launch (tab shell). `--es screen settings|me|logbook|…` = tab shell opened on that screen
+        // (DebugLaunch, as iOS -btScreen). Any other option = spike launch (scripts): screen=record|style|showcase|fx, style, camera.
+        val shellScreen = DebugLaunch.applyShellOptions(options)
+        val launch = if (options.isEmpty() || shellScreen) null else SpikeLaunch.parse(options)
         AuthConfig.googleWebClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
         DebugTools.install(this) // debug: drawer + log/analytics/backend wiring + dev sign-in; release: nothing
         DebugTools.onActivityCreated(this) // debug + Local backend: local-network permission (Android 17+)

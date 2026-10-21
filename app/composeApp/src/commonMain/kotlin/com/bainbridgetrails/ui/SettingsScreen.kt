@@ -303,8 +303,10 @@ private fun LazyListScope.playSection(
     onReplayWake: (() -> Unit)?,
     onPlayClock: (() -> Unit)?,
 ) {
+    // The switch shows in every dataset and build type; only the debug clock row is build-gated (DebugPlayClock).
+    val revealed = playSettingsRows(enabled = true, replay = onReplayWake != null, debugClock = onPlayClock != null)
     item(key = "play-h") { Group(stringResource(Res.string.play_settings_section)) }
-    item(key = "play-toggle") {
+    if (PlaySettingsRow.TOGGLE in playSettingsRows(play.enabled, replay = false, debugClock = false)) item(key = "play-toggle") {
         val st by toggle.state.collectAsStateWithLifecycle()
         SettingSwitchRow(
             stringResource(Res.string.play_settings_toggle),
@@ -321,16 +323,34 @@ private fun LazyListScope.playSection(
             exit = if (reduced) ExitTransition.None else shrinkVertically(tween(BtDuration.short4)),
         ) {
             Column {
-                SettingSwitchRow(stringResource(Res.string.play_settings_sounds), play.sounds, onSounds, description = stringResource(Res.string.play_settings_sounds_body))
-                SettingSwitchRow(stringResource(Res.string.play_settings_ambient), play.ambient, onAmbient, description = stringResource(Res.string.play_settings_ambient_body))
-                NavRow(stringResource(Res.string.play_settings_ranks), onRanks)
-                NavRow(stringResource(Res.string.play_settings_logbook), onLogbook)
-                NavRow(stringResource(Res.string.play_settings_about), onAbout)
-                if (onReplayWake != null) NavRow(stringResource(Res.string.play_settings_replay), onReplayWake, trailingIcon = null)
-                if (onPlayClock != null) NavRow(stringResource(Res.string.play_settings_clock_debug), onPlayClock)
+                for (row in revealed) when (row) {
+                    PlaySettingsRow.TOGGLE -> Unit
+                    PlaySettingsRow.SOUNDS -> SettingSwitchRow(stringResource(Res.string.play_settings_sounds), play.sounds, onSounds, description = stringResource(Res.string.play_settings_sounds_body))
+                    PlaySettingsRow.AMBIENT -> SettingSwitchRow(stringResource(Res.string.play_settings_ambient), play.ambient, onAmbient, description = stringResource(Res.string.play_settings_ambient_body))
+                    PlaySettingsRow.RANKS -> NavRow(stringResource(Res.string.play_settings_ranks), onRanks)
+                    PlaySettingsRow.LOGBOOK -> NavRow(stringResource(Res.string.play_settings_logbook), onLogbook)
+                    PlaySettingsRow.ABOUT -> NavRow(stringResource(Res.string.play_settings_about), onAbout)
+                    PlaySettingsRow.REPLAY -> onReplayWake?.let { NavRow(stringResource(Res.string.play_settings_replay), it, trailingIcon = null) }
+                    PlaySettingsRow.DEBUG_CLOCK -> onPlayClock?.let { NavRow(stringResource(Res.string.play_settings_clock_debug), it) }
+                }
             }
         }
     }
+}
+
+/** Settings › Play rows (ux.md § 3.1), in order. */
+internal enum class PlaySettingsRow { TOGGLE, SOUNDS, AMBIENT, RANKS, LOGBOOK, ABOUT, REPLAY, DEBUG_CLOCK }
+
+/**
+ * The Play section's rows: the switch always (every dataset, debug and release); with Play on the Play rows, the
+ * replay row unless the quiet day hides it ([replay]) and the clock row on debug builds only ([debugClock]).
+ */
+internal fun playSettingsRows(enabled: Boolean, replay: Boolean, debugClock: Boolean): List<PlaySettingsRow> = buildList {
+    add(PlaySettingsRow.TOGGLE)
+    if (!enabled) return@buildList
+    addAll(listOf(PlaySettingsRow.SOUNDS, PlaySettingsRow.AMBIENT, PlaySettingsRow.RANKS, PlaySettingsRow.LOGBOOK, PlaySettingsRow.ABOUT))
+    if (replay) add(PlaySettingsRow.REPLAY)
+    if (debugClock) add(PlaySettingsRow.DEBUG_CLOCK)
 }
 
 @Composable

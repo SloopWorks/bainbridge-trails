@@ -631,7 +631,8 @@ private fun RecordingSheet(
             }
         }
         // Section header: tap to expand the sheet (peek shows the top two rows).
-        val canExpand = rows.size > 2
+        // Nearby (ux.md §3.8) lives in the expanded sheet only, so a short list with Nearby can still expand.
+        val canExpand = rows.size > 2 || nearby != null
         Row(
             Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 .then(if (canExpand) Modifier.clickable { expanded = !expanded } else Modifier)
@@ -662,7 +663,7 @@ private fun RecordingSheet(
                 }
             }
             // Play Nearby (ux.md §3.8): after the pure live list, expanded sheet only.
-            if (expanded || rows.size <= 2) nearby?.invoke()
+            if (expanded) nearby?.invoke()
         }
         PrimaryButton(
             stringResource(Res.string.record_finish),

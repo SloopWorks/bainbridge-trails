@@ -25,6 +25,26 @@ object DebugLaunch {
     var playTide: String? = null
     var playConfig: String? = null
 
+    /** Android spike screens (`--es screen record|style|showcase|fx`, SpikeLaunch); any other `screen` is a tab-shell screen. */
+    private val SPIKE_SCREENS = setOf("record", "style", "showcase", "fx")
+
+    /**
+     * Android debug `--es screen settings` (and the other [screen] names): the tab-shell screen to open, or null for a
+     * spike screen / no `screen`. Without this every `screen` extra opened a spike (unknown names: the Record spike).
+     */
+    fun shellScreen(options: Map<String, String>): String? =
+        options["screen"]?.trim()?.takeIf { it.isNotEmpty() && it.lowercase() !in SPIKE_SCREENS }
+
+    /** Android: binds a tab-shell launch (`screen`, `scroll`, `page`, `devSignIn`); true when [options] named one. */
+    fun applyShellOptions(options: Map<String, String>): Boolean {
+        val shell = shellScreen(options) ?: return false
+        screen = shell
+        scroll = options["scroll"]?.toIntOrNull() ?: 0
+        page = options["page"]?.toIntOrNull() ?: 0
+        devSignIn = options["devSignIn"].let { it == "1" || it.equals("true", ignoreCase = true) }
+        return true
+    }
+
     /** `2026-10-29T14:00` read as island time (America/Los_Angeles); null when absent or unparseable. */
     fun parsePlayClock(text: String?): Instant? = PlayClock.parseIsland(text)
 

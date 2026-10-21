@@ -28,4 +28,14 @@ class DebugLaunchTest {
         assertEquals(PlayTideOverride.NONE, DebugLaunch.parsePlayTide("sideways"))
         assertEquals(PlayTideOverride.NONE, DebugLaunch.parsePlayTide(null))
     }
+
+    /** Android `--es screen settings`: a tab-shell screen, not a spike (it used to fall through to the Record spike). */
+    @Test
+    fun shellScreenOptionsAreNotSpikes() {
+        assertEquals("settings", DebugLaunch.shellScreen(mapOf("screen" to "settings")))
+        assertEquals("trail:t-1", DebugLaunch.shellScreen(mapOf("screen" to "trail:t-1", "playClock" to "x")))
+        for (spike in listOf("record", "style", "showcase", "fx", "FX")) assertNull(DebugLaunch.shellScreen(mapOf("screen" to spike)))
+        assertNull(DebugLaunch.shellScreen(mapOf("style" to "DARK")))
+        assertNull(DebugLaunch.shellScreen(emptyMap()))
+    }
 }
