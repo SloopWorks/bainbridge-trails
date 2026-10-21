@@ -286,14 +286,14 @@ object PlayClaims {
         claims: List<Claim>,
         walkingDay: LocalDate?,
         foundPerDay: Int,
-        title: (itemId: String) -> String,
+        title: (claim: Claim) -> String,
         newId: () -> String,
     ): PlayState {
         var lb = state.logbook
         for (c in claims) {
             val date = com.bainbridgetrails.play.time.IslandTime.dateOf(c.at)
             lb = lb.addFind(
-                LogEntry(newId(), c.kind.logKind, title(c.itemId), LogCopy.why(c.kind.logKind), date, c.marks, walkId = sessionId, contentId = c.key, band = c.band),
+                LogEntry(newId(), c.kind.logKind, title(c), LogCopy.why(c.kind.logKind), date, c.marks, walkId = sessionId, contentId = c.key, band = c.band),
                 foundPerDay,
             )
         }
@@ -310,7 +310,7 @@ object PlayClaims {
     fun cappedKeys(state: PlayState, sessionId: String, claims: List<Claim>, foundPerDay: Int): Set<String> {
         val before = state.logbook.entries.size
         var n = 0
-        val after = record(state, sessionId, claims, null, foundPerDay, { it }, { "capped-probe-${n++}" }).logbook.entries
+        val after = record(state, sessionId, claims, null, foundPerDay, { it.itemId }, { "capped-probe-${n++}" }).logbook.entries
         val keys = claims.mapTo(HashSet()) { it.key }
         return after.drop(before).filter { it.capped && it.contentId in keys }.mapNotNullTo(LinkedHashSet()) { it.contentId }
     }

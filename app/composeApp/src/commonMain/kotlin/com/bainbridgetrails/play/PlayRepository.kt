@@ -6,6 +6,7 @@ import com.bainbridgetrails.net.ApiClient
 import com.bainbridgetrails.net.ApiResult
 import com.bainbridgetrails.net.PlayChallengesDto
 import com.bainbridgetrails.net.PlayLogDto
+import com.bainbridgetrails.play.claim.Claim
 import com.bainbridgetrails.play.claim.ClaimEvaluator
 import com.bainbridgetrails.play.claim.ClaimKind
 import com.bainbridgetrails.play.claim.ClaimResult
@@ -379,7 +380,7 @@ class PlayRepository(
             val result = ev.evaluate(kept, plans, user.found, user.hints, _sensed.value, summary.droppedVehicle, walkEnd, completed, earlier)
             val endDate = IslandTime.dateOf(walkEnd)
             val day = endDate.takeIf { Marks.isWalkingDay(to - from, summary.matchedM) && !user.logbook.hasDay(it) }
-            Pass(config, result, day, user.hints, WalkDone(sessionId, to, completed).takeIf { completed > 0 })
+            Pass(config, result, day, user.hints, WalkDone(sessionId, to, completed).takeIf { completed > 0 }, plans)
         } ?: return null
         val claimed = pass.result.claims
         if (claimed.isNotEmpty() || pass.day != null) {
@@ -390,8 +391,17 @@ class PlayRepository(
             // Queue first: a crash before the Logbook write re-runs the pass, which merges into the same element.
             val expired = queue.add(PlayClaims.element(sessionId, pass.config.version, claimed, pass.day?.let { IslandTime.weekId(it) }, hints, capped))
             val items = pass.config.items.associateBy { it.id }
+            // F11: a treasure title is a template ("{tier} on {place}"); fill it from the placement before persisting.
+            val placements = pass.plans.flatMap { p -> p.occurrences.flatMap { o -> o.placements } }.associateBy { it.key }
+            val names = walkContext().names
+            fun title(c: Claim): String {
+                val template = items[c.itemId]?.copy?.title ?: return c.itemId
+                if (!template.contains('{')) return template
+                val pl = placements[c.key]
+                return LogCopy.fillTitle(template, pl?.tier?.let { LogCopy.tier(it.name) }, pl?.featureId?.let { names[it] })
+            }
             store.update { st ->
-                val next = PlayClaims.record(st, sessionId, claimed, pass.day, foundPerDay, { items[it]?.copy?.title ?: it }, newId)
+                val next = PlayClaims.record(st, sessionId, claimed, pass.day, foundPerDay, ::title, newId)
                 next.copy(logbook = PlayClaims.settle(next.logbook, expired), walks = withWalk(next.walks, pass.walk))
             }
             AppLog.i(TAG, "walk claimed ${claimed.size} items${if (pass.day != null) " + walking day" else ""} (pending)")
@@ -402,7 +412,7 @@ class PlayRepository(
         return pass.result
     }
 
-    private class Pass(val config: PlayConfig, val result: ClaimResult, val day: LocalDate?, val hints: Map<String, Int>, val walk: WalkDone?)
+    private class Pass(val config: PlayConfig, val result: ClaimResult, val day: LocalDate?, val hints: Map<String, Int>, val walk: WalkDone?, val plans: List<DayPlan> = emptyList())
 
     /** [walks] with [walk] (replacing the same walk's record), minus records older than [WalkDone.KEEP_MS] before it. */
     private fun withWalk(walks: List<WalkDone>, walk: WalkDone?): List<WalkDone> {

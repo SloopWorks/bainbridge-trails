@@ -49,4 +49,12 @@ class LogCopyTest {
         val lb = StartBalance.onEnable(Logbook(emptyList()), WalkDerived(10, 0, 0), kotlinx.datetime.LocalDate(2027, 1, 4)) { "a" }
         assertEquals("Your walks so far", lb.entries.single().what)
     }
+
+    @Test
+    fun `treasure title template is filled from tier and place`() {
+        // e2e run-2 F11: the raw "{tier} on {place}" reached the Logbook.
+        assertEquals("Agate on Northeast Morgan Road", LogCopy.fillTitle("{tier} on {place}", LogCopy.tier("agate"), "Northeast Morgan Road"))
+        assertEquals("Treasure on the island", LogCopy.fillTitle("{tier} on {place}", null, null))
+        assertEquals("Ship’s bell", LogCopy.tier("ships_bell"))
+    }
 }

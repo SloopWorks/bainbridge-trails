@@ -184,7 +184,7 @@ class PlayClaimQueueTest {
         val at = Instant.parse("2026-10-27T20:00:00Z")
         val claims = listOf("a@2026-10-26#0", "b@2026-10-26#1").map { Claim(it, it.substringBefore('@'), ClaimKind.treasure, LocalDate(2026, 10, 26), 60, null, at) }
         var n = 0
-        val st = PlayClaims.record(PlayState(), "s1", claims, null, 400, { it }) { "e${++n}" }
+        val st = PlayClaims.record(PlayState(), "s1", claims, null, 400, { it.itemId }) { "e${++n}" }
         val lb = PlayClaims.settle(st.logbook, settled)
         val a = lb.entries.single { it.contentId == "a@2026-10-26#0" }
         assertEquals(Triple(BoardState.accepted, 0, true), Triple(a.board, a.marks, a.capped))
@@ -214,12 +214,12 @@ class PlayClaimQueueTest {
         )
         var n = 0
         val tue = LocalDate(2026, 10, 27)
-        val once = PlayClaims.record(PlayState(), "s1", claims, tue, 400, { "title $it" }) { "e${++n}" }
+        val once = PlayClaims.record(PlayState(), "s1", claims, tue, 400, { "title ${it.itemId}" }) { "e${++n}" }
         assertEquals(listOf(LogKind.treasure, LogKind.ink, LogKind.day), once.logbook.entries.map { it.kind })
         assertTrue(once.logbook.entries.all { it.board == BoardState.pending && it.walkId == "s1" && it.date == tue })
         assertEquals(155, once.logbook.total)
         assertEquals(claims.map { it.key }.toSet(), once.found)
-        assertEquals(once, PlayClaims.record(once, "s1", claims, tue, 400, { "title $it" }) { "e${++n}" }.copy(found = once.found), "idempotent")
+        assertEquals(once, PlayClaims.record(once, "s1", claims, tue, 400, { "title ${it.itemId}" }) { "e${++n}" }.copy(found = once.found), "idempotent")
 
         val el = PlayClaims.element("s1", "2026.11.0", claims, IslandTimeWeek.of(tue), null)
         assertEquals(listOf(claim("treasure-weekly-roads@2026-10-26#07"), PlayClaimDto("kraken-roads@2026-10-29#0", "ink", week, 95)), el.claims)

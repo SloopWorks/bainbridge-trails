@@ -12,6 +12,21 @@ data class LogLine(val what: String?, val why: String)
  * reads the same (`LogCopyTest` pins them). [catchUp] is the second `coverage` line (walks while Play was off).
  */
 object LogCopy {
+    /** Treasure tier labels for persisted Logbook titles (same words as `play_tier_*`). */
+    fun tier(name: String): String = when (name) {
+        "sea_glass" -> "Sea glass"
+        "agate" -> "Agate"
+        "glass_float" -> "Glass float"
+        "ships_bell" -> "Ship’s bell"
+        else -> name.replace('_', ' ').replaceFirstChar { it.uppercase() }
+    }
+
+    /** Fills a pack title template (`{tier} on {place}`) for a persisted entry; unknown parts fall back to the template's words. */
+    fun fillTitle(template: String, tier: String?, place: String?): String = template
+        .replace("{tier}", tier ?: "Treasure")
+        .replace("{place}", place ?: "the island")
+        .trim()
+
     private val BY_KIND: Map<LogKind, LogLine> = mapOf(
         // Walk-derived (W-*), written on the phone.
         LogKind.coverage to LogLine("New ground", "New coverage on this walk"),

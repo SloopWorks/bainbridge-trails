@@ -25,6 +25,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -529,7 +530,8 @@ private fun TopControls(
             )
         }
         Row(
-            Modifier.align(Alignment.TopCenter).padding(horizontal = 56.dp).heightIn(min = 48.dp),
+            // One line always (e2e F12: the narrower iOS width wrapped "1 find" letter by letter); scrolls when crowded.
+            Modifier.align(Alignment.TopCenter).padding(horizontal = 56.dp).heightIn(min = 48.dp).horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) { chips() }

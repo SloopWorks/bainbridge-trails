@@ -107,7 +107,7 @@ fun StateChip(text: String, modifier: Modifier = Modifier, icon: DrawableResourc
     ) {
         leading?.invoke()
         if (icon != null) BtIcon(icon, null, size = 18.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, softWrap = false)
     }
 }
 
