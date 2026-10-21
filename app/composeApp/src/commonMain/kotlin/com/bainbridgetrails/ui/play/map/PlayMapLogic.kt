@@ -95,18 +95,32 @@ sealed interface MapTapAction {
 }
 
 /**
- * MapTab tap order with Play on (ux.md §3.5.4, PD-12, product PF3-5): the pure `TappableTrailLayerIds` query first; a
- * hit is a trail tap whatever Play draws there (an inked kraken stretch included). Only a miss queries `fx-marker-hit`:
- * a pin opens its EncounterSheet, a cluster zooms to z14, nothing clears.
+ * MapTab tap order with Play on (ux.md §3.5.4, PD-12 refined by PD-25, product PF3-5): a tap point inside a Play
+ * marker's own 48 dp figure rect (`fx-marker-hit` queried at the point: pins, the kraken coast label, cluster discs)
+ * is that marker's, whatever line runs underneath. Otherwise the pure `TappableTrailLayerIds` query decides: a hit is a
+ * trail tap whatever Play draws there (an inked kraken stretch included), and only a miss queries `fx-marker-hit` over
+ * the tap rect: a pin opens its EncounterSheet, a cluster zooms to z14, nothing clears.
  */
 object MapTapLogic {
     const val CLUSTER_ZOOM = 14.0
 
-    /** Whether MapTab queries the Play hit layer at all for this tap. */
+    /** Whether MapTab queries the Play hit layer at the tap point (inside a figure rect, PD-25): whenever Play is on. */
+    fun queriesFigure(playOn: Boolean): Boolean = playOn
+
+    /** Whether MapTab queries the Play hit layer over the tap rect (a near miss): only when the pure query missed. */
     fun queriesPlay(pure: TapResult, playOn: Boolean): Boolean = playOn && pure is TapResult.None
 
-    fun decide(pure: TapResult, play: List<PlayHit>): MapTapAction {
+    /**
+     * [inFigure] = Play hits whose figure rect contains the tap point (they win, PD-25); [play] = hits over the tap rect,
+     * used only on a pure miss.
+     */
+    fun decide(pure: TapResult, play: List<PlayHit>, inFigure: List<PlayHit> = emptyList()): MapTapAction {
+        if (inFigure.isNotEmpty()) return pick(inFigure)
         if (pure !is TapResult.None) return MapTapAction.Trail(pure)
+        return pick(play)
+    }
+
+    private fun pick(play: List<PlayHit>): MapTapAction {
         play.filterIsInstance<PlayHit.Cluster>().firstOrNull()?.let { return MapTapAction.ZoomTo(it.lon, it.lat, CLUSTER_ZOOM) }
         val pin = play.filterIsInstance<PlayHit.Pin>().minByOrNull { it.kind.ordinal } ?: return MapTapAction.Clear
         return MapTapAction.OpenEncounter(pin.key)

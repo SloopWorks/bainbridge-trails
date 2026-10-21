@@ -43,3 +43,33 @@ fun Modifier.fxPlacedAt(
         .graphicsLayer { alpha = ctx.gestureAlpha() }
         .clearAndSetSemantics {}
 }
+
+/**
+ * Overlay part sizing (e2e run 1 F2): a part is a box placed in geographic units, and Compose constraints cannot
+ * represent a side much past 2^18 px (iOS aborted on an 89 917 px kraken rig whose water point lay kilometres from the
+ * stretch it gripped). Every variable-size part goes through [partDp]: its side is clamped to [MAX_PX] (drawing is not
+ * clipped to the box, so a clamped part still draws whole), and a part more than [SKIP_FACTOR] × that is not composed
+ * at all: its Layer-tier part (the ink casing) is the whole effect there.
+ */
+object FxOverlayExtent {
+    /** Largest overlay part side, px. */
+    const val MAX_PX = 4096f
+
+    /** A part wanting more than `MAX_PX × SKIP_FACTOR` px (several viewports) is skipped, not shrunk. */
+    const val SKIP_FACTOR = 4f
+
+    private const val ISLAND_LAT = 47.63
+
+    /** Side, px, of a part [metres] across at [zoom] (at [lat], [density] px per dp), clamped to [MAX_PX]. */
+    fun overlayExtentPx(zoom: Double, metres: Double, lat: Double = ISLAND_LAT, density: Float = 1f): Float {
+        val px = (FxProjection.metresToDp(metres, lat, zoom) * density).toFloat()
+        return if (px.isFinite()) px.coerceIn(0f, MAX_PX) else MAX_PX
+    }
+
+    /** The side (dp) to compose for a part wanting [dp] at [density]; null = skip the part (Layer tier only). */
+    fun partDp(dp: Float, density: Float): Float? {
+        val px = dp * density
+        if (!px.isFinite() || px > MAX_PX * SKIP_FACTOR) return null
+        return if (px <= MAX_PX) dp else MAX_PX / density
+    }
+}

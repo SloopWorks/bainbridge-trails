@@ -50,6 +50,13 @@ data class PlayOverrides(
 interface PlayClock {
     fun now(): Instant
 
+    /**
+     * Play time minus system time, ms: 0 for [SystemPlayClock] and a debug clock on [PlayClockMode.Real]. Recording fixes
+     * and walk summaries carry system time; Play converts them (`timeMs + offsetMs`) before sensing and claiming, so a
+     * time-travelled walk is judged at Play time (e2e run 1 F1).
+     */
+    val offsetMs: Long
+
     /** Changes when a debug override changes (time travel, tide, config source); constant for [SystemPlayClock]. */
     val overrides: StateFlow<PlayOverrides>
 
@@ -70,6 +77,7 @@ interface PlayClock {
 object SystemPlayClock : PlayClock {
     private val none = MutableStateFlow(PlayOverrides()).asStateFlow()
     override fun now(): Instant = Clock.System.now()
+    override val offsetMs: Long get() = 0L
     override val overrides: StateFlow<PlayOverrides> get() = none
 }
 
@@ -89,6 +97,13 @@ class DebugPlayClock(
         is PlayClockMode.Fixed -> m.at
         is PlayClockMode.Offset -> system() + m.ms.milliseconds
     }
+
+    override val offsetMs: Long
+        get() = when (val m = _overrides.value.mode) {
+            PlayClockMode.Real -> 0L
+            is PlayClockMode.Fixed -> (m.at - system()).inWholeMilliseconds
+            is PlayClockMode.Offset -> m.ms
+        }
 
     fun set(mode: PlayClockMode) = _overrides.update { it.copy(mode = mode) }
 

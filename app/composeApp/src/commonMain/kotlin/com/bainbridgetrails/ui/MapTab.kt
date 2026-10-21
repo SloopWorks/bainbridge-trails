@@ -163,6 +163,7 @@ import com.bainbridgetrails.resources.play_kraken_coast
 import com.bainbridgetrails.ui.play.components.rememberPlay
 import com.bainbridgetrails.ui.play.components.titleRes
 import com.bainbridgetrails.ui.play.map.ChallengesChip
+import com.bainbridgetrails.ui.play.map.Coast
 import com.bainbridgetrails.ui.play.map.EncounterLogic
 import com.bainbridgetrails.ui.play.map.EncounterModel
 import com.bainbridgetrails.ui.play.map.EncounterSheet
@@ -170,6 +171,7 @@ import com.bainbridgetrails.ui.play.map.EncounterVariant
 import com.bainbridgetrails.ui.play.map.MapTapAction
 import com.bainbridgetrails.ui.play.map.MapTapLogic
 import com.bainbridgetrails.ui.play.map.MarkerKind
+import com.bainbridgetrails.ui.play.map.PlayHit
 import com.bainbridgetrails.ui.play.map.PlayHud
 import com.bainbridgetrails.ui.play.map.PlayLegendGroup
 import com.bainbridgetrails.ui.play.map.PlayMapSync
@@ -185,6 +187,7 @@ import com.bainbridgetrails.ui.play.map.RiddlePickBar
 import com.bainbridgetrails.ui.play.map.WalkTarget
 import com.bainbridgetrails.ui.play.map.playLiveRegistry
 import com.bainbridgetrails.ui.play.map.rememberFerryTimetable
+import com.bainbridgetrails.ui.play.map.PlayMapEffects
 import com.bainbridgetrails.ui.play.map.PlayMapEffectsSync
 import com.bainbridgetrails.ui.play.map.PlayMapFocus
 import com.bainbridgetrails.ui.play.map.PlayFocusLogic
@@ -234,6 +237,9 @@ private const val LOCATE_TIMEOUT_MS = 12_000L
 
 /** A road-end pin wins a tap within this distance (docs/roads/ux.md §2.6). */
 private const val ROAD_END_TAP_DP = 16.0
+
+/** Half-side of the point probe for Play figure rects (PD-25): the tap point itself, not the 44 dp tap rect. */
+private const val FIGURE_PROBE_DP = 1
 
 /**
  * Map tab (ux.md §3.2, §6; product F2): full-bleed map with per-segment status layers, tap → peek / chooser sheet,
@@ -288,15 +294,17 @@ fun MapTab(
     val ferry = rememberFerryTimetable(play)
     // One renderer per kind (KrakenAttack carries the ink casing, FrogRock the stamp + hop); rebuilt only with the timetable.
     val playRegistry = remember(playMarkerArt, ferry) { playMarkerArt?.let { art -> playLiveRegistry(art, ferry) { AppGraph.playClock.now() } } }
-    val playMarkers = remember(playAgenda, playState?.solved, playConfig, data) {
+    // The coastline places each kraken water point in the water (F6); read only while Play is on.
+    val playCoast = if (playOn) produceState<Coast?>(null) { value = PlayMapEffects.loadCoast() }.value else null
+    val playMarkers = remember(playAgenda, playState?.solved, playConfig, data, playCoast) {
         if (playAgenda == null || playConfig == null) emptyList()
         else PlayMarkerLogic.markers(
             playAgenda, playConfig.items.associate { it.id to it.lore }, playState?.solved?.keys.orEmpty(),
             // The kraken marker sits on its attack's water point (the lurk / pool anchor, ux.md §2.2).
             water = data?.let { d ->
-                com.bainbridgetrails.ui.play.map.PlayMapEffects.waterPoints(playAgenda) { id ->
+                PlayMapEffects.waterPoints(playAgenda, { id ->
                     d.dataset.segmentsById[id]?.coords?.map { GeoPoint(lon = it[0], lat = it[1]) }
-                }
+                }, playCoast)
             }.orEmpty(),
         )
     }
@@ -463,17 +471,22 @@ fun MapTab(
                 answerRiddle(id, RiddlePick(featureIds = hits.flatMap { it.trailIds }.distinct(), at = GeoPoint(lat = tapGeo.latitude, lon = tapGeo.longitude)))
                 return@launch
             }
-            // Play only on a pure miss (PF3-5, PD-12): `fx-marker-hit`, never a casing or a stamp.
-            val playHits = if (MapTapLogic.queriesPlay(r, fx != null)) {
-                runCatching { map.queryRenderedFeatures(rect, PlayMarkers.hitLayerIds.toSet()) }.getOrDefault(emptyList()).mapNotNull { f ->
+            // `fx-marker-hit` only, never a casing or a stamp.
+            suspend fun playHitsIn(area: DpRect): List<PlayHit> =
+                runCatching { map.queryRenderedFeatures(area, PlayMarkers.hitLayerIds.toSet()) }.getOrDefault(emptyList()).mapNotNull { f ->
                     val props = f.properties?.mapValues { (it.value as? JsonPrimitive)?.content ?: it.value.toString() } ?: return@mapNotNull null
                     val visible = if (props["c"] == "1") zoom < 13.0 else (props["z"]?.toDoubleOrNull() ?: 0.0) <= zoom
                     if (visible) MapTapLogic.hitOf(props) else null
                 }
+            // PD-25: the tap point inside a marker's own 48 dp figure rect is the marker's, whatever line runs under it.
+            val figureHits = if (MapTapLogic.queriesFigure(fx != null)) {
+                playHitsIn(DpRect(o.x - FIGURE_PROBE_DP.dp, o.y - FIGURE_PROBE_DP.dp, o.x + FIGURE_PROBE_DP.dp, o.y + FIGURE_PROBE_DP.dp))
             } else {
                 emptyList()
             }
-            when (val action = MapTapLogic.decide(r, playHits)) {
+            // The tap rect only on a pure miss (PF3-5, PD-12): a near-miss pin still gets the tap.
+            val playHits = if (figureHits.isEmpty() && MapTapLogic.queriesPlay(r, fx != null)) playHitsIn(rect) else emptyList()
+            when (val action = MapTapLogic.decide(r, playHits, figureHits)) {
                 is MapTapAction.OpenEncounter -> {
                     clearSelection()
                     playSelected = action.key

@@ -60,6 +60,8 @@ class TrackerSensingSink(
     private val plan: () -> DayPlan?,
     private val found: () -> Set<String>,
     private val hints: () -> Map<String, Int>,
+    /** [PlayClock.offsetMs]: fixes are sensed at Play time, so a time-travelled walk senses what the map shows. */
+    private val offsetMs: () -> Long = { 0L },
 ) : SensingSink {
     @Volatile private var tracker: SensingTracker? = null
     private var trackerFor: ClaimEvaluator? = null
@@ -71,7 +73,7 @@ class TrackerSensingSink(
             tracker = it
             trackerFor = ev
         }
-        val claims = t.onFix(fix.toGated(), day) // fed every fix: the speed rule needs the trailing 60 s
+        val claims = t.onFix(fix.toGated(offsetMs()), day) // fed every fix: the speed rule needs the trailing 60 s
         if (claims.isEmpty() || targets.isEmpty()) return emptyList()
         val byKey = HashMap<String, Pair<ActiveItem, ResolvedPlacement?>>()
         for (a in targets) {
@@ -90,14 +92,17 @@ class TrackerSensingSink(
     }
 }
 
-/** A recording fix as `:play` sees it (no `:coverage` dependency there). */
-fun Fix.toGated(): GatedFix = GatedFix(timeMs, lat, lon, accuracyM, isMock)
+/**
+ * A recording fix as `:play` sees it (no `:coverage` dependency there), at Play time: [offsetMs] is the clock's
+ * [PlayClock.offsetMs] (0 in release, so the time is the fix's own).
+ */
+fun Fix.toGated(offsetMs: Long = 0L): GatedFix = GatedFix(timeMs + offsetMs, lat, lon, accuracyM, isMock)
 
-/** The Finalizer's walk summary as `:play` sees it. */
-fun SessionSummary.toGated(): GatedSummary = GatedSummary(
+/** The Finalizer's walk summary as `:play` sees it, its start and end at Play time (see [Fix.toGated]); unset stays 0. */
+fun SessionSummary.toGated(offsetMs: Long = 0L): GatedSummary = GatedSummary(
     sessionId = sessionId,
-    startedAtMs = startedAt,
-    endedAtMs = endedAt,
+    startedAtMs = if (startedAt > 0) startedAt + offsetMs else 0L,
+    endedAtMs = if (endedAt > 0) endedAt + offsetMs else 0L,
     distanceM = distanceM,
     matchedM = matchedM,
     newlyCompleted = newlyCompleted,

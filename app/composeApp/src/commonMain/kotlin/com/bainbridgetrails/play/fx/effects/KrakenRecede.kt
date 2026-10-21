@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.map.StatusLayerSpec
@@ -18,6 +19,7 @@ import com.bainbridgetrails.play.fx.FxLayerContext
 import com.bainbridgetrails.play.fx.FxLayerIds
 import com.bainbridgetrails.play.fx.FxLive
 import com.bainbridgetrails.play.fx.FxOverlayContext
+import com.bainbridgetrails.play.fx.FxOverlayExtent
 import com.bainbridgetrails.play.fx.FxPriority
 import com.bainbridgetrails.play.fx.FxProjection
 import com.bainbridgetrails.play.fx.FxRenderer
@@ -128,7 +130,9 @@ object KrakenRecede : FxRenderer {
         if (path.size < 2) return
         val anchor = path.first()
         val targets = remember(path) { path.drop(1) }
-        val extent = remember(anchor, targets) { KrakenAttack.extentDp(anchor, targets, zoom = 18.0) }
+        val density = LocalDensity.current.density
+        // F2: clamped to FxOverlayExtent.MAX_PX; a rig kilometres across is Layer-tier only.
+        val extent = remember(anchor, targets, density) { FxOverlayExtent.partDp(KrakenAttack.extentDp(anchor, targets, zoom = 18.0), density) } ?: return
         val ring = BtTheme.colors.waterLine
         val p = ctx.palette
         val rig = remember(spec.seed) { TentacleArt(count = 3, seed = spec.seed) }

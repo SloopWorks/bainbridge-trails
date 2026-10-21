@@ -124,6 +124,7 @@ class PlayRepository(
         plan = { _today.value },
         found = { store.state.value.found },
         hints = { store.state.value.hints },
+        offsetMs = { clock().offsetMs },
     )
 
     private val _agenda = MutableStateFlow<PlayAgenda?>(null)
@@ -180,8 +181,11 @@ class PlayRepository(
     val gatedHook: suspend (sessionId: String, kept: List<Fix>, summary: SessionSummary) -> Unit = { id, kept, summary ->
         if (running && content.state.value?.config?.kill?.all != true) {
             liveSink.onGated(id, kept, summary)
-            claimWalk(id, kept.map { it.toGated() }, summary.toGated())
-            recordWalkMarks(id, kept.map { GeoPoint(lat = it.lat, lon = it.lon) }, summary.newlyCompleted, summary.endedAt)
+            // Play time (F1): one offset for the whole walk, so its fixes, day plans and Logbook date agree.
+            val offset = clock().offsetMs
+            val gated = summary.toGated(offset)
+            claimWalk(id, kept.map { it.toGated(offset) }, gated)
+            recordWalkMarks(id, kept.map { GeoPoint(lat = it.lat, lon = it.lon) }, summary.newlyCompleted, gated.endedAtMs)
         }
     }
 

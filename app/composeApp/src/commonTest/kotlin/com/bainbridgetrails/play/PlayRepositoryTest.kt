@@ -12,7 +12,14 @@ import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.WalkDerived
 import com.bainbridgetrails.play.schedule.ActiveItem
 import com.bainbridgetrails.play.schedule.DerivedGoal
+import com.bainbridgetrails.play.schedule.FeatureInfo
+import com.bainbridgetrails.play.schedule.FeatureRef
 import com.bainbridgetrails.play.schedule.Gate
+import com.bainbridgetrails.play.schedule.PlaceIndex
+import com.bainbridgetrails.play.schedule.SegRef
+import com.bainbridgetrails.play.schedule.StretchRef
+import com.bainbridgetrails.play.geo.GeoMath
+import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.tracking.SessionSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -57,6 +64,8 @@ class PlayRepositoryTest {
         walkDerived: suspend () -> WalkDerived? = { null },
         claims: PlayClaimQueue? = null,
         quietFeatures: Set<String> = emptySet(),
+        places: PlaceIndex = PlayFixtures.EmptyPlaces,
+        liveSink: SensingSink? = sink,
     ): PlayRepository {
         val d = StandardTestDispatcher(testScheduler)
         val content = PlayContentRepository(
@@ -66,8 +75,8 @@ class PlayRepositoryTest {
         )
         return PlayRepository(
             scope = backgroundScope, goal = Goal.roads, clock = { clock }, content = content,
-            places = { PlayFixtures.EmptyPlaces }, derived = { DerivedGoal.decode(PlayFixtures.read("derived-roads.json")) },
-            store = PlayStateStore("$dir/roads-state.json", d), track = track, sink = sink, compute = d,
+            places = { places }, derived = { DerivedGoal.decode(PlayFixtures.read("derived-roads.json")) },
+            store = PlayStateStore("$dir/roads-state.json", d), track = track, sink = liveSink, compute = d,
             walkDerived = walkDerived, newId = { "id-${ids++}" }, claims = claims,
             walkContext = { WalkContext(quietFeatures = quietFeatures) },
         )
@@ -235,6 +244,90 @@ class PlayRepositoryTest {
         runCurrent()
         assertEquals(3, calls)
         assertEquals(510, r.store.state.value.logbook.entries.single { it.kind == LogKind.start_balance }.marks)
+        r.stop()
+    }
+
+    /** One kraken shore road (K5's first stretch, 1,158 m due north) and nothing else. */
+    private object ManitouPlaces : PlaceIndex {
+        const val ID = "road-manitou-beach-drive-northeast"
+        val start = GeoPoint(lat = 47.6380, lon = -122.5060)
+        val end = GeoMath.offset(start, 0.0, 1_158.0)
+        private val info = FeatureInfo(ID, Goal.roads, category = "residential", public = true, ownership = "public_city", speedMph = 25)
+        private val seg = SegRef.fromLine("rseg-manitou", listOf(start, end), 25, "residential")
+        override fun segments(ref: FeatureRef): List<SegRef> = if (ref == StretchRef(ID) || ref == com.bainbridgetrails.play.schedule.RoadRef(ID)) listOf(seg) else emptyList()
+        override fun point(ref: FeatureRef): GeoPoint? = null
+        override fun feature(id: String): FeatureInfo? = info.takeIf { id == ID }
+        override fun features(goal: Goal): List<FeatureInfo> = if (goal == Goal.roads) listOf(info) else emptyList()
+    }
+
+    /** Fixes every 2 s at 1.3 m/s along Manitou from [startMs] (real recording time), 8 m accuracy. */
+    private fun manitouWalk(startMs: Long): List<Fix> {
+        val n = (1_158.0 / 2.6).toInt()
+        return (0..n).map { i ->
+            val f = i.toDouble() / n
+            val lat = ManitouPlaces.start.lat + f * (ManitouPlaces.end.lat - ManitouPlaces.start.lat)
+            Fix(startMs + i * 2_000L, ManitouPlaces.start.lon, lat, 8.0)
+        }
+    }
+
+    private fun walkSummary(id: String, fixes: List<Fix>) = SessionSummary(
+        sessionId = id, islandBefore = 0.0, islandAfter = 0.0, trails = emptyList(), verified = true, droppedVehicle = 0,
+        droppedSteps = 0, newlyCompleted = emptyList(), startedAt = fixes.first().timeMs, endedAt = fixes.last().timeMs,
+        distanceM = 1_158.0, matchedM = 1_158.0,
+    )
+
+    /**
+     * e2e run 1 F1: the debug clock ticking from Thu 2026-10-29 14:00 while the device is at Wed 2026-10-21 01:00 (night,
+     * before the attack): a walk recorded "now" is evaluated at Play time, so the Finish pass claims the kraken stretch,
+     * live sensing senses it, and the Logbook files it under the Play date.
+     */
+    @Test
+    fun shiftedPlayClockClaimsAWalkRecordedNow() = runTest {
+        system = PlayFixtures.island("2026-10-21T01:00")
+        clock.startAt(PlayFixtures.island("2026-10-29T14:00"))
+        clock.setTide(PlayTideOverride.LOW)
+        val q = PlayClaimQueue("$dir/claims-shift.json", StandardTestDispatcher(testScheduler))
+        val r = repo(claims = q, places = ManitouPlaces, liveSink = null)
+        r.start()
+        runCurrent()
+        assertTrue(r.sensingTargets().any { it.occurrence.itemId == "kraken-roads" }, "the attack is on at Play time")
+
+        val fixes = manitouWalk(system.toEpochMilliseconds())
+        track.value = fixes
+        runCurrent()
+        assertTrue(r.sensed.value.any { it.startsWith("kraken-roads@2026-10-29") }, "live: ${r.sensed.value}")
+
+        r.gatedHook("s1", fixes, walkSummary("s1", fixes))
+        runCurrent()
+        val ink = r.claimResults.value.getValue("s1").claims.single { it.kind == ClaimKind.ink }
+        assertTrue(ink.key.startsWith("kraken-roads@2026-10-29#"), ink.key)
+        val entry = r.store.state.value.logbook.entries.single { it.kind == LogKind.ink }
+        assertEquals(LocalDate(2026, 10, 29), entry.date, "filed under the Play date")
+        r.stop()
+    }
+
+    /** Offset 0 (the release clock, or the debug clock on Real) is a no-op: the same night walk claims nothing. */
+    @Test
+    fun zeroOffsetEvaluatesTheFixesAsRecorded() = runTest {
+        assertEquals(0L, SystemPlayClock.offsetMs)
+        system = PlayFixtures.island("2026-10-21T01:00")
+        clock.set(PlayClockMode.Real)
+        clock.setTide(PlayTideOverride.LOW)
+        assertEquals(0L, clock.offsetMs)
+        val q = PlayClaimQueue("$dir/claims-zero.json", StandardTestDispatcher(testScheduler))
+        val r = repo(claims = q, places = ManitouPlaces, liveSink = null)
+        r.start()
+        runCurrent()
+        val night = manitouWalk(system.toEpochMilliseconds())
+        r.gatedHook("s1", night, walkSummary("s1", night))
+        runCurrent()
+        assertTrue(r.claimResults.value.getValue("s1").claims.none { it.kind == ClaimKind.ink })
+
+        // The same walk really recorded on Thursday afternoon claims at its own time.
+        val thu = manitouWalk(PlayFixtures.island("2026-10-29T14:00").toEpochMilliseconds())
+        r.gatedHook("s2", thu, walkSummary("s2", thu))
+        runCurrent()
+        assertTrue(r.claimResults.value.getValue("s2").claims.any { it.kind == ClaimKind.ink })
         r.stop()
     }
 }

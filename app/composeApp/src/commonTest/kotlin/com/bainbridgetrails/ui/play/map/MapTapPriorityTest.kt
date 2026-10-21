@@ -21,18 +21,41 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
-/** MapTab tap order with Play on (ux.md §3.5.4, PD-12, product PF3-5): the pure trail hit test first, Play only on a miss. */
+/**
+ * MapTab tap order with Play on (ux.md §3.5.4, PD-12 refined by PD-25, product PF3-5): a tap point inside a marker's own
+ * figure rect is the marker's; otherwise the pure trail hit test first, Play only on a miss.
+ */
 class MapTapPriorityTest {
     private val pin = PlayHit.Pin("treasure-weekly-trails@2026-10-26#03", MarkerKind.TREASURE)
 
     @Test
-    fun `trail hit wins over play pin`() {
+    fun `trail hit wins outside the figure`() {
         val pure = TapResult.Select("trail-grand-forest-west")
-        // The Play query is not even made when the pure query hit (PF3-5).
+        // The tap-rect Play query is not even made when the pure query hit (PF3-5); a pin whose 48 dp hit rect only
+        // overlaps the tap rect (the point is outside its figure) does not take the tap from the line.
         assertFalse(MapTapLogic.queriesPlay(pure, playOn = true))
         assertEquals(MapTapAction.Trail(pure), MapTapLogic.decide(pure, listOf(pin)))
+        assertEquals(MapTapAction.Trail(pure), MapTapLogic.decide(pure, listOf(pin), inFigure = emptyList()))
         val choose = TapResult.Choose(listOf("trail-a", "trail-b"))
         assertEquals(MapTapAction.Trail(choose), MapTapLogic.decide(choose, listOf(pin)))
+    }
+
+    /** e2e run 1 F5 (PD-25): the kraken label, the Frog Rock riddle pin and the Grand Forest pins lost taps to the line under them. */
+    @Test
+    fun `pin wins inside its figure`() {
+        assertTrue(MapTapLogic.queriesFigure(playOn = true))
+        assertFalse(MapTapLogic.queriesFigure(playOn = false), "Play off: no fx query at all")
+        val road = TapResult.Select("road-northeast-spargur-loop-road")
+        val riddle = PlayHit.Pin("riddle-frog@always", MarkerKind.RIDDLE)
+        assertEquals(MapTapAction.OpenEncounter(riddle.key), MapTapLogic.decide(road, emptyList(), inFigure = listOf(riddle)))
+        val kraken = PlayHit.Pin("kraken-roads@2026-10-29", MarkerKind.KRAKEN)
+        assertEquals(MapTapAction.OpenEncounter(kraken.key), MapTapLogic.decide(TapResult.Select("road-falk-road-northeast"), emptyList(), listOf(kraken)))
+        val trails = TapResult.Choose(listOf("trail-grand-forest-west", "trail-grand-forest-east"))
+        assertEquals(MapTapAction.OpenEncounter(pin.key), MapTapLogic.decide(trails, emptyList(), listOf(pin)))
+        // Two figures under the point: the declutter priority picks.
+        assertEquals(MapTapAction.OpenEncounter(kraken.key), MapTapLogic.decide(road, emptyList(), listOf(riddle, kraken)))
+        // An island-zoom disc under the point zooms, even over a line.
+        assertEquals(MapTapAction.ZoomTo(-122.5, 47.6, 14.0), MapTapLogic.decide(road, emptyList(), listOf(PlayHit.Cluster(-122.5, 47.6))))
     }
 
     @Test
@@ -74,7 +97,7 @@ class MapTapPriorityTest {
         assertTrue(KrakenInk.layerIds.none { it in PlayMarkers.hitLayerIds })
         assertTrue(PlayMarkers.hitLayerIds.none { it in TappableTrailLayerIds }, "fx layers never join the pure query")
         // The line under the ink is in TappableTrailLayerIds, so the pure query hits it and the tap is a trail tap,
-        // even with the kraken's own hit rect under the finger.
+        // even with the kraken's own hit rect overlapping the tap rect (the point outside its label, PD-25).
         val road = TapResult.Select("road-manitou-beach-drive-northeast")
         val kraken = PlayHit.Pin("kraken-roads@2026-10-29", MarkerKind.KRAKEN)
         assertEquals(MapTapAction.Trail(road), MapTapLogic.decide(road, listOf(kraken)))

@@ -352,6 +352,20 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
   (`onLaunch replays …`), `SyncRepositoryTest` (`a walk whose play hook has not finished …`),
   `PlayOffNothingCreatedTest` (`awaitSettled…`), `PlayClaimQueueTest` (`at most 50 claims per upload`).
 
+## PD-25 A tap inside a Play marker's own figure is the marker's (e2e run 1 F5; refines the PD-12 tap order)
+- **Context.** `screens/README.md` F5: with the pure trail query first and Play only on a miss (ux.md § 3.5.4,
+  PF3-5), a pin drawn over a line could never be tapped: the kraken coast label, the Frog Rock riddle pin and the
+  Grand Forest pins opened "Roads/Trails on this section" instead of their sheet.
+- **Decision.** MapTab probes `fx-marker-hit` at the tap point first (a 2 dp rect, Play on only): a point inside a
+  marker's own 48 dp figure rect (a pin's lifted figure, the kraken label at its water point, an island-zoom disc) is
+  that marker's, whatever line runs underneath; several under the point go by the declutter priority. A tap whose
+  point is outside every figure rect stays pure: the 44 dp trail query decides, and only its miss queries
+  `fx-marker-hit` over the tap rect (a near-miss pin still gets the tap). Ink casings, stamps and other FX layers are
+  never tap targets (unchanged).
+- **Consequence.** A line under a pin is tappable everywhere except under the 48 dp figure itself (select it from the
+  line beside the pin, or the list). Play off makes no Play query at all. Proof: `MapTapPriorityTest`
+  (`trail hit wins outside the figure`, `pin wins inside its figure`, `inked stretch tap is a trail tap`).
+
 ## Status
 
 | doc | status |
