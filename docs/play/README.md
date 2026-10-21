@@ -4,6 +4,10 @@ Work item: [`brief.md`](brief.md). Status: specs ACCEPTED 2026-10-20 after round
 ([`decisions.md`](decisions.md), resolving [`reviews/2026-10-20-round1-specs.md`](reviews/2026-10-20-round1-specs.md)).
 v1 scope: [`product.md` § "v1 scope"](product.md).
 
+## Status (2026-10-21)
+
+Built on branch `gamification/v1` per [`plan.md`](plan.md): all lanes L1–L4 and stages through L2-10 landed; reviews in [`reviews/`](reviews/) (round 1 and round 2 applied, AC 9 gate fixes applied); full verify lane green (see the PR); AC 8 evidence in [`screens/README.md`](screens/README.md) (run 1 found blockers F1/F2, fixed; run 2 is the current result). Owner items still open: OD-19 privacy-policy sign-off before the next Worker deploy, OD-21 claim retention, OD-1 Prue's House, the real WSF ferry timetable, and the on-device PERF run ([`perf.md`](perf.md)).
+
 ## Documents
 
 | doc | owns | status |
