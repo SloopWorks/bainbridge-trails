@@ -29,6 +29,8 @@ export const LIMITS = {
   nameChangesPerUser: { limit: 5, windowMs: 24 * 60 * 60_000 },
   reportsPerUser: { limit: 20, windowMs: 24 * 60 * 60_000 },
   hideTogglesPerUser: { limit: 10, windowMs: 24 * 60 * 60_000 },
+  /** GET /v1/play/me: the Play chip summary and the Logbook restore; the app reads it on sign-in and a few times a day. */
+  playMePerUser: { limit: 60, windowMs: 10 * 60_000 },
   publicPerIp: { limit: 120, windowMs: 10 * 60_000 },
 } as const;
 

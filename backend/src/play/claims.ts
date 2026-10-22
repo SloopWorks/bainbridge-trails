@@ -54,14 +54,16 @@ import { owedKeys } from "./trails";
  * current week whatever `weekId` the client sent (P2-5), so a week boundary never doubles the weekly cap.
  * W-DAY: a `dayKey` counts only on a credited walk of at least 10 minutes (P2-3); the walks whose `dayKey` was booked
  * are answered in `dayAccepted` (review P1-3).
- * Challenge claims (L3-3, `challenges.ts`): only solo challenges are claimable (`ch-sweep`); the island challenge
- * is credited by the daily cron, so a client claim for it is `unknown_item`. A solo claim is accepted until the week's
- * end + 7 days when the user's contributions (stored + this upload's) reach the target, else `no_bits`.
+ * Challenge claims (L3-3, `challenges.ts`): only solo challenges are claimable (`ch-sweep`; trails: `ch-climb`,
+ * `ch-parkhop`); the island challenge is credited by the daily cron, so a client claim for it is `unknown_item`. A
+ * solo claim is accepted until the week's end + 7 days when the user's contributions (stored + this upload's) reach
+ * the target (the pack's; the trails challenges' personal D5 target from the sticky completed set), else `no_bits`.
  * Side effects of an upload on challenges, written in the same batch (`playStatements`):
  *   - an accepted new `ink` claim adds 1 to the stretch's `play_attack_stretches.repelled_by` (distinct users per
  *     stretch per attack) and 1 to the user's `ch-krakenweek@<Thursday>` contribution;
- *   - the trails / roads this upload newly completed add to the user's contribution of every solo `completed`
- *     challenge occurrence that takes contributions now (window start → window end + 2 days).
+ *   - the trails / roads this upload newly completed add to the user's contribution of ONE occurrence per solo
+ *     challenge item (the one active now, else the latest still in grace: P1-1): their count (`ch-sweep`), their gain
+ *     in dm (`ch-climb`) or their distinct Play parks (`ch-parkhop`, a count: plan D12 reversed).
  * Trails rules (v1.1, `trails.ts`, plan D2): whenever `play` is present on a trails upload, the keys the merged
  * coverage + sticky completions qualify for minus the ledger (`play_trail_paid`) are inserted (`ON CONFLICT DO
  * NOTHING`) before the totals upsert, which folds `SUM(marks)` of the ledger into `trail_marks` and `total`. Idempotent
@@ -193,7 +195,7 @@ export interface ClaimContext {
   now: number;
   /** Kept packs by version (`config.packByVersion`). */
   packFor(version: string): PlayPack | null;
-  /** The CURRENT pack, for kill switches / `enabled` / `expires` (default: `config.CURRENT`). Injectable for tests. */
+  /** The CURRENT pack: kill switches, caps, challenge windows and targets (default: `config.CURRENT`; tests inject). */
   current?: PlayPack;
   /** Walks this upload credits (new for this user and dataset): walk id → `durationS`. */
   freshWalks: ReadonlyMap<string, number>;
@@ -205,8 +207,10 @@ export interface ClaimContext {
   existingZero?: ReadonlySet<string>;
   /** Stored week rows (only the weeks the upload names). */
   weeks: ReadonlyMap<string, WeekState>;
-  /** Trails / roads this upload newly completed (sticky set), for solo `completed` challenges. */
+  /** Trails / roads this upload newly completed (sticky set), for the solo challenges. */
   newlyCompleted?: readonly string[];
+  /** The sticky completed set after this upload (`newlyCompleted` included): the trails challenges' D5 target. */
+  completed?: readonly string[];
   /** Stored challenge contributions of this user (only the occurrences the upload claims). */
   progress?: ReadonlyMap<string, number>;
   /** Trails rules: every key the merged coverage, completions and island metres qualify for (absent for roads). */
@@ -235,7 +239,7 @@ export interface Evaluation {
   weekDelta: Map<string, WeekState>;
   foundMarks: number;
   dayMarks: number;
-  /** Challenge contributions to add: occurrence key → count (solo `completed` challenges). */
+  /** Challenge contributions to add: occurrence key → amount (solo challenges; `ch-climb`: dm). */
   progress: Map<string, number>;
   /** Accepted new `ink` claims: the stretch occurrence and the island challenge occurrence it contributes to. */
   stretches: { occ: string; island: string | null }[];
@@ -314,11 +318,11 @@ function checkOccurrence(c: PlayClaim, config: string | null, ctx: ClaimContext)
 }
 
 /** The caps in force: the CURRENT pack's (P2-6), never the named version's. */
-const capsNow = () => capsOf(CURRENT);
+const capsNow = (ctx: ClaimContext) => capsOf(ctx.current ?? CURRENT);
 
 /** Check 5 (product § 3.5 clock tolerance and replay guard). */
 function checkTime(c: PlayClaim, ch: Checked, ctx: ClaimContext): ClaimCode | null {
-  const caps = capsNow();
+  const caps = capsNow(ctx);
   const current = weekIdAt(ctx.now);
   const previous = addDays(current, -7);
   if (c.weekId > current || ch.occ.start > ctx.now + caps.clockAheadMin * 60_000) return "too_early";
@@ -360,7 +364,7 @@ function marksOf(c: PlayClaim, ch: Checked, el: PlayElement, ctx: ClaimContext, 
     case "challenge": {
       const progress = (ctx.progress?.get(c.id) ?? 0) + (ev.progress.get(c.id) ?? 0);
       // the late window is a cap: from the CURRENT pack (P2-6)
-      return challengeClaimMarks(item, c.weekId, ctx.dataset, ctx.now, CURRENT, progress);
+      return challengeClaimMarks(item, c.weekId, ctx.dataset, ctx.now, ctx.current ?? CURRENT, progress, ctx.completed ?? []);
     }
     default:
       return itemMarks(item);
@@ -382,7 +386,7 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
     weekDelta: new Map(),
     foundMarks: 0,
     dayMarks: 0,
-    progress: completionProgress(ctx.dataset, ctx.now, ctx.newlyCompleted ?? []),
+    progress: completionProgress(ctx.dataset, ctx.now, ctx.newlyCompleted ?? [], ctx.current ?? CURRENT),
     stretches: [],
     trailKeys: owedKeys(ctx.trailQualifying ?? new Set(), ctx.trailPaid ?? new Set()),
   };
@@ -393,7 +397,7 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
   };
   const claimed = new Set(ctx.existing);
   const zero = new Set(ctx.existingZero ?? []);
-  const capPerWeek = capsNow().foundPerWeek;
+  const capPerWeek = capsNow(ctx).foundPerWeek;
   const current = weekIdAt(ctx.now);
 
   for (const el of play.elements) {
@@ -446,7 +450,7 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
   for (const el of play.elements) {
     const k = el.dayKey;
     if (k === null || (ctx.freshWalks.get(el.walkId) ?? 0) < MIN_DAY_WALK_S || !isMonday(k) || k > current) continue;
-    if (ctx.now >= islandInstant(addDays(k, 7), 0) + capsNow().weekLateDays * DAY_MS) continue;
+    if (ctx.now >= islandInstant(addDays(k, 7), 0) + capsNow(ctx).weekLateDays * DAY_MS) continue;
     const have = (ctx.weeks.get(k)?.dayKeys ?? 0) + (ev.weekDelta.get(k)?.dayKeys ?? 0);
     if (have >= MAX_DAY_KEYS_PER_WEEK) continue;
     week(k).dayKeys += 1;

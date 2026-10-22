@@ -81,6 +81,9 @@ stores the day, the time or the route of a claim. Because many Play items sit at
 server that you were near that place at some point during that week. Your Play claims and marks are not shown to
 other people; island-wide Play results (for example how many shore stretches islanders cleared this week) are
 counts only, with no names. Turning Play off stops sending claims; deleting your account deletes them.
+<!-- OD-19 draft, owner sign-off before deploy -->
+Our server also works out which trail rewards you have earned (for example a park's first visit or a climb step)
+from your covered sections and completed trails, and keeps that list with your account.
 
 ## Data we do not collect
 

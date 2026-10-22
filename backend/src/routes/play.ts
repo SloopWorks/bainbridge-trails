@@ -3,8 +3,9 @@ import type { Deps } from "../deps";
 import { ApiError, json } from "../http";
 import { challengesBody, playLog } from "../play/challenges";
 import { CLAIM_KINDS, playSummary } from "../play/claims";
-import { CONTENT_BODY, CURRENT, contentEtag, tidesFor } from "../play/config";
+import { CONTENT_BODY, CURRENT, PACKS, contentEtag, tidesFor } from "../play/config";
 import { TRAIL_KINDS, kindOf } from "../play/trails";
+import { LIMITS, rateLimit } from "../ratelimit";
 import { parseDataset } from "../segments";
 
 const CONTENT_CACHE = "public, max-age=300";
@@ -47,10 +48,12 @@ export function playTides(path: string): Response {
  * for the Logbook. No times, no days, no positions. No side effects.
  * Trails only (v1.1, plan D3): `perKind` also counts the ledger keys of the six trails rules (`climb`, `high_ground`,
  * `milestone`, `park_first`, `park_complete`, `island`) and the body ends with `paid` = every ledger key, sorted (the
- * Restored write seeds the phone's `trailPaid` from it). The roads body is unchanged.
+ * Restored write seeds the phone's `trailPaid` from it). The roads body is unchanged. Per-user limit: 60 / 10 min
+ * (`429 rate_limited`), like the other signed-in reads.
  */
 export async function playMe(url: URL, env: Env, deps: Deps, user: UserRow): Promise<Response> {
   const dataset = parseDataset(url.searchParams.get("dataset") ?? undefined);
+  await rateLimit(env, deps.now(), `playme:${user.id}`, LIMITS.playMePerUser.limit, LIMITS.playMePerUser.windowMs);
   const [summary, claims, log, paid] = await Promise.all([
     playSummary(env, user.id, dataset, deps.now()),
     env.DB.prepare("SELECT occ, kind FROM play_claims WHERE user_id = ? AND dataset = ? ORDER BY occ")
@@ -90,6 +93,6 @@ export async function playMe(url: URL, env: Env, deps: Deps, user: UserRow): Pro
  */
 export async function playChallenges(url: URL, env: Env, deps: Deps, user: UserRow | null): Promise<Response> {
   const dataset = parseDataset(url.searchParams.get("dataset") ?? undefined);
-  const body = await challengesBody(env, dataset, deps.now(), user?.id ?? null);
+  const body = await challengesBody(env, dataset, deps.now(), user?.id ?? null, (deps.packs ?? PACKS).current);
   return json(body, 200, { "cache-control": user ? "private, no-store" : "public, max-age=300" });
 }

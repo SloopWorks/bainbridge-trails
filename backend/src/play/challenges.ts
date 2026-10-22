@@ -19,16 +19,31 @@ import {
   weekId,
   weekIdAt,
 } from "./recurrence";
+import { type TrailMetric, type TrailTables, challengeTarget } from "./trails";
+import { completedSet } from "../users";
 
 /**
  * Challenges, kraken aggregates and the daily Play cron (schedule.md § 7.3, § 7.4; product § 3.2 W-WEEK, § 3.4,
  * § 4.3.2, § 4.5; PD-3, PD-4). Windows are server-authoritative: they come from the Worker's current pack and island
  * time, never from the client. Nothing here is timed and nothing names a person: public results are `{band, count}`.
  *
- * Contributions (`play_progress`, migration 0006), one count per user and challenge occurrence:
- * - `ch-sweep@<Saturday>` (solo, metric `completed`): trails / roads newly completed by Play uploads (the request
- *   carried `play`) received inside [window start, window end + the find grace]. The claim
+ * Contributions (`play_progress`, migration 0006), one count per user and challenge occurrence. One Play upload (the
+ * request carried `play`) contributes to at most ONE occurrence per challenge item (plan P1-1): the one active at
+ * `now`, else the latest whose window end is still inside the find grace. A walk synced late, after the next window
+ * opened, therefore counts toward the new occurrence while the phone counted it by its Logbook date (PD-26).
+ * - `ch-sweep@<Saturday>` (solo, metric `completed`): trails / roads newly completed by the upload. The claim
  *   `{ id: "ch-sweep@<Saturday>", kind: "challenge" }` is accepted when that count reaches the goal's target.
+ * - `ch-climb@<Monday>` (solo, metric `climb`, trails only, v1.1): Σ gain of the non-quiet trails newly completed, in
+ *   integer decimetres (`derived-trails.json` `featureGainM` × 10; 149.9 m = 1,499 < 1,500). The pack's target is
+ *   metres; the server carries it as dm everywhere (claims, `/challenges`, bands).
+ * - `ch-parkhop@<Saturday>` (solo, metric `parks`, trails only): the distinct Play parks (Pritchard Park excluded by
+ *   the pack build, quiet trails never) among the trails this upload newly completed. A count only (plan D12 reversed
+ *   by the privacy review: no per-park key table), so the same park reached by two different trails completed in two
+ *   separate uploads of one window counts twice; a bounded overcount, documented in api.md.
+ * - The two trails challenges have a personal target (D5): `min(default, remaining + progress)` where remaining is
+ *   what the user's sticky completed set still leaves (climb: dm of non-quiet trails not completed; parks: Play parks
+ *   with a non-quiet trail not completed); 0 = nothing left: not listed for the user, never claimable. The claim is
+ *   accepted when progress ≥ target > 0 and the occurrence is unclaimed (P2-6), inside the existing caps.
  * - `ch-krakenweek@<Thursday>` (island, metric `stretches_repelled`): kraken stretches of that attack the user
  *   repelled (accepted `ink` claims). `play_attack_stretches.repelled_by` counts each stretch's distinct users.
  *   The island challenge is never claimed by the client: the cron credits it.
@@ -70,31 +85,62 @@ interface ChallengeSpec {
   retreatMarks?: number;
 }
 
+export type ChallengeMetric = "completed" | "stretches_repelled" | TrailMetric;
+type SoloMetric = Exclude<ChallengeMetric, "stretches_repelled">;
+
 export interface ChallengeDef {
   item: PlayItem;
   scope: "solo" | "island";
-  metric: "completed" | "stretches_repelled";
+  metric: ChallengeMetric;
   spec: ChallengeSpec;
 }
+
+const SOLO_METRICS: readonly SoloMetric[] = ["completed", "climb", "parks"];
+const isTrailMetric = (m: ChallengeMetric): m is TrailMetric => m === "climb" || m === "parks";
 
 /** The challenge kinds the server evaluates; any other `challenge` item is unknown here. */
 export function challengeDef(item: PlayItem): ChallengeDef | null {
   if (item.type !== "challenge") return null;
   const spec = item.challenge as ChallengeSpec | undefined;
-  if (spec?.scope === "solo" && spec.metric === "completed") return { item, scope: "solo", metric: "completed", spec };
+  if (spec?.scope === "solo" && (SOLO_METRICS as readonly string[]).includes(spec.metric ?? "")) {
+    return { item, scope: "solo", metric: spec.metric as SoloMetric, spec };
+  }
   if (spec?.scope === "island" && spec.metric === "stretches_repelled") return { item, scope: "island", metric: "stretches_repelled", spec };
   return null;
 }
 
-/** Enabled, non-killed challenges of `dataset` the server evaluates. */
+/** The trails tables a `climb` / `parks` challenge needs (null on roads: those metrics are never evaluated there). */
+const tablesOf = (dataset: Dataset): TrailTables | null => DERIVED[dataset].trailRules;
+
+/** Enabled, non-killed challenges of `dataset` the server evaluates (trail metrics only where the tables exist). */
 export function challengesOf(pack: PlayPack, dataset: Dataset): ChallengeDef[] {
   const out: ChallengeDef[] = [];
   for (const item of pack.items) {
     if (item.enabled === false || killed(pack, item) || !inGoal(item, dataset)) continue;
     const def = challengeDef(item);
-    if (def) out.push(def);
+    if (def && (!isTrailMetric(def.metric) || tablesOf(dataset) !== null)) out.push(def);
   }
   return out;
+}
+
+/**
+ * The pack's target for `dataset` as the server counts it (climb: metres → dm), or 0 when the item has none. Solo
+ * challenges only; island targets are the attack's stretch count.
+ */
+export function defaultTarget(def: ChallengeDef, dataset: Dataset): number {
+  const t = def.spec.target?.[dataset];
+  if (typeof t !== "number" || !(t > 0)) return 0;
+  return def.metric === "climb" ? Math.round(t * 10) : t;
+}
+
+/**
+ * D5 personal target of a solo challenge for one user: the default for `completed`; for `climb` / `parks`
+ * `min(default, remaining(completed) + progress)` from `trails.ts`. 0 = nothing left (no card, no claim).
+ */
+export function personalTarget(def: ChallengeDef, dataset: Dataset, completed: Iterable<string>, progress: number): number {
+  const dflt = defaultTarget(def, dataset);
+  if (!isTrailMetric(def.metric)) return dflt;
+  return challengeTarget(def.metric, dflt, completed, progress, tablesOf(dataset));
 }
 
 /** True while claims for an occurrence ending at `end` are still accepted (same rule as `too_late` in claims.ts). */
@@ -111,6 +157,15 @@ export function currentOccurrences(pack: PlayPack, item: PlayItem, now: number):
     if (o && o.end !== null && o.start <= now && inGrace(o.end, now, pack)) out.push(o);
   }
   return out;
+}
+
+/**
+ * The one occurrence of `item` an upload received at `now` contributes to (P1-1): the occurrence active at `now`,
+ * else the latest still in grace; null when none takes contributions.
+ */
+export function contributionOccurrence(pack: PlayPack, item: PlayItem, now: number): Occurrence | null {
+  const current = currentOccurrences(pack, item, now);
+  return current.find((o) => now < o.end!) ?? current[current.length - 1] ?? null;
 }
 
 /** The kraken attack starting on `date` in `dataset`: its item id and stretch occurrence keys (claim index order). */
@@ -139,8 +194,9 @@ export function bandOf(progress: number, target: number): Band | null {
 // Claims (called by claims.ts inside the coverage upload)
 
 /**
- * Contributions of one Play upload to solo `completed` challenges: the trails / roads it newly completed (quiet
- * trails never count, PD-6), for every occurrence that takes contributions now (server windows, current pack).
+ * Contributions of one Play upload to the solo challenges, occurrence key → amount (`completed`: trails / roads newly
+ * completed, quiet trails never, PD-6; `climb`: their gain in dm; `parks`: their distinct Play parks), each to the one
+ * occurrence per item that takes contributions at `now` (server windows, current pack; `contributionOccurrence`).
  */
 export function completionProgress(
   dataset: Dataset,
@@ -149,13 +205,32 @@ export function completionProgress(
   pack: PlayPack = CURRENT,
 ): Map<string, number> {
   const out = new Map<string, number>();
-  const n = newlyCompleted.filter((f) => !DERIVED[dataset].quietFeatures.has(f)).length;
-  if (n === 0) return out;
+  if (newlyCompleted.length === 0) return out;
+  const amounts = uploadAmounts(dataset, newlyCompleted);
   for (const def of challengesOf(pack, dataset)) {
-    if (def.metric !== "completed") continue;
-    for (const o of currentOccurrences(pack, def.item, now)) out.set(o.key, n);
+    if (def.scope !== "solo") continue;
+    const n = amounts[def.metric as SoloMetric];
+    if (n <= 0) continue;
+    const o = contributionOccurrence(pack, def.item, now);
+    if (o) out.set(o.key, n);
   }
   return out;
+}
+
+/** What one upload's new completions are worth per solo metric (0 for a trail metric without tables: roads). */
+function uploadAmounts(dataset: Dataset, newlyCompleted: readonly string[]): Record<SoloMetric, number> {
+  const completed = newlyCompleted.filter((f) => !DERIVED[dataset].quietFeatures.has(f)).length;
+  const tables = tablesOf(dataset);
+  if (!tables) return { completed, climb: 0, parks: 0 };
+  let climb = 0;
+  const parks = new Set<string>();
+  for (const t of newlyCompleted) {
+    if (tables.quietFeatures.has(t) || !(t in tables.gainDm)) continue;
+    climb += tables.gainDm[t]!;
+    const park = tables.parkOf[t];
+    if (park && tables.parks.has(park)) parks.add(park);
+  }
+  return { completed, climb, parks: parks.size };
 }
 
 /** The island challenge occurrence an accepted `ink` claim of the attack starting on `date` contributes to. */
@@ -167,16 +242,26 @@ export function islandOccFor(pack: PlayPack, dataset: Dataset, date: string): st
 }
 
 /**
- * A `challenge` claim (checks 1–3 and 5 already passed): only solo challenges are claimable. Accepted until the week's
- * end + `weekLateDays` (product § 3.5 late grace) when the stored + this upload's contributions reach the target;
- * short of it → `no_bits` (the uploads do not support the claim). Returns the item's marks, or a code.
+ * A `challenge` claim (checks 1–3 and 5 already passed): only solo challenges are claimable, and a trail metric only
+ * on a goal with trails tables. Accepted until the week's end + `weekLateDays` (product § 3.5 late grace) when the
+ * stored + this upload's contributions reach the user's target (`personalTarget`; `completed`: the pack's); short of
+ * it, or with nothing left to do (target 0) → `no_bits` (the uploads do not support the claim). Returns the item's
+ * marks, or a code.
  */
-export function challengeClaimMarks(item: PlayItem, week: string, dataset: Dataset, now: number, pack: PlayPack, progress: number): number | ClaimCode {
+export function challengeClaimMarks(
+  item: PlayItem,
+  week: string,
+  dataset: Dataset,
+  now: number,
+  pack: PlayPack,
+  progress: number,
+  completed: Iterable<string> = [],
+): number | ClaimCode {
   const def = challengeDef(item);
-  const target = def?.spec.target?.[dataset];
-  if (!def || def.scope !== "solo" || typeof target !== "number" || target <= 0) return "unknown_item";
+  if (!def || def.scope !== "solo" || defaultTarget(def, dataset) <= 0 || (isTrailMetric(def.metric) && !tablesOf(dataset))) return "unknown_item";
   if (now >= islandInstant(addDays(week, 7), 0) + capsOf(pack).weekLateDays * DAY_MS) return "too_late";
-  return progress >= target ? itemMarks(item) : "no_bits";
+  const target = personalTarget(def, dataset, completed, progress);
+  return target > 0 && progress >= target ? itemMarks(item) : "no_bits";
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -191,8 +276,9 @@ export interface ChallengeEntry {
   windowEnd: string;
   /** false after the window end, while late contributions are still accepted. */
   open: boolean;
-  /** The caller's contributions (null when not signed in). */
+  /** The caller's contributions (null when not signed in); `ch-climb`: decimetres. */
   progress: number | null;
+  /** The pack's target (`ch-climb`: dm) for everyone; signed in, a trails challenge carries the caller's D5 target. */
   target: number;
   you: { band: Band } | null;
   /** Participants per band; a count below 5 is null, larger ones rounded to 5. */
@@ -208,7 +294,11 @@ interface Pending {
   stretchOccs: string[] | null;
 }
 
-/** Body of `GET /v1/play/challenges?dataset=`: every current challenge occurrence of the goal, sorted by `occ`. */
+/**
+ * Body of `GET /v1/play/challenges?dataset=`: every current challenge occurrence of the goal, sorted by `occ`. Bands
+ * are counted against the pack's target (dm for `ch-climb`); signed in, a trails challenge's `target` and `you.band`
+ * use the caller's personal D5 target, and an occurrence with nothing left for the caller (target 0) is omitted.
+ */
 export async function challengesBody(
   env: Env,
   dataset: Dataset,
@@ -219,8 +309,8 @@ export async function challengesBody(
   const pending: Pending[] = [];
   for (const def of challengesOf(pack, dataset)) {
     for (const o of currentOccurrences(pack, def.item, now)) {
-      if (def.metric === "completed") {
-        const target = def.spec.target?.[dataset] ?? 0;
+      if (def.scope === "solo") {
+        const target = defaultTarget(def, dataset);
         if (target > 0) pending.push({ def, o, target, stretchOccs: null });
       } else {
         const attack = attackOf(pack, dataset, o.date);
@@ -251,12 +341,20 @@ export async function challengesBody(
       stmts.push(repelledSql.bind(dataset, JSON.stringify(p.stretchOccs), min));
     }
   }
-  const results = await env.DB.batch<Record<string, number>>(stmts);
+  const personal = userId !== null && pending.some((p) => isTrailMetric(p.def.metric));
+  const [results, completed] = await Promise.all([
+    env.DB.batch<Record<string, number>>(stmts),
+    personal ? completedSet(env, userId!, dataset) : Promise.resolve([] as string[]),
+  ]);
   let i = 0;
-  const current = pending.map((p): ChallengeEntry => {
+  const current: ChallengeEntry[] = [];
+  for (const p of pending) {
     const counts = results[i++]!.results[0]!;
     const mine = userId !== null ? (results[i++]!.results[0]!.n ?? 0) : null;
-    const band = mine === null ? null : bandOf(mine, p.target);
+    const repelled = p.stretchOccs ? (results[i++]!.results[0]!.n ?? 0) : null;
+    const target = mine === null || !isTrailMetric(p.def.metric) ? p.target : personalTarget(p.def, dataset, completed, mine);
+    if (target <= 0) continue; // nothing left for this user (D5): no card
+    const band = mine === null ? null : bandOf(mine, target);
     const entry: ChallengeEntry = {
       id: p.def.item.id,
       occ: p.o.key,
@@ -265,13 +363,13 @@ export async function challengesBody(
       windowEnd: islandIso(p.o.end!),
       open: now < p.o.end!,
       progress: mine,
-      target: p.target,
+      target,
       you: band ? { band } : null,
       bands: BANDS.map((b) => ({ band: b, count: communityCount(counts[b] ?? 0) })),
     };
-    if (p.stretchOccs) entry.island = { stretches: p.stretchOccs.length, repelled: results[i++]!.results[0]!.n ?? 0 };
-    return entry;
-  });
+    if (repelled !== null) entry.island = { stretches: p.stretchOccs!.length, repelled };
+    current.push(entry);
+  }
   return { dataset, minCount: MIN_COMMUNITY_COUNT, current };
 }
 

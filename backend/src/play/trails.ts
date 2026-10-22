@@ -172,8 +172,9 @@ export function trailQualifying(dataset: Dataset, cov: CoverageMap, completed: I
 /**
  * D5 personal challenge target: `min(default, remaining(completed) + progress)`. `climb`: remaining = Σ dm of non-quiet
  * trails not completed, `progress` in dm; `parks`: remaining = Play parks with ≥ 1 non-quiet trail not completed,
- * `progress` = the distinct parks already hopped this window (counted into the union). 0 = nothing left to do (no
- * card, no claim).
+ * `progress` = the distinct parks already hopped this window (counted into the union when the names are known; the
+ * server keeps a count only, D12 reversed, and adds it: a hopped park still in `remaining` is then counted twice, a
+ * bounded overestimate that only matters below the default). 0 = nothing left to do (no card, no claim).
  */
 export function challengeTarget(
   metric: TrailMetric,
@@ -191,5 +192,5 @@ export function challengeTarget(
   }
   const remaining = new Set(typeof progress === "number" ? [] : progress);
   for (const [t, p] of Object.entries(tables.parkOf)) if (!tables.quietFeatures.has(t) && tables.parks.has(p) && !c.has(t)) remaining.add(p);
-  return Math.min(dflt, remaining.size);
+  return Math.min(dflt, remaining.size + (typeof progress === "number" ? progress : 0));
 }

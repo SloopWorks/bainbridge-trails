@@ -20,7 +20,6 @@ const PLAY_OBJECTS = [
   "play_claims",
   "play_claims_week",
   "play_progress",
-  "play_progress_keys",
   "play_progress_occ",
   "play_totals",
   "play_trail_paid",
@@ -244,7 +243,7 @@ describe("migration 0007 (play trails)", () => {
     }
     expect(after.get("play_totals")).toContain("trail_marks INTEGER NOT NULL DEFAULT 0");
     expect(after.get("play_totals")!.replace(/,\s*trail_marks INTEGER NOT NULL DEFAULT 0/, "")).toBe(before.get("play_totals"));
-    expect([...after.keys()].filter((n) => !before.has(n)).sort()).toEqual(["play_progress_keys", "play_trail_paid"]);
+    expect([...after.keys()].filter((n) => !before.has(n)).sort()).toEqual(["play_trail_paid"]);
     // the existing row keeps its values and reads 0 trail marks
     expect(await one("SELECT cov_marks, derived_marks, found_marks, week_marks, trail_marks, total FROM play_totals WHERE user_id = 't1'")).toEqual({
       cov_marks: 10,
@@ -268,22 +267,16 @@ describe("migration 0007 (play trails)", () => {
       .bind("t1", "trails", 12, 125, 0, 0)
       .run();
     expect(await one("SELECT total, trail_marks FROM play_totals WHERE user_id = 't1'")).toEqual({ total: 172, trail_marks: 0 });
-    // the new tables take rows, dedupe by key and enforce the dataset check
+    // the ledger takes rows, dedupes by key and enforces the dataset check (no per-park key table: D12 reversed)
     await db.batch([
       db.prepare("INSERT INTO play_trail_paid VALUES ('t1', 'trails', 'park1:Gazzam Lake Preserve', 50) ON CONFLICT DO NOTHING"),
       db.prepare("INSERT INTO play_trail_paid VALUES ('t1', 'trails', 'park1:Gazzam Lake Preserve', 50) ON CONFLICT DO NOTHING"),
-      db.prepare("INSERT INTO play_progress_keys VALUES ('t1', 'trails', 'ch-parkhop@2026-10-31', 'Gazzam Lake Preserve') ON CONFLICT DO NOTHING"),
-      db.prepare("INSERT INTO play_progress_keys VALUES ('t1', 'trails', 'ch-parkhop@2026-10-31', 'Gazzam Lake Preserve') ON CONFLICT DO NOTHING"),
     ]);
     expect(await one("SELECT COUNT(*) AS n, SUM(marks) AS marks FROM play_trail_paid WHERE user_id = 't1'")).toEqual({ n: 1, marks: 50 });
-    expect(await one("SELECT COUNT(*) AS n FROM play_progress_keys WHERE user_id = 't1'")).toEqual({ n: 1 });
     await expect(db.prepare("INSERT INTO play_trail_paid VALUES ('t1', 'rivers', 'island', 1000)").run()).rejects.toThrow(/CHECK constraint failed/);
-    await expect(db.prepare("INSERT INTO play_progress_keys VALUES ('t1', 'rivers', 'x@2026-10-31', 'k')").run()).rejects.toThrow(
-      /CHECK constraint failed/,
-    );
+    expect(after.has("play_progress_keys")).toBe(false);
     // rows go with the user (ON DELETE CASCADE)
     await db.prepare("DELETE FROM users WHERE id = 't1'").run();
     expect(await one("SELECT COUNT(*) AS n FROM play_trail_paid")).toEqual({ n: 0 });
-    expect(await one("SELECT COUNT(*) AS n FROM play_progress_keys")).toEqual({ n: 0 });
   });
 });
