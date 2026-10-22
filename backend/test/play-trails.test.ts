@@ -174,6 +174,8 @@ describe("trails-rewards golden (parity with Kotlin TrailRewards)", () => {
     expect(kindOf("parkc:Gazzam Lake Preserve")).toBe("park_complete");
     expect(kindOf("island")).toBe("island");
     expect(kindOf("island:x")).toBeNull(); // Kotlin `TrailRewards.kindOf`: `island` is the exact key only
+    expect(kindOf("constructor:x")).toBeNull(); // own keys only, never a prototype member
+    expect(kindOf("__proto__")).toBeNull();
     expect(kindOf("bogus:1")).toBeNull();
     expect(owedKeys(new Set(["island", "bogus:1"]), new Set())).toEqual([
       { key: "bogus:1", marks: 0 },

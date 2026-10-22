@@ -140,7 +140,7 @@ export function kindOf(key: string): TrailKind | null {
   const colon = key.indexOf(":");
   const prefix = colon < 0 ? key : key.slice(0, colon);
   if (prefix === "island") return key === "island" ? "island" : null;
-  return KIND_BY_PREFIX[prefix] ?? null;
+  return Object.hasOwn(KIND_BY_PREFIX, prefix) ? (KIND_BY_PREFIX[prefix] ?? null) : null;
 }
 
 /** Marks a key pays (0 for an unknown key). */
