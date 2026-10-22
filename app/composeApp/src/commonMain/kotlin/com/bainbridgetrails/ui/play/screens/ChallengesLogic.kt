@@ -13,6 +13,7 @@ import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.config.Scope
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
+import com.bainbridgetrails.play.rules.Logbook
 import com.bainbridgetrails.play.rules.TrailRewards
 import com.bainbridgetrails.play.schedule.Occurrence
 import com.bainbridgetrails.play.schedule.PlayAgenda
@@ -143,6 +144,14 @@ object ChallengesLogic {
     }
 
     private fun PlayChallengesDto?.forItem(id: String): PlayChallengeDto? = this?.current?.firstOrNull { it.id == id && it.open }
+
+    /**
+     * What the trails challenge statuses read from the Logbook: its `complete` entries (feature, island date; progress P,
+     * and a new completion is when the sticky completed set grows). `rememberTrailChallenges` re-reads when this changes,
+     * not on every find or board change. Null = no Logbook yet.
+     */
+    fun completionKey(logbook: Logbook?): List<Pair<String?, LocalDate>>? =
+        logbook?.entries?.mapNotNull { e -> (e.contentId to e.date).takeIf { e.kind == LogKind.complete } }
 
     /**
      * The challenge occurrences to ask `PlayRepository.trailChallenges` about: the active ones and this agenda's

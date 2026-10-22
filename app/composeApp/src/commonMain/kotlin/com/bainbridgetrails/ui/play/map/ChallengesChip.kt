@@ -137,10 +137,11 @@ private val PROBE_SLOTS = listOf("play-full", "play-compact", "challenges-full",
 object ChallengesChipLogic {
     /**
      * This week's challenges ([PlayMarkerLogic.challengesThisWeek]) without the trails `climb` / `parks` occurrences
-     * whose status in [trail] is hidden (nothing left for this player, plan D5). Roads: [trail] is empty.
+     * whose status in [trail] is hidden (nothing left for this player, plan D5). Roads: [trail] is empty. Trails, [trail]
+     * null = not read yet: 0, so the chip is held rather than counting a hidden card and then dropping it.
      */
-    fun count(agenda: PlayAgenda, trail: Map<String, TrailChallengeStatus>): Int =
-        PlayMarkerLogic.challengesThisWeek(agenda.copy(active = agenda.active.filter { trail[it.occurrence.key]?.hidden != true }))
+    fun count(agenda: PlayAgenda, trail: Map<String, TrailChallengeStatus>?): Int =
+        if (trail == null) 0 else PlayMarkerLogic.challengesThisWeek(agenda.copy(active = agenda.active.filter { trail[it.occurrence.key]?.hidden != true }))
 }
 
 /** ChallengesChip (ux.md §2.1): pennant + "2 challenges this week" ([compact]: the count only; a11y keeps the phrase). */

@@ -63,7 +63,6 @@ import com.bainbridgetrails.ui.play.screens.LogTrailing
 import com.bainbridgetrails.ui.play.screens.LogbookLogic
 import com.bainbridgetrails.ui.theme.BtTheme
 import org.jetbrains.compose.resources.StringResource
-import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /** `play_kind_*` for a Logbook kind (goal words through `LocalGoal`). */
@@ -131,7 +130,7 @@ fun LogbookRow(row: LogRowModel, modifier: Modifier = Modifier) {
     if (value != null && whatRes != null) {
         val template = LocalGoal.current.s(whatRes)
         what = stringResource(template, value.text)
-        spokenWhat = stringResource(template, pluralStringResource(value.unit.spoken, value.pluralQuantity, value.number))
+        spokenWhat = stringResource(template, spokenValue(value))
     } else {
         what = row.what
         spokenWhat = row.what

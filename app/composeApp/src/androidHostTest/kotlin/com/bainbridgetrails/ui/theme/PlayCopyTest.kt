@@ -82,6 +82,7 @@ class PlayCopyTest {
             "play_trail_ms_high" to listOf("High ground"),
             "play_trail_ms_high_title" to listOf("High-ground trails"),
             "play_trail_ms_high_line" to listOf("%1\$d of %2\$d trails"),
+            "play_trail_ms_high_row_a11y" to listOf("%1\$s, %2\$s of climb"),
             "play_challenge_progress_climb" to listOf("%1\$s of %2\$s climbed"),
             "play_challenge_progress_parks" to listOf("%1\$d of %2\$d park", "%1\$d of %2\$d parks"),
             "play_unit_feet_a11y" to listOf("%1\$s foot", "%1\$s feet"),

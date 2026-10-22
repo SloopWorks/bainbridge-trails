@@ -41,6 +41,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.isSpecified
 import com.bainbridgetrails.data.Units
 import com.bainbridgetrails.map.RoadCaution
 import com.bainbridgetrails.map.RoadEnd
@@ -101,6 +103,7 @@ import com.bainbridgetrails.ui.theme.PlayColors
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.PI
+import kotlin.math.min
 import kotlin.math.roundToLong
 
 // ---- labels (docs/roads/product.md §3) -------------------------------------------------------------------------
@@ -518,10 +521,19 @@ fun MilestoneMedallion(
             MilestoneState.NEXT -> colors.nextMark
             MilestoneState.LOCKED -> colors.lockedMark
         }
-        val style = if (mark.length > 2) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge
+        val base = if (mark.length > 2) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge
+        // UX-9: the mark grows with the font scale only to 1.3× ("4,101" fits the 64dp medallion at 2.0); ≤ 1.3 unchanged.
+        val k = medallionMarkScale(LocalDensity.current.fontScale)
+        val style = if (k < 1f) base.copy(fontSize = base.fontSize * k, lineHeight = if (base.lineHeight.isSpecified) base.lineHeight * k else base.lineHeight) else base
         Text(mark, style = style, color = color, maxLines = 1, textAlign = TextAlign.Center)
     }
 }
+
+/** Largest font scale a [MilestoneMedallion] mark follows (the Me hero's `statHero` cap). */
+private const val MEDALLION_MARK_MAX_FONT_SCALE = 1.3f
+
+/** Factor on the mark's sp size so its effective growth stops at [MEDALLION_MARK_MAX_FONT_SCALE]; 1 at or below it. */
+internal fun medallionMarkScale(fontScale: Float): Float = min(1f, MEDALLION_MARK_MAX_FONT_SCALE / fontScale)
 
 /** Medallion + 2-line title (+ "3.2 / 5" when next), 96dp wide, whole column clickable (ux.md §5.3). */
 @Composable

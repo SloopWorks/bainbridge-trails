@@ -236,7 +236,7 @@ class GoalVocabularyGuardTest {
             "play_trail_ms_so_far", "play_trail_ms_climb", "play_trail_ms_miles", "play_trail_ms_parks",
             "play_trail_ms_parks_title", "play_trail_ms_parks_line", "play_trail_ms_park_finished",
             "play_trail_ms_park_started", "play_trail_ms_park_not_started", "play_trail_ms_high",
-            "play_trail_ms_high_title", "play_trail_ms_high_line", "play_challenge_progress_climb",
+            "play_trail_ms_high_title", "play_trail_ms_high_line", "play_trail_ms_high_row_a11y", "play_challenge_progress_climb",
             "play_challenge_progress_parks", "play_unit_feet_a11y", "play_unit_metres_a11y", "play_unit_miles_a11y",
             "play_unit_km_a11y",
         )

@@ -237,6 +237,7 @@ trails) so AC 6's routing rule holds uniformly.
 | play_trail_ms_high | High ground |
 | play_trail_ms_high_title | High-ground trails |
 | play_trail_ms_high_line | %1$d of %2$d trails |
+| play_trail_ms_high_row_a11y | %1$s, %2$s of climb |
 | play_challenge_progress_climb | %1$s of %2$s climbed |
 | play_challenge_progress_parks (plural on %2$d) | one: %1$d of %2$d park · other: %1$d of %2$d parks |
 | play_unit_feet_a11y / _metres_a11y / _miles_a11y / _km_a11y (plurals) | %1$s feet · %1$s metres · %1$s miles · %1$s kilometres (one: foot / metre / mile / kilometre) |

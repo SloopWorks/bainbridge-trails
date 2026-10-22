@@ -126,6 +126,8 @@ import kotlinx.datetime.TimeZone
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private const val HISTORY_PAGE = 20
 
@@ -196,7 +198,10 @@ fun MeScreen(
                 value = if (play == null || goal.isRoads) {
                     TrailMilestonesLoad.Absent
                 } else {
-                    TrailMilestonesLogic.model(play.trailRewardTables(), play.trailRewardInput(), trailNames::get, goal.isRoads)
+                    val tables = play.trailRewardTables()
+                    val input = play.trailRewardInput()
+                    // The ladders and the high-ground sort are CPU work: off the main thread.
+                    withContext(Dispatchers.Default) { TrailMilestonesLogic.model(tables, input, trailNames::get, goal.isRoads) }
                         ?.let(TrailMilestonesLoad::Ready) ?: TrailMilestonesLoad.Absent
                 }
             }

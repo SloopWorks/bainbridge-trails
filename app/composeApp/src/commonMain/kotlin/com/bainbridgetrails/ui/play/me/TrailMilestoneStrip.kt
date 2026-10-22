@@ -1,9 +1,11 @@
 package com.bainbridgetrails.ui.play.me
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -14,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.resources.Res
@@ -32,9 +35,8 @@ import com.bainbridgetrails.ui.components.MilestoneBadge
 import com.bainbridgetrails.ui.components.MilestoneColors
 import com.bainbridgetrails.ui.components.SectionHeader
 import com.bainbridgetrails.ui.components.SkeletonBlock
-import com.bainbridgetrails.ui.play.components.TrailValue
+import com.bainbridgetrails.ui.play.components.spokenValue
 import com.bainbridgetrails.ui.theme.BtTheme
-import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -50,7 +52,8 @@ fun TrailMilestoneStrip(model: TrailMilestonesModel?, units: com.bainbridgetrail
         SectionHeader(
             stringResource(goal.s(Res.string.play_trail_ms_title)),
             Modifier.padding(horizontal = BtTheme.spacing.screenH),
-            action = stringResource(goal.s(Res.string.play_trail_ms_all)) to onAll,
+            // Nothing to open until the tables are read (the skeleton badges are not buttons either).
+            action = if (model != null) stringResource(goal.s(Res.string.play_trail_ms_all)) to onAll else null,
         )
         if (model == null) {
             Row(
@@ -119,19 +122,23 @@ private fun badgeTitle(b: TrailBadge, spoken: Boolean): String {
     }
 }
 
-/** A value with its unit spoken in full ("820 feet"; ux § 1): TalkBack / VoiceOver do not expand "ft" reliably. */
-@Composable
-internal fun spokenValue(v: TrailValue): String = pluralStringResource(LocalGoal.current.p(v.unit.spoken), v.pluralQuantity, v.number)
-
-/** Loading badge (ux § 5.1): a 64dp circle and a 72×12dp line; [SkeletonBlock] drops its shimmer under reduced motion. */
+/**
+ * Loading badge (ux § 5.1): a 64dp circle, a 72×12dp title line and a 40×12dp progress line, each line centred in the
+ * slot a real NEXT badge gives it (2-line `labelMedium` title, `numeric` progress, in sp so it follows the font scale),
+ * so the strip keeps its height when the badges land. [SkeletonBlock] drops its shimmer under reduced motion.
+ */
 @Composable
 private fun SkeletonBadge() {
+    val density = LocalDensity.current
+    val titleSlot = with(density) { (MaterialTheme.typography.labelMedium.lineHeight * 2).toDp() }
+    val progressSlot = with(density) { BtTheme.type.numeric.lineHeight.toDp() }
     Column(
         Modifier.width(96.dp).padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         SkeletonBlock(64.dp, 64.dp, shape = CircleShape)
-        SkeletonBlock(72.dp, 12.dp)
+        Box(Modifier.height(titleSlot), contentAlignment = Alignment.Center) { SkeletonBlock(72.dp, 12.dp) }
+        Box(Modifier.height(progressSlot), contentAlignment = Alignment.Center) { SkeletonBlock(40.dp, 12.dp) }
     }
 }

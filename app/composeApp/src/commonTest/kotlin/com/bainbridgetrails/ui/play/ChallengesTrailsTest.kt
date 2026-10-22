@@ -8,6 +8,10 @@ import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.config.PlayConfigResult
+import com.bainbridgetrails.play.rules.BoardState
+import com.bainbridgetrails.play.rules.LogEntry
+import com.bainbridgetrails.play.rules.LogKind
+import com.bainbridgetrails.play.rules.Logbook
 import com.bainbridgetrails.play.schedule.PlayContext
 import com.bainbridgetrails.play.schedule.PlayScheduler
 import com.bainbridgetrails.ui.play.components.PlayFormat
@@ -19,8 +23,10 @@ import com.bainbridgetrails.ui.play.screens.ChallengeState
 import com.bainbridgetrails.ui.play.screens.ChallengesLogic
 import com.bainbridgetrails.ui.play.screens.GoalNouns
 import com.bainbridgetrails.ui.play.screens.WhatsOnLogic
+import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -123,6 +129,29 @@ class ChallengesTrailsTest {
         val rows = WhatsOnLogic.model(agenda, config, Goal.trails, now, hidden).today.map { it.itemId }
         assertTrue("ch-climb" !in rows && "ch-parkhop" !in rows, "$rows")
         assertTrue("ch-climb" in WhatsOnLogic.model(agenda, config, Goal.trails, now).today.map { it.itemId })
+    }
+
+    @Test
+    fun `chip is held until the trail statuses are read`() {
+        // Trails ux § 7 / UI review P2-2: before the first read (null) a hidden ch-climb / ch-parkhop would be counted
+        // and then dropped, so the chip shows nothing until the statuses arrive.
+        assertEquals(0, ChallengesChipLogic.count(agenda, null))
+        assertTrue(ChallengesChipLogic.count(agenda, emptyMap()) > 0)
+    }
+
+    @Test
+    fun `statuses re-read on a new complete entry, not on every find`() {
+        // UI review P3-9: rememberTrailChallenges is keyed on the Logbook's `complete` entries (what P reads), so a find
+        // or a board change does not re-read coverage, and a newly completed trail still does.
+        val d = LocalDate(2026, 10, 21)
+        fun e(id: String, kind: LogKind, content: String?, board: BoardState = BoardState.pending) =
+            LogEntry(id, kind, "w", "y", d, 10, contentId = content, board = board)
+        val base = Logbook(listOf(e("a", LogKind.complete, "t1"), e("b", LogKind.coverage, null)))
+        val key = ChallengesLogic.completionKey(base)
+        assertEquals(key, ChallengesLogic.completionKey(Logbook(base.entries + e("c", LogKind.treasure, "occ-1"))))
+        assertEquals(key, ChallengesLogic.completionKey(Logbook(base.entries.map { it.copy(board = BoardState.accepted) })))
+        assertNotEquals(key, ChallengesLogic.completionKey(Logbook(base.entries + e("d", LogKind.complete, "t2"))))
+        assertNull(ChallengesLogic.completionKey(null))
     }
 
     @Test

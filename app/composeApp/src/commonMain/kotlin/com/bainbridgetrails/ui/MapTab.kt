@@ -291,8 +291,10 @@ fun MapTab(
     val playOn = settings.play.enabled
     val playAgenda = play?.agenda?.collectAsStateWithLifecycle()?.value
     val playState = play?.store?.state?.collectAsStateWithLifecycle()?.value
-    // Trails ux § 7: a climb / parks challenge with nothing left is not counted on the ChallengesChip (empty on roads).
-    val trailChallenges = play?.let { rememberTrailChallenges(it, playAgenda, playState?.logbook) }
+    // Trails ux § 7: a climb / parks challenge with nothing left is not counted on the ChallengesChip. Trails: null until
+    // read (the chip is held); roads: always empty (the chip counts as before).
+    val roads = LocalGoal.current.isRoads
+    val trailChallenges = play?.let { rememberTrailChallenges(it, playAgenda, playState?.logbook) }.let { if (roads) emptyMap() else it }
     val playConfig = play?.config?.collectAsStateWithLifecycle()?.value?.config
     // P2-10: the marker renderer, its registry and the sheet copy exist only while Play is on.
     val playMarkerArt = remember(playOn) { PlayMapAlloc.markersOrNull(playOn) }
@@ -728,7 +730,7 @@ fun MapTab(
                     )
                 } else {
                     val total = playState?.logbook?.total
-                    val count = agenda?.let { ChallengesChipLogic.count(it, trailChallenges.orEmpty()) } ?: 0
+                    val count = agenda?.let { ChallengesChipLogic.count(it, trailChallenges) } ?: 0
                     val shownTotal = total?.takeIf { agenda != null }
                     val rankTitle = stringResource(Ranks.of(shownTotal ?: 0).titleRes)
                     // §2.1 / §5.3: compact by measurement (Challenges chip first, then the rank title); both compact
