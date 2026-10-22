@@ -66,11 +66,12 @@ object TrailMilestonesLogic {
     private const val LOCKED_AHEAD = 2
 
     /**
-     * The model, or null on roads ([isRoads], ux § 0.1) or while the tables or the input are unknown. [names]: a trail
-     * id's display name (the dataset's), falling back to the id.
+     * The model, or null while the tables or the input are unknown, which includes roads: its tables are always null
+     * (ux § 0.1; `PlayRepository.trailRewardTables`, and MeScreen does not ask on roads). [names]: a trail id's display
+     * name (the dataset's), falling back to the id.
      */
-    fun model(tables: TrailTables?, input: TrailRewardInput?, names: (String) -> String?, isRoads: Boolean): TrailMilestonesModel? {
-        if (isRoads || tables == null || input == null) return null
+    fun model(tables: TrailTables?, input: TrailRewardInput?, names: (String) -> String?): TrailMilestonesModel? {
+        if (tables == null || input == null) return null
         val done = input.completed.filter { it in tables.gainDm && it !in tables.quietFeatures }.toSet()
         val touched = input.touchedParks.toSet()
         val parks = tables.parks.sorted().map { p ->
@@ -90,8 +91,9 @@ object TrailMilestonesLogic {
         return TrailMilestonesModel(
             climbDm = done.sumOf { tables.gainDm.getValue(it) },
             coveredM = input.nonQuietCoveredM,
-            // An island shorter than a mile still shows the 1 mi step (the strip is always four badges).
-            mileSteps = TrailRewardFormat.mileLadder(islandM).ifEmpty { listOf(1) },
+            // W-MILE's own ladder up to the island's reachable top; an island shorter than a mile still shows the
+            // 1 mi step (the strip is always four badges).
+            mileSteps = TrailRewards.mileSteps(islandM / TrailRewards.METRES_PER_MILE).ifEmpty { listOf(1) },
             parks = parks,
             high = high,
         )
@@ -133,7 +135,7 @@ object TrailMilestonesLogic {
 
     /** "So far: 1,207 ft": floor, clamped against the whole climb ladder (TrailRewardFormat.climbSoFar). */
     fun climbSoFar(m: TrailMilestonesModel, units: Units): TrailValue =
-        TrailRewardFormat.climbSoFar(m.climbM, units, TrailRewards.CLIMB_STEPS_M)
+        TrailRewardFormat.climbSoFar(m.climbM, units)
 
     /** "So far: 41.3 mi": floor to one decimal, clamped against the reachable mile ladder. */
     fun milesSoFar(m: TrailMilestonesModel, units: Units): TrailValue =

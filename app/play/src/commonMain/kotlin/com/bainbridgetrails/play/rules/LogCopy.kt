@@ -84,7 +84,7 @@ object LogCopy {
         "blakely-cemetery" to "Visited Port Blakely Cemetery",
     )
 
-    /** The kinds with a line (v2 kinds have none yet). */
+    /** The kinds with a line: all but [LogKind.bramble], [LogKind.horn] and [LogKind.wave], which nothing writes yet. */
     val kinds: Set<LogKind> get() = BY_KIND.keys
 
     operator fun get(kind: LogKind): LogLine = BY_KIND[kind] ?: error("no Logbook copy for $kind")

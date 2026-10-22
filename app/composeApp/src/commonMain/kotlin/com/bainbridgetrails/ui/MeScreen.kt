@@ -201,7 +201,7 @@ fun MeScreen(
                     val tables = play.trailRewardTables()
                     val input = play.trailRewardInput()
                     // The ladders and the high-ground sort are CPU work: off the main thread.
-                    withContext(Dispatchers.Default) { TrailMilestonesLogic.model(tables, input, trailNames::get, goal.isRoads) }
+                    withContext(Dispatchers.Default) { TrailMilestonesLogic.model(tables, input, trailNames::get) }
                         ?.let(TrailMilestonesLoad::Ready) ?: TrailMilestonesLoad.Absent
                 }
             }

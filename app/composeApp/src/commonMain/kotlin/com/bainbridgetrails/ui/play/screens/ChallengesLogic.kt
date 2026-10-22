@@ -218,7 +218,7 @@ object ChallengesLogic {
         val shownProgress = if (state == ChallengeState.Upcoming) null else progress
         val climbTarget = if (metric == ChallengeMetric.climb && target != null) TrailRewardFormat.climbStep(target / 10.0, units) else null
         val climbProgress = if (climbTarget != null && target != null && shownProgress != null) {
-            TrailRewardFormat.climbProgress(shownProgress / 10.0, target / 10.0, units).first
+            TrailRewardFormat.climbProgress(shownProgress / 10.0, target / 10.0, units)
         } else {
             null
         }

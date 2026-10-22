@@ -1,5 +1,6 @@
 package com.bainbridgetrails.data
 
+import com.bainbridgetrails.ui.theme.TrailsEditionCopy
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -181,11 +182,14 @@ class GoalVocabularyGuardTest {
         assertEquals(emptyList(), TRAIL_ONLY.filter { it !in entries })
     }
 
-    /** docs/play/trails/ux.md § 8: the trails edition's keys exist and have no roads twin and no Roads override. */
+    /**
+     * docs/play/trails/ux.md § 8: the trails edition's keys ([TrailsEditionCopy]) exist and have no roads twin and no
+     * Roads override: they are composed only on trails (ux § 0) and rendered through `LocalGoal.current` (identity).
+     */
     @Test
     fun trailsEditionKeysHaveNoRoadsTwin() {
         val overridden = GoalVocabulary.Roads.stringOverrides.keys.map { it.key }.toSet() + GoalVocabulary.Roads.pluralOverrides.keys.map { it.key }
-        val problems = TRAILS_V1_1.flatMap { k ->
+        val problems = TrailsEditionCopy.TEXTS.keys.flatMap { k ->
             listOfNotNull(
                 "$k is missing".takeIf { k !in entries },
                 "roads_$k exists".takeIf { "roads_$k" in entries },
@@ -219,26 +223,10 @@ class GoalVocabularyGuardTest {
         val TRAIL_ONLY = setOf(
             "detail_trailheads", "detail_trailhead_row", "detail_official_map", "detail_official_map_host",
             "trails_filter_park", "trails_filter_park_all", "trails_filter_park_none", "trails_park_sheet_title",
-            "play_kind_park_complete", // (v2) W-PARKC: parks are trails-only (docs/play/product.md §3.2)
+            "play_kind_park_complete", // W-PARKC (Play trails v1.1): parks are trails-only (docs/play/product.md §3.2)
             // Trails edition v1.1 (docs/play/trails/ux.md § 8): the § 8 keys whose text says "trail".
             "play_kind_start_trails", "play_log_mile_what", "play_trail_ms_title", "play_trail_ms_miles",
             "play_trail_ms_high_title", "play_trail_ms_high_line",
-        )
-
-        /**
-         * Every copy key of the trails edition (docs/play/trails/ux.md § 8): composed only on trails (ux § 0), so none
-         * has a `roads_` twin or a GoalVocabulary.Roads override; rendered through `LocalGoal.current` (identity).
-         */
-        val TRAILS_V1_1 = setOf(
-            "play_kind_climb", "play_kind_high_ground", "play_kind_start_trails", "play_log_climb_what",
-            "play_log_mile_what", "play_results_more", "play_trail_ms_title", "play_trail_ms_all",
-            "play_trail_ms_progress", "play_trail_ms_next_a11y", "play_trail_ms_earned_a11y", "play_trail_ms_locked_a11y",
-            "play_trail_ms_so_far", "play_trail_ms_climb", "play_trail_ms_miles", "play_trail_ms_parks",
-            "play_trail_ms_parks_title", "play_trail_ms_parks_line", "play_trail_ms_park_finished",
-            "play_trail_ms_park_started", "play_trail_ms_park_not_started", "play_trail_ms_high",
-            "play_trail_ms_high_title", "play_trail_ms_high_line", "play_trail_ms_high_row_a11y", "play_challenge_progress_climb",
-            "play_challenge_progress_parks", "play_unit_feet_a11y", "play_unit_metres_a11y", "play_unit_miles_a11y",
-            "play_unit_km_a11y",
         )
 
         /** docs/play/product.md §7.3 keys marked (goal): each has a `roads_` twin. */

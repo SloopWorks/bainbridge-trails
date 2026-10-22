@@ -6,6 +6,7 @@ import com.bainbridgetrails.play.rules.TrailRewardInput
 import com.bainbridgetrails.play.rules.TrailRewards
 import com.bainbridgetrails.play.rules.TrailTables
 import com.bainbridgetrails.ui.MilestoneState
+import com.bainbridgetrails.ui.Milestones
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -31,7 +32,7 @@ class TrailMilestonesLogicTest {
     private val names: (String) -> String? = { TrailFixtures.names[it] }
 
     private fun model(input: TrailRewardInput, t: TrailTables = tables): TrailMilestonesModel =
-        assertNotNull(TrailMilestonesLogic.model(t, input, names, isRoads = false))
+        assertNotNull(TrailMilestonesLogic.model(t, input, names))
 
     private val newPlayer = TrailRewardInput(0.0, emptyList(), emptyList(), emptySet(), islandWhole = false)
 
@@ -176,8 +177,23 @@ class TrailMilestonesLogicTest {
 
     @Test
     fun `roads model null`() {
-        assertNull(TrailMilestonesLogic.model(tables, afterThreeWalks, names, isRoads = true))
-        assertNull(TrailMilestonesLogic.model(null, afterThreeWalks, names, isRoads = false))
-        assertNull(TrailMilestonesLogic.model(tables, null, names, isRoads = false))
+        // Roads: PlayRepository.trailRewardTables is null off the trails goal, so the model is too.
+        assertNull(TrailMilestonesLogic.model(null, afterThreeWalks, names))
+        assertNull(TrailMilestonesLogic.model(null, null, names))
+        assertNull(TrailMilestonesLogic.model(tables, null, names))
+    }
+
+    @Test
+    fun `mile ladder is the rules' own and equals Milestones distanceStep`() {
+        val totalM = 60 * mile + 500
+        val ladder = model(newPlayer, tables.copy(segmentLengthM = mapOf("seg-x" to totalM))).mileSteps
+        assertEquals(listOf(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60), ladder)
+        assertEquals(ladder.indices.map(Milestones::distanceStep), ladder)
+        // Parity with the rules' own ladder (review L2-1 #2: the logic delegates, it does not re-derive).
+        assertEquals(TrailRewards.mileSteps(totalM / TrailRewards.METRES_PER_MILE), ladder)
+        assertEquals(listOf(1, 5), model(newPlayer, tables.copy(segmentLengthM = mapOf("seg-x" to 5 * mile))).mileSteps)
+        // Under a mile the rules' ladder is empty; the strip still shows the 1 mi step.
+        assertEquals(emptyList(), TrailRewards.mileSteps(1609.0 / TrailRewards.METRES_PER_MILE))
+        assertEquals(listOf(1), model(newPlayer, tables.copy(segmentLengthM = mapOf("seg-x" to 1609.0))).mileSteps)
     }
 }

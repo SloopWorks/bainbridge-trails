@@ -71,7 +71,7 @@ object TrailRewardFormat {
      * highest reached step as shown, then at most the next step as shown − 1. So 750 m under its earned 2,461 ft step
      * shows "2,461 ft" (not the floor 2,460) and 499.9 m short of the 1,640 ft step shows "1,639 ft".
      */
-    fun climbSoFar(metres: Double, units: Units, stepsM: List<Int>): TrailValue {
+    fun climbSoFar(metres: Double, units: Units, stepsM: List<Int> = TrailRewards.CLIMB_STEPS_M): TrailValue {
         val dm = decimetres(metres)
         val reached = stepsM.lastOrNull { dm >= it * 10L }
         val next = stepsM.firstOrNull { dm < it * 10L }
@@ -85,19 +85,12 @@ object TrailRewardFormat {
     fun climbStep(metres: Double, units: Units): TrailValue = TrailValue(whole(climbTicks(metres, units)), climbUnit(units))
 
     /**
-     * Challenge climb "progress of target" (ux § 7): progress is capped at the target once done
-     * ("150 of 150 m climbed"), and clamped below it while not ("149 of 150 m").
+     * Challenge climb progress of a target (ux § 7), the "progress" half of "progress of target" (the target is
+     * [climbStep]): capped at the target once done ("150 of 150 m climbed"), clamped below it while not ("149 of 150 m").
      */
-    fun climbProgress(progressM: Double, targetM: Double, units: Units): Pair<TrailValue, TrailValue> {
+    fun climbProgress(progressM: Double, targetM: Double, units: Units): TrailValue {
         val done = decimetres(progressM) >= decimetres(targetM)
-        return climb(if (done) targetM else progressM, units, targetM) to climbStep(targetM, units)
-    }
-
-    /** Trail distance so far: floor, one decimal ("7.4 mi" / "11.9 km"); with [stepMi], clamped against that step. */
-    fun distance(metres: Double, units: Units, stepMi: Int? = null): TrailValue {
-        var shown = floorTicks(metres / metresPerUnit(units) * 10)
-        if (stepMi != null) shown = clamp(shown, mileStepTenths(stepMi, units), metres / METRES_PER_MILE + EPS >= stepMi)
-        return TrailValue(tenths(shown), distanceUnit(units))
+        return climb(if (done) targetM else progressM, units, targetM)
     }
 
     /**
@@ -120,12 +113,6 @@ object TrailRewardFormat {
         Units.MILES -> TrailValue(whole(miles.toLong()), TrailUnit.MILES)
         Units.KILOMETRES -> TrailValue(tenths(mileStepTenths(miles, units)), TrailUnit.KILOMETRES)
     }
-
-    /**
-     * The trail-mile ladder (W-MILE: 1, then every 5, [TrailRewards.mileSteps]) up to the reachable top, the highest
-     * step ≤ [totalM] (the island's non-quiet trail distance) in miles.
-     */
-    fun mileLadder(totalM: Double): List<Int> = TrailRewards.mileSteps(totalM / METRES_PER_MILE)
 
     fun climbUnit(units: Units): TrailUnit = if (units == Units.MILES) TrailUnit.FEET else TrailUnit.METRES
 
