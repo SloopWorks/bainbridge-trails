@@ -22,7 +22,7 @@ import {
   limitsFrom,
 } from "../plausibility";
 import { type Evaluation, assertNoPlayWrites, evaluatePlay, loadPlayState, parsePlay, playResponse, playStatements } from "../play/claims";
-import { PACKS } from "../play/config";
+import { packByVersion } from "../play/config";
 import { walkDerivedMarks } from "../play/marks";
 import { trailQualifying } from "../play/trails";
 import { LIMITS, rateLimit } from "../ratelimit";
@@ -237,12 +237,10 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
     let playEval: Evaluation | null = null;
     let playStmts: D1PreparedStatement[] = [];
     if (play && playState) {
-      const packs = deps.packs ?? PACKS;
       playEval = evaluatePlay(play, {
         dataset,
         now,
-        packFor: packs.byVersion,
-        current: packs.current,
+        packFor: packByVersion,
         freshWalks: new Map(fresh.map((w) => [w.id, w.durationS])),
         coverage: merged,
         existing: playState.existing,

@@ -2,48 +2,17 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { challengesOf, completionProgress, contributionOccurrence } from "../src/play/challenges";
 import { evaluatePlay, parsePlay } from "../src/play/claims";
-import { CURRENT as REAL, type PlayPacks, packByVersion } from "../src/play/config";
+import { CURRENT, packByVersion } from "../src/play/config";
 import { DERIVED } from "../src/play/derived";
-import type { PlayItem, PlayPack } from "../src/play/recurrence";
+import type { PlayPack } from "../src/play/recurrence";
 import { LIMITS } from "../src/ratelimit";
 import { type Harness, devLogin, harness, trailFull, upload } from "./helpers";
 
 /**
  * L3-2 (plan § 3; D5, P1-1, P2-6, P2-7; PD-26; privacy review: D12 reversed, park-hop is a per-upload count):
- * `ch-climb` and `ch-parkhop` on the server, plus the `/v1/play/me` privacy checks (isolation, 401, per-user limit).
- * The pack gains the two items in 2026.11.3 (stage L4-2, concurrent), so this suite runs against the CURRENT pack
- * with the two items injected (`Deps.packs`, same version) unless the pack already carries them; `current pack: both
- * trails-only, absent for roads` reads the real pack and skips until L4-2 lands.
+ * `ch-climb` and `ch-parkhop` on the server (bundled pack 2026.11.3 carries both), plus the `/v1/play/me` privacy
+ * checks (isolation, 401, per-user limit).
  */
-
-const ITEMS: PlayItem[] = [
-    {
-      id: "ch-climb",
-      type: "challenge",
-      lore: "challenge",
-      goals: ["trails"],
-      when: { every: "week", on: ["mon"], from: "00:00", to: "24:00", days: 7 },
-      marks: 100,
-      repeat: "once",
-      resolve: { by: "challenge" },
-      challenge: { scope: "solo", metric: "climb", target: { trails: 150 } },
-    },
-    {
-      id: "ch-parkhop",
-      type: "challenge",
-      lore: "challenge",
-      goals: ["trails"],
-      when: { every: "week", on: ["sat"], from: "00:00", to: "24:00", days: 2 },
-      marks: 100,
-      repeat: "once",
-      resolve: { by: "challenge" },
-      challenge: { scope: "solo", metric: "parks", target: { trails: 3 } },
-    },
-];
-const MISSING = ITEMS.filter((i) => !REAL.items.some((x) => x.id === i.id));
-/** The CURRENT pack with ch-climb / ch-parkhop injected (its own version, so claims name it). */
-const CURRENT: PlayPack = MISSING.length === 0 ? REAL : { ...REAL, items: [...REAL.items, ...MISSING] };
-const PACKS: PlayPacks = { current: CURRENT, byVersion: (v) => (v === CURRENT.version ? CURRENT : packByVersion(v)) };
 
 const PACK = CURRENT.version;
 const pdt = (y: number, mo: number, d: number, h: number) => Date.UTC(y, mo - 1, d, h + 7);
@@ -89,7 +58,6 @@ let h: Harness;
 
 beforeEach(() => {
   h = harness();
-  h.deps.packs = PACKS;
   h.clock.t = pdt(2026, 10, 29, 14); // Thu 2026-10-29 14:00 PDT, week 2026-10-26
 });
 
@@ -129,8 +97,7 @@ describe("ch-climb / ch-parkhop claims on PUT /v1/coverage (L3-2)", () => {
       evaluatePlay(parsePlay({ playConfig: PACK, play: [{ walkId, claims: [claim(CLIMB)] }] })!, {
         dataset: "trails",
         now: h.clock.t,
-        packFor: PACKS.byVersion,
-        current: CURRENT,
+        packFor: packByVersion,
         freshWalks: new Map([[walkId, 3600]]),
         coverage: new Map(),
         existing: new Set(),
@@ -379,27 +346,18 @@ describe("D5 personal target", () => {
 });
 
 describe("pack", () => {
-  const real = REAL;
-  const hasBoth = MISSING.length === 0;
-
-  it.skipIf(!hasBoth)("current pack: both trails-only, absent for roads", async () => {
-    h.deps.packs = undefined; // the bundled packs
+  it("current pack: both trails-only, absent for roads", async () => {
     for (const id of ["ch-climb", "ch-parkhop"]) {
-      const item = real.items.find((i) => i.id === id)!;
+      const item = CURRENT.items.find((i) => i.id === id)!;
       expect(item.goals, id).toEqual(["trails"]);
       expect((item.challenge as { target: Record<string, number> }).target).toEqual({ trails: id === "ch-climb" ? 150 : 3 });
     }
-    expect(challengesOf(real, "trails").map((d) => d.item.id)).toEqual(expect.arrayContaining(["ch-climb", "ch-parkhop"]));
-    expect(challengesOf(real, "roads").map((d) => d.item.id)).not.toEqual(expect.arrayContaining(["ch-climb"]));
+    expect(challengesOf(CURRENT, "trails").map((d) => d.item.id)).toEqual(expect.arrayContaining(["ch-climb", "ch-parkhop"]));
+    expect(challengesOf(CURRENT, "roads").map((d) => d.item.id)).not.toEqual(expect.arrayContaining(["ch-climb"]));
     const roads = (await (await h.call("GET", "/v1/play/challenges?dataset=roads")).json()) as { current: { id: string }[] };
     expect(roads.current.map((c) => c.id)).not.toContain("ch-climb");
     expect(roads.current.map((c) => c.id)).not.toContain("ch-parkhop");
   });
-  if (!hasBoth) {
-    it("current pack: both trails-only, absent for roads (pending L4-2)", () => {
-      console.log(`play-trails-challenges: pack ${real.version} has no ch-climb / ch-parkhop yet (L4-2 adds them in 2026.11.3); the pack guard is skipped`);
-    });
-  }
 
   it("roads never evaluates climb or parks, even if a pack lists them", () => {
     const pack: PlayPack = {

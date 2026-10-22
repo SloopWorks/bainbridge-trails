@@ -1,11 +1,8 @@
 import type { JSONWebKeySet } from "jose";
-import type { PlayPacks } from "./play/config";
 
-/** Injectable side effects, so tests can supply JWKS, outbound fetch, a clock and the Play packs. */
+/** Injectable side effects, so tests can supply JWKS, outbound fetch and a clock. */
 export interface Deps {
   now(): number;
-  /** The Play packs claims and challenges are evaluated against (default: the bundled `config.PACKS`). */
-  packs?: PlayPacks;
   /** `refresh`: the token's kid was not found; refetch unless refetched in the last 5 min. */
   fetchJwks(url: string, refresh?: boolean): Promise<JSONWebKeySet>;
   /** Outbound calls other than JWKS (Apple token exchange / revocation). */

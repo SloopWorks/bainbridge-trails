@@ -66,7 +66,8 @@ export interface TrailInputs {
 
 export type TrailMetric = "climb" | "parks";
 
-const tablesOf = (dataset: Dataset): TrailTables | null => DERIVED[dataset].trailRules;
+/** The trails tables of `dataset` (null on roads: no trails rules, no `climb` / `parks` challenges). */
+export const tablesOf = (dataset: Dataset): TrailTables | null => DERIVED[dataset].trailRules;
 
 /**
  * Covered metres per counted (included) segment, clamped to its length, in dataset order, from coverage bits. The
@@ -134,9 +135,12 @@ export function qualifyingKeys(inputs: TrailInputs, completed: Iterable<string>,
   return keys;
 }
 
+/** Kind of a key by its prefix; `island` only for the exact key (mirrors Kotlin `TrailRewards.kindOf`). */
 export function kindOf(key: string): TrailKind | null {
   const colon = key.indexOf(":");
-  return KIND_BY_PREFIX[colon < 0 ? key : key.slice(0, colon)] ?? null;
+  const prefix = colon < 0 ? key : key.slice(0, colon);
+  if (prefix === "island") return key === "island" ? "island" : null;
+  return KIND_BY_PREFIX[prefix] ?? null;
 }
 
 /** Marks a key pays (0 for an unknown key). */
@@ -170,27 +174,21 @@ export function trailQualifying(dataset: Dataset, cov: CoverageMap, completed: I
 }
 
 /**
- * D5 personal challenge target: `min(default, remaining(completed) + progress)`. `climb`: remaining = Σ dm of non-quiet
- * trails not completed, `progress` in dm; `parks`: remaining = Play parks with ≥ 1 non-quiet trail not completed,
- * `progress` = the distinct parks already hopped this window (counted into the union when the names are known; the
- * server keeps a count only, D12 reversed, and adds it: a hopped park still in `remaining` is then counted twice, a
- * bounded overestimate that only matters below the default). 0 = nothing left to do (no card, no claim).
+ * D5 personal challenge target: `min(default, remaining(completed) + progress)`, `progress` a count. `climb`:
+ * remaining = Σ dm of non-quiet trails not completed, `progress` in dm. `parks`: remaining = the number of Play parks
+ * with ≥ 1 non-quiet trail not completed, `progress` = the parks hopped this window (the server keeps a count only,
+ * D12 reversed; a hopped park still in `remaining` is counted twice, a bounded overestimate that only matters below
+ * the default). 0 = nothing left to do (no card, no claim).
  */
-export function challengeTarget(
-  metric: TrailMetric,
-  dflt: number,
-  completed: Iterable<string>,
-  progress: number | readonly string[],
-  tables: TrailTables | null,
-): number {
+export function challengeTarget(metric: TrailMetric, dflt: number, completed: Iterable<string>, progress: number, tables: TrailTables | null): number {
   if (!tables) return 0;
   const c = new Set(completed);
   if (metric === "climb") {
     let remaining = 0;
     for (const [t, dm] of Object.entries(tables.gainDm)) if (!tables.quietFeatures.has(t) && !c.has(t)) remaining += dm;
-    return Math.min(dflt, remaining + (typeof progress === "number" ? progress : progress.length));
+    return Math.min(dflt, remaining + progress);
   }
-  const remaining = new Set(typeof progress === "number" ? [] : progress);
+  const remaining = new Set<string>();
   for (const [t, p] of Object.entries(tables.parkOf)) if (!tables.quietFeatures.has(t) && tables.parks.has(p) && !c.has(t)) remaining.add(p);
-  return Math.min(dflt, remaining.size + (typeof progress === "number" ? progress : 0));
+  return Math.min(dflt, remaining.size + progress);
 }

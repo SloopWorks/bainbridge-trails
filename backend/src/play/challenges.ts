@@ -19,7 +19,7 @@ import {
   weekId,
   weekIdAt,
 } from "./recurrence";
-import { type TrailMetric, type TrailTables, challengeTarget } from "./trails";
+import { type TrailMetric, challengeTarget, tablesOf } from "./trails";
 import { completedSet } from "../users";
 
 /**
@@ -108,9 +108,6 @@ export function challengeDef(item: PlayItem): ChallengeDef | null {
   if (spec?.scope === "island" && spec.metric === "stretches_repelled") return { item, scope: "island", metric: "stretches_repelled", spec };
   return null;
 }
-
-/** The trails tables a `climb` / `parks` challenge needs (null on roads: those metrics are never evaluated there). */
-const tablesOf = (dataset: Dataset): TrailTables | null => DERIVED[dataset].trailRules;
 
 /** Enabled, non-killed challenges of `dataset` the server evaluates (trail metrics only where the tables exist). */
 export function challengesOf(pack: PlayPack, dataset: Dataset): ChallengeDef[] {
