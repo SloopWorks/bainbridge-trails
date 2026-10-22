@@ -1,6 +1,7 @@
 package com.bainbridgetrails.ui.play.components
 
 import com.bainbridgetrails.data.Units
+import com.bainbridgetrails.play.rules.TrailRewards
 import com.bainbridgetrails.ui.Milestones
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -113,6 +114,9 @@ class TrailRewardFormatTest {
         val ladder = TrailRewardFormat.mileLadder(60 * mile + 500)
         assertEquals(listOf(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60), ladder)
         assertEquals(ladder.indices.map(Milestones::distanceStep), ladder)
+        // Parity with the rules' own ladder (review L2-1 #2: the format delegates, it does not re-derive).
+        assertEquals(TrailRewards.mileSteps((60 * mile + 500) / TrailRewards.METRES_PER_MILE), ladder)
+        assertEquals(TrailRewards.mileSteps(1.0), TrailRewardFormat.mileLadder(mile))
         assertEquals(listOf(1, 5), TrailRewardFormat.mileLadder(5 * mile))
         assertEquals(emptyList(), TrailRewardFormat.mileLadder(1609.0))
     }
@@ -130,5 +134,45 @@ class TrailRewardFormatTest {
             listOf("play_unit_feet_a11y", "play_unit_metres_a11y", "play_unit_miles_a11y", "play_unit_km_a11y"),
             TrailUnit.entries.map { it.spoken.key },
         )
+    }
+
+    private val climbSteps = TrailRewards.CLIMB_STEPS_M
+    private val mileSteps = listOf(1, 5, 10, 15)
+
+    @Test
+    fun `so far 750 m under the earned 750 m step shows 2_461 ft`() {
+        // Single-target clamp against the next step (1,000 m) alone would show 2,460 under the earned 2,461 ft badge.
+        assertEquals("2,460 ft", TrailRewardFormat.climb(750.0, mi, targetM = 1000.0).text)
+        assertEquals("2,461 ft", TrailRewardFormat.climbSoFar(750.0, mi, climbSteps).text)
+        assertEquals("750 m", TrailRewardFormat.climbSoFar(750.0, km, climbSteps).text)
+    }
+
+    @Test
+    fun `so far 499_9 m below the 500 m step shows 1_639 ft`() {
+        assertEquals("1,639 ft", TrailRewardFormat.climbSoFar(499.9, mi, climbSteps).text)
+        assertEquals("499 m", TrailRewardFormat.climbSoFar(499.9, km, climbSteps).text)
+    }
+
+    @Test
+    fun `so far 10 mi in km shows 16_1 km`() {
+        // Single-target clamp against the next step (15 mi) alone would show 16.0 under the earned 16.1 km badge.
+        assertEquals("16.0 km", TrailRewardFormat.distance(10 * mile, km, stepMi = 15).text)
+        assertEquals("16.1 km", TrailRewardFormat.distanceSoFar(10 * mile, km, mileSteps).text)
+        assertEquals("10.0 mi", TrailRewardFormat.distanceSoFar(10 * mile, mi, mileSteps).text)
+    }
+
+    @Test
+    fun `so far 1_605 m below the 1 mi step shows 1_5 km`() {
+        assertEquals("1.5 km", TrailRewardFormat.distanceSoFar(1605.0, km, mileSteps).text)
+        assertEquals("0.9 mi", TrailRewardFormat.distanceSoFar(1605.0, mi, mileSteps).text)
+    }
+
+    @Test
+    fun `so far past the top step and at zero`() {
+        assertEquals("4,490 ft", TrailRewardFormat.climbSoFar(1368.8, mi, climbSteps).text) // all 6 earned: floor only
+        assertEquals("0 ft", TrailRewardFormat.climbSoFar(0.0, mi, climbSteps).text)
+        assertEquals("0.0 km", TrailRewardFormat.distanceSoFar(0.0, km, mileSteps).text)
+        assertEquals("16.1 km", TrailRewardFormat.distanceSoFar(10 * mile, km, listOf(1, 5, 10)).text) // 10 = top
+        assertEquals("0 ft", TrailRewardFormat.climbSoFar(0.0, mi, emptyList()).text)
     }
 }

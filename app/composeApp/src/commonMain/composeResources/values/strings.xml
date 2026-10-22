@@ -441,6 +441,8 @@
     <string name="play_trail_ms_high">High ground</string>
     <string name="play_trail_ms_high_title">High-ground trails</string>
     <string name="play_trail_ms_high_line">%1$d of %2$d trails</string>
+    <!-- L2-4: a High ground row's a11y (ux § 5.2 "Peter's Trail, 302 feet of climb[, earned]"); %2$s = spoken climb -->
+    <string name="play_trail_ms_high_row_a11y">%1$s, %2$s of climb</string>
     <string name="play_challenge_progress_climb">%1$s of %2$s climbed</string>
     <!-- plural on the target (%2$d): "0 of 1 park" -->
     <plurals name="play_challenge_progress_parks">
