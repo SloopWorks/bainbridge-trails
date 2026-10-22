@@ -100,8 +100,10 @@ data class ChallengeCardText(val window: String, val progress: String?, val band
  * (active, then upcoming), merged with the server's `{band, count}` standings (`GET /v1/play/challenges`) and, for
  * solo progress when the server has not answered, the Logbook's completions inside the window. Ended challenges of
  * the last 7 days come from the server list. Nothing timed: windows are island days. Trails `climb` / `parks` cards
- * ([trail], `PlayRepository.trailChallenges` over [trailOccurrences], plan D5) take the personal target and local
- * progress from their status, `{target}` in [units]; a hidden status (nothing left) has no card (trails ux § 7).
+ * ([trail], `PlayRepository.trailChallenges` over [trailOccurrences], plan D5) take progress and target as one pair:
+ * the server's when it has both, else their status (the personal target), else the pack default with no progress;
+ * `{target}` in [units]; a hidden status (nothing left) has no card (trails ux § 7). An occurrence in [found] (the Play
+ * state's claimed set, restored ones included) is Done whatever its progress.
  */
 object ChallengesLogic {
     fun model(
@@ -114,10 +116,11 @@ object ChallengesLogic {
         nouns: GoalNouns,
         trail: Map<String, TrailChallengeStatus> = emptyMap(),
         units: Units = Units.MILES,
+        found: Set<String> = emptySet(),
     ): ChallengesModel {
         val items = config.items.associateBy { it.id }
         fun cardAt(item: Item, occ: String, start: Instant, end: Instant?, dto: PlayChallengeDto?) =
-            card(item, goal, occ, start, end, now, dto, logbook, nouns, trail[occ], units)
+            card(item, goal, occ, start, end, now, dto, logbook, nouns, trail[occ], units, occ in found)
         val byOcc = server?.current.orEmpty().associateBy { it.occ }
         val cards = ArrayList<ChallengeCardModel>()
         // A hidden trails status (nothing left, D5) counts as seen: no card from the agenda or the server list.
@@ -182,6 +185,7 @@ object ChallengesLogic {
         nouns: GoalNouns,
         status: TrailChallengeStatus?,
         units: Units,
+        found: Boolean,
     ): ChallengeCardModel {
         val spec = item.challenge
         val island = spec?.scope == ChallengeScope.island
@@ -191,9 +195,13 @@ object ChallengesLogic {
         val (progress, target) = if (island) {
             dto?.island?.let { it.repelled to it.stretches } ?: (null to null)
         } else if (metric != null) {
-            // D5: the personal target (local status, else the server's, else the pack default); progress as ch-sweep.
-            val t = status?.target ?: dto?.target?.takeIf { it > 0 } ?: spec.target?.get(goal)?.let { TrailRewards.compareTarget(metric, it) }
-            (dto?.progress ?: status?.progress) to t
+            // D5 + final review P2-1: progress and target from one side, never server progress against the local target:
+            // the server's pair when it has both, else the local status, else no progress against the pack default.
+            when {
+                dto != null && dto.progress != null && dto.target > 0 -> dto.progress to dto.target
+                status != null -> status.progress to status.target
+                else -> null to spec.target?.get(goal)?.let { TrailRewards.compareTarget(metric, it) }
+            }
         } else {
             val t = spec?.target?.get(goal) ?: dto?.target?.takeIf { it > 0 }
             val local = if (spec?.metric == ChallengeMetric.completed) {
@@ -203,7 +211,8 @@ object ChallengesLogic {
             }
             (dto?.progress ?: local) to t
         }
-        val done = progress != null && target != null && target > 0 && progress >= target
+        // Found (claimed, incl. restored from the account) is done even with no in-window completion (final review P2-2).
+        val done = found || (progress != null && target != null && target > 0 && progress >= target)
         val state = when {
             now < start -> ChallengeState.Upcoming
             done -> ChallengeState.Done

@@ -1,6 +1,8 @@
 package com.bainbridgetrails.ui.play
 
 import com.bainbridgetrails.data.Units
+import com.bainbridgetrails.net.PlayChallengeDto
+import com.bainbridgetrails.net.PlayChallengesDto
 import com.bainbridgetrails.play.PlayFixtures
 import com.bainbridgetrails.play.TrailChallengeStatus
 import com.bainbridgetrails.play.config.ChallengeMetric
@@ -169,6 +171,46 @@ class ChallengesTrailsTest {
         assertTrue((m.solo + m.island).none { it.itemId == "ch-parkhop" })
         assertTrue(WhatsOnLogic.model(a, config, Goal.trails, thu, hidden).coming.none { it.itemId == "ch-parkhop" })
         assertTrue(WhatsOnLogic.model(a, config, Goal.trails, thu).coming.any { it.itemId == "ch-parkhop" })
+    }
+
+    @Test
+    fun `server progress never pairs with the local target`() {
+        // Final review P2-1: a late-synced walk across a window boundary leaves the server's progress above the local
+        // personal target; the card takes progress and target from one side (server pair, else local, else pack).
+        fun card(dto: PlayChallengeDto, status: Map<String, TrailChallengeStatus>): ChallengeCardModel {
+            val m = ChallengesLogic.model(config, Goal.trails, agenda, PlayChallengesDto(current = listOf(dto)), emptyList(), now, nouns, status, Units.KILOMETRES)
+            return (m.solo + m.island + m.ended).single { it.itemId == "ch-climb" }
+        }
+        val dto = PlayChallengeDto(id = "ch-climb", occ = climbOcc, progress = 1_200, target = 1_500)
+        val both = card(dto, climb(0, 1_000))
+        assertEquals(1_200 to 1_500, both.progress to both.target, "the server's pair")
+        assertEquals(ChallengeState.Active, both.state, "1,200 of the server's 1,500 dm: not done, whatever the local target")
+        // No server progress (signed out): the local pair, never the server's target with local progress.
+        val local = card(dto.copy(progress = null), climb(950, 1_000))
+        assertEquals(950 to 1_000, local.progress to local.target)
+        // Server progress without a server target: the local pair, so 1,200 never meets the local 1,000.
+        val noTarget = card(dto.copy(target = 0), climb(950, 1_000))
+        assertEquals(950 to 1_000, noTarget.progress to noTarget.target)
+        assertEquals(ChallengeState.Active, noTarget.state)
+        // Neither side: no progress, the pack default target.
+        val none = card(dto.copy(progress = null, target = 0), emptyMap())
+        assertNull(none.progress)
+        assertEquals(cards(emptyMap()).single { it.itemId == "ch-climb" }.target, none.target)
+    }
+
+    @Test
+    fun `found occurrence shows done with no in-window completions`() {
+        // Final review P2-2: after a reinstall restore a claimed occurrence is in `found` while the Logbook has no
+        // completion inside the window; its card shows Done (the found guard already blocks a second claim).
+        val sweepOcc = agenda.active.single { it.occurrence.itemId == "ch-sweep" }.occurrence.key
+        fun solo(found: Set<String>) = ChallengesLogic.model(config, Goal.trails, agenda, null, emptyList(), now, nouns, climb(0, 1_500), found = found).solo
+        val before = solo(emptySet())
+        assertEquals(ChallengeState.Active, before.single { it.itemId == "ch-sweep" }.state)
+        assertEquals(ChallengeState.Active, before.single { it.itemId == "ch-climb" }.state)
+        val after = solo(setOf(sweepOcc, climbOcc))
+        assertEquals(ChallengeState.Done, after.single { it.itemId == "ch-sweep" }.state)
+        assertEquals(ChallengeState.Done, after.single { it.itemId == "ch-climb" }.state)
+        assertEquals(ChallengeState.Active, after.single { it.itemId == "ch-parkhop" }.state, "only the found occurrences")
     }
 
     @Test

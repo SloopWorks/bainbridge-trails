@@ -227,16 +227,20 @@ class PlayRepository(
         val completed = newlyCompleted.filter { it !in ctx.quietFeatures }
         // Trails (plan D4, P1-8): this walk's snapshot runs the trails start when it has not run, then pays new keys.
         val trailWalk = trailSnapshot()?.let { (tables, input) -> TrailWalk(tables, input) }
-        fun next(st: PlayState): PlayState {
+        // The next state and whether the trails start was deferred; the flag is set only inside the update (P2-4).
+        fun next(st: PlayState): Pair<PlayState, Boolean> {
             val deferred = trailWalk != null && deferTrailStart(st)
-            if (deferred) trailStartDeferred = true
-            return WalkMarks.apply(st, goal, sessionId, date, after, completed, { ctx.names[it] ?: it }, visited, newId, trailWalk.takeUnless { deferred })
+            return WalkMarks.apply(st, goal, sessionId, date, after, completed, { ctx.names[it] ?: it }, visited, newId, trailWalk.takeUnless { deferred }) to deferred
         }
         val before = store.load()
         // Queue first (as the claim pass does): a crash before the Logbook write leaves the walk carried, not lost.
-        val expired = if (WalkMarks.hasPending(next(before).logbook, sessionId)) queue.add(QueuedPlay(sessionId, version, walkMarks = true)) else emptyList()
+        val expired = if (WalkMarks.hasPending(next(before).first.logbook, sessionId)) queue.add(QueuedPlay(sessionId, version, walkMarks = true)) else emptyList()
         var wrote = false
-        store.update { st -> next(st).let { n -> n.copy(logbook = WalkMarks.settle(n.logbook, expired)) }.also { wrote = it.logbook != st.logbook } }
+        store.update { st ->
+            val (n, deferred) = next(st)
+            if (deferred) trailStartDeferred = true
+            n.copy(logbook = WalkMarks.settle(n.logbook, expired)).also { wrote = it.logbook != st.logbook }
+        }
         return wrote
     }
 
@@ -307,8 +311,12 @@ class PlayRepository(
     /** A `/v1/play/me` body was applied to the state in this process (set inside [restore]'s update). */
     @Volatile private var meApplied = false
 
-    /** The trails start was skipped by [deferTrailStart]; the next successful [restore] runs it ([creditTrails]). */
-    @Volatile private var trailStartDeferred = false
+    /**
+     * The trails start was skipped by [deferTrailStart]; the next successful [restore] runs it ([creditTrails]). Set
+     * only inside a `store.update` (final review P2-4); internal for tests.
+     */
+    @Volatile internal var trailStartDeferred = false
+        private set
 
     /**
      * Bumped by [forgetAccount] (sign-out, phone wipe): a `/v1/play/me` reply requested under an earlier account is
@@ -858,9 +866,6 @@ class PlayRepository(
  */
 data class TrailChallengeStatus(val metric: ChallengeMetric, val progress: Int, val target: Int) {
     val hidden: Boolean get() = target <= 0
-
-    /** P reached the target (the claim rule, P2-6; the card's "done" also follows the occurrence being found). */
-    val reached: Boolean get() = TrailRewards.claims(target, progress)
 
     companion object {
         /**

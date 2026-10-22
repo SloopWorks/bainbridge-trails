@@ -6,6 +6,7 @@ import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Rank
 import com.bainbridgetrails.play.rules.Ranks
+import com.bainbridgetrails.play.rules.TrailRewards
 import com.bainbridgetrails.play.time.IslandTime
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.play_log_climb_what
@@ -131,7 +132,8 @@ object LogbookLogic {
     /**
      * [e]'s line. With [units], a trails `climb` (`climb:<m>`) or `milestone` (`mile:<mi>`) entry carries its step
      * re-rendered from the `contentId` through [TrailRewardFormat] (trails ux § 2.2: "820 ft" for `climb:250` in
-     * miles); an unparseable key, another kind, or no [units] keeps the persisted what. Roads never writes these keys.
+     * miles); an unparseable key, a step not on the rules' ladder ([TrailRewards.CLIMB_STEPS_M] /
+     * [TrailRewards.MILE_STEPS]), another kind, or no [units] keeps the persisted what. Roads never writes these keys.
      */
     fun row(e: LogEntry, units: Units? = null): LogRowModel {
         val localOnly = e.board == BoardState.local_only
@@ -158,13 +160,14 @@ object LogbookLogic {
 
     private fun trailValue(e: LogEntry, units: Units): TrailValue? {
         val key = e.contentId ?: return null
-        val prefix = when (e.kind) {
-            LogKind.climb -> "climb:"
-            LogKind.milestone -> "mile:"
+        val (prefix, ladder) = when (e.kind) {
+            LogKind.climb -> "climb:" to TrailRewards.CLIMB_STEPS_M
+            LogKind.milestone -> "mile:" to TrailRewards.MILE_STEPS
             else -> return null
         }
         if (!key.startsWith(prefix)) return null
-        val step = key.removePrefix(prefix).toIntOrNull()?.takeIf { it > 0 } ?: return null
+        // Only a step of the rules' own ladder re-renders (final review P2-3: tampered / corrupt state keeps its what).
+        val step = key.removePrefix(prefix).toIntOrNull()?.takeIf { it in ladder } ?: return null
         return if (e.kind == LogKind.climb) TrailRewardFormat.climbStep(step.toDouble(), units) else TrailRewardFormat.mileStep(step, units)
     }
 

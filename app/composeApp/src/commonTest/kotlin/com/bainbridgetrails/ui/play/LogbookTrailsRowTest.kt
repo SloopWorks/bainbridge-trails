@@ -6,6 +6,7 @@ import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.TrailRewards
 import com.bainbridgetrails.ui.play.components.PlayFormat
+import com.bainbridgetrails.ui.play.components.TrailRewardFormat
 import com.bainbridgetrails.ui.play.components.TrailUnit
 import com.bainbridgetrails.ui.play.components.TrailValue
 import com.bainbridgetrails.ui.play.screens.LogRowModel
@@ -70,6 +71,27 @@ class LogbookTrailsRowTest {
         assertNull(LogbookLogic.row(entry("high:trail-peters-trail"), Units.MILES).value)
         // No units (the celebration's marks line): the persisted what.
         assertNull(LogbookLogic.row(entry("climb:250")).value)
+    }
+
+    @Test
+    fun `climb_2147483647 falls back to the persisted what`() {
+        // Final review P2-3 (tampered / corrupt state): only a ladder step re-renders; a huge step never wraps.
+        val row = LogbookLogic.row(entry("climb:2147483647", what = "Climb as written"), Units.MILES)
+        assertNull(row.value)
+        assertEquals("Climb as written", shown(row))
+        assertNull(LogbookLogic.row(entry("climb:300", what = "Climb as written"), Units.KILOMETRES).value, "300 m is not a step")
+        // The formatter's whole() clamps instead of wrapping (1e9 m = 3.28e9 ft > Int.MAX_VALUE).
+        assertEquals(PlayFormat.marks(Int.MAX_VALUE), TrailRewardFormat.climbStep(1e9, Units.MILES).number)
+    }
+
+    @Test
+    fun `mile_7 (not a ladder step) falls back`() {
+        val row = LogbookLogic.row(entry("mile:7", what = "Miles as written"), Units.MILES)
+        assertNull(row.value)
+        assertEquals("Miles as written", shown(row))
+        assertNull(LogbookLogic.row(entry("mile:65"), Units.KILOMETRES).value, "past the ladder's 60")
+        for (step in TrailRewards.MILE_STEPS) assertNotNull(LogbookLogic.row(entry("mile:$step"), Units.MILES).value, "mile:$step")
+        for (step in TrailRewards.CLIMB_STEPS_M) assertNotNull(LogbookLogic.row(entry("climb:$step"), Units.MILES).value, "climb:$step")
     }
 
     @Test

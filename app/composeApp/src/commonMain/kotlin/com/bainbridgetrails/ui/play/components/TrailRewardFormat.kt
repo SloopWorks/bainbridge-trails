@@ -138,7 +138,8 @@ object TrailRewardFormat {
     private fun clamp(shown: Long, step: Long, reached: Boolean): Long =
         if (reached) maxOf(shown, step) else minOf(shown, (step - 1).coerceAtLeast(0))
 
-    private fun whole(n: Long): String = PlayFormat.marks(n.toInt())
+    /** Clamped, never wrapped past [Int.MAX_VALUE] (final review P2-3). */
+    private fun whole(n: Long): String = PlayFormat.marks(n.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
 
     private fun tenths(n: Long): String = "${whole(n / 10)}.${n % 10}"
 }

@@ -431,8 +431,8 @@ fun ChallengesScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: (
             return@WithPlay
         }
         val now = AppGraph.playClock.now()
-        val model = remember(agenda, c, server, state.logbook, nouns, trail, settings.units) {
-            ChallengesLogic.model(c, play.goal, agenda, server, state.logbook.entries, now, nouns, trail, settings.units)
+        val model = remember(agenda, c, server, state.logbook, nouns, trail, settings.units, state.found) {
+            ChallengesLogic.model(c, play.goal, agenda, server, state.logbook.entries, now, nouns, trail, settings.units, state.found)
         }
         var open by remember { mutableStateOf<ChallengeCardModel?>(null) }
         ListScreen(title, onBack = onBack) {

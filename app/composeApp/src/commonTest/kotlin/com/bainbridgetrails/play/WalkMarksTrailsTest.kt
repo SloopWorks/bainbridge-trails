@@ -15,6 +15,7 @@ import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.Scope
 import com.bainbridgetrails.play.rules.BoardState
+import com.bainbridgetrails.play.rules.LogCopy
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Logbook
@@ -28,7 +29,9 @@ import com.bainbridgetrails.play.rules.WalkDerived
 import com.bainbridgetrails.play.schedule.DerivedGoal
 import com.bainbridgetrails.play.schedule.Occurrence
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.bainbridgetrails.tracking.SessionSummary
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.Json
@@ -204,7 +207,7 @@ class WalkMarksTrailsTest {
         val climbOcc = assertNotNull(r.refresh()).active.map { it.occurrence }.single { it.itemId == "ch-climb" }
         val before = r.trailChallenges(listOf(climbOcc)).getValue(climbOcc.key)
         assertEquals(TrailChallengeStatus(ChallengeMetric.climb, progress = 84, target = 1_000), before, "dm: 8.4 m of 100 m")
-        assertFalse(before.hidden || before.reached)
+        assertFalse(before.hidden || TrailRewards.claims(before.target, before.progress))
 
         // Saturday: Peter's (92.1 m) → P = 100.5 m ≥ 100 m: the walk claims ch-climb.
         input = TrailFixtures.bothDoneIsland
@@ -221,7 +224,7 @@ class WalkMarksTrailsTest {
         r.store.update { it.copy(logbook = it.logbook.add(LogEntry("c2", LogKind.complete, "Peter's Trail", "why", LocalDate(2026, 10, 31), 100, walkId = "s1", contentId = TrailFixtures.PETERS))) }
         val after = r.trailChallenges(listOf(climbOcc)).getValue(climbOcc.key)
         assertEquals(TrailChallengeStatus(ChallengeMetric.climb, progress = 1_005, target = 1_000), after)
-        assertTrue(after.reached)
+        assertTrue(TrailRewards.claims(after.target, after.progress))
         assertEquals(emptyMap(), r.trailChallenges(emptyList()))
     }
 
@@ -239,6 +242,55 @@ class WalkMarksTrailsTest {
         val open = TrailChallengeStatus.of(spec, o, TrailFixtures.tables, emptySet(), Logbook())!!
         assertEquals(TrailChallengeStatus(ChallengeMetric.parks, 0, 3), open)
         assertNull(TrailChallengeStatus.of(spec.copy(metric = ChallengeMetric.completed), o, TrailFixtures.tables, emptySet(), Logbook()))
+    }
+
+    @Test
+    fun `probe leaves trailStartDeferred untouched`() = runTest {
+        // Final review P2-4: recordWalkMarks' `hasPending` probe runs the walk's next state outside the store update; the
+        // deferral it computes there must not set the flag. Here the probe sees "signed in" (defer) and the update does
+        // not, so the walk runs the trails start itself and nothing is left deferred for the next restore.
+        val clock = DebugPlayClock(system = { Instant.parse("2026-10-31T18:00:00Z") })
+        clock.set(PlayClockMode.Fixed(PlayFixtures.island("2026-10-31T11:00")))
+        val d = StandardTestDispatcher(testScheduler)
+        val dir = DataFixtures.tmpDir("play-walk-probe")
+        val server = FakeServer().apply { on("GET /v1/play/content", Reply(304, "")) }
+        val content = PlayContentRepository(
+            api = server.client(), dir = dir, bundled = { PlayFixtures.pack },
+            bundledTides = { PlayFixtures.tideText(it) }, playOn = { true }, now = { 0L }, io = d, compute = d,
+        )
+        val signedInAnswers = ArrayDeque<Boolean>()
+        var input: TrailRewardInput? = null
+        val r = PlayRepository(
+            scope = backgroundScope, goal = Goal.trails, clock = { clock }, content = content,
+            places = { PlayFixtures.EmptyPlaces }, derived = { DerivedGoal.decode(PlayFixtures.read("derived-trails.json")) },
+            store = PlayStateStore("$dir/trails-state.json", d), track = MutableStateFlow<List<Fix>>(emptyList()), compute = d,
+            claims = PlayClaimQueue("$dir/claims.json", d), signedIn = { signedInAnswers.removeFirstOrNull() ?: false },
+            walkDerived = { WalkDerived(500, 100, 25) }, walkContext = { WalkContext(names = TrailFixtures.names) },
+            newId = newId, trailTables = { TrailFixtures.tables }, trailInput = { input },
+        )
+        // A v1-restored Logbook whose trails start has not run (the deferral's precondition); the trail input is
+        // unavailable during the turn-on, so the start waits for the walk.
+        r.store.update {
+            PlayState(logbook = Logbook(listOf(LogEntry("r", LogKind.restored, LogCopy.what(LogKind.restored), LogCopy.why(LogKind.restored), LocalDate(2026, 10, 20), 3_000, board = BoardState.accepted))))
+        }
+        r.start()
+        runCurrent()
+        assertFalse(r.store.state.value.trailsStarted)
+        assertFalse(r.trailStartDeferred)
+
+        input = TrailFixtures.bothDoneIsland
+        signedInAnswers += true // the probe's read only; the update reads signed out
+        val start = PlayFixtures.island("2026-10-31T10:00").toEpochMilliseconds()
+        val summary = SessionSummary(
+            sessionId = "s1", islandBefore = 0.0, islandAfter = 1.0, trails = emptyList(), verified = true, droppedVehicle = 0,
+            droppedSteps = 0, newlyCompleted = listOf(TrailFixtures.PETERS), startedAt = start, endedAt = start + 3_600_000, distanceM = 1_110.0, matchedM = 1_110.0,
+        )
+        r.gatedHook("s1", emptyList(), summary)
+        runCurrent()
+        assertTrue(signedInAnswers.isEmpty(), "the probe read signed in")
+        assertTrue(r.store.state.value.trailsStarted, "the update did not defer: the walk ran the trails start")
+        assertFalse(r.trailStartDeferred, "the probe's deferral never reaches the flag")
+        r.stop()
     }
 }
 
