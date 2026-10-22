@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,6 +97,7 @@ import com.bainbridgetrails.ui.MilestoneState
 import com.bainbridgetrails.ui.RoadGroup
 import com.bainbridgetrails.ui.theme.BtTheme
 import com.bainbridgetrails.ui.theme.PillShape
+import com.bainbridgetrails.ui.theme.PlayColors
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.PI
@@ -435,18 +438,60 @@ fun CategoryHeader(
 private fun Modifier.rotateIf(up: Boolean): Modifier = if (up) this.rotate(180f) else this
 
 /**
- * Survey-marker medallion (ux.md §5.3 MilestoneBadge), 64dp: Earned = primary container fill, primary outer ring,
- * engraved inner ring, mark in Fraunces; Next = dotted outline-variant track with a primary arc for [fraction];
- * Locked = dotted ring, faded mark. Milestones use `primary`, never status hues. [sweep] animates the earned ring
- * (0..1) for the results card stamp.
+ * Colors of a [MilestoneMedallion]: EARNED fill, outer ring and mark (the engraved inner ring is the mark at 40 %);
+ * NEXT fill, progress arc and mark; the dotted [track] of NEXT and LOCKED; the LOCKED mark. [roads] is the default
+ * every existing caller draws with; [play] is the Play variant (docs/play/trails/ux.md § 5.1).
+ */
+@Immutable
+data class MilestoneColors(
+    val earnedFill: Color,
+    val earnedRing: Color,
+    val earnedMark: Color,
+    val nextFill: Color,
+    val track: Color,
+    val nextArc: Color,
+    val nextMark: Color,
+    val lockedMark: Color,
+) {
+    companion object {
+        /** Survey slate: `primary` ring and arc on a primary-container medallion (ux.md §5.3). */
+        fun roads(s: ColorScheme) = MilestoneColors(
+            earnedFill = s.primaryContainer,
+            earnedRing = s.primary,
+            earnedMark = s.onPrimaryContainer,
+            nextFill = s.surfaceContainerLow,
+            track = s.outlineVariant,
+            nextArc = s.primary,
+            nextMark = s.onSurface,
+            lockedMark = s.onSurfaceVariant.copy(alpha = 0.6f),
+        )
+
+        /** Play: tertiary-container EARNED, sea-glass NEXT arc; never `primary` for Play progress. */
+        fun play(s: ColorScheme, play: PlayColors) = roads(s).copy(
+            earnedFill = s.tertiaryContainer,
+            earnedRing = s.onTertiaryContainer,
+            earnedMark = s.onTertiaryContainer,
+            nextArc = play.seaGlass,
+        )
+    }
+}
+
+/**
+ * Survey-marker medallion (ux.md §5.3 MilestoneBadge), 64dp: Earned = container fill, outer ring, engraved inner
+ * ring, mark in Fraunces; Next = dotted outline-variant track with an arc for [fraction]; Locked = dotted ring, faded
+ * mark. Roads milestones use `primary` ([MilestoneColors.roads], the default), never status hues. [sweep] animates
+ * the earned ring (0..1) for the results card stamp.
  */
 @Composable
-fun MilestoneMedallion(mark: String, state: MilestoneState, fraction: Double, modifier: Modifier = Modifier, size: Dp = 64.dp, sweep: Float = 1f) {
-    val primary = MaterialTheme.colorScheme.primary
-    val container = MaterialTheme.colorScheme.primaryContainer
-    val onContainer = MaterialTheme.colorScheme.onPrimaryContainer
-    val track = MaterialTheme.colorScheme.outlineVariant
-    val low = MaterialTheme.colorScheme.surfaceContainerLow
+fun MilestoneMedallion(
+    mark: String,
+    state: MilestoneState,
+    fraction: Double,
+    modifier: Modifier = Modifier,
+    size: Dp = 64.dp,
+    sweep: Float = 1f,
+    colors: MilestoneColors = MilestoneColors.roads(MaterialTheme.colorScheme),
+) {
     Box(modifier.size(size).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(size)) {
             val outer = 2.dp.toPx()
@@ -454,24 +499,24 @@ fun MilestoneMedallion(mark: String, state: MilestoneState, fraction: Double, mo
             val dotted = PathEffect.dashPathEffect(floatArrayOf(0.01f, 5.dp.toPx()))
             when (state) {
                 MilestoneState.EARNED -> {
-                    drawCircle(container, r)
-                    drawArc(primary, -90f, 360f * sweep, false, Offset(outer, outer), Size(r * 2, r * 2), style = Stroke(outer * 0.9f + 0.6.dp.toPx(), cap = StrokeCap.Round))
-                    drawCircle(onContainer.copy(alpha = 0.4f), r - 6.dp.toPx(), style = Stroke(1.dp.toPx()))
+                    drawCircle(colors.earnedFill, r)
+                    drawArc(colors.earnedRing, -90f, 360f * sweep, false, Offset(outer, outer), Size(r * 2, r * 2), style = Stroke(outer * 0.9f + 0.6.dp.toPx(), cap = StrokeCap.Round))
+                    drawCircle(colors.earnedMark.copy(alpha = 0.4f), r - 6.dp.toPx(), style = Stroke(1.dp.toPx()))
                 }
                 MilestoneState.NEXT -> {
-                    drawCircle(low, r)
-                    drawCircle(track, r, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, pathEffect = dotted))
-                    if (fraction > 0) drawArc(primary, -90f, (360 * fraction).toFloat(), false, Offset(outer, outer), Size(r * 2, r * 2), style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
+                    drawCircle(colors.nextFill, r)
+                    drawCircle(colors.track, r, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, pathEffect = dotted))
+                    if (fraction > 0) drawArc(colors.nextArc, -90f, (360 * fraction).toFloat(), false, Offset(outer, outer), Size(r * 2, r * 2), style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
                 }
                 MilestoneState.LOCKED -> {
-                    drawCircle(track, r, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, pathEffect = dotted))
+                    drawCircle(colors.track, r, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, pathEffect = dotted))
                 }
             }
         }
         val color = when (state) {
-            MilestoneState.EARNED -> onContainer
-            MilestoneState.NEXT -> MaterialTheme.colorScheme.onSurface
-            MilestoneState.LOCKED -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            MilestoneState.EARNED -> colors.earnedMark
+            MilestoneState.NEXT -> colors.nextMark
+            MilestoneState.LOCKED -> colors.lockedMark
         }
         val style = if (mark.length > 2) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge
         Text(mark, style = style, color = color, maxLines = 1, textAlign = TextAlign.Center)
@@ -489,6 +534,7 @@ fun MilestoneBadge(
     a11y: String,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    colors: MilestoneColors = MilestoneColors.roads(MaterialTheme.colorScheme),
 ) {
     Column(
         modifier.width(96.dp).heightIn(min = 48.dp).clip(MaterialTheme.shapes.medium)
@@ -498,7 +544,7 @@ fun MilestoneBadge(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        MilestoneMedallion(mark, state, fraction)
+        MilestoneMedallion(mark, state, fraction, colors = colors)
         Text(title, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
         if (progressText != null) Text(progressText, style = BtTheme.type.numeric, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

@@ -35,6 +35,8 @@ enum class FxGlyph {
     LanternUnlit, LanternLit,
     Frog, Ferry, KrakenEye, Pennant,
     QuietRing,
+    /** A hill with the survey mark on its crest: climb and high ground (docs/play/trails/ux.md § 2.3). */
+    Summit,
     GateSun, GateWave, GateMoon, GateShield,
     ;
 
@@ -130,6 +132,7 @@ private class Art(val b: ImageVector.Builder, val ink: Color, val lamp: Color) {
         FxGlyph.KrakenEye -> krakenEye()
         FxGlyph.Pennant -> pennant()
         FxGlyph.QuietRing -> quietRing()
+        FxGlyph.Summit -> summit()
         FxGlyph.GateSun -> sun()
         FxGlyph.GateWave -> wave()
         FxGlyph.GateMoon -> moon()
@@ -275,6 +278,20 @@ private class Art(val b: ImageVector.Builder, val ink: Color, val lamp: Color) {
     private fun quietRing() {
         detail { circle(12f, 12f, 8f) }
         detail { moveTo(8f, 12f); lineTo(16f, 12f) }
+    }
+
+    /**
+     * Summit (trails ux § 2.3): an open hill contour (x 3–21, crest y 15), one inner contour, and the survey △ with
+     * its centre dot at 55 % of [marks] standing on the crest (its stroke scales to 1.1, drawn at the detail weight).
+     */
+    private fun summit() {
+        stroke { moveTo(3f, 20.5f); curveTo(6.5f, 16.6f, 9f, 15f, 12f, 15f); curveTo(15f, 15f, 17.5f, 16.6f, 21f, 20.5f) }
+        detail { moveTo(8f, 20.5f); curveTo(9.6f, 19f, 10.7f, 18.4f, 12f, 18.4f); curveTo(13.3f, 18.4f, 14.4f, 19f, 16f, 20.5f) }
+        val s = 0.55f
+        val base = 13.4f
+        val top = base - 16f * s
+        detail { moveTo(12f, top); lineTo(12f + 8.5f * s, base); lineTo(12f - 8.5f * s, base); close() }
+        fill(ink) { circle(12f, base - (base - top) / 3f, 1.5f * s) }
     }
 
     /** Gate: daylight only. */

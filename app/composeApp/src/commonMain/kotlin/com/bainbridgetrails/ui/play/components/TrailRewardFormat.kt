@@ -1,0 +1,126 @@
+package com.bainbridgetrails.ui.play.components
+
+import com.bainbridgetrails.data.Units
+import com.bainbridgetrails.resources.Res
+import com.bainbridgetrails.resources.play_unit_feet_a11y
+import com.bainbridgetrails.resources.play_unit_km_a11y
+import com.bainbridgetrails.resources.play_unit_metres_a11y
+import com.bainbridgetrails.resources.play_unit_miles_a11y
+import com.bainbridgetrails.ui.Milestones
+import kotlin.math.floor
+import kotlin.math.roundToLong
+import org.jetbrains.compose.resources.PluralStringResource
+
+/**
+ * Display unit of a trails reward value: [abbrev] follows the number ("820 ft"); [spoken] is the plural a11y strings use
+ * instead, because TalkBack / VoiceOver do not reliably expand "ft" or "m" (ux § 1).
+ */
+enum class TrailUnit(val abbrev: String) {
+    FEET("ft"), METRES("m"), MILES("mi"), KILOMETRES("km");
+
+    val spoken: PluralStringResource
+        get() = when (this) {
+            FEET -> Res.plurals.play_unit_feet_a11y
+            METRES -> Res.plurals.play_unit_metres_a11y
+            MILES -> Res.plurals.play_unit_miles_a11y
+            KILOMETRES -> Res.plurals.play_unit_km_a11y
+        }
+}
+
+/**
+ * A formatted trails reward value: [number] ("1,207", "16.1") in [unit]. [text] is what screens show; a11y speaks
+ * [number] through the unit's `play_unit_*_a11y` plural with [pluralQuantity] (English: one only for "1").
+ */
+data class TrailValue(val number: String, val unit: TrailUnit) {
+    val text: String get() = "$number ${unit.abbrev}"
+    val pluralQuantity: Int get() = if (number == "1") 1 else OTHER
+
+    companion object {
+        /** A quantity that selects the English `other` form ("1.0 miles", "0 feet"). */
+        const val OTHER = 2
+    }
+}
+
+/**
+ * Display formatting of the trails rewards (docs/play/trails/ux.md § 1). Rules store and pay climb in **metres** and
+ * trail miles in **miles**; this converts for the Units setting (miles ⇒ ft + mi, kilometres ⇒ m + km) and never
+ * decides anything. So-far values floor, steps and targets round to nearest, and the clamp keeps the shown progress
+ * honest: below a step (in its stored unit) it is at most the shown step − 1 display unit, at or past it at least the
+ * shown step ("492 of 492 ft" is never an unfinished challenge, "2,460 ft" never sits under an earned 2,461 ft step).
+ */
+object TrailRewardFormat {
+    private const val FEET_PER_METRE = 3.28084
+    private const val METRES_PER_MILE = 1609.344
+    private const val METRES_PER_KM = 1000.0
+    private const val EPS = 1e-9
+
+    /** Climb so far: floor, whole ft / m; with [targetM], clamped against that step or target. */
+    fun climb(metres: Double, units: Units, targetM: Double? = null): TrailValue {
+        val k = climbFactor(units)
+        var shown = floorTicks(metres * k)
+        if (targetM != null) shown = clamp(shown, climbTicks(targetM, units), decimetres(metres) >= decimetres(targetM))
+        return TrailValue(whole(shown), climbUnit(units))
+    }
+
+    /** A climb step or challenge target: nearest, whole ft / m ("820 ft" for 250 m). */
+    fun climbStep(metres: Double, units: Units): TrailValue = TrailValue(whole(climbTicks(metres, units)), climbUnit(units))
+
+    /**
+     * Challenge climb "progress of target" (ux § 7): progress is capped at the target once done
+     * ("150 of 150 m climbed"), and clamped below it while not ("149 of 150 m").
+     */
+    fun climbProgress(progressM: Double, targetM: Double, units: Units): Pair<TrailValue, TrailValue> {
+        val done = decimetres(progressM) >= decimetres(targetM)
+        return climb(if (done) targetM else progressM, units, targetM) to climbStep(targetM, units)
+    }
+
+    /** Trail distance so far: floor, one decimal ("7.4 mi" / "11.9 km"); with [stepMi], clamped against that step. */
+    fun distance(metres: Double, units: Units, stepMi: Int? = null): TrailValue {
+        var shown = floorTicks(metres / metresPerUnit(units) * 10)
+        if (stepMi != null) shown = clamp(shown, mileStepTenths(stepMi, units), metres / METRES_PER_MILE + EPS >= stepMi)
+        return TrailValue(tenths(shown), distanceUnit(units))
+    }
+
+    /** A trail-mile step: "10 mi" (whole), or in km nearest to one decimal ("16.1 km"). */
+    fun mileStep(miles: Int, units: Units): TrailValue = when (units) {
+        Units.MILES -> TrailValue(whole(miles.toLong()), TrailUnit.MILES)
+        Units.KILOMETRES -> TrailValue(tenths(mileStepTenths(miles, units)), TrailUnit.KILOMETRES)
+    }
+
+    /**
+     * The trail-mile ladder (the roads distance ladder: 1, then every 5, [Milestones.distanceStep]) up to the reachable
+     * top, the highest step ≤ [totalM] (the island's non-quiet trail distance) in miles.
+     */
+    fun mileLadder(totalM: Double): List<Int> {
+        val top = totalM / METRES_PER_MILE + EPS
+        return generateSequence(0) { it + 1 }.map(Milestones::distanceStep).takeWhile { it <= top }.toList()
+    }
+
+    fun climbUnit(units: Units): TrailUnit = if (units == Units.MILES) TrailUnit.FEET else TrailUnit.METRES
+
+    fun distanceUnit(units: Units): TrailUnit = if (units == Units.MILES) TrailUnit.MILES else TrailUnit.KILOMETRES
+
+    private fun climbFactor(units: Units) = if (units == Units.MILES) FEET_PER_METRE else 1.0
+
+    private fun climbTicks(metres: Double, units: Units): Long = (metres * climbFactor(units)).roundToLong()
+
+    private fun metresPerUnit(units: Units) = if (units == Units.MILES) METRES_PER_MILE else METRES_PER_KM
+
+    /** A mile step in tenths of the display unit. */
+    private fun mileStepTenths(miles: Int, units: Units): Long = when (units) {
+        Units.MILES -> miles * 10L
+        Units.KILOMETRES -> (miles * METRES_PER_MILE / METRES_PER_KM * 10).roundToLong()
+    }
+
+    /** Climb rules compare whole decimetres (plan D6: 99.9 m = 999 < 1000). */
+    private fun decimetres(metres: Double): Long = (metres * 10).roundToLong()
+
+    private fun floorTicks(v: Double): Long = floor(v + EPS).toLong().coerceAtLeast(0)
+
+    private fun clamp(shown: Long, step: Long, reached: Boolean): Long =
+        if (reached) maxOf(shown, step) else minOf(shown, (step - 1).coerceAtLeast(0))
+
+    private fun whole(n: Long): String = PlayFormat.marks(n.toInt())
+
+    private fun tenths(n: Long): String = "${whole(n / 10)}.${n % 10}"
+}
