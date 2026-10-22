@@ -1,5 +1,6 @@
 package com.bainbridgetrails.ui.play.screens
 
+import com.bainbridgetrails.play.TrailChallengeStatus
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.Item
 import com.bainbridgetrails.play.config.ItemType
@@ -59,13 +60,15 @@ data class WhatsOnModel(
  * `agenda.active`, Coming up = `agenda.upcoming`, the day line = `agenda.day`. It adds no item, rule or window of its
  * own; lore, eggs and the ferry sprite are never rows (eggs are never listed); a weekly treasure set is one row. On the
  * quiet day (Mar 30) there is one row, the memorial card, and nothing else. Times are island time; [windowText]
- * appends `play_island_time` when the phone's zone differs.
+ * appends `play_island_time` when the phone's zone differs. A trails `climb` / `parks` challenge whose status in
+ * [trail] is hidden (nothing left, plan D5; trails ux § 7) has no row, today or coming up.
  */
 object WhatsOnLogic {
     private val LISTED = setOf(ItemType.treasure, ItemType.obstacle, ItemType.riddle, ItemType.challenge)
 
-    fun model(agenda: PlayAgenda, config: PlayConfig, goal: Goal, now: Instant): WhatsOnModel {
+    fun model(agenda: PlayAgenda, config: PlayConfig, goal: Goal, now: Instant, trail: Map<String, TrailChallengeStatus> = emptyMap()): WhatsOnModel {
         val items = config.items.associateBy { it.id }
+        fun hidden(key: String) = trail[key]?.hidden == true
         val weekOf = IslandTime.weekId(agenda.day.date)
         if (agenda.day.quietDay) {
             val memorial = config.items.firstOrNull { it.enabled && it.type == ItemType.lore && it.lore == Marks.REMEMBRANCE && goal in it.goals }
@@ -78,7 +81,7 @@ object WhatsOnLogic {
         val seen = HashSet<String>()
         for (a in agenda.active) {
             val o = a.occurrence
-            if (o.type !in LISTED || o.hidden) continue
+            if (o.type !in LISTED || o.hidden || hidden(o.key)) continue
             val item = items[o.itemId] ?: continue
             if (!seen.add(o.itemId)) continue
             val kind = kindOf(item)
@@ -96,7 +99,7 @@ object WhatsOnLogic {
                 marks = marksOf(item, o),
             )
         }
-        val coming = agenda.upcoming.filter { it.type in LISTED }.mapNotNull { u ->
+        val coming = agenda.upcoming.filter { it.type in LISTED && !hidden(it.key) }.mapNotNull { u ->
             val item = items[u.itemId] ?: return@mapNotNull null
             ComingRowModel(u.key, u.itemId, kindOf(item), item.copy.title, u.start)
         }

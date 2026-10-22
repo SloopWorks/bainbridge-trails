@@ -49,6 +49,13 @@ class PlayCopyTest {
         if (problems.isNotEmpty()) fail(problems.joinToString("\n"))
     }
 
+    /** docs/play/trails/ux.md § 8, verbatim (plurals as [one, other]); the blocklist tests above cover them too. */
+    @Test
+    fun trailsEditionCopyIsVerbatim() {
+        val problems = TrailsEditionCopy.TEXTS.mapNotNull { (k, texts) -> if (play[k] == texts) null else "$k: ${play[k]} != $texts" }
+        if (problems.isNotEmpty()) fail(problems.joinToString("\n"))
+    }
+
     private companion object {
         val FORBIDDEN = Regex(
             """\b(race[sd]?|racing|run|runs|running|ran|fast|faster|fastest|speed\w*|sprint\w*|beat|beats|beaten|beating|points?)\b""",

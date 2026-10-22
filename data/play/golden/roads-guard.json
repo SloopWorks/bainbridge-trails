@@ -1,0 +1,409 @@
+{
+  "_note": [
+    "Play trails v1.1 G0 roads guard (brief § 4 AC 1, plan D9). Captured on a git worktree of main 2aee859 by running the three",
+    "guard tests in write mode: backend `PLAY_GOLDEN_WRITE=1 npx vitest run test/play-roads-guard.test.ts` (section `server`),",
+    "`cd app && ./gradlew :play:jvmTest -Pplay.updateGolden=true --tests '*RoadsGuardTest*'` (section `play`), and",
+    "`./gradlew :composeApp:testAndroidHostTest --tests '*RoadsGuardTest*'` with the `client` section absent (section `client`).",
+    "Every later run asserts equality. Re-capture only from main; a difference on a branch means the roads Play path moved.",
+    "roadsSha256 = sha256 of data/play/derived/roads.json with its `\"pack\":` line removed (the pack version moves; nothing else may)."
+  ],
+  "capturedFrom": "2aee859",
+  "roadsSha256": "4ea0afa8ea4c134b43f28ee9de723628bf37c28c3e501cf3a7f5211b3f4f44b9",
+  "server": {
+    "pack": "2026.11.1",
+    "roadsDatasetVersion": "2026-10-20+86788962",
+    "clock": "2026-10-29T21:00:00.000Z",
+    "states": [
+      {
+        "name": "one single-segment road complete",
+        "segments": {
+          "rseg-000050": "//8f"
+        },
+        "completed": [
+          "road-alder-avenue-northeast-2"
+        ]
+      },
+      {
+        "name": "six roads complete",
+        "segments": {
+          "rseg-000050": "//8f",
+          "rseg-000107": "/wE=",
+          "rseg-000109": "Bw==",
+          "rseg-000110": "////",
+          "rseg-002399": "//8f",
+          "rseg-002409": "//8f",
+          "rseg-002416": "//8f",
+          "rseg-003575": "//8=",
+          "rseg-003577": "//8=",
+          "rseg-001754": "/38=",
+          "rseg-001808": "//8B",
+          "rseg-004030": "////Pw==",
+          "rseg-004068": "////Pw==",
+          "rseg-004104": "////",
+          "rseg-004105": "////",
+          "rseg-004108": "////",
+          "rseg-004109": "////",
+          "rseg-004110": "////",
+          "rseg-004111": "////",
+          "rseg-001692": "Dw==",
+          "rseg-003924": "//8/",
+          "rseg-003925": "//8/",
+          "rseg-003930": "//8/",
+          "rseg-003931": "//8f",
+          "rseg-003937": "////",
+          "rseg-003938": "////",
+          "rseg-003939": "////",
+          "rseg-003941": "//8f",
+          "rseg-003944": "////",
+          "rseg-004016": "//9/",
+          "rseg-004050": "//9/",
+          "rseg-004061": "//9/",
+          "rseg-004082": "//9/",
+          "rseg-004090": "//9/"
+        },
+        "completed": [
+          "road-alder-avenue-northeast-2",
+          "road-aaron-avenue-northeast",
+          "road-affirmed-lane-northeast",
+          "road-agate-pass-road-northeast",
+          "road-agate-point-road-northeast",
+          "road-agate-street-northeast"
+        ]
+      },
+      {
+        "name": "half of one segment plus one road",
+        "segments": {
+          "rseg-000050": "//8f",
+          "rseg-000107": "Dw=="
+        },
+        "completed": [
+          "road-alder-avenue-northeast-2"
+        ]
+      }
+    ],
+    "walkDerived": [
+      {
+        "name": "one single-segment road complete",
+        "cov": 4,
+        "derived": 50
+      },
+      {
+        "name": "six roads complete",
+        "cov": 139,
+        "derived": 300
+      },
+      {
+        "name": "half of one segment plus one road",
+        "cov": 4,
+        "derived": 75
+      }
+    ],
+    "upload": {
+      "play": {
+        "accepted": [
+          "egg-madrone@2026-10-26"
+        ],
+        "rejected": [
+          {
+            "id": "lore-lynwood@2026-10-26",
+            "code": "unknown_item"
+          }
+        ],
+        "capped": [],
+        "dayAccepted": [
+          "3f2a1b4c-5d6e-4f70-8192-a3b4c5d6e7f8"
+        ],
+        "total": 474,
+        "week": 35
+      },
+      "totals": {
+        "cov_marks": 139,
+        "derived_marks": 300,
+        "found_marks": 20,
+        "week_marks": 15,
+        "total": 474
+      }
+    },
+    "me": {
+      "dataset": "roads",
+      "weekId": "2026-10-26",
+      "total": 474,
+      "week": 35,
+      "perKind": {
+        "treasure": 0,
+        "egg": 1,
+        "riddle": 0,
+        "ink": 0,
+        "lore": 0,
+        "challenge": 0
+      },
+      "occ": [
+        "egg-madrone@2026-10-26"
+      ],
+      "log": []
+    },
+    "challenges": [
+      {
+        "id": "ch-sweep",
+        "scope": "solo",
+        "metric": "completed",
+        "spec": {
+          "scope": "solo",
+          "metric": "completed",
+          "target": {
+            "trails": 3,
+            "roads": 5
+          }
+        }
+      },
+      {
+        "id": "ch-krakenweek",
+        "scope": "island",
+        "metric": "stretches_repelled",
+        "spec": {
+          "scope": "island",
+          "metric": "stretches_repelled",
+          "minPlayersPerStretch": 3,
+          "retreatMarks": 50
+        }
+      }
+    ]
+  },
+  "play": {
+    "startBalance": {
+      "first": {
+        "coverage": 493,
+        "complete": 175,
+        "squares": 275,
+        "total": 943
+      },
+      "later": {
+        "coverage": 800,
+        "complete": 225,
+        "squares": 350,
+        "total": 1375
+      },
+      "entries": [
+        {
+          "id": "id-0",
+          "kind": "start_balance",
+          "what": "Your walks so far",
+          "why": "Coverage, completions and squares from before Play",
+          "date": "2026-10-29",
+          "marks": 943,
+          "walkId": null,
+          "contentId": null,
+          "board": "pending",
+          "capped": false,
+          "band": null
+        }
+      ],
+      "catchUpEntries": [
+        {
+          "id": "id-1",
+          "kind": "coverage",
+          "what": "Walks while Play was off",
+          "why": "New coverage, completions and squares",
+          "date": "2026-10-29",
+          "marks": 432,
+          "walkId": null,
+          "contentId": null,
+          "board": "pending",
+          "capped": false,
+          "band": null
+        }
+      ],
+      "againAddsNothing": true,
+      "total": 1375
+    },
+    "marks": {
+      "covRateM": 25,
+      "doneMarks": 25,
+      "square": 25,
+      "day": 15,
+      "coverageDelta_12345_6_to_20000": 307,
+      "keptWeek_0_1_6_7": [
+        40,
+        50,
+        100,
+        100
+      ]
+    },
+    "challenges": [
+      {
+        "id": "ch-sweep",
+        "scope": "solo",
+        "metric": "completed",
+        "target": 5,
+        "marks": 100
+      },
+      {
+        "id": "ch-krakenweek",
+        "scope": "island",
+        "metric": "stretches_repelled",
+        "target": null,
+        "marks": 75
+      }
+    ],
+    "walkDerivedKinds": [
+      "coverage",
+      "complete",
+      "square",
+      "start_balance"
+    ],
+    "agendaRoadsSha256": "93517aa593106aea00bab2cb408119652378a12816f77fd1288779c60c4c4603"
+  },
+  "client": {
+    "walkMarks": {
+      "before": "493+175+275=943",
+      "after": "520+225+325=1070",
+      "startEntries": [
+        {
+          "id": "id-0",
+          "kind": "start_balance",
+          "what": "Your walks so far",
+          "why": "Coverage, completions and squares from before Play",
+          "date": "2026-10-29",
+          "marks": 943,
+          "walkId": null,
+          "contentId": null,
+          "board": "pending",
+          "capped": false,
+          "band": null
+        }
+      ],
+      "walkEntries": [
+        {
+          "id": "id-1",
+          "kind": "complete",
+          "what": "First Road",
+          "why": "Completed on this walk",
+          "date": "2026-10-29",
+          "marks": 25,
+          "walkId": "s1761591600000-ab12",
+          "contentId": "road-first",
+          "board": "pending",
+          "capped": false,
+          "band": null
+        },
+        {
+          "id": "id-2",
+          "kind": "complete",
+          "what": "Second Road",
+          "why": "Completed on this walk",
+          "date": "2026-10-29",
+          "marks": 25,
+          "walkId": "s1761591600000-ab12",
+          "contentId": "road-second",
+          "board": "pending",
+          "capped": false,
+          "band": null
+        },
+        {
+          "id": "id-3",
+          "kind": "coverage",
+          "what": "New ground",
+          "why": "New coverage on this walk",
+          "date": "2026-10-29",
+          "marks": 27,
+          "walkId": "s1761591600000-ab12",
+          "contentId": null,
+          "board": "pending",
+          "capped": false,
+          "band": null
+        },
+        {
+          "id": "id-4",
+          "kind": "square",
+          "what": "Fog lifted",
+          "why": "First coverage in a chart square",
+          "date": "2026-10-29",
+          "marks": 50,
+          "walkId": "s1761591600000-ab12",
+          "contentId": null,
+          "board": "pending",
+          "capped": false,
+          "band": null
+        },
+        {
+          "id": "id-5",
+          "kind": "visit",
+          "what": "Visited Port Blakely Cemetery",
+          "why": "A quiet place. No marks here.",
+          "date": "2026-10-29",
+          "marks": 0,
+          "walkId": "s1761591600000-ab12",
+          "contentId": "visit:blakely-cemetery@2026-10-29",
+          "board": "accepted",
+          "capped": false,
+          "band": null
+        }
+      ],
+      "derivedBase": "520/225/325",
+      "hasPending": true,
+      "againAddsNothing": true,
+      "settledWithWalk": [
+        "complete",
+        "coverage",
+        "square"
+      ],
+      "total": 1070
+    },
+    "upload": {
+      "keys": [
+        "dataset",
+        "datasetVersion",
+        "play",
+        "playConfig",
+        "segments",
+        "tickM",
+        "walks"
+      ],
+      "walkKeys": [
+        "durationS",
+        "id"
+      ],
+      "playKeys": [
+        "claims",
+        "dayKey",
+        "hints",
+        "walkId"
+      ],
+      "claimKeys": [
+        "band",
+        "capped",
+        "id",
+        "kind",
+        "weekId"
+      ],
+      "json": "{\"datasetVersion\":\"2026-10-20+86788962\",\"tickM\":5,\"segments\":{\"rseg-000011\":\"Aw==\"},\"walks\":[{\"id\":\"3f2a1b4c-5d6e-4f70-8192-a3b4c5d6e7f8\",\"durationS\":3600}],\"dataset\":\"roads\",\"playConfig\":\"2026.11.1\",\"play\":[{\"walkId\":\"3f2a1b4c-5d6e-4f70-8192-a3b4c5d6e7f8\",\"claims\":[{\"id\":\"egg-madrone@2026-10-26\",\"kind\":\"egg\",\"weekId\":\"2026-10-26\",\"band\":95,\"capped\":true}],\"dayKey\":\"2026-10-26\",\"hints\":{\"riddle-frog\":1}}]}"
+    },
+    "v1LogKinds": [
+      "coverage",
+      "complete",
+      "park_first",
+      "park_complete",
+      "milestone",
+      "island",
+      "square",
+      "day",
+      "week",
+      "treasure",
+      "egg",
+      "riddle",
+      "ink",
+      "retreat",
+      "bramble",
+      "lore",
+      "horn",
+      "challenge",
+      "island_challenge",
+      "wave",
+      "start_balance",
+      "restored",
+      "stamp",
+      "visit"
+    ],
+    "v1State": "{\"schema\":2,\"found\":[\"egg-madrone@2026-10-26\",\"treasure-weekly-roads@2026-10-26#00\"],\"solved\":{\"riddle-frog\":\"2026-10-27\"},\"hints\":{\"riddle-frog\":1},\"logbook\":{\"entries\":[{\"id\":\"e0\",\"kind\":\"coverage\",\"what\":\"what coverage\",\"why\":\"why coverage\",\"date\":\"2026-10-29\",\"marks\":10,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":\"content:coverage\",\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e1\",\"kind\":\"complete\",\"what\":\"what complete\",\"why\":\"why complete\",\"date\":\"2026-10-29\",\"marks\":11,\"walkId\":null,\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e2\",\"kind\":\"park_first\",\"what\":\"what park_first\",\"why\":\"why park_first\",\"date\":\"2026-10-29\",\"marks\":12,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e3\",\"kind\":\"park_complete\",\"what\":\"what park_complete\",\"why\":\"why park_complete\",\"date\":\"2026-10-29\",\"marks\":13,\"walkId\":null,\"contentId\":\"content:park_complete\",\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e4\",\"kind\":\"milestone\",\"what\":\"what milestone\",\"why\":\"why milestone\",\"date\":\"2026-10-29\",\"marks\":14,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e5\",\"kind\":\"island\",\"what\":\"what island\",\"why\":\"why island\",\"date\":\"2026-10-29\",\"marks\":15,\"walkId\":null,\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e6\",\"kind\":\"square\",\"what\":\"what square\",\"why\":\"why square\",\"date\":\"2026-10-29\",\"marks\":16,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":\"content:square\",\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e7\",\"kind\":\"day\",\"what\":\"what day\",\"why\":\"why day\",\"date\":\"2026-10-29\",\"marks\":17,\"walkId\":null,\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e8\",\"kind\":\"week\",\"what\":\"what week\",\"why\":\"why week\",\"date\":\"2026-10-29\",\"marks\":18,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e9\",\"kind\":\"treasure\",\"what\":\"what treasure\",\"why\":\"why treasure\",\"date\":\"2026-10-29\",\"marks\":19,\"walkId\":null,\"contentId\":\"content:treasure\",\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e10\",\"kind\":\"egg\",\"what\":\"what egg\",\"why\":\"why egg\",\"date\":\"2026-10-29\",\"marks\":20,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":null,\"board\":\"pending\",\"capped\":true,\"band\":null},{\"id\":\"e11\",\"kind\":\"riddle\",\"what\":\"what riddle\",\"why\":\"why riddle\",\"date\":\"2026-10-29\",\"marks\":21,\"walkId\":null,\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e12\",\"kind\":\"ink\",\"what\":\"what ink\",\"why\":\"why ink\",\"date\":\"2026-10-29\",\"marks\":22,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":\"content:ink\",\"board\":\"pending\",\"capped\":false,\"band\":80},{\"id\":\"e13\",\"kind\":\"retreat\",\"what\":\"what retreat\",\"why\":\"why retreat\",\"date\":\"2026-10-29\",\"marks\":23,\"walkId\":null,\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e14\",\"kind\":\"bramble\",\"what\":\"what bramble\",\"why\":\"why bramble\",\"date\":\"2026-10-29\",\"marks\":24,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e15\",\"kind\":\"lore\",\"what\":\"what lore\",\"why\":\"why lore\",\"date\":\"2026-10-29\",\"marks\":25,\"walkId\":null,\"contentId\":\"content:lore\",\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e16\",\"kind\":\"horn\",\"what\":\"what horn\",\"why\":\"why horn\",\"date\":\"2026-10-29\",\"marks\":26,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e17\",\"kind\":\"challenge\",\"what\":\"what challenge\",\"why\":\"why challenge\",\"date\":\"2026-10-29\",\"marks\":27,\"walkId\":null,\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e18\",\"kind\":\"island_challenge\",\"what\":\"what island_challenge\",\"why\":\"why island_challenge\",\"date\":\"2026-10-29\",\"marks\":28,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":\"content:island_challenge\",\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e19\",\"kind\":\"wave\",\"what\":\"what wave\",\"why\":\"why wave\",\"date\":\"2026-10-29\",\"marks\":29,\"walkId\":null,\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e20\",\"kind\":\"start_balance\",\"what\":\"what start_balance\",\"why\":\"why start_balance\",\"date\":\"2026-10-29\",\"marks\":30,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e21\",\"kind\":\"restored\",\"what\":\"what restored\",\"why\":\"why restored\",\"date\":\"2026-10-29\",\"marks\":31,\"walkId\":null,\"contentId\":\"content:restored\",\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e22\",\"kind\":\"stamp\",\"what\":\"what stamp\",\"why\":\"why stamp\",\"date\":\"2026-10-29\",\"marks\":0,\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null},{\"id\":\"e23\",\"kind\":\"visit\",\"what\":\"what visit\",\"why\":\"why visit\",\"date\":\"2026-10-29\",\"marks\":0,\"walkId\":null,\"contentId\":null,\"board\":\"pending\",\"capped\":false,\"band\":null}]},\"derivedBase\":{\"coverage\":493,\"complete\":175,\"squares\":275},\"walks\":[{\"walkId\":\"w-0123456789abcdef0123456789abcdef\",\"endedAt\":1761700000000,\"completed\":2}]}"
+  }
+}

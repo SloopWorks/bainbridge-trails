@@ -72,6 +72,13 @@ prototype exists but is compiled only with `-PgeofencePrototype=true` (Android) 
   Protect on the owner's phone; field data collection with geofences resumes only with the opt-in build flag.
 - **Map labels at the screen edge** are clipped like any map (e.g. "Bremerton" under the MapLibre logo on the
   wider iOS framing); the logo now sits on its own pill so this no longer reads as a broken credit.
+- **Play v1 W-COV / W-SQUARE quiet-segment drift (trails):** the phone excludes the derived JSON `quietSegments`
+  (55 segment ids, including segments that touch a quiet zone) while the server's `walkDerivedMarks` excludes only
+  the segments of the three quiet features (28 ids), so the two disagree by ≈ 954.8 m of coverage on the Blakely
+  Harbor trails (the cemetery quiet zone): W-COV can differ by up to ≈ 95 marks and a square lifted only through
+  such a segment may be paid on one side only. Found by the trails v1.1 plan review (P1-2, `docs/play/trails/reviews/`);
+  the v1.1 trails rules use the derived `quietSegments` on both sides (PD-26), the v1 path is left as is for the
+  roads guard. Follow-up: align the server on the derived set (needs a golden rewrite and a one-off totals reconcile).
 
 ## Next steps (backlog)
 

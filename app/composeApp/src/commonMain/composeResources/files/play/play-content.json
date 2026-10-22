@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.11.1",
+  "version": "2026.11.3",
   "epoch": "2026-10-29",
   "_note": "Play v1 content pack (docs/play/schedule.md § 4; product.md § 4 is the authority). Edit this file only; run node scripts/build-play-content.mjs (validates, derives, snapshots to data/play/published/, copies into the app and the Worker). Published item ids are immutable: to change an item's when/where/rewards/fx publish a new id and set expires on the old one. enabled:false items wait on an owner check (product OD-16 TBC facts, on-site spots).",
   "minAppBuild": 0,
@@ -137,6 +137,25 @@
       "lon": -122.51283,
       "radiusM": 800,
       "_note": "Bainbridge terminal reference point, the one terminal coordinate in every Play doc; ambient only"
+    },
+    "fort-ward-south": {
+      "lat": 47.579871,
+      "lon": -122.525173,
+      "radiusM": 60,
+      "_note": "trailhead th-b40243 (Fort Ward Park, south entrance) on trail-fort-ward-trail-fort-ward-park; 49 m inland; chart square 2:6, away from the 3:6 cell that holds egg-station-s and lore-fortward"
+    },
+    "blakely-park-trailhead": {
+      "lat": 47.593244,
+      "lon": -122.523812,
+      "radiusM": 60,
+      "_note": "trailhead th-23141f (Blakely Harbor Park, west entrance), 5 m from trail-fort-ward-to-blakely-harbor-trail, the one Blakely Harbor Park trail clear of the cemetery quiet zone; 472 m inland"
+    },
+    "sakai-loop": {
+      "lat": 47.63936,
+      "lon": -122.51954,
+      "radiusM": 60,
+      "verify": true,
+      "_note": "midpoint of trail-north-loop-trail (Sakai Park, seg-002692); the Sakai facts are TBC (secondary sources only), so the card stays enabled:false until the owner checks (OD-16)"
     }
   },
   "pools": {
@@ -206,6 +225,21 @@
     "madrone-answer": {
       "members": ["road:road-winslow-way-east", "trail:trail-west-loop-trail"],
       "_note": "riddle-madrone answer per goal: each goal claims on its own feature (100 m)"
+    },
+    "manzanita-trails": {
+      "goal": "trails",
+      "members": ["park:Manzanita Park"],
+      "_note": "riddle-manzanita answer: any Manzanita Park trail (100 m)"
+    },
+    "ted-olson-trails": {
+      "goal": "trails",
+      "members": ["park:Ted Olson Nature Preserve"],
+      "_note": "riddle-gift answer: any Ted Olson Nature Preserve trail (100 m)"
+    },
+    "nutes-pond-trails": {
+      "goal": "trails",
+      "members": ["park:Nute's Pond"],
+      "_note": "riddle-roof answer: any Nute's Pond Park trail on Toe Jam Hill (100 m)"
     }
   },
   "quietZones": [
@@ -574,6 +608,144 @@
       "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
     },
     {
+      "id": "egg-strawberry",
+      "type": "egg",
+      "lore": "history",
+      "goals": ["trails"],
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "Moritani Preserve (trail-hayano-trail, park Moritani Preserve): island fact (docs/play/trails/lore-facts.md: Island, Moritani). Open farm meadow, no canopy flag",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-hayano-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": [
+        "https://en.wikipedia.org/wiki/Bainbridge_Island,_Washington",
+        "https://bijac.org/?p=1143",
+        "https://bainbridgereview.com/?p=68802"
+      ],
+      "copy": {
+        "title": "Strawberry capital",
+        "body": "",
+        "found": "In the 1930s this island was called the strawberry capital of the Pacific Northwest. Marshall strawberries grew on this farm from 1905."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-fivemasts",
+      "type": "egg",
+      "lore": "history",
+      "goals": ["trails"],
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "Blakely Harbor Park: trail-fort-ward-to-blakely-harbor-trail is the park's one trail clear of the cemetery quiet zone (trail-blakely-harbor-trail and trail-blakely-trail touch it). Fact: docs/play/trails/lore-facts.md Blakely Harbor Park (Hall Brothers)",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-fort-ward-to-blakely-harbor-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": [
+        "https://www.bi-landtrust.org/protected-space/blakely-harbor/",
+        "https://en.wikipedia.org/wiki/Port_Blakely,_Bainbridge_Island,_Washington"
+      ],
+      "copy": {
+        "title": "Five masts",
+        "body": "",
+        "found": "Among the ships launched at the Hall Brothers' yard here was the H.K. Hall of 1902, a schooner with five masts."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-toejam",
+      "type": "egg",
+      "lore": "place",
+      "goals": ["trails"],
+      "hidden": true,
+      "canopy": true,
+      "notBefore": "2026-10-26",
+      "_note": "Nute's Pond Park on Toe Jam Hill (trail-nutes-trail; riddle-roof sits on trail-nutes-pond-trails). Woods and wetland per the source, so canopy: 25 m. Fact: docs/play/trails/lore-facts.md Toe Jam Hill (name origin \"all conjecture\")",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-nutes-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 25 },
+      "sources": ["https://en.wikipedia.org/wiki/Toe_Jam_Hill"],
+      "copy": {
+        "title": "Toe Jam Hill",
+        "body": "",
+        "found": "Toe Jam Hill is the island's roof. How it got that name is, in the record's own words, all conjecture."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-hilltop",
+      "type": "egg",
+      "lore": "forest",
+      "goals": ["trails"],
+      "hidden": true,
+      "canopy": true,
+      "notBefore": "2026-10-26",
+      "_note": "Grand Forest Hilltop link (trail-hilltop-trail, park Grand Forest); forest cover, so canopy: 25 m. riddle-bond covers the 1991 bond; this egg covers the 2013 link. Fact: docs/play/trails/lore-facts.md Grand Forest",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-hilltop-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 25 },
+      "sources": [
+        "https://www.bi-landtrust.org/protected-space/grand",
+        "https://www.bainbridgereview.com/2014/01/24/meadow-and-forest-forever-hilltop-preserved/"
+      ],
+      "copy": {
+        "title": "The Hilltop link",
+        "body": "",
+        "found": "The Hilltop link opened around 2013 and joined the Grand Forest's pieces into about 540 acres of unbroken woods."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-coastline",
+      "type": "egg",
+      "lore": "place",
+      "goals": ["trails"],
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "Hawley Cove Park (trail-hawley-cove-trail), a shore park for a coastline fact; the seeded point stays on the trail, above the beach. Fact: docs/play/trails/lore-facts.md Island",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-hawley-cove-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": ["https://en.wikipedia.org/wiki/Bainbridge_Island,_Washington"],
+      "copy": {
+        "title": "Fifty-three miles",
+        "body": "",
+        "found": "Around the island's 27.8 square miles of land there are about 53 miles of coastline."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-chillyhilly",
+      "type": "egg",
+      "lore": "place",
+      "goals": ["trails"],
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "Sunny Hill Trail (no park; by Toe Jam Hill): a hill for the Chilly Hilly fact. Fact: docs/play/trails/lore-facts.md Island (Chilly Hilly)",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-sunny-hill-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": ["https://cascade.org/rides-events/chilly-hilly-2026"],
+      "copy": {
+        "title": "Chilly Hilly",
+        "body": "",
+        "found": "Every late February, Chilly Hilly riders circle the island: 33 miles and about 2,173 feet of climbing."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
       "id": "riddle-frog",
       "type": "riddle",
       "lore": "riddle",
@@ -682,6 +854,135 @@
       "fx": "riddle_marker"
     },
     {
+      "id": "riddle-roof",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Toe Jam Hill / Nute's Pond Park: marker seeded on trail-nutes-pond-trails, answer = any Nute's Pond trail (pool over park:Nute's Pond, as riddle-bond). Fact: docs/play/trails/lore-facts.md Toe Jam Hill",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-nutes-pond-trails", "pick": 1 } },
+      "stars": 2,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "pool:nutes-pond-trails", "minM": 100 },
+      "sources": ["https://en.wikipedia.org/wiki/Toe_Jam_Hill"],
+      "copy": {
+        "title": "Riddle",
+        "body": "I am the island's roof, about 425 feet up, with a pond and 31 acres of woods and wetland on top. Walk a hundred metres of the park's trails.",
+        "found": "Claimed. It was Nute's Pond Park, on Toe Jam Hill."
+      },
+      "a11y": { "label": "Riddle, 2 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-steep",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Gazzam Lake Preserve: Peters Trail is the dataset's steepest named trail (gain_m 92.1, data/dist/trails.json 2026-10-18); the app's trail sheet shows gain, so it is solvable in-app. Fact: docs/play/trails/lore-facts.md Gazzam Lake",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-peters-trail", "pick": 1 } },
+      "stars": 3,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "trail:trail-peters-trail", "minM": 100 },
+      "sources": [
+        "dataset:data/dist/trails.json",
+        "https://www.bi-landtrust.org/protected-space/gazzam-lake-preserve/"
+      ],
+      "copy": {
+        "title": "Riddle",
+        "body": "Of every named trail on the island I climb the most, 92 metres, inside the largest nature preserve. Walk a hundred metres of me.",
+        "found": "Claimed. It was Peters Trail at Gazzam Lake."
+      },
+      "a11y": { "label": "Riddle, 3 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-close",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Gazzam Lake Preserve, the Close property trail to a small rocky beach (trail-close-trail). The seeded marker stays on the trail; the beach itself is never an anchor. Fact: docs/play/trails/lore-facts.md Gazzam Lake",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-close-trail", "pick": 1 } },
+      "stars": 2,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "trail:trail-close-trail", "minM": 100 },
+      "sources": ["https://www.wta.org/go-hiking/hikes/gazzam-lake-close-beach"],
+      "copy": {
+        "title": "Riddle",
+        "body": "I am named for a property, not for being near. From the big preserve I lead down to a small rocky beach. Walk a hundred metres of me.",
+        "found": "Claimed. It was the Close Trail."
+      },
+      "a11y": { "label": "Riddle, 2 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-manzanita",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Manzanita Park (park pool): about 2 miles of trails, popular with horse riders; acreage and creek name unconfirmed and not stated. Fact: docs/play/trails/lore-facts.md Manzanita Park",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "pool:manzanita-trails", "pick": 1 } },
+      "stars": 1,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "pool:manzanita-trails", "minM": 100 },
+      "sources": ["https://www.wta.org/go-hiking/hikes/manzanita-trail"],
+      "copy": {
+        "title": "Riddle",
+        "body": "About two miles of trail, shared with riders on horseback, in a park named for a shrub. Walk a hundred metres of it.",
+        "found": "Claimed. It was Manzanita Park."
+      },
+      "a11y": { "label": "Riddle, 1 star", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-gift",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Ted Olson Nature Preserve (park pool): 1973 gift of 10 acres, about 15 today. Fact: docs/play/trails/lore-facts.md Ted Olson Nature Preserve",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "pool:ted-olson-trails", "pick": 1 } },
+      "stars": 2,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "pool:ted-olson-trails", "minM": 100 },
+      "sources": ["https://www.bi-landtrust.org/protected-space/ted-olson-nature-preserve/"],
+      "copy": {
+        "title": "Riddle",
+        "body": "In 1973 a man gave ten acres to the park district so some island land would stay wild. Walk a hundred metres of the preserve that carries his name.",
+        "found": "Claimed. It was the Ted Olson Nature Preserve."
+      },
+      "a11y": { "label": "Riddle, 2 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-dock",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Hidden Cove: the answer is the dataset's trail-hidden-cove-trails network (park null, so no W-PARK credit), the trails-goal stand-in for the Hidden Cove Park facts; the park's shore itself is never an anchor. The marker sits on the neighbouring trail-hidden-cove-loop-trail (chart square 13:5): seeded on the answer it landed in 14:6, Frog Rock's cell, where a riddle outranks lore-frog in treasure weeks (Density). Fact: docs/play/trails/lore-facts.md Hidden Cove Park",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-hidden-cove-loop-trail", "pick": 1 } },
+      "stars": 1,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "trail:trail-hidden-cove-trails", "minM": 100 },
+      "sources": ["https://www.bainbridgereview.com/?p=42232", "https://en.wikipedia.org/wiki/Port_Madison"],
+      "copy": {
+        "title": "Riddle",
+        "body": "Six acres of Port Madison shore, bought in 2005, with a dock long enough for sailboats. Walk a hundred metres of the trails that share the cove's name.",
+        "found": "Claimed. It was Hidden Cove."
+      },
+      "a11y": { "label": "Riddle, 1 star", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
       "id": "kraken-roads",
       "type": "obstacle",
       "lore": "kraken",
@@ -753,6 +1054,32 @@
       "challenge": { "scope": "solo", "metric": "completed", "target": { "trails": 3, "roads": 5 } },
       "copy": { "title": "Weekend sweep", "body": "Finish {target} {goal.items} this weekend. Short ones count." },
       "a11y": { "label": "Weekend sweep", "announce": "Weekend sweep: {progress} of {target}." }
+    },
+    {
+      "id": "ch-climb",
+      "type": "challenge",
+      "lore": "challenge",
+      "goals": ["trails"],
+      "when": { "every": "week", "on": ["mon"], "from": "00:00", "to": "24:00", "days": 7 },
+      "marks": 100,
+      "repeat": "once",
+      "resolve": { "by": "challenge" },
+      "challenge": { "scope": "solo", "metric": "climb", "target": { "trails": 150 } },
+      "copy": { "title": "Uphill week", "body": "Finish trails that climb {target} between them this week." },
+      "a11y": { "label": "Uphill week", "announce": "Uphill week: {progress} of {target} climbed." }
+    },
+    {
+      "id": "ch-parkhop",
+      "type": "challenge",
+      "lore": "challenge",
+      "goals": ["trails"],
+      "when": { "every": "week", "on": ["sat"], "from": "00:00", "to": "24:00", "days": 2 },
+      "marks": 100,
+      "repeat": "once",
+      "resolve": { "by": "challenge" },
+      "challenge": { "scope": "solo", "metric": "parks", "target": { "trails": 3 } },
+      "copy": { "title": "Park hop", "body": "Finish a trail in different parks this weekend. Each park counts once." },
+      "a11y": { "label": "Park hop", "announce": "Park hop: {progress} of {target} parks." }
     },
     {
       "id": "ch-krakenweek",
@@ -919,7 +1246,7 @@
       ],
       "copy": {
         "title": "Battle Point helix house",
-        "body": "From the early 1940s this was a Navy radio transmitting station, with an 800 ft tower beside the helix house, which matched transmitters to antennas. It closed in 1959. Volunteers saved the helix house in 1992 and built an observatory on it."
+        "body": "From the early 1940s this was a Navy radio transmitting station, with an 800 ft tower beside the helix house, which matched transmitters to antennas. It closed in 1959. Volunteers saved the helix house in 1992 and built an observatory on it, now the Battle Point Observatory (renamed in June 2025)."
       },
       "a11y": {
         "label": "Battle Point helix house, island story",
@@ -945,7 +1272,7 @@
       ],
       "copy": {
         "title": "Fort Ward batteries",
-        "body": "A coast-artillery post from 1903. Batteries Thornburgh and Vinton held 3-inch guns until 1920; two other batteries stand on private land and are not mapped. From 1939 the Navy's Station S listening post intercepted Japanese naval radio here. The Army left in 1958, and the park passed to the park district in 2011."
+        "body": "A coast-artillery post from 1903. Batteries Thornburgh and Vinton held 3-inch guns until 1920; two other batteries stand on private land and are not mapped. From 1939 the Navy's Station S listening post intercepted Japanese naval radio here. The Army fort closed in 1928, the Navy left in 1958, and the park passed to the park district in 2011."
       },
       "a11y": {
         "label": "Fort Ward batteries, island story",
@@ -1061,6 +1388,137 @@
         "body": "A public garden reserve on the north end, open with timed tickets. Play places nothing inside it."
       },
       "a11y": { "label": "Bloedel Reserve, island story", "announce": "Bloedel Reserve, an island story." }
+    },
+    {
+      "id": "lore-gazzam",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Gazzam Lake Preserve main trail. No naming claim (the Gazzam name origin is unconfirmed). The Close trail and Peters Trail facts are kept for riddle-close / riddle-steep. Fact: docs/play/trails/lore-facts.md Gazzam Lake",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-gazzam-lake-main-trail", "pick": 1 } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://www.bi-landtrust.org/protected-space/gazzam-lake-preserve/",
+        "https://www.wta.org/go-hiking/hikes/gazzam-lake-close-beach",
+        "https://www.historylink.org/File/22902"
+      ],
+      "copy": {
+        "title": "Gazzam Lake",
+        "body": "Gazzam Lake Nature Preserve covers about 457 acres, the island's largest nature preserve. At its heart is a 13.5-acre lake where waterfowl rest."
+      },
+      "a11y": { "label": "Gazzam Lake, island story", "announce": "Gazzam Lake. 15 marks when you finish." }
+    },
+    {
+      "id": "lore-fortward-navy",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Fort Ward Park south trailhead (th-b40243), a new angle next to lore-fortward (batteries, Station S): the guns never fired, the Navy years and the park's path. Fact: docs/play/trails/lore-facts.md Fort Ward Park. Note: lore-fortward says \"the Army left in 1958\"; the verified line is that the Navy left in 1958 (owner / research-verifier to reconcile)",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:fort-ward-south" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://www.historylink.org/File/9699",
+        "https://www.historylink.org/File/9648",
+        "https://en.wikipedia.org/wiki/Fort_Ward_(Washington)"
+      ],
+      "copy": {
+        "title": "Fort Ward's quiet guns",
+        "body": "Fort Ward was an Army coast-artillery post from 1903 to 1928. Its guns were removed in 1920 and never fired in anger. The Navy took over in 1938 and left in 1958; the land was a state park from 1960 to 2011, then passed to the park district."
+      },
+      "a11y": {
+        "label": "Fort Ward's quiet guns, island story",
+        "announce": "Fort Ward's quiet guns. 15 marks when you finish."
+      }
+    },
+    {
+      "id": "lore-hallbrothers",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Blakely Harbor Park west trailhead (th-23141f, 5 m from trail-fort-ward-to-blakely-harbor-trail): the shipyard angle, next to lore-mill (the mill) at the harbor trailhead. Fact: docs/play/trails/lore-facts.md Blakely Harbor Park",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:blakely-park-trailhead" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://www.bi-landtrust.org/protected-space/blakely-harbor/",
+        "https://en.wikipedia.org/wiki/Port_Blakely,_Bainbridge_Island,_Washington"
+      ],
+      "copy": {
+        "title": "Hall Brothers' shipyard",
+        "body": "Beside the Port Blakely mill, the Hall Brothers' yard launched 77 ships between 1881 and 1904. Down on the shore, the skeleton of a generator building still stands."
+      },
+      "a11y": {
+        "label": "Hall Brothers' shipyard, island story",
+        "announce": "Hall Brothers' shipyard. 15 marks when you finish."
+      }
+    },
+    {
+      "id": "lore-moritani",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "armchair only (view, stamp only, 0 marks): Moritani Preserve lies wholly in chart square 7:6, the Winslow cell, where riddle-madrone, the weekly treasure, lore-eagleharbor and lore-ferry already fill maxPlacementsPerCell (3), so a proximity marker here was density-dropped every day (PlaySchedulerGoldenTest). egg-strawberry (hidden, not counted by density) keeps a find on the ground. Stated plainly and briefly, as lore-memorial / lore-yama do. Fact: docs/play/trails/lore-facts.md Moritani Preserve",
+      "when": { "every": "always" },
+      "marks": 0,
+      "repeat": "once",
+      "resolve": { "by": "none" },
+      "sources": ["https://bainbridgereview.com/?p=68802", "https://bijac.org/?p=1143"],
+      "copy": {
+        "title": "Moritani Preserve",
+        "body": "Hyakutaro Moritani came from Hiroshima in 1905 and planted Marshall strawberries here. Sent away in 1942, the family came back after the war and farmed until the 1960s. Only the porch steps remain. The Fletcher Bay Foundation kept the 8.5 acres as a preserve around 2017."
+      },
+      "a11y": { "label": "Moritani Preserve, island story", "announce": "Moritani Preserve, an island story." }
+    },
+    {
+      "id": "lore-battlepoint",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Battle Point Park loop (trail-battle-point): the park's story at park level; lore-helix (disabled until the observatory point is checked) keeps the helix house itself. Fact: docs/play/trails/lore-facts.md Battle Point Park",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-battle-point", "pick": 1 } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": ["https://bpastro.org/about/", "https://www.bainbridgereview.com/?p=118963"],
+      "copy": {
+        "title": "Battle Point",
+        "body": "About 90 acres here were cleared in 1941 for a Navy radio transmitter site. It was deactivated in 1959 and passed to the park district in 1972. The concrete Helix House, once slated for demolition, is now the Battle Point Observatory, built by volunteers and renamed in June 2025."
+      },
+      "a11y": { "label": "Battle Point, island story", "announce": "Battle Point. 15 marks when you finish." }
+    },
+    {
+      "id": "lore-sakai",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "enabled": false,
+      "notBefore": "2026-10-26",
+      "_note": "enabled:false while the Sakai Park facts are TBC (docs/play/trails/lore-facts.md: secondary sources only, biparks.org unreachable); place sakai-loop carries verify:true (OD-16 pattern). Stated plainly and briefly",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:sakai-loop" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": ["https://bainbridgereview.com/?p=31487", "https://bijac.org/?p=1233"],
+      "copy": {
+        "title": "Sakai Park",
+        "body": "The Sakai family bought this land in 1935 and farmed berries here before and after 1942. The park district bought about 23 acres in 2015."
+      },
+      "a11y": { "label": "Sakai Park, island story", "announce": "Sakai Park. 15 marks when you finish." }
     },
     {
       "id": "ferry-sprite",

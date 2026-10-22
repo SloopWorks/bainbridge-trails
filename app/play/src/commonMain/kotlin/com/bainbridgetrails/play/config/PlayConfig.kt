@@ -143,9 +143,14 @@ enum class ResolveBy { proximity, segments, riddle, challenge, none }
 @Serializable
 enum class ChallengeScope { solo, island }
 
-/** v1: `completed`, `stretches_repelled`; v2 adds the other two. There is no timing metric (PD-4). */
+/**
+ * v1: `completed`, `stretches_repelled`; v2 adds `squares_lifted`, `new_metres`. Play trails v1.1 (plan D5) adds
+ * `climb` (Σ gain of non-quiet trails newly completed in the window, compared in integer decimetres; the pack's target
+ * is metres) and `parks` (distinct Play parks with a new non-quiet completion in the window): solo, trails-only,
+ * whole-day windows. There is no timing metric (PD-4).
+ */
 @Serializable
-enum class ChallengeMetric { completed, stretches_repelled, squares_lifted, new_metres }
+enum class ChallengeMetric { completed, stretches_repelled, squares_lifted, new_metres, climb, parks }
 
 @Serializable
 enum class Every { day, week, month, year, dates, always }

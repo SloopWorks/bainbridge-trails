@@ -169,6 +169,15 @@ tracked (PF0, `PureModeTest`). Specs: `docs/play/README.md`; build order and e2e
   `docs/play/plan.md` § 2 (e.g. `treasure_glint`/`fay-5`, `kraken_attack`/`manitou`, `play_wake`/`island-home`).
 - **E2E (AC 8).** The opt-in → treasure → kraken → riddle → challenge → Logbook walkthrough, its fixed clock, the
   local wrangler dev clock and the screenshot list are in `docs/play/plan.md` § 3 (`docs/play/e2e-ids.env` pins ids).
+  `scripts/play-e2e.sh` defaults to the roads flavour; **`MODE=trails scripts/play-e2e.sh`** runs the trails edition
+  (v1.1): package `com.bainbridgetrails.app.dev` (`:androidApp:assembleTrailsDebug`), trails dataset (`data/dist`),
+  island clock Sat 2026-10-31 10:00, three replayed trails `trail-hayano-trail`, `trail-peters-trail`,
+  `trail-grand-forest-east-trail` (`scripts/emu-route.sh <id> 2`, sync between walks; fallback walk 3
+  `trail-main-loop-trail`), expected rows rebuilt from `agenda-trails.tsv`; screenshots and the run record go to
+  `docs/play/trails/screens/`. Plan: `docs/superpowers/plans/2026-10-21-play-trails-v1-1.md` § 3 W4.
+- **Pack version.** The committed pack is `data/play/play-content.json` `2026.11.2` (trails content, published);
+  `ch-climb` / `ch-parkhop` ship in **2026.11.3** (plan stage L4-2), so the client runs max(bundled, cached) =
+  2026.11.3 from then on and a Worker not yet deployed answers `stale_config` for claims naming it (PD-26 D11).
 
 ## Local backend
 

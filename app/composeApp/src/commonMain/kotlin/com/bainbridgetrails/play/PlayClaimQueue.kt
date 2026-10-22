@@ -57,7 +57,11 @@ data class PlaySettled(
     val capped: Set<String> = emptySet(),
     val localOnly: Map<String, String> = emptyMap(),
     val day: BoardState? = null,
-    /** The walk's walk-derived entries ([WalkMarks.SETTLED_WITH_WALK]): accepted once the upload is answered with `play`. */
+    /**
+     * The walk's walk-derived entries: accepted once the upload is answered with `play`. [PlayClaims.settle] applies it
+     * to the [WalkMarks.SETTLED_WITH_WALK] rows; the trails rows ([WalkMarks.TRAILS_SETTLED_WITH_WALK]) take it via
+     * [WalkMarks.settle], which every production settle calls.
+     */
     val walk: BoardState? = null,
 )
 
@@ -315,7 +319,11 @@ object PlayClaims {
         return after.drop(before).filter { it.capped && it.contentId in keys }.mapNotNullTo(LinkedHashSet()) { it.contentId }
     }
 
-    /** Applies upload outcomes to the walk's `pending` entries (never touches other walks or non-pending entries). */
+    /**
+     * Applies upload outcomes to the walk's `pending` entries (never touches other walks or non-pending entries). Not
+     * the trails rows ([WalkMarks.TRAILS_SETTLED_WITH_WALK]): those settle via [WalkMarks.settle], which wraps this and
+     * is what production calls.
+     */
     fun settle(logbook: Logbook, settled: List<PlaySettled>): Logbook {
         if (settled.isEmpty()) return logbook
         val bySession = settled.associateBy { it.sessionId }

@@ -240,5 +240,20 @@ include the client IP, for a few days; the privacy policy discloses this (max 7 
 would remove it. `DELETE /v1/me` deletes every row for
 the user (including their leaderboard snapshot row); aggregate per-trail counts drop them at the next rebuild.
 
+Play tables (migrations 0005–0007; opt-in, written only when an upload carries `play`; none holds a time of day, a
+date of a walk or a position; all deleted with the account):
+
+| table | holds |
+|---|---|
+| `play_claims` | per user, dataset: the claimed occurrence key (`<item>@<date>[#n]`), claim kind, week id (Monday), pack version, marks paid |
+| `play_weeks` | per user, dataset, week id: count of walking days sent (≤ 7), found marks of the week, W-WEEK kept marks |
+| `play_totals` | per user, dataset: marks totals by source (`cov_marks`, `derived_marks`, `found_marks`, `week_marks`, `trail_marks` from 0007) and `total` |
+| `play_progress` | per user, dataset, challenge occurrence: one contribution count (completions, climb in dm, parks per upload, stretches) |
+| `play_attack_stretches` | per dataset, kraken stretch occurrence: how many distinct users repelled it (a count, no user) |
+| `play_trail_paid` | per user, dataset: the trails rule keys paid by value (`climb:250`, `park1:<park>`, `island` …) and their marks |
+
+A claim or a park key says the user was near a fixed place at some point during that week (the privacy policy's
+Play paragraph discloses this); nothing finer is stored.
+
 The public privacy policy (`docs/legal/privacy-policy.md`, served at `/privacy`) must stay in line with this
 section; update both together.

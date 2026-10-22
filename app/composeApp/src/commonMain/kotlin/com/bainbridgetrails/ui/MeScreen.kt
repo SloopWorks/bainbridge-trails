@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import com.bainbridgetrails.ui.play.components.PlayCard
+import com.bainbridgetrails.ui.play.me.TrailMilestoneStrip
+import com.bainbridgetrails.ui.play.me.TrailMilestonesLogic
+import com.bainbridgetrails.ui.play.me.TrailMilestonesModel
+import com.bainbridgetrails.ui.play.me.TrailMilestonesSheet
 import com.bainbridgetrails.ui.play.components.rememberPlay
 import com.bainbridgetrails.ui.play.screens.LogbookTotals
 import com.bainbridgetrails.ui.play.screens.StoriesLogic
@@ -122,6 +126,8 @@ import kotlinx.datetime.TimeZone
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private const val HISTORY_PAGE = 20
 
@@ -144,6 +150,8 @@ fun MeScreen(
     onPlayLogbook: () -> Unit = {},
     onPlayWhatsOn: () -> Unit = {},
     onPlayStories: () -> Unit = {},
+    /** Me › Trail milestones sheet park row (docs/play/trails/ux.md § 5.2) → the Trails list filtered to that park. */
+    onPlayPark: (String) -> Unit = {},
 ) {
     val snapshot by graph.progress.snapshot.collectAsStateWithLifecycle()
     val history by graph.walks.history.collectAsStateWithLifecycle()
@@ -155,6 +163,7 @@ fun MeScreen(
     LaunchedEffect(signedIn) { if (signedIn) graph.leaderboard.refresh() }
     var info by remember { mutableStateOf<StatInfo?>(null) }
     var milestonesOpen by remember { mutableStateOf(false) }
+    var trailMilestonesOpen by remember { mutableStateOf(false) }
     val goal = LocalGoal.current
     val play = rememberPlay(graph, settings.play.enabled)
 
@@ -182,6 +191,29 @@ fun MeScreen(
                 ) }
             }
             if (milestonesOpen && roadsLadder != null) MilestonesSheet(roadsLadder, settings.units) { milestonesOpen = false }
+            // Trails + Play on (docs/play/trails/ux.md § 0, § 5): the model is read off composition (the input reads
+            // coverage from disk) and is null on roads; the composable guard below is the second line.
+            val trailNames = remember(data) { data.dataset.trails.associate { it.id to it.name } }
+            val trailMilestones by produceState<TrailMilestonesLoad>(TrailMilestonesLoad.Loading, play, s, trailNames, goal.isRoads) {
+                value = if (play == null || goal.isRoads) {
+                    TrailMilestonesLoad.Absent
+                } else {
+                    val tables = play.trailRewardTables()
+                    val input = play.trailRewardInput()
+                    // The ladders and the high-ground sort are CPU work: off the main thread.
+                    withContext(Dispatchers.Default) { TrailMilestonesLogic.model(tables, input, trailNames::get) }
+                        ?.let(TrailMilestonesLoad::Ready) ?: TrailMilestonesLoad.Absent
+                }
+            }
+            val trailModel = (trailMilestones as? TrailMilestonesLoad.Ready)?.model
+            if (trailMilestonesOpen && trailModel != null && !goal.isRoads) {
+                TrailMilestonesSheet(
+                    trailModel, settings.units,
+                    onPark = { trailMilestonesOpen = false; onPlayPark(it) },
+                    onTrail = { trailMilestonesOpen = false; onTrail(it) },
+                    onDismiss = { trailMilestonesOpen = false },
+                )
+            }
 
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 val listState = rememberLazyListState()
@@ -215,6 +247,11 @@ fun MeScreen(
                             val stories = remember(pc, ps.found) { StoriesLogic.model(pc?.config, play.goal, ps.found) }
                             val totals = remember(ps.logbook) { LogbookTotals.of(ps.logbook.total, 0) }
                             PlayCard(totals, stories.met, stories.total, onPlayLogbook, onPlayWhatsOn, onPlayStories, m.padding(top = BtTheme.spacing.md))
+                        }
+                        if (!goal.isRoads && trailMilestones != TrailMilestonesLoad.Absent) {
+                            item(key = "trail-milestones") {
+                                TrailMilestoneStrip(trailModel, settings.units, onAll = { trailMilestonesOpen = true }, Modifier.padding(top = BtTheme.spacing.md))
+                            }
                         }
                     }
                     if (roadsNumbers != null) {
@@ -283,6 +320,13 @@ fun MeScreen(
 }
 
 private enum class StatInfo { ISLAND, TRAILS, MILES, WALKS }
+
+/** Me › Trail milestones (ux § 5.1): skeleton while the derived tables load; item absent when they fail or on roads. */
+private sealed interface TrailMilestonesLoad {
+    data object Loading : TrailMilestonesLoad
+    data object Absent : TrailMilestonesLoad
+    data class Ready(val model: TrailMilestonesModel) : TrailMilestonesLoad
+}
 
 @Composable
 private fun ProfileHeaderRow(name: String, onClick: () -> Unit, modifier: Modifier = Modifier) {

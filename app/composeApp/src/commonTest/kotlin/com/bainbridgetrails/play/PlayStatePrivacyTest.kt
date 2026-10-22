@@ -8,6 +8,9 @@ import com.bainbridgetrails.play.rules.BoardState
 import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Logbook
+import com.bainbridgetrails.play.rules.StartBalance
+import com.bainbridgetrails.play.rules.TrailRewards
+import com.bainbridgetrails.play.rules.WalkDerived
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.io.buffered
@@ -127,5 +130,43 @@ class PlayStatePrivacyTest {
         assertFalse(SystemFileSystem.exists(Path(mapPath)))
         val reread = PlayFiles.store(privateDir, legacyDir, Goal.roads).load()
         assertTrue(reread.logbook.entries.all { it.walkId!!.startsWith(PlayStateStore.OPAQUE_PREFIX) })
+    }
+
+    /**
+     * Play trails v1.1 (plan L2-2, D1): the trails rows and the device ledger add keys and island dates only — no time of
+     * day, no epoch instant, no session id, no coordinate. Pending trails rows carry opaque walk ids on disk like every row.
+     */
+    @Test
+    fun `trail kinds and trailPaid hold no time of day`() = runTest {
+        val date = LocalDate(2026, 10, 31)
+        var n = 0
+        val opted = PlayState(logbook = StartBalance.onEnable(Logbook(), WalkDerived(0, 0, 0), date) { "sb${n++}" }, derivedBase = DerivedBase())
+        // The race path (the trails start: start_trails), then a later walk's per-key pending rows.
+        val first = WalkMarks.apply(
+            opted, Goal.trails, session, date, WalkDerived(500, 100, 25), listOf(TrailFixtures.HAYANO),
+            { TrailFixtures.names[it] ?: it }, emptySet(), { "e${n++}" }, trails = TrailWalk(TrailFixtures.tables, TrailFixtures.hayanoDone),
+        )
+        val second = WalkMarks.apply(
+            first, Goal.trails, "s1761595200000-cd34", date, WalkDerived(600, 200, 30), listOf(TrailFixtures.PETERS),
+            { TrailFixtures.names[it] ?: it }, emptySet(), { "e${n++}" }, trails = TrailWalk(TrailFixtures.tables, TrailFixtures.bothDoneIsland),
+        )
+        val kinds = second.logbook.entries.map { it.kind }.toSet()
+        assertTrue(kinds.containsAll(listOf(LogKind.start_trails, LogKind.climb, LogKind.high_ground, LogKind.park_first, LogKind.island)), "$kinds")
+        assertTrue(second.trailPaid.isNotEmpty())
+
+        val store = PlayFiles.store(privateDir, legacyDir, Goal.trails)
+        store.update { second }
+        val onDisk = text(PlayFiles.statePath(privateDir, Goal.trails))
+        assertFalse(sessionPattern.containsMatchIn(onDisk), "no session id: $onDisk")
+        assertFalse(Regex("""T\d{2}:\d{2}""").containsMatchIn(onDisk), "no time of day: $onDisk")
+        assertFalse(Regex("""[":,\[]\d{12,}[",\]}]""").containsMatchIn(onDisk), "no epoch instant: $onDisk")
+        assertFalse(Regex("""\d{1,3}\.\d{4,}""").containsMatchIn(onDisk), "no coordinate: $onDisk")
+        val stored = JsonFile(PlayFiles.statePath(privateDir, Goal.trails), PlayState.serializer()).read()!!
+        assertEquals(second.trailPaid, stored.trailPaid, "keys by value")
+        assertTrue(stored.trailPaid.all { TrailRewards.kindOf(it) != null }, "${stored.trailPaid}")
+        assertTrue(stored.trailsStarted)
+        val trailRows = stored.logbook.entries.filter { it.kind in TrailRewards.KINDS && it.walkId != null }
+        assertTrue(trailRows.isNotEmpty() && trailRows.all { it.walkId!!.startsWith(PlayStateStore.OPAQUE_PREFIX) })
+        assertEquals(second, PlayFiles.store(privateDir, legacyDir, Goal.trails).load(), "reads back as written")
     }
 }

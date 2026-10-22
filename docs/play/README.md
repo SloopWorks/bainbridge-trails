@@ -6,14 +6,14 @@ v1 scope: [`product.md` § "v1 scope"](product.md).
 
 ## Status (2026-10-21)
 
-Built on branch `gamification/v1` per [`plan.md`](plan.md): all lanes L1–L4 and stages through L2-10 landed; reviews in [`reviews/`](reviews/) (round 1 and round 2 applied, AC 9 gate fixes applied); full verify lane green (see the PR); AC 8 evidence in [`screens/README.md`](screens/README.md) (run 1 found blockers F1/F2, fixed; run 2 is the current result). Owner items still open: OD-19 privacy-policy sign-off before the next Worker deploy, OD-21 claim retention, OD-1 Prue's House, the real WSF ferry timetable, and the on-device PERF run ([`perf.md`](perf.md)).
+v1 is on `main` (PRs #11–#13, built on `gamification/v1` per [`plan.md`](plan.md)): all lanes L1–L4 and stages through L2-10 landed; reviews in [`reviews/`](reviews/) (round 1 and round 2 applied, AC 9 gate fixes applied); full verify lane green; AC 8 evidence in [`screens/README.md`](screens/README.md) (run 2 is the current result). **v1.1 (trails edition) in progress on `play/trails-v1-1`** (2026-10-21): brief, UX addendum and plan accepted, PD-26 recorded, goldens (G0) and content pack 2026.11.2 committed; see the Trails edition row below. Owner items still open: OD-19 privacy-policy sign-off before the next Worker deploy (which also applies migration 0007), OD-21 claim retention, OD-1 Prue's House, and the on-device PERF run ([`perf.md`](perf.md)).
 
 ## Documents
 
 | doc | owns | status |
 |---|---|---|
 | [`brief.md`](brief.md) | The owner request, problem, non-goals, acceptance criteria 1–9, gates | intake |
-| [`decisions.md`](decisions.md) | PD-1 … PD-17: every material decision and the review findings each resolves | ACCEPTED |
+| [`decisions.md`](decisions.md) | PD-1 … PD-26: every material decision and the review findings each resolves | ACCEPTED |
 | [`product.md`](product.md) | **Rules, economy and safety**: principles, marks, Logbook, ranks, content types, opt-in, flows and ACs (PF0–PF16), copy, safety, owner decisions, the v1 scope | ACCEPTED |
 | [`schedule.md`](schedule.md) | **Time, determinism and the content pack schema**: island time, sun, tides, ferry, seeds, weekly rhythm, `play-content.json`, `PlayScheduler`, the server's claims and challenges | ACCEPTED |
 | [`engine.md`](engine.md) | **Rendering (normative)**: MapFx tiers, clock, scene, bands, projection, budgets, PF-1 … PF-9, engine plan | ACCEPTED |
@@ -22,6 +22,7 @@ Built on branch `gamification/v1` per [`plan.md`](plan.md): all lanes L1–L4 an
 | [`ux.md`](ux.md) | **Screen layout and interaction**: Play tokens, components, screens, motion, a11y, copy keys | ACCEPTED (PD-18) |
 | [`plan.md`](plan.md) | The staged build plan (lanes L1–L4, waves W0–W8), the AC 8 e2e script, the effect inventory per stage | written (PD-17) |
 | [`reviews/`](reviews/) | Adversarial reviews | — |
+| **Trails edition (v1.1)**: [`trails/brief.md`](trails/brief.md) · [`trails/ux.md`](trails/ux.md) · [`trails/content.md`](trails/content.md) · [`trails/lore-facts.md`](trails/lore-facts.md) · [plan](../superpowers/plans/2026-10-21-play-trails-v1-1.md) · [`trails/reviews/`](trails/reviews/) | Trails-only delta on v1 (PD-26): W-CLIMB, W-STEEP, trails W-MILE, W-PARK1, W-PARKC, W-ISLAND; `ch-climb`, `ch-parkhop`; trails content pack 2026.11.2 → 2026.11.3; e2e screens in `trails/screens/` | in progress on `play/trails-v1-1` |
 
 Precedence: `decisions.md` > `product.md` > `schedule.md` > `engine.md` > `effects.md` > `ai.md` > the brief.
 `docs/mvp/decisions.md` and `docs/roads/decisions.md` still govern pure mode.

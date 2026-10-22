@@ -37,6 +37,12 @@ data class PlayMeDto(
      * row once (`"<kind>@<week>"`), so its total meets [total].
      */
     val log: List<PlayLogDto> = emptyList(),
+    /**
+     * Trails only (Play trails v1.1, plan D3): every trails rule key the server has paid (`climb:100`, `mile:5`,
+     * `high:<trailId>`, `park1:<park>`, `parkc:<park>`, `island`), sorted. Read only by the Logbook restore, which adds
+     * them to the phone's ledger on its Restored write. Absent on roads (empty).
+     */
+    val paid: List<String> = emptyList(),
 )
 
 /** One server-only credit: [week] = the week id (its Monday), [kind] = `week` | `retreat` | `island_challenge`. */

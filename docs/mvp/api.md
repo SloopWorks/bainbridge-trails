@@ -148,7 +148,7 @@ a name longer than 24 chars) → 47 adjectives × 47 nouns × NN 10–99. The cl
 ### `DELETE /v1/me`
 
 Deletes the account and **all** server data in every dataset (coverage, trail/road fractions, completions,
-metrics, walk ids, Play claims / week rows / totals, sessions, reports by/against, leaderboard rows); revokes the Apple token when configured. `204`. Local data is the
+metrics, walk ids, Play claims / week rows / totals / challenge contributions / trails ledger, sessions, reports by/against, leaderboard rows); revokes the Apple token when configured. `204`. Local data is the
 client's decision (D12). Signing in again creates a fresh account.
 
 Public web page for store listings: `GET /delete-account` (HTML, no `/v1`).
@@ -432,11 +432,20 @@ Only when signed in **and** Play is on. Two optional body fields next to the cov
   (`floor(non-quiet covered m / 10)` trails, `/ 25` roads), W-DONE (+100 / +25 per completed non-quiet feature) and
   W-SQUARE (+25 per chart square) from the merged coverage and credits `max(previous, new)` (this is also the
   opt-in starting balance).
+- Trails rules (v1.1, trails goal only; `docs/play/trails/brief.md` § 2): on the same uploads the server also derives
+  W-CLIMB (`climb:<m>`, steps 100 / 250 / 500 / 750 / 1,000 / 1,250 m of Σ gain of completed non-quiet trails, +50
+  each), W-STEEP (`high:<trailId>`, a completed non-quiet trail with gain ≥ 40.0 m, +50), W-MILE (`mile:<mi>`, 1 then
+  every 5 up to 60 mi of non-quiet covered metres, +50 each), W-PARK1 (`park1:<park>`, first non-quiet coverage in a
+  Play park, +50), W-PARKC (`parkc:<park>`, every non-quiet trail of the park complete, +150) and W-ISLAND (`island`,
+  +1,000). Each key is paid once, by value (`play_trail_paid`, migration 0007, which adds only that table and
+  `play_totals.trail_marks`): a dataset update never lowers or re-pays; `total` includes them. The first Play upload pays every key already earned
+  (the server side of the start balance); an upload without `play` touches nothing. Quiet segments here are the
+  derived `quietSegments` (quiet trails + segments touching a quiet zone). Roads uploads are unchanged.
 
 ### `GET /v1/play/me?dataset=trails|roads`
 
 Bearer required (`401` without). The Play chip summary and the Logbook restore after a reinstall (product § 3.6.5).
-No side effects.
+No side effects. Per-user limit 60 / 10 min (`429 rate_limited`, `Retry-After`).
 
 ```json
 {
@@ -457,6 +466,12 @@ No side effects.
 daily cron credits: `kraken-<goal>@<Thursday>` (kind `ink`, no `#n`) = F-RETREAT for that attack and
 `ch-krakenweek@<Thursday>` (kind `challenge`) = C-ISLAND.
 
+`dataset=trails` only (v1.1): `perKind` also carries the six trails rules, as ledger key counts
+(`"climb": 2, "high_ground": 1, "milestone": 3, "park_first": 4, "park_complete": 1, "island": 0`), and the body
+ends with `"paid": ["climb:100", "climb:250", "high:trail-peters-trail", "mile:1", …]` = every trails rule key the
+server has paid, sorted. On the Restored write the phone adds them to its `trailPaid` so no key is paid twice. The
+roads body is unchanged (no `paid`, six claim kinds).
+
 `log` = every credit only the daily cron pays (never claimed by the phone), for the Logbook: `kind` `week` = W-WEEK
 of a closed kept week (`week` = that week's id; a week closed as not kept is not listed), `retreat` = F-RETREAT and
 `island_challenge` = C-ISLAND (`week` = the attack's week). `marks` = what was paid (0 when the weekly found cap was
@@ -476,6 +491,28 @@ your progress, and `{band, count}` island results. Two kinds in v1 (product § 4
   end + 7 days.
 - **`ch-krakenweek`** (island, the kraken window Thu 06:00 → Sun 20:00). Never claimed by the client. Each accepted
   new `ink` claim counts its stretch once per user (`repelled_by`) and adds 1 to your contribution.
+
+Trails goal only (v1.1, pack 2026.11.3, `docs/play/decisions.md` PD-26), same claim shape, 100 marks each, the
+existing caps apply:
+
+- **`ch-climb`** (solo, weekly Mon 00:00 → Mon 00:00, pack target 150 m). Your contribution = the climb of the
+  non-quiet trails newly completed by your Play uploads, carried everywhere as **integer decimetres** (`progress`
+  and `target` in `/challenges`, the claim test): 149.9 m = 1,499 < 1,500. Claim `{ "id": "ch-climb@<Monday>",
+  "kind": "challenge" }`.
+- **`ch-parkhop`** (solo, Sat 00:00 → Mon 00:00 like `ch-sweep`, target 3 parks). Your contribution = per upload,
+  the distinct Play parks (never Pritchard Park or a quiet trail) among the trails that upload newly completed,
+  added as a count. The server keeps no list of parks, so a park reached through two different trails completed in
+  two separate uploads of one window counts twice (a bounded overcount, accepted by the privacy review over a
+  per-park table). Claim `{ "id": "ch-parkhop@<Saturday>", "kind": "challenge" }`.
+- **One occurrence per upload.** An upload contributes to at most one occurrence of each challenge: the one whose
+  window contains the server time, else the latest whose window ended at most 2 days ago (`ch-sweep` too). A walk
+  synced after the next window opened counts toward the new occurrence on the server while the phone counted it
+  by its finish date; the two may differ until the next walk.
+- **Personal target.** For `ch-climb` / `ch-parkhop` the target you must reach is
+  `min(pack target, remaining + progress)`, where remaining is what your completed trails still leave on the
+  island (climb: the gain of non-quiet trails not yet completed; parks: Play parks with a non-quiet trail not yet
+  completed). The claim is accepted when `progress ≥ target > 0` and the occurrence is unclaimed, else `no_bits`;
+  a target of 0 (nothing left) is never claimable and the occurrence is left out of your `/challenges`.
 
 Daily cron (the existing `17 9 * * *` trigger; idempotent, running twice credits once):
 - **W-WEEK**: a week with ≥ 2 accepted `dayKey`s is kept once it ended: +40, +10 for each consecutive kept week
@@ -528,12 +565,15 @@ occurrence of the goal whose window has started and still takes contributions (w
 
 - `windowStart` / `windowEnd`: the schedule's window in island wall time with its offset (the same for everyone; no
   per-user time is ever returned). `open`: false after the window end while late contributions are still accepted.
-- `progress`: your contributions (ch-sweep: completions counted as above; ch-krakenweek: stretches of this attack
-  you repelled); `null` without a token. `target`: the goal's target / the attack's stretch count.
-- Bands by contribution against `target`: `top` = reached, `middle` = at least half, `starting` = any. `you` = your
-  band, `null` without a contribution or a token. `bands[].count` = participants in the band (admin-hidden users
-  excluded); **below `minCount` (5) it is `null`** ("fewer than 5"), larger counts are rounded to the nearest 5.
-  No names, user ids, scores, marks, ranks or timestamps.
+- `progress`: your contributions (ch-sweep: completions counted as above; ch-climb: decimetres; ch-parkhop: parks;
+  ch-krakenweek: stretches of this attack you repelled); `null` without a token. `target`: the goal's target
+  (ch-climb: decimetres, 1500) / the attack's stretch count; with a token, ch-climb and ch-parkhop carry **your
+  personal target** (above), and an occurrence with nothing left for you is omitted from `current`.
+- Bands by contribution against the goal's target (ch-climb: the dm target): `top` = reached, `middle` = at least
+  half, `starting` = any. `you` = your band against your personal target, `null` without a contribution or a token.
+  `bands[].count` = participants in the band (admin-hidden users excluded); **below `minCount` (5) it is `null`**
+  ("fewer than 5"), larger counts are rounded to the nearest 5. No names, user ids, scores, marks, ranks or
+  timestamps.
 - `island` (island challenges only): the attack's stretches and how many have been repelled by ≥ 3 players.
 
 ### Dev clock (local only)

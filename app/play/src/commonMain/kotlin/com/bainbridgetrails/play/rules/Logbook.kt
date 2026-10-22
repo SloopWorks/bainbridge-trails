@@ -8,13 +8,20 @@ import kotlinx.serialization.Serializable
 
 /**
  * What a Logbook entry records (product §3.8 `kind`). [restored] (§3.6.5) and [visit] (a remembrance visit, §4.6.3,
- * no number at all) complete the product list; v2 kinds are present so a v2 Logbook still decodes.
+ * no number at all) complete the product list; [bramble], [horn] and [wave] are declared ahead of the content that
+ * writes them (none yet; they have no [LogCopy] line), so a Logbook holding one still decodes.
+ *
+ * Play trails v1.1 (plan D1, D7) appends [climb] (W-CLIMB), [high_ground] (W-STEEP) and [start_trails] (the trails
+ * rules' start-balance sibling, ux § 6); W-MILE / W-PARK1 / W-PARKC / W-ISLAND use [milestone] / [park_first] /
+ * [park_complete] / [island]. New kinds only ever append: the names are the stored keywords, and a v1 build cannot
+ * decode a Logbook holding one (local Play state is lost on downgrade, D7).
  */
 @Serializable
 enum class LogKind {
     coverage, complete, park_first, park_complete, milestone, island, square, day, week,
     treasure, egg, riddle, ink, retreat, bramble, lore, horn, challenge, island_challenge, wave,
     start_balance, restored, stamp, visit,
+    climb, high_ground, start_trails,
     ;
 
     /** Found marks (F-*, C-*): what the daily cap (§3.5) sums. */

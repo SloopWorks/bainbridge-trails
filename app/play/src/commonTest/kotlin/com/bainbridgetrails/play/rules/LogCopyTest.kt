@@ -30,6 +30,14 @@ class LogCopyTest {
             LogKind.restored to ("Restored from your account" to "Your marks so far; earlier detail is not on this phone"),
             LogKind.stamp to (null to "Riddle solved"),
             LogKind.visit to (null to "A quiet place. No marks here."),
+            // Play trails v1.1 (ux § 2.2, § 6): the walk-derived trails rows and their start balance sibling.
+            LogKind.park_first to (null to "First new ground in this park"),
+            LogKind.park_complete to (null to "Every trail in this park finished"),
+            LogKind.milestone to (null to "Distance across all your walks"),
+            LogKind.island to ("The whole island" to "All of the island's trails walked"),
+            LogKind.climb to (null to "Climb on trails you've finished"),
+            LogKind.high_ground to (null to "A steep trail, finished"),
+            LogKind.start_trails to ("Trail rewards so far" to "Climb, trail miles, parks and high ground already walked"),
         )
         assertEquals(expected.keys, LogCopy.kinds)
         for ((kind, line) in expected) assertEquals(LogLine(line.first, line.second), LogCopy[kind], kind.name)
@@ -37,6 +45,17 @@ class LogCopyTest {
         assertEquals("Visited the Exclusion Memorial", LogCopy.visitWhat("exclusion-memorial"))
         assertEquals("Visited Port Blakely Cemetery", LogCopy.visitWhat("blakely-cemetery"))
         assertNull(LogCopy.visitWhat("other"))
+    }
+
+    @Test
+    fun `trails lines verbatim`() {
+        // ux § 2.2: the persisted what of climb / milestone is the canonical text in the stored unit
+        assertEquals("100 m climbed", LogCopy.climbWhat(100))
+        assertEquals("1,250 m climbed", LogCopy.climbWhat(1_250))
+        assertEquals("1 mi of trail walked", LogCopy.mileWhat(1))
+        assertEquals("60 mi of trail walked", LogCopy.mileWhat(60))
+        // plan D4 (review P2-8): the neutral catch-up line, not ux § 6's "while Play was off"
+        assertEquals(LogLine("Trail rewards caught up", "Trail rewards owed from earlier walks"), LogCopy.trailCatchUp)
     }
 
     @Test

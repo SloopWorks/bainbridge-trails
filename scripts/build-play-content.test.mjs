@@ -6,8 +6,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import {
-  FIXTURE, MIN_SQUARE_PLAYERS, ROOT, PATHS, buildFixture, chartSquare, decodePolyline, derive, encodePolyline, epochDay, ferryDrift, formatJson, hhmm,
-  loadCoastline, loadMapData, makeIndex, readPublished, run, simplifyLine, suppressSmallCounts, sunDay, validatePack,
+  CHALLENGE_METRICS, FIXTURE, MIN_SQUARE_PLAYERS, ROOT, PATHS, buildFixture, chartSquare, decodePolyline, derive, derivedContinuityErrors, encodePolyline, epochDay,
+  ferryDrift, formatJson, hhmm, loadCoastline, loadMapData, makeIndex, readPublished, run, simplifyLine, suppressSmallCounts, sunDay, validatePack,
 } from "./build-play-content.mjs";
 
 const realPack = () => JSON.parse(readFileSync(join(ROOT, PATHS.pack), "utf8"));
@@ -24,10 +24,10 @@ const fixtureIndex = () =>
     trails: {
       version: "fixture",
       trails: [
-        { id: "trail-bainbridge-island-japanese-american-memorial-trail", name: "Memorial", park: "Pritchard Park", segment_ids: ["seg-m1"] },
-        { id: "trail-blakley-cemetary-trail", name: "Cemetery", park: null, segment_ids: ["seg-c1"] },
-        { id: "trail-pritchard-trail", name: "Pritchard", park: "Pritchard Park", segment_ids: ["seg-p1"] },
-        { id: "trail-ok-trail", name: "Ok", park: "Grand Forest", segment_ids: ["seg-t1"] },
+        { id: "trail-bainbridge-island-japanese-american-memorial-trail", name: "Memorial", park: "Pritchard Park", gain_m: 2.1, segment_ids: ["seg-m1"] },
+        { id: "trail-blakley-cemetary-trail", name: "Cemetery", park: null, gain_m: 66.5, segment_ids: ["seg-c1"] },
+        { id: "trail-pritchard-trail", name: "Pritchard", park: "Pritchard Park", gain_m: 57.9, segment_ids: ["seg-p1"] },
+        { id: "trail-ok-trail", name: "Ok", park: "Grand Forest", gain_m: 12, segment_ids: ["seg-t1"] },
       ],
     },
     trailSegments: {
@@ -229,8 +229,148 @@ test("committed pack is valid without map data and canonical", () => {
   const pack = JSON.parse(text);
   assert.equal(formatJson(pack), text);
   assert.deepEqual(errorsOf(pack, { published: readPublished(), coastline: loadCoastline() }), []);
-  assert.equal(pack.version, "2026.11.1");
   assert.equal(pack.epoch, "2026-10-29");
+});
+
+// --- Play trails v1.1 (plan L4-2): climb / parks challenges, pack 2026.11.3 --------------------------------------
+// The Node rules mirror app/play/.../PlayConfigValidator.kt `trailChallenge`: solo, goals exactly ["trails"], target
+// keyed trails only (> 0), whole-day unanchored window 00:00 → 24:00.
+
+const trailChallenge = (metric, over = {}) => ({
+  id: `ch-test-${metric}`,
+  type: "challenge",
+  lore: "challenge",
+  goals: ["trails"],
+  when: { every: "week", on: ["mon"], from: "00:00", to: "24:00", days: 7 },
+  marks: 100,
+  repeat: "once",
+  resolve: { by: "challenge" },
+  challenge: { scope: "solo", metric, target: { trails: metric === "climb" ? 150 : 3 } },
+  copy: { title: "Test", body: "Finish trails this week." },
+  a11y: { label: "Test", announce: "Test: {progress} of {target}." },
+  ...over,
+});
+const withItem = (item) => {
+  const p = realPack();
+  p.items.push(item);
+  return p;
+};
+const itemErrors = (item) => errorsOf(withItem(item)).filter((e) => e.includes(`items.${item.id}`));
+
+test("accepts climb and parks for trails", () => {
+  assert.deepEqual(CHALLENGE_METRICS, ["completed", "stretches_repelled", "climb", "parks"]);
+  assert.deepEqual(itemErrors(trailChallenge("climb")), []);
+  assert.deepEqual(itemErrors(trailChallenge("parks", { when: { every: "week", on: ["sat"], from: "00:00", to: "24:00", days: 2 } })), []);
+  // the committed items are exactly the plan's shape (ux § 7 copy, D5 window)
+  const climb = realPack().items.find((it) => it.id === "ch-climb");
+  const hop = realPack().items.find((it) => it.id === "ch-parkhop");
+  assert.deepEqual(climb.when, { every: "week", on: ["mon"], from: "00:00", to: "24:00", days: 7 });
+  assert.deepEqual(climb.challenge, { scope: "solo", metric: "climb", target: { trails: 150 } });
+  assert.deepEqual(hop.when, realPack().items.find((it) => it.id === "ch-sweep").when);
+  assert.deepEqual(hop.challenge, { scope: "solo", metric: "parks", target: { trails: 3 } });
+  for (const it of [climb, hop]) {
+    assert.deepEqual([it.goals, it.marks, it.lore, it.resolve], [["trails"], 100, "challenge", { by: "challenge" }]);
+  }
+  assert.equal(climb.copy.title, "Uphill week");
+  assert.equal(climb.copy.body, "Finish trails that climb {target} between them this week.");
+  assert.equal(hop.copy.title, "Park hop");
+  assert.equal(hop.copy.body, "Finish a trail in different parks this weekend. Each park counts once.");
+  // island scope and a roads key in the target are refused for both metrics
+  hasError(itemErrors(trailChallenge("climb", { marks: 75, challenge: { scope: "island", metric: "climb", minPlayersPerStretch: 3, retreatMarks: 50 } })), /ch-test-climb\.challenge\.scope: a climb challenge is solo/);
+  hasError(itemErrors(trailChallenge("parks", { challenge: { scope: "solo", metric: "parks", target: { trails: 3, roads: 5 } } })), /ch-test-parks\.challenge\.target: a parks challenge's target is keyed trails only/);
+  hasError(itemErrors(trailChallenge("parks", { challenge: { scope: "solo", metric: "parks", target: { trails: 0 } } })), /ch-test-parks\.challenge\.target: positive integer per goal/);
+});
+
+test("rejects climb on roads", () => {
+  const roads = trailChallenge("climb", { goals: ["roads"], challenge: { scope: "solo", metric: "climb", target: { roads: 150 } } });
+  const errors = itemErrors(roads);
+  hasError(errors, /ch-test-climb\.goals: a climb challenge is trails-only, goals must be \["trails"\] \(was \["roads"\]\)/);
+  hasError(errors, /ch-test-climb\.challenge\.target: a climb challenge's target is keyed trails only/);
+  // both goals (the default when `goals` is absent) is roads too
+  const both = trailChallenge("parks", { goals: undefined, challenge: { scope: "solo", metric: "parks", target: { trails: 3, roads: 3 } } });
+  delete both.goals;
+  hasError(itemErrors(both), /ch-test-parks\.goals: a parks challenge is trails-only, goals must be \["trails"\] \(was \["trails","roads"\]\)/);
+});
+
+test("rejects parks window not whole days", () => {
+  const re = /ch-test-parks\.when: a parks challenge's window is whole island days, 00:00 → 24:00, unanchored/;
+  hasError(itemErrors(trailChallenge("parks", { when: { every: "week", on: ["sat"], from: "06:00", to: "24:00", days: 2 } })), re);
+  hasError(itemErrors(trailChallenge("parks", { when: { every: "week", on: ["sat"], from: "00:00", to: "20:00", days: 2 } })), re);
+  hasError(itemErrors(trailChallenge("parks", { when: { every: "week", on: ["sat"], from: "00:00", to: "+2d", days: 2 } })), re);
+  hasError(itemErrors(trailChallenge("climb", { when: { every: "week", on: ["mon"], from: "00:00", to: "24:00", days: 7, anchor: { at: "tide.high", before: "1h", after: "1h" } } })), /ch-test-climb\.when: a climb challenge's window is whole island days/);
+  // sun-relative windows fail the server-subset rule and the whole-day rule alike
+  hasError(itemErrors(trailChallenge("parks", { when: { every: "week", on: ["sat"], from: "dawn", to: "dusk", days: 2 } })), /ch-test-parks\.when: the Worker evaluates challenge windows: HH:MM times only/);
+  // ch-sweep (completed) keeps its own rules: a clock window inside the day is still fine for it
+  const sweep = realPack();
+  sweep.items.find((it) => it.id === "ch-sweep").when.from = "06:00";
+  assert.deepEqual(errorsOf(sweep).filter((e) => /whole island days/.test(e)), []);
+});
+
+test("rejects climb every always", () => {
+  // review P2-B: one never-ending occurrence; the phone and the Worker claim per occurrence, so climb / parks recur
+  hasError(itemErrors(trailChallenge("climb", { when: { every: "always" } })), /ch-test-climb\.when: a climb challenge recurs \(day, week, month, year or dates\), never every: always/);
+});
+
+test("rejects parks days over period", () => {
+  // review P2-B: `every: day, days: 7` → 7 live occurrences, each claimable on the phone, the Worker credits one
+  const daily = { every: "day", from: "00:00", to: "24:00", days: 7 };
+  hasError(
+    itemErrors(trailChallenge("parks", { when: daily })),
+    /ch-test-parks\.when: a parks challenge's occurrences overlap: days 7 > the 1-day gap between starts \(days ≤ the recurrence period\)/,
+  );
+  // two starts a week, two days each: Sat → Sun overlaps; one weekly start over 8 days overlaps the next
+  hasError(itemErrors(trailChallenge("parks", { when: { every: "week", on: ["sat", "sun"], from: "00:00", to: "24:00", days: 2 } })), /a parks challenge's occurrences overlap: days 2 > the 1-day gap/);
+  hasError(itemErrors(trailChallenge("climb", { when: { every: "week", on: ["mon"], from: "00:00", to: "24:00", days: 8 } })), /a climb challenge's occurrences overlap: days 8 > the 7-day gap/);
+  // a day at a time is fine (the claim-span rule may still object; the overlap rule does not)
+  assert.deepEqual(itemErrors(trailChallenge("parks", { when: { ...daily, days: 1 } })).filter((e) => /overlap/.test(e)), []);
+});
+
+test("rejects unknown metric", () => {
+  for (const metric of ["timing", "squares_lifted", "new_metres", "", undefined]) {
+    hasError(itemErrors(trailChallenge("climb", { challenge: { scope: "solo", metric, target: { trails: 1 } } })), /ch-test-climb\.challenge\.metric: completed\|stretches_repelled\|climb\|parks \(no timing metric exists\)/);
+  }
+});
+
+test("fails when a published park or trail id disappears", () => {
+  const committed = derive(fixturePack(), fixtureIndex()).trails;
+  assert.deepEqual(derivedContinuityErrors(committed, committed), []);
+  // a trail dropped from the dataset: its id and (it was the park's only trail) the park vanish
+  const idx = fixtureIndex();
+  const ok = idx.trails.get("trail-ok-trail");
+  idx.trails.delete("trail-ok-trail");
+  assert.deepEqual(derivedContinuityErrors(committed, derive(fixturePack(), idx).trails), [
+    'data/play/derived/trails.json: park "Grand Forest" disappeared from the regenerated tables; a published park name must survive (ledger keys name it; an alias map for renames is v2, plan P2-3)',
+    'data/play/derived/trails.json: trail "trail-ok-trail" disappeared from the regenerated tables; a published trail id must survive (ledger keys name it; an alias map for renames is v2, plan P2-3)',
+  ]);
+  // a trail renamed in the dataset keeps its park: only the id is reported
+  idx.trails.set("trail-ok-trail-renamed", { ...ok, id: "trail-ok-trail-renamed" });
+  assert.deepEqual(
+    derivedContinuityErrors(committed, derive(fixturePack(), idx).trails).map((e) => /trail "([^"]+)"|park "([^"]+)"/.exec(e)[0]),
+    ['trail "trail-ok-trail"'],
+  );
+  // additions are fine; an excluded park dropping out of `parks` by configuration is not a disappearance of data
+  const grown = fixtureIndex();
+  grown.trails.set("trail-new-trail", { id: "trail-new-trail", name: "New", park: "New Park", gainM: 1, segIds: [] });
+  assert.deepEqual(derivedContinuityErrors(committed, derive(fixturePack(), grown).trails), []);
+  const more = fixturePack();
+  more.excludedParks = [];
+  const next2 = derive(more, fixtureIndex()).trails;
+  assert.deepEqual(derivedContinuityErrors(committed, next2), [], "Pritchard Park joins parks; nothing left");
+  hasError(derivedContinuityErrors(next2, committed), /park "Pritchard Park" disappeared/);
+});
+
+test("committed pack is 2026.11.3", () => {
+  const pack = realPack();
+  assert.equal(pack.version, "2026.11.3");
+  assert.deepEqual(pack.items.filter((it) => it.type === "challenge").map((it) => it.id), ["ch-sweep", "ch-climb", "ch-parkhop", "ch-krakenweek"]);
+  assert.ok(existsSync(join(ROOT, PATHS.published, "2026.11.3.json")), "published snapshot");
+  assert.ok(existsSync(join(ROOT, PATHS.backend, "2026.11.3.json")), "Worker copy");
+  assert.equal(readPublished().at(-1).version, "2026.11.3");
+  const config = readFileSync(join(ROOT, "backend/src/play/config.ts"), "utf8");
+  assert.match(config, /import v2026_11_3 from "\.\.\/data\/play\/2026\.11\.3\.json"/, "config.ts imports the snapshot");
+  assert.match(config, /PUBLISHED_FILES[^\n]*v2026_11_3\]/, "config.ts bundles it");
+  for (const g of ["trails", "roads"]) assert.equal(JSON.parse(readFileSync(join(ROOT, PATHS.derived, `${g}.json`), "utf8")).pack, "2026.11.3", `${g} derived stamp`);
+  assert.equal(JSON.parse(readFileSync(join(ROOT, PATHS.app, "play-content.json"), "utf8")).version, "2026.11.3");
 });
 
 test("pack ferry block mirrors data/play/ferry-timetable.json, holiday column included", () => {
@@ -351,6 +491,43 @@ test("derives 370 roadSafety roads on 2026-10-20 data (skip without data)", (t) 
   assert.equal(d.roads.roadSafety.ids.length, 370);
   // Taylor Ave NE and Welfare Ave NE pass roadSafety but touch the memorial zone, so they are not in the pool.
   assert.equal(d.roads.pools["play-safe-roads"].length, 368);
+});
+
+// docs/play/trails/brief.md § 2 (W-CLIMB, W-STEEP, W-PARK1, W-PARKC): the trails table carries park membership and
+// climb per trail; the roads table is untouched.
+test("derived trails table carries featurePark, featureGainM and the Play parks", () => {
+  const d = derive(fixturePack(), fixtureIndex());
+  assert.deepEqual(d.trails.featurePark, {
+    "trail-bainbridge-island-japanese-american-memorial-trail": "Pritchard Park", // excluded park kept as data
+    "trail-ok-trail": "Grand Forest",
+    "trail-pritchard-trail": "Pritchard Park",
+  });
+  assert.deepEqual(d.trails.featureGainM, {
+    "trail-bainbridge-island-japanese-american-memorial-trail": 2.1,
+    "trail-blakley-cemetary-trail": 66.5,
+    "trail-ok-trail": 12,
+    "trail-pritchard-trail": 57.9,
+  });
+  assert.deepEqual(d.trails.parks, ["Grand Forest"]);
+  assert.deepEqual(Object.keys(d.trails.featurePark), Object.keys(d.trails.featurePark).sort(), "sorted by trail id");
+  for (const k of ["featurePark", "featureGainM", "parks"]) assert.equal(k in d.roads, false, `roads.json has no ${k}`);
+  // a trail without gain_m reads 0
+  const idx = fixtureIndex();
+  idx.trails.get("trail-ok-trail").gainM = 0;
+  assert.equal(derive(fixturePack(), idx).trails.featureGainM["trail-ok-trail"], 0);
+});
+
+test("derives 19 Play parks and Peters Trail 92.1 m on 2026-10-18 data (skip without data)", (t) => {
+  if (!data.idx) return t.skip("no map data");
+  if (!String(data.idx.versions.trails).startsWith("2026-10-18")) return t.skip(`trails dataset ${data.idx.versions.trails} is not the 2026-10-18 build`);
+  const d = derive(realPack(), data.idx);
+  assert.equal(d.trails.parks.length, 19);
+  assert.ok(!d.trails.parks.includes("Pritchard Park"));
+  assert.ok(d.trails.parks.includes("Gazzam Lake Preserve"));
+  assert.equal(d.trails.featurePark["trail-pritchard-trail"], "Pritchard Park");
+  assert.equal("trail-hidden-cove-trails" in d.trails.featurePark, false, "a trail without a park is absent");
+  assert.equal(d.trails.featureGainM["trail-peters-trail"], 92.1);
+  assert.equal(Object.keys(d.trails.featureGainM).length, data.raw.trails.trails.length, "every trail");
 });
 
 test("K5 has 2 stretches ≥ 100 m (skip without data)", (t) => {

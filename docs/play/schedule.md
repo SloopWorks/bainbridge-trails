@@ -578,7 +578,7 @@ simulator screenshots, following the existing `-btScreen` pattern.
     val canopy: Boolean = false,          // eggs under forest cover: radius/accuracy 25 m (product § 4.2)
     val spotCooldown: Int = 0, val spread: Spread? = null,   // treasure: maxPerSquare, minApartM, lowTrafficShare, quadrants
     val resolve: Resolve,                 // how it is found/solved on device
-    val challenge: ChallengeSpec? = null, // type == challenge only: scope solo|island, metric, target, minPlayers
+    val challenge: ChallengeSpec? = null, // type == challenge only: scope solo|island, metric (completed | stretches_repelled | climb | parks), target, minPlayers
     val variants: List<Variant> = emptyList(),
     val copy: Copy, val a11y: A11y, val sources: List<String> = emptyList(),
     val fx: String? = null,               // snake_case effect id (effects.md § 3); reduced = its final frame
@@ -974,8 +974,13 @@ Built-ins and conveniences, all part of the schema:
 - `every: "always"` gives permanent items one occurrence keyed by `notBefore`
   (`egg-ladybug@2026-10-26`), resolvable in daylight.
 - `challenge: { … }` is the challenge-only sub-object: `scope` (`solo` | `island`), `metric` (`completed`,
-  `stretches_repelled`; v2 adds `squares_lifted`, `new_metres`), `target`, and for island challenges
-  `minPlayersPerStretch` and `retreatMarks` (F-RETREAT). There is no timing metric.
+  `stretches_repelled`; v1.1 adds the trails-only solo metrics `climb` and `parks`, PD-26; v2 adds `squares_lifted`,
+  `new_metres`), `target`, and for island challenges `minPlayersPerStretch` and `retreatMarks` (F-RETREAT). There is
+  no timing metric. `climb` = Σ `gain_m` of non-quiet trails newly completed inside the window; the pack `target`
+  is in metres (`{ "trails": 150 }`), and `progress` / `target` travel in integer **decimetres** on the wire and in
+  `/challenges`. `parks` = distinct Play parks with ≥ 1 new non-quiet completion inside the window (`{ "trails": 3 }`).
+  Both require `goals: ["trails"]`, a target keyed `trails` only and a whole-day window (validator); the effective
+  target is `min(default, what remains for the player)` and the item is hidden when nothing remains.
 
 Copy tokens: `{place}`, `{coast}`, `{tier}`, `{marks}`, `{target}`, `{progress}`, `{end}`, `{n}` and `{riddle}`,
 plus the goal vocabulary tokens `{goal.item}` and `{goal.items}`, are substituted by composeApp through
@@ -1182,6 +1187,23 @@ CREATE TABLE play_attack_stretches ( -- island aggregate for F-RETREAT / ch-krak
 ) WITHOUT ROWID;
 ```
 
+**v1.1 trails ledger (`0007_play_trails.sql`, additive; PD-26).** The six trails rules are paid **by value**, so one
+MAX'd `derived_marks` cannot hold them (a drop in one rule would mask a new step in another):
+
+```sql
+CREATE TABLE play_trail_paid (     -- trails only: climb:<m> | mile:<mi> | high:<trailId> | park1:<park> | parkc:<park> | island
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  dataset TEXT NOT NULL, key TEXT NOT NULL, marks INTEGER NOT NULL,
+  PRIMARY KEY (user_id, dataset, key)
+) WITHOUT ROWID;
+ALTER TABLE play_totals ADD COLUMN trail_marks INTEGER NOT NULL DEFAULT 0;  -- = SUM(play_trail_paid.marks); total adds it
+-- (a `play_progress_keys` table was planned and dropped before any apply: PD-26 D12)
+```
+
+Ledger rows derive from coverage bits and completions only (no time, day or position); inserts are
+`ON CONFLICT DO NOTHING` inside the upload batch, before the totals upsert, and are allowed on the no-change upload
+path. `DELETE /v1/me` removes both tables. Remote apply of 0007 is the owner's, with the Worker deploy (OD-19 first).
+
 **Request.** `PUT /v1/coverage` (existing auth, rate limit and body limits) gains two optional fields, product § 3.10:
 `playConfig` (string) and `play: [{ walkId, claims: [{ id, kind, weekId, band? }], dayKey?, hints? }]`, at most one
 element per walk and at most 50 claims per upload. `SyncRepository` builds one `CoverageUpload` that batches up to
@@ -1215,7 +1237,10 @@ after Sunday 20:00.
 **Response.** When the request carried `play`, the 200 body gains `play: { accepted: [occ], rejected: [{ occ, code }],
 total, week }`; otherwise it is byte-identical to today. A 422 rejects the coverage and its claims together; the
 client marks those entries `local_only`. `GET /v1/play/me?dataset=` returns `{ total, week, perKind, occ: [...] }`
-for the Logbook restore (product § 3.6.5).
+for the Logbook restore (product § 3.6.5). For `dataset=trails` (v1.1, PD-26) `perKind` also carries `climb`,
+`high_ground`, `milestone`, `park_first`, `park_complete`, `island` (ledger key counts) and the body gains
+`paid: string[]` (the sorted ledger keys, seeding the device's `trailPaid` on a Restored write); the roads body is
+byte-identical to v1.
 
 Write budget: one claim is about 3 row writes (claim, week, totals). 1,000 active players × 10 claims a week is
 about 4.3k writes a day, inside D1's 100k writes a day. D1 started **enforcing** the free-tier limits on 2026-09-01,
@@ -1232,6 +1257,13 @@ Timed races, the `race` item type, the `play_races` / `play_race_entries` tables
   (island time). The completing walk's `play` element carries `{ id: "ch-sweep@<Saturday>", kind: "challenge" }`.
   The server accepts it when the user's newly completed trails/roads credited by uploads received inside
   [window start, window end + 2 days] reach the target; it never sees a time.
+- **Solo, trails only (v1.1, PD-26):** `ch-climb` (`climb`, Mon → Mon, 150 m = 1,500 dm) and `ch-parkhop` (`parks`,
+  Sat → Mon, 3 parks). Same claim shape; the server evaluates them from the upload's Play completions (quiet trails
+  and Pritchard Park add nothing), one upload contributes to **at most one occurrence per item** (the one active at
+  `now`, else the latest still in grace), park-hop progress = the distinct parks of that upload's new completions added
+  to `play_progress` (nothing else stored; a park reached in two separate uploads counts twice, PD-26 D12), and the claim is accepted when progress ≥ the personal target
+  (`min(default, remaining)`). `/challenges` returns the personal target when signed in (default otherwise), climb
+  `progress` / `target` in decimetres, and omits an item whose remaining is 0 for that user.
 - **Island** (`ch-krakenweek`): the server increments `play_attack_stretches.repelled_by` once per distinct user
   per stretch on accepted `ink` claims. The cron after Sunday 20:00 checks every stretch ≥ 3 and credits F-RETREAT
   (+50) and C-ISLAND (+75) to every user with ≥ 1 accepted `ink` claim in that attack.

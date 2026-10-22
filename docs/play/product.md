@@ -233,12 +233,14 @@ Earned on every finished walk with Play on (and retroactively once, at opt-in, �
 |---|---|---|---|---|---|
 | W-COV | New counted coverage | **Fixed rate:** 1 mark per 10 m of new counted coverage outside quiet trails, cumulative: `floor(nonQuietCoveredM / 10)`; walk's marks = value after − value before | **Fixed rate:** 1 mark per 25 m: `floor(coveredM / 25)` | A fixed rate per goal, never a share of the island total, so a dataset update that grows the map never lowers anyone's marks; the server credits `max(previous, new)` so a dataset update that removes segments can't either (monotone). Same `coveredM` as island % (shared segments once), minus quiet trails' metres. Computed from the post-Finalizer snapshot, never live. Today's whole maps: ≈ 10,296 (trails, 102,964 m outside quiet trails) and ≈ 10,461 (roads, 261,537 m). | Bounded by the map. |
 | W-DONE | A trail/road crosses completion (`newlyCompleted`) | +100 each | +25 each | Uses the walk summary's `newlyCompleted` (sticky set, TL-7). Uncounted roads never. Quiet trails (§ 4.6.3) never. | Bounded by N. |
-| W-PARK1 (v2) | First new coverage in a park | +50 per park | — | Park = `trails.json` `park` (non-null), except Pritchard Park (quiet, never a Play park). Once per park ever. | 19 parks today. |
-| W-PARKC (v2) | Every named trail in a park complete | +150 per park | — | Fires on the walk that completes the park's last trail. | Once per park. |
-| W-MILE (v2) | Roads distance milestone (1, 5, 10, 15 … in user's unit) | — | +50 | Same `Milestones.crossed` math (RP-8). Highest crossed only (as today). Unit switching can't double-pay: Play records paid milestones by value in **miles** (km converted down). | Bounded by island length. |
+| W-CLIMB (v1.1 trails) | Cumulative climb ladder | +50 per step | — | Σ `gain_m` (`trails.json`, per trail) of **completed** non-quiet trails; partial coverage adds nothing. Steps keyed in **metres**: 100, 250, 500, 750, 1,000, 1,250 (1,500 is unreachable: the non-quiet total is 1,368.8 m). Shown in the user's unit (ft with mi, m with km, integer). Trails that share segments each count their own `gain_m` (completion-based, like W-DONE; brief Q4). Never from GPS or barometric altitude. PD-26. | 6 steps. |
+| W-STEEP "High ground" (v1.1 trails) | A steep trail finished | +50 | — | Completing a non-quiet trail with `gain_m ≥ 40`; once per trail id, by value. PD-26. | 10 trails today. |
+| W-PARK1 (v1.1 trails) | First new coverage in a park | +50 per park | — | Park = `trails.json` `park` (non-null), except Pritchard Park (quiet, never a Play park). First **non-quiet** coverage; once per park ever, by value. PD-26. | 19 parks today. |
+| W-PARKC (v1.1 trails) | Every named trail in a park complete | +150 per park | — | Every named **non-quiet** trail; fires on the walk that completes the park's last trail. PD-26. | Once per park (19 parks, 7 single-trail). |
+| W-MILE (v1.1 trails; roads v2) | Distance milestone (1, 5, 10, 15 … 60 in user's unit) | +50 per step | +50 | Same `Milestones` ladder math (RP-8). Trails (v1.1, PD-26): cumulative **non-quiet** covered trail metres (W-COV's `coveredM`), `nonQuietCoveredM / 1,609.344`, every step crossed paid (13 steps on today's 102,964 m). Roads (v2): highest crossed only (as today). Unit switching can't double-pay: Play records paid milestones by value in **miles** (km converted down). | Bounded by island length. |
 | W-ROADS (v2) | Roads-completed ladder (1, 10, 25 … 400) | — | +50 | As RP-8. | 11 steps. |
 | W-TYPE (v2) | Every road of a type complete | — | +250 | As RP-8. | 4. |
-| W-ISLAND (v2) | Island complete | +1,000 | +1,000 | Existing `islandReached`. | Once. |
+| W-ISLAND (v1.1 trails; roads v2) | Island complete | +1,000 | +1,000 | Existing `islandReached` (trails: island fraction ≥ 1 − 1e-9, PD-26). | Once. |
 | W-SQUARE | First new coverage in a chart square ("fog lifted") | +25 | +25 | Square derived on device from the segment coordinates of the newly covered ticks. Counted segments only, never quiet trails (a square lifts only through non-quiet coverage). Once per square ever. | 62 / 83. |
 | W-DAY | Walking day | +15 | +15 | First finished walk of the island-time day with duration ≥ 10 min **and** matched distance ≥ 500 m on any mapped segment (repeats count, same as "miles on this phone"). Rewards Dana's familiar loop. | 1 per day. |
 | W-WEEK | Kept week | +40, +10 for each consecutive kept week before it, max +100 | same | A week is kept when W-DAY was earned on **≥ 2 different days** of the week. Awarded at week close (Monday 00:00 island time; the week is half-open), logged on Sunday. The server derives it from the walks' `dayKey`s (§ 3.10). Missing a week resets the run to the base +40 next time; nothing else happens, no "streak lost" copy. Two days so weekend walkers (Marcus) qualify. | 1 per week. |
@@ -398,15 +400,19 @@ Cumulative marks per goal. Titles are Bainbridge-flavoured and goal-neutral (sam
 | Completions (W-DONE) | 111 non-quiet trails × 100 = 11,100 | 430 × 25 = 10,750 |
 | Chart squares (W-SQUARE) | 62 × 25 = 1,550 | 83 × 25 = 2,075 |
 | **Walking the whole goal, v1** | **≈ 22,946** | **≈ 23,286** |
-| Parks (W-PARK1 + W-PARKC) (v2) | 19 × 50 + 19 × 150 = 3,800 | — |
+| Climb ladder (W-CLIMB) (v1.1 trails) | 6 × 50 = 300 | — |
+| High ground (W-STEEP) (v1.1 trails) | 10 × 50 = 500 | — |
+| Trail miles (W-MILE) (v1.1 trails) | 13 × 50 = 650 | — |
+| Parks (W-PARK1 + W-PARKC) (v1.1 trails) | 19 × 50 + 19 × 150 = 3,800 | — |
+| Island (W-ISLAND) (v1.1 trails; roads v2) | 1,000 | 1,000 |
+| **Walking the whole goal, v1.1** (PD-26) | **≈ 29,196** (22,946 + 6,250) | **≈ 23,286** (unchanged) |
 | Roads milestones (v2) | — | distance 33 × 50 + ladder 11 × 50 + types 4 × 250 = 3,200 |
-| Island (v2) | 1,000 | 1,000 |
-| **Walking the whole goal, with v2** | **≈ 27,746** | **≈ 27,486** |
+| **Walking the whole goal, with v2** | **≈ 29,196** | **≈ 27,486** |
 | Typical weekly content available (finds + kraken + challenges) | ≈ 500–800 | ≈ 600–900 |
 
 So "Keeper of the Chart" (30,000) needs the whole map plus several seasons of Play content: a multi-year title for
-both goals. Counts are recomputed from the dataset at build; the table is
-illustrative.
+both goals. The trails/roads asymmetry is accepted (PD-26): ranks are per goal and nothing compares across goals.
+Counts are recomputed from the dataset at build; the table is illustrative.
 
 ### 3.8 The Logbook
 
@@ -752,6 +758,8 @@ Seed instances:
 | id | kind | window | target | reward | notes |
 |---|---|---|---|---|---|
 | `ch-sweep` | solo | Sat 00:00 → Mon 00:00, weekly | Trails: finish 3 trails. Roads: finish 5 roads. | 100 | Short trails/roads make it family-sized (113 counted roads under 0.1 mi). |
+| `ch-climb` (v1.1 trails) | solo | Mon 00:00 → Mon 00:00, weekly | Finish non-quiet trails that climb ≥ 150 m between them (metric `climb`, Σ `gain_m` of trails newly completed in the window; progress and target carried in decimetres) | 100 | "Uphill week". Never timed. Target = min(150 m, what remains for this player); nothing left → card hidden. Progress as text ("95 of 150 m climbed" / "311 of 492 ft climbed"). PD-26. |
+| `ch-parkhop` (v1.1 trails) | solo | Sat 00:00 → Mon 00:00, weekly | Finish a trail in ≥ 3 distinct Play parks (metric `parks`; each park counts once; Pritchard Park and quiet trails never) | 100 | "Park hop". Never timed. Target = min(3, parks with an uncompleted trail left); nothing left → card hidden. Progress as text ("2 of 3 parks"). PD-26. |
 | `ch-crossing` (v2) | solo | Any 35 min starting at a scheduled departure from Bainbridge terminal (pack timetable), daylight | New coverage ≥ 300 m (trails) / 800 m (roads) within one crossing time | 50 | "Walk while the boat crosses." A walk qualifies if ≥ the target of its new coverage was matched within that 35 min (from the walk's own local timeline; never uploaded). Copy never says beat or race the boat. |
 | `ch-foglifter` (v2) | solo | Calendar month | Lift fog over 3 new squares | 150 | Monthly. If fewer than 3 fogged squares remain, target = remaining. |
 | `ch-krakenweek` | island | Kraken window | Every attacked stretch repelled by ≥ 3 players | 75 + F-RETREAT | Same mechanic as § 4.3.2, framed as a challenge. |

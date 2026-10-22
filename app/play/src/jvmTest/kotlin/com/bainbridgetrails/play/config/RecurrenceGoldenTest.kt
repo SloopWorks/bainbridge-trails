@@ -29,8 +29,8 @@ class RecurrenceGoldenTest {
         val perItem = occs.groupingBy { it.substringBefore('@') }.eachCount()
         assertEquals(
             mapOf(
-                "ch-krakenweek" to 52, "ch-sweep" to 52, "kraken-roads" to 52, "kraken-trails" to 52, "lore-kraken" to 52,
-                "treasure-weekly-roads" to 52, "treasure-weekly-trails" to 52,
+                "ch-climb" to 52, "ch-krakenweek" to 52, "ch-parkhop" to 52, "ch-sweep" to 52, "kraken-roads" to 52,
+                "kraken-trails" to 52, "lore-kraken" to 52, "treasure-weekly-roads" to 52, "treasure-weekly-trails" to 52,
             ),
             perItem,
         )

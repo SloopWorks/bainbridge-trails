@@ -26,10 +26,12 @@ import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.play_celebrate_marks
 import com.bainbridgetrails.resources.play_kind_bramble
 import com.bainbridgetrails.resources.play_kind_challenge
+import com.bainbridgetrails.resources.play_kind_climb
 import com.bainbridgetrails.resources.play_kind_complete
 import com.bainbridgetrails.resources.play_kind_coverage
 import com.bainbridgetrails.resources.play_kind_day
 import com.bainbridgetrails.resources.play_kind_egg
+import com.bainbridgetrails.resources.play_kind_high_ground
 import com.bainbridgetrails.resources.play_kind_horn
 import com.bainbridgetrails.resources.play_kind_ink
 import com.bainbridgetrails.resources.play_kind_island
@@ -43,6 +45,7 @@ import com.bainbridgetrails.resources.play_kind_retreat
 import com.bainbridgetrails.resources.play_kind_riddle
 import com.bainbridgetrails.resources.play_kind_square
 import com.bainbridgetrails.resources.play_kind_start_balance
+import com.bainbridgetrails.resources.play_kind_start_trails
 import com.bainbridgetrails.resources.play_kind_treasure
 import com.bainbridgetrails.resources.play_kind_visit
 import com.bainbridgetrails.resources.play_kind_wave
@@ -57,6 +60,7 @@ import com.bainbridgetrails.ui.components.BtIcons
 import com.bainbridgetrails.ui.play.screens.LogNote
 import com.bainbridgetrails.ui.play.screens.LogRowModel
 import com.bainbridgetrails.ui.play.screens.LogTrailing
+import com.bainbridgetrails.ui.play.screens.LogbookLogic
 import com.bainbridgetrails.ui.theme.BtTheme
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -87,6 +91,10 @@ fun LogKind.labelRes(): StringResource = when (this) {
     LogKind.start_balance -> Res.string.play_kind_start_balance
     LogKind.restored -> Res.string.play_kind_restored
     LogKind.visit -> Res.string.play_kind_visit
+    // Play trails v1.1 (trails ux § 2.2, § 6, § 8): trails-only keys, routed through the goal like every trails key.
+    LogKind.climb -> LocalGoal.current.s(Res.string.play_kind_climb)
+    LogKind.high_ground -> LocalGoal.current.s(Res.string.play_kind_high_ground)
+    LogKind.start_trails -> LocalGoal.current.s(Res.string.play_kind_start_trails)
 }
 
 /** The art tile's glyph for a kind (placeholder art, ux § 7.2 #4). */
@@ -99,6 +107,8 @@ fun LogKind.glyph(): FxGlyph = when (this) {
     LogKind.horn -> FxGlyph.Ferry
     LogKind.challenge, LogKind.island_challenge, LogKind.wave -> FxGlyph.Pennant
     LogKind.visit -> FxGlyph.QuietRing
+    // Trails ux § 2.3: climb and high ground; parks, miles, island and start_trails keep the survey mark.
+    LogKind.climb, LogKind.high_ground -> FxGlyph.Summit
     else -> FxGlyph.Marks
 }
 
@@ -107,10 +117,24 @@ fun LogKind.glyph(): FxGlyph = when (this) {
  * `titleSmall`, why `bodySmall` `onSurfaceVariant`; trailing `+n` in `marksDelta` `play.seaGlass` (muted:
  * `onSurfaceVariant`), a stamp, or nothing (remembrance). `local_only` adds a third line with cloud-off. One merged
  * node: "Treasure. Sea glass on Rose Loop. Weekly treasure, common. Plus 25 marks." No time of day, ever.
+ * A trails climb / trail-mile line with a [LogRowModel.value] shows it through `play_log_climb_what` /
+ * `play_log_mile_what` ("820 ft climbed") and speaks it with the spoken unit ("820 feet climbed", trails ux § 2.2).
  */
 @Composable
 fun LogbookRow(row: LogRowModel, modifier: Modifier = Modifier) {
     val kind = stringResource(row.kind.labelRes())
+    val value = row.value
+    val whatRes = LogbookLogic.whatRes(row.kind)
+    val what: String
+    val spokenWhat: String
+    if (value != null && whatRes != null) {
+        val template = LocalGoal.current.s(whatRes)
+        what = stringResource(template, value.text)
+        spokenWhat = stringResource(template, spokenValue(value))
+    } else {
+        what = row.what
+        spokenWhat = row.what
+    }
     val why = when {
         row.note == LogNote.Cap -> stringResource(Res.string.play_log_cap)
         row.kind == LogKind.restored -> stringResource(Res.string.play_log_restored)
@@ -121,7 +145,7 @@ fun LogbookRow(row: LogRowModel, modifier: Modifier = Modifier) {
     val trailing = row.trailing
     val number = (trailing as? LogTrailing.Marks)?.let { PlayFormat.marks(it.marks) }
     val spokenMarks = number?.let { stringResource(Res.string.play_celebrate_marks, it) }
-    val spoken = listOfNotNull(kind, row.what, why, spokenMarks ?: stamp.takeIf { trailing == LogTrailing.Stamp }, localOnly)
+    val spoken = listOfNotNull(kind, spokenWhat, why, spokenMarks ?: stamp.takeIf { trailing == LogTrailing.Stamp }, localOnly)
         .joinToString(". ")
     Row(
         modifier
@@ -137,7 +161,7 @@ fun LogbookRow(row: LogRowModel, modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center,
         ) { FxGlyphImage(row.kind.glyph(), size = 20.dp) }
         Column(Modifier.weight(1f)) {
-            Text(row.what, style = MaterialTheme.typography.titleSmall)
+            Text(what, style = MaterialTheme.typography.titleSmall)
             Text(why, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (localOnly != null) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

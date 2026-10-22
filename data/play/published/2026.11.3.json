@@ -1,0 +1,1544 @@
+{
+  "schema": 1,
+  "version": "2026.11.3",
+  "epoch": "2026-10-29",
+  "_note": "Play v1 content pack (docs/play/schedule.md § 4; product.md § 4 is the authority). Edit this file only; run node scripts/build-play-content.mjs (validates, derives, snapshots to data/play/published/, copies into the app and the Worker). Published item ids are immutable: to change an item's when/where/rewards/fx publish a new id and set expires on the old one. enabled:false items wait on an owner check (product OD-16 TBC facts, on-site spots).",
+  "minAppBuild": 0,
+  "tz": "America/Los_Angeles",
+  "islandSeed": "5eed1b1a2026c0de",
+  "kill": { "all": false, "types": [], "items": [] },
+  "rules": {
+    "playHours": { "from": "06:00", "to": "21:00" },
+    "ambientHours": { "from": "05:00", "to": "23:00" },
+    "heroMaxConcurrent": 1,
+    "maxPlacementsPerCell": 3,
+    "maxVisiblePlacements": 40,
+    "krakenMaxTideM": 2.44,
+    "roadSafety": {
+      "categories": ["residential", "collector", "arterial"],
+      "maxSpeedMph": 25,
+      "nullSpeedOnly": ["residential"],
+      "ownershipPrefix": "public_",
+      "requirePublic": true
+    }
+  },
+  "caps": {
+    "foundPerDay": 400,
+    "foundPerWeek": 2800,
+    "weekLateDays": 7,
+    "findGraceDays": 2,
+    "clockAheadMin": 60,
+    "keptConfigs": 8
+  },
+  "climate": [{ "id": "wet", "from": "10-15", "to": "04-30" }, { "id": "dry", "from": "07-01", "to": "09-15" }],
+  "aggregates": {
+    "asOf": "2026-10-20",
+    "lowTrafficSquares": { "trails": [], "roads": [] },
+    "_note": "per-square player counts from the Worker cron, baked in at publish; empty until Play has players"
+  },
+  "windows": {
+    "exclusion-remembrance": {
+      "every": "year",
+      "in": ["mar"],
+      "on": [30],
+      "from": "00:00",
+      "to": "24:00",
+      "_note": "island-wide quiet day (product § 4.6.3, OD-4)"
+    }
+  },
+  "places": {
+    "frog-rock": {
+      "lat": 47.69594,
+      "lon": -122.52357,
+      "radiusM": 60,
+      "landmark": { "lat": 47.69612, "lon": -122.52347 },
+      "_note": "trigger snapped 21 m onto road-northeast-spargur-loop-road (25 mph); never Phelps Rd NE or N Madison Ave NE (35 mph)"
+    },
+    "ladybug": {
+      "lat": 47.69594,
+      "lon": -122.52357,
+      "radiusM": 15,
+      "landmark": { "lat": 47.69612, "lon": -122.52347 }
+    },
+    "fairy-door": {
+      "lat": 47.66908,
+      "lon": -122.57829,
+      "radiusM": 25,
+      "verify": true,
+      "_note": "trail-fairy-dell-trail midpoint, canopy; spot TBC on site"
+    },
+    "helix-house": {
+      "lat": 47.66609,
+      "lon": -122.5772,
+      "radiusM": 15,
+      "verify": true,
+      "_note": "on trail-battle-point by the helix house; observatory exact point TBC (OD-16)"
+    },
+    "lynwood": {
+      "lat": 47.60445,
+      "lon": -122.54742,
+      "radiusM": 15,
+      "landmark": { "lat": 47.60444, "lon": -122.5475 },
+      "_note": "Lynwood Theatre; trigger snapped 6 m onto road-pleasant-beach-drive-northeast (25 mph)"
+    },
+    "madrone": {
+      "lat": 47.62479,
+      "lon": -122.50838,
+      "radiusM": 15,
+      "landmark": { "lat": 47.62475, "lon": -122.5081 },
+      "_note": "on road-winslow-way-east (25 mph), moved 21 m west of the product point to sit 45 m inland (≥ 30 m from coastline.json)"
+    },
+    "fort-ward": {
+      "lat": 47.58971,
+      "lon": -122.52871,
+      "radiusM": 15,
+      "_note": "on trail-fort-ward-trail-fort-ward-park, in the park; never at the private former Station S building"
+    },
+    "fort-ward-fence": {
+      "lat": 47.58869,
+      "lon": -122.52678,
+      "radiusM": 60,
+      "_note": "on trail-fort-ward-fence-line-trail; Batteries Nash and Warner are private and not mapped"
+    },
+    "memorial-card": {
+      "lat": 47.6156,
+      "lon": -122.51019,
+      "radiusM": 30,
+      "_note": "the remembrance card marker; the only marker inside its own quiet zone"
+    },
+    "mill-trails": {
+      "lat": 47.59606,
+      "lon": -122.52013,
+      "radiusM": 60,
+      "landmark": { "lat": 47.59535, "lon": -122.51975 },
+      "_note": "Blakely Harbor Park trailhead th-fa3d07 is the landmark; its trails touch the cemetery quiet zone, so the trigger is snapped 84 m onto trail-fort-ward-to-blakely-harbor-trail"
+    },
+    "mill-road": {
+      "lat": 47.59845,
+      "lon": -122.51383,
+      "radiusM": 60,
+      "_note": "on road-blakely-hill-road-northeast (25 mph)"
+    },
+    "strawberry-hill": {
+      "lat": 47.63844,
+      "lon": -122.54806,
+      "radiusM": 60,
+      "landmark": { "lat": 47.63854, "lon": -122.54879 },
+      "_note": "trigger snapped 56 m onto road-strawberry-hill-park (public parks road)"
+    },
+    "ferry-anchor": {
+      "lat": 47.62319,
+      "lon": -122.517,
+      "radiusM": 60,
+      "_note": "on road-brien-drive-southeast, inside the Winslow waterfront zone; serves both goals (the trail-west-loop-trail anchor sits < 30 m from the shore)"
+    },
+    "winslow-waterfront": {
+      "lat": 47.62371,
+      "lon": -122.51283,
+      "radiusM": 800,
+      "_note": "Bainbridge terminal reference point, the one terminal coordinate in every Play doc; ambient only"
+    },
+    "fort-ward-south": {
+      "lat": 47.579871,
+      "lon": -122.525173,
+      "radiusM": 60,
+      "_note": "trailhead th-b40243 (Fort Ward Park, south entrance) on trail-fort-ward-trail-fort-ward-park; 49 m inland; chart square 2:6, away from the 3:6 cell that holds egg-station-s and lore-fortward"
+    },
+    "blakely-park-trailhead": {
+      "lat": 47.593244,
+      "lon": -122.523812,
+      "radiusM": 60,
+      "_note": "trailhead th-23141f (Blakely Harbor Park, west entrance), 5 m from trail-fort-ward-to-blakely-harbor-trail, the one Blakely Harbor Park trail clear of the cemetery quiet zone; 472 m inland"
+    },
+    "sakai-loop": {
+      "lat": 47.63936,
+      "lon": -122.51954,
+      "radiusM": 60,
+      "verify": true,
+      "_note": "midpoint of trail-north-loop-trail (Sakai Park, seg-002692); the Sakai facts are TBC (secondary sources only), so the card stays enabled:false until the owner checks (OD-16)"
+    }
+  },
+  "pools": {
+    "coast-k2": {
+      "goal": "roads",
+      "members": [
+        "stretch:road-crystal-springs-drive-northeast",
+        "stretch:road-point-white-drive-northeast",
+        "stretch:road-pleasant-beach-drive-northeast"
+      ],
+      "_note": "K2 Rich Passage west / Point White"
+    },
+    "coast-k3": {
+      "goal": "roads",
+      "members": ["stretch:road-shannon-drive-1", "stretch:road-lovell-avenue-southwest-2", "stretch:road-rose-loop"],
+      "_note": "K3 Eagle Harbor south & west"
+    },
+    "coast-k4": {
+      "goal": "roads",
+      "members": [
+        "stretch:road-northeast-south-beach-drive-1",
+        "stretch:road-rockaway-beach-road-northeast",
+        "stretch:road-northeast-seaborn-road",
+        "stretch:road-three-t-road-northeast"
+      ],
+      "_note": "K4 South & east shore"
+    },
+    "coast-k5": {
+      "goal": "roads",
+      "members": ["stretch:road-manitou-beach-drive-northeast", "stretch:road-northeast-gertie-johnson-road"],
+      "_note": "K5 Manitou / Murden Cove"
+    },
+    "coast-k6": {
+      "goal": "roads",
+      "members": [
+        "stretch:road-point-monroe-drive-northeast",
+        "stretch:road-reitan-road-northeast",
+        "stretch:road-skogen-lane-northeast"
+      ],
+      "_note": "K6 North end / Port Madison / Agate Pass"
+    },
+    "coast-k7": {
+      "goal": "roads",
+      "members": ["stretch:road-olympus-beach-road-northeast", "stretch:road-northeast-monte-vista-drive"],
+      "_note": "K7 West shore"
+    },
+    "coast-t2": {
+      "goal": "trails",
+      "members": ["stretch:trail-fort-ward-trail-fort-ward-park", "stretch:trail-lower-fort-ward-trail"],
+      "_note": "T2 Fort Ward / Rich Passage"
+    },
+    "coast-t3": {
+      "goal": "trails",
+      "members": [
+        "stretch:trail-west-loop-trail",
+        "stretch:trail-west-loop-trail-3",
+        "stretch:trail-waypoint-woods-trail"
+      ],
+      "_note": "T3 Winslow waterfront"
+    },
+    "coast-t4": {
+      "goal": "trails",
+      "members": ["stretch:trail-fairy-dell-trail", "stretch:trail-schel-chelb-trail"],
+      "_note": "T4 West shore. trail-woodland-drive-road-end dropped: its only segment is not included (not counted). T5 (Hawley Cove, T'Chookwop) has no stretch ≥ 100 m on coastline.json and is out of the rotation."
+    },
+    "grand-forest-trails": { "goal": "trails", "members": ["park:Grand Forest"] },
+    "madrone-answer": {
+      "members": ["road:road-winslow-way-east", "trail:trail-west-loop-trail"],
+      "_note": "riddle-madrone answer per goal: each goal claims on its own feature (100 m)"
+    },
+    "manzanita-trails": {
+      "goal": "trails",
+      "members": ["park:Manzanita Park"],
+      "_note": "riddle-manzanita answer: any Manzanita Park trail (100 m)"
+    },
+    "ted-olson-trails": {
+      "goal": "trails",
+      "members": ["park:Ted Olson Nature Preserve"],
+      "_note": "riddle-gift answer: any Ted Olson Nature Preserve trail (100 m)"
+    },
+    "nutes-pond-trails": {
+      "goal": "trails",
+      "members": ["park:Nute's Pond"],
+      "_note": "riddle-roof answer: any Nute's Pond Park trail on Toe Jam Hill (100 m)"
+    }
+  },
+  "quietZones": [
+    {
+      "id": "exclusion-memorial",
+      "feature": "trail:trail-bainbridge-island-japanese-american-memorial-trail",
+      "bufferM": 200
+    },
+    { "id": "blakely-cemetery", "feature": "trail:trail-blakley-cemetary-trail", "bufferM": 100 }
+  ],
+  "excludedParks": ["Pritchard Park"],
+  "quietDays": ["exclusion-remembrance"],
+  "pauses": [],
+  "ferry": {
+    "route": "seattle-bainbridge",
+    "crossingMin": 35,
+    "terminals": {
+      "bainbridge": { "lat": 47.62371, "lon": -122.51283 },
+      "seattle": { "lat": 47.6026, "lon": -122.3393, "verify": true }
+    },
+    "timetables": [
+      {
+        "id": "2026-fall",
+        "from": "2026-09-20",
+        "to": "2026-12-26",
+        "_note": "WSF Fall 2026 Seattle/Bainbridge Island schedule (wsdot.wa.gov/ferries/schedule, route sea-bi, copied 2026-10-21); mirrors data/play/ferry-timetable.json. weekendDates = WSF holidays (Thanksgiving, Christmas), which run the holiday column (weekend + the Saturday-and-holiday-only 07:55 from Bainbridge). Winter 2026-27 not yet published: the owner adds it when WSF does.",
+        "weekday": {
+          "fromSeattle": [
+            "05:30",
+            "06:10",
+            "07:05",
+            "07:55",
+            "08:45",
+            "09:35",
+            "10:40",
+            "11:25",
+            "12:25",
+            "13:10",
+            "14:05",
+            "15:00",
+            "15:50",
+            "16:45",
+            "17:45",
+            "18:30",
+            "19:30",
+            "20:15",
+            "21:20",
+            "22:05",
+            "22:50",
+            "24:15",
+            "25:35"
+          ],
+          "fromBainbridge": [
+            "04:45",
+            "05:20",
+            "06:20",
+            "07:05",
+            "07:55",
+            "08:45",
+            "09:40",
+            "10:25",
+            "11:30",
+            "12:20",
+            "13:15",
+            "14:05",
+            "14:55",
+            "15:50",
+            "16:45",
+            "17:35",
+            "18:40",
+            "19:20",
+            "20:20",
+            "21:00",
+            "22:00",
+            "23:30",
+            "24:55"
+          ]
+        },
+        "weekend": {
+          "fromSeattle": [
+            "06:10",
+            "07:55",
+            "08:55",
+            "09:35",
+            "10:40",
+            "11:25",
+            "12:30",
+            "13:15",
+            "14:10",
+            "15:05",
+            "15:50",
+            "16:45",
+            "17:35",
+            "18:25",
+            "19:20",
+            "20:10",
+            "21:00",
+            "21:45",
+            "22:40",
+            "23:15",
+            "24:45",
+            "26:10"
+          ],
+          "fromBainbridge": [
+            "05:20",
+            "07:05",
+            "08:45",
+            "09:45",
+            "10:25",
+            "11:35",
+            "12:20",
+            "13:20",
+            "14:10",
+            "15:00",
+            "15:55",
+            "16:40",
+            "17:35",
+            "18:30",
+            "19:15",
+            "20:10",
+            "20:55",
+            "21:45",
+            "22:30",
+            "24:00",
+            "25:25"
+          ]
+        },
+        "holiday": {
+          "fromSeattle": [
+            "06:10",
+            "07:55",
+            "08:55",
+            "09:35",
+            "10:40",
+            "11:25",
+            "12:30",
+            "13:15",
+            "14:10",
+            "15:05",
+            "15:50",
+            "16:45",
+            "17:35",
+            "18:25",
+            "19:20",
+            "20:10",
+            "21:00",
+            "21:45",
+            "22:40",
+            "23:15",
+            "24:45",
+            "26:10"
+          ],
+          "fromBainbridge": [
+            "05:20",
+            "07:05",
+            "07:55",
+            "08:45",
+            "09:45",
+            "10:25",
+            "11:35",
+            "12:20",
+            "13:20",
+            "14:10",
+            "15:00",
+            "15:55",
+            "16:40",
+            "17:35",
+            "18:30",
+            "19:15",
+            "20:10",
+            "20:55",
+            "21:45",
+            "22:30",
+            "24:00",
+            "25:25"
+          ]
+        },
+        "weekendDates": ["2026-11-26", "2026-12-25"]
+      }
+    ]
+  },
+  "tides": { "station": "9445882", "years": [2026, 2027, 2028, 2029] },
+  "items": [
+    {
+      "id": "treasure-weekly-trails",
+      "type": "treasure",
+      "lore": "treasure",
+      "goals": ["trails"],
+      "when": { "every": "week", "on": ["mon"], "from": "05:00", "to": "24:00", "days": 7 },
+      "where": { "trails": { "pick": 12, "from": "pool:play-safe-trails" } },
+      "count": 12,
+      "tiers": [
+        { "tier": "sea_glass", "marks": 25, "count": 7 },
+        { "tier": "agate", "marks": 40, "count": 3 },
+        { "tier": "glass_float", "marks": 60, "count": 1 },
+        { "tier": "ships_bell", "marks": 150, "count": 1, "everyNthWeek": 4, "else": "glass_float" }
+      ],
+      "spread": { "maxPerSquare": 1, "minApartM": 300, "lowTrafficShare": 0.4, "quadrants": 4 },
+      "spotCooldown": 4,
+      "repeat": "weekly_set",
+      "resolve": { "by": "proximity", "radiusM": 20 },
+      "copy": {
+        "title": "{tier} on {place}",
+        "body": "This week's treasure. Gone at the end of the week.",
+        "found": "{tier}, found",
+        "missed": "This week's treasures have washed away. New ones Monday."
+      },
+      "a11y": { "label": "{tier}, {marks} marks", "announce": "Found {tier}. {marks} marks when you finish." },
+      "fx": "treasure_glint"
+    },
+    {
+      "id": "treasure-weekly-roads",
+      "type": "treasure",
+      "lore": "treasure",
+      "goals": ["roads"],
+      "when": { "every": "week", "on": ["mon"], "from": "05:00", "to": "24:00", "days": 7 },
+      "where": { "roads": { "pick": 20, "from": "pool:play-safe-roads" } },
+      "count": 20,
+      "tiers": [
+        { "tier": "sea_glass", "marks": 25, "count": 12 },
+        { "tier": "agate", "marks": 40, "count": 5 },
+        { "tier": "glass_float", "marks": 60, "count": 2 },
+        { "tier": "ships_bell", "marks": 150, "count": 1, "everyNthWeek": 4, "else": "glass_float" }
+      ],
+      "spread": { "maxPerSquare": 1, "minApartM": 300, "lowTrafficShare": 0.4, "quadrants": 4 },
+      "spotCooldown": 4,
+      "repeat": "weekly_set",
+      "resolve": { "by": "proximity", "radiusM": 25 },
+      "copy": {
+        "title": "{tier} on {place}",
+        "body": "This week's treasure. Gone at the end of the week.",
+        "found": "{tier}, found",
+        "missed": "This week's treasures have washed away. New ones Monday."
+      },
+      "a11y": { "label": "{tier}, {marks} marks", "announce": "Found {tier}. {marks} marks when you finish." },
+      "fx": "treasure_glint"
+    },
+    {
+      "id": "egg-ladybug",
+      "type": "egg",
+      "lore": "frog",
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:ladybug" }, "trails": { "at": "place:ladybug" } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": [
+        "https://en.wikipedia.org/wiki/Frog_Rock_(Bainbridge_Island,_Washington)",
+        "https://assets.atlasobscura.com/places/frog-rock-bainbridge-island"
+      ],
+      "copy": {
+        "title": "Frog Rock's ladybug",
+        "body": "",
+        "found": "The year after the frog was painted, its painters also painted the small rock beside it as a ladybug."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-fairydoor",
+      "type": "egg",
+      "lore": "forest",
+      "goals": ["trails"],
+      "enabled": false,
+      "hidden": true,
+      "canopy": true,
+      "notBefore": "2026-10-26",
+      "_note": "enabled:false until the owner verifies the spot on site (OD-16)",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:fairy-door" } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 25 },
+      "sources": [],
+      "copy": {
+        "title": "Fairy door",
+        "body": "",
+        "found": "A door too small for you. Knock anyway. (Made up for this app.)"
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-helix",
+      "type": "egg",
+      "lore": "history",
+      "goals": ["trails"],
+      "enabled": false,
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "enabled:false while the helix house / observatory exact point is TBC (OD-16)",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:helix-house" } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": [
+        "https://navy-radio.virhistory.com/commsta/battle.htm",
+        "https://www.bainbridgereview.com/?p=118963",
+        "https://bpastro.org/about/"
+      ],
+      "copy": {
+        "title": "Helix hum",
+        "body": "",
+        "found": "The round concrete helix house once matched the Navy's transmitters to their antennas. Now it watches stars."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-marquee",
+      "type": "egg",
+      "lore": "history",
+      "goals": ["roads"],
+      "enabled": false,
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "enabled:false while the Lynwood Theatre facts are TBC (OD-16: 'first sound-film cinema', single source); the copy below avoids that claim",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:lynwood" } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": ["https://en.wikipedia.org/wiki/Lynwood_Theatre"],
+      "copy": { "title": "The 1936 marquee", "body": "", "found": "The Lynwood Theatre opened on July 3, 1936." },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-madrone",
+      "type": "egg",
+      "lore": "history",
+      "goals": ["roads"],
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:madrone" } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": ["https://www.historylink.org/file/8274"],
+      "copy": {
+        "title": "Madrone",
+        "body": "",
+        "found": "Before the shipyard came in 1902 and 1903, this town was called Madrone."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-station-s",
+      "type": "egg",
+      "lore": "history",
+      "goals": ["trails"],
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "product.md calls it egg-stationS; ids are [a-z0-9-] (schedule.md § 4.3)",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:fort-ward" } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": ["https://en.wikipedia.org/wiki/Fort_Ward_(Washington)", "https://historylink.org/File/9648"],
+      "copy": {
+        "title": "Station S static",
+        "body": "",
+        "found": "In 1939 the Navy moved a listening post here. Station S intercepted Japanese naval radio traffic."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-strawberry",
+      "type": "egg",
+      "lore": "history",
+      "goals": ["trails"],
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "Moritani Preserve (trail-hayano-trail, park Moritani Preserve): island fact (docs/play/trails/lore-facts.md: Island, Moritani). Open farm meadow, no canopy flag",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-hayano-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": [
+        "https://en.wikipedia.org/wiki/Bainbridge_Island,_Washington",
+        "https://bijac.org/?p=1143",
+        "https://bainbridgereview.com/?p=68802"
+      ],
+      "copy": {
+        "title": "Strawberry capital",
+        "body": "",
+        "found": "In the 1930s this island was called the strawberry capital of the Pacific Northwest. Marshall strawberries grew on this farm from 1905."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-fivemasts",
+      "type": "egg",
+      "lore": "history",
+      "goals": ["trails"],
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "Blakely Harbor Park: trail-fort-ward-to-blakely-harbor-trail is the park's one trail clear of the cemetery quiet zone (trail-blakely-harbor-trail and trail-blakely-trail touch it). Fact: docs/play/trails/lore-facts.md Blakely Harbor Park (Hall Brothers)",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-fort-ward-to-blakely-harbor-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": [
+        "https://www.bi-landtrust.org/protected-space/blakely-harbor/",
+        "https://en.wikipedia.org/wiki/Port_Blakely,_Bainbridge_Island,_Washington"
+      ],
+      "copy": {
+        "title": "Five masts",
+        "body": "",
+        "found": "Among the ships launched at the Hall Brothers' yard here was the H.K. Hall of 1902, a schooner with five masts."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-toejam",
+      "type": "egg",
+      "lore": "place",
+      "goals": ["trails"],
+      "hidden": true,
+      "canopy": true,
+      "notBefore": "2026-10-26",
+      "_note": "Nute's Pond Park on Toe Jam Hill (trail-nutes-trail; riddle-roof sits on trail-nutes-pond-trails). Woods and wetland per the source, so canopy: 25 m. Fact: docs/play/trails/lore-facts.md Toe Jam Hill (name origin \"all conjecture\")",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-nutes-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 25 },
+      "sources": ["https://en.wikipedia.org/wiki/Toe_Jam_Hill"],
+      "copy": {
+        "title": "Toe Jam Hill",
+        "body": "",
+        "found": "Toe Jam Hill is the island's roof. How it got that name is, in the record's own words, all conjecture."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-hilltop",
+      "type": "egg",
+      "lore": "forest",
+      "goals": ["trails"],
+      "hidden": true,
+      "canopy": true,
+      "notBefore": "2026-10-26",
+      "_note": "Grand Forest Hilltop link (trail-hilltop-trail, park Grand Forest); forest cover, so canopy: 25 m. riddle-bond covers the 1991 bond; this egg covers the 2013 link. Fact: docs/play/trails/lore-facts.md Grand Forest",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-hilltop-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 25 },
+      "sources": [
+        "https://www.bi-landtrust.org/protected-space/grand",
+        "https://www.bainbridgereview.com/2014/01/24/meadow-and-forest-forever-hilltop-preserved/"
+      ],
+      "copy": {
+        "title": "The Hilltop link",
+        "body": "",
+        "found": "The Hilltop link opened around 2013 and joined the Grand Forest's pieces into about 540 acres of unbroken woods."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-coastline",
+      "type": "egg",
+      "lore": "place",
+      "goals": ["trails"],
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "Hawley Cove Park (trail-hawley-cove-trail), a shore park for a coastline fact; the seeded point stays on the trail, above the beach. Fact: docs/play/trails/lore-facts.md Island",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-hawley-cove-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": ["https://en.wikipedia.org/wiki/Bainbridge_Island,_Washington"],
+      "copy": {
+        "title": "Fifty-three miles",
+        "body": "",
+        "found": "Around the island's 27.8 square miles of land there are about 53 miles of coastline."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "egg-chillyhilly",
+      "type": "egg",
+      "lore": "place",
+      "goals": ["trails"],
+      "hidden": true,
+      "notBefore": "2026-10-26",
+      "_note": "Sunny Hill Trail (no park; by Toe Jam Hill): a hill for the Chilly Hilly fact. Fact: docs/play/trails/lore-facts.md Island (Chilly Hilly)",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-sunny-hill-trail", "pick": 1 } },
+      "marks": 20,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 15 },
+      "sources": ["https://cascade.org/rides-events/chilly-hilly-2026"],
+      "copy": {
+        "title": "Chilly Hilly",
+        "body": "",
+        "found": "Every late February, Chilly Hilly riders circle the island: 33 miles and about 2,173 feet of climbing."
+      },
+      "a11y": { "label": "Easter egg", "announce": "An easter egg. 20 marks when you finish." }
+    },
+    {
+      "id": "riddle-frog",
+      "type": "riddle",
+      "lore": "riddle",
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:frog-rock" }, "trails": { "at": "place:frog-rock" } },
+      "stars": 1,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "place:frog-rock", "radiusM": 30 },
+      "sources": [
+        "https://en.wikipedia.org/wiki/Frog_Rock_(Bainbridge_Island,_Washington)",
+        "https://assets.atlasobscura.com/places/frog-rock-bainbridge-island"
+      ],
+      "copy": {
+        "title": "Riddle",
+        "body": "I sit by the road but never hop. Two islanders painted me in 1971. Find me on the north end, by a quiet loop road.",
+        "found": "Claimed. It was Frog Rock."
+      },
+      "a11y": { "label": "Riddle, 1 star", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-bond",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "pool:grand-forest-trails", "pick": 1 } },
+      "stars": 2,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "pool:grand-forest-trails", "minM": 100 },
+      "sources": ["https://www.bi-landtrust.org/grand-forest/"],
+      "copy": {
+        "title": "Riddle",
+        "body": "In 1991 islanders voted a bond to save a forest from sale. Walk a hundred metres of it.",
+        "found": "Claimed. It was the Grand Forest."
+      },
+      "a11y": { "label": "Riddle, 2 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-fairy",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-fairy-dell-trail", "pick": 1 } },
+      "stars": 1,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "trail:trail-fairy-dell-trail", "minM": 100 },
+      "sources": ["dataset:data/dist/trails.json"],
+      "copy": {
+        "title": "Riddle",
+        "body": "Near the park that's named for a battle, a small dell where tiny folk might settle.",
+        "found": "Claimed. It was Fairy Dell."
+      },
+      "a11y": { "label": "Riddle, 1 star", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-madrone",
+      "type": "riddle",
+      "lore": "riddle",
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": {
+        "roads": { "along": "road:road-winslow-way-east", "pick": 1 },
+        "trails": { "along": "trail:trail-west-loop-trail", "pick": 1 }
+      },
+      "stars": 2,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "pool:madrone-answer", "minM": 100 },
+      "sources": ["https://www.historylink.org/file/8274", "https://revisitwa.org/waypoint/winslow/"],
+      "copy": {
+        "title": "Riddle",
+        "body": "A shipyard came and the town took a brother's name. What was I called before?",
+        "found": "Claimed. It was Madrone, now Winslow."
+      },
+      "a11y": { "label": "Riddle, 2 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-monroe",
+      "type": "riddle",
+      "lore": "riddle",
+      "notBefore": "2026-10-26",
+      "_note": "roads: claim by walking 100 m of Point Monroe Drive NE. trails: no Play-safe trail answer, so no trails placement; trails players can solve it from the riddle list for a stamp only (product § 4.4 rd-monroe)",
+      "when": { "every": "always" },
+      "where": { "roads": { "along": "road:road-point-monroe-drive-northeast", "pick": 1 } },
+      "stars": 3,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "road:road-point-monroe-drive-northeast", "minM": 100 },
+      "sources": [
+        "https://en.wikipedia.org/wiki/Bainbridge_Island,_Washington",
+        "https://coastview.org/2023/10/07/hedley-spit-bainbridge-island/",
+        "https://www.historylink.org/file/5226"
+      ],
+      "copy": {
+        "title": "Riddle",
+        "body": "Wilkes named a port for one president and a point for the next. Walk the road along the point's spit.",
+        "found": "Claimed. It was Point Monroe."
+      },
+      "a11y": { "label": "Riddle, 3 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-roof",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Toe Jam Hill / Nute's Pond Park: marker seeded on trail-nutes-pond-trails, answer = any Nute's Pond trail (pool over park:Nute's Pond, as riddle-bond). Fact: docs/play/trails/lore-facts.md Toe Jam Hill",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-nutes-pond-trails", "pick": 1 } },
+      "stars": 2,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "pool:nutes-pond-trails", "minM": 100 },
+      "sources": ["https://en.wikipedia.org/wiki/Toe_Jam_Hill"],
+      "copy": {
+        "title": "Riddle",
+        "body": "I am the island's roof, about 425 feet up, with a pond and 31 acres of woods and wetland on top. Walk a hundred metres of the park's trails.",
+        "found": "Claimed. It was Nute's Pond Park, on Toe Jam Hill."
+      },
+      "a11y": { "label": "Riddle, 2 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-steep",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Gazzam Lake Preserve: Peters Trail is the dataset's steepest named trail (gain_m 92.1, data/dist/trails.json 2026-10-18); the app's trail sheet shows gain, so it is solvable in-app. Fact: docs/play/trails/lore-facts.md Gazzam Lake",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-peters-trail", "pick": 1 } },
+      "stars": 3,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "trail:trail-peters-trail", "minM": 100 },
+      "sources": [
+        "dataset:data/dist/trails.json",
+        "https://www.bi-landtrust.org/protected-space/gazzam-lake-preserve/"
+      ],
+      "copy": {
+        "title": "Riddle",
+        "body": "Of every named trail on the island I climb the most, 92 metres, inside the largest nature preserve. Walk a hundred metres of me.",
+        "found": "Claimed. It was Peters Trail at Gazzam Lake."
+      },
+      "a11y": { "label": "Riddle, 3 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-close",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Gazzam Lake Preserve, the Close property trail to a small rocky beach (trail-close-trail). The seeded marker stays on the trail; the beach itself is never an anchor. Fact: docs/play/trails/lore-facts.md Gazzam Lake",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-close-trail", "pick": 1 } },
+      "stars": 2,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "trail:trail-close-trail", "minM": 100 },
+      "sources": ["https://www.wta.org/go-hiking/hikes/gazzam-lake-close-beach"],
+      "copy": {
+        "title": "Riddle",
+        "body": "I am named for a property, not for being near. From the big preserve I lead down to a small rocky beach. Walk a hundred metres of me.",
+        "found": "Claimed. It was the Close Trail."
+      },
+      "a11y": { "label": "Riddle, 2 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-manzanita",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Manzanita Park (park pool): about 2 miles of trails, popular with horse riders; acreage and creek name unconfirmed and not stated. Fact: docs/play/trails/lore-facts.md Manzanita Park",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "pool:manzanita-trails", "pick": 1 } },
+      "stars": 1,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "pool:manzanita-trails", "minM": 100 },
+      "sources": ["https://www.wta.org/go-hiking/hikes/manzanita-trail"],
+      "copy": {
+        "title": "Riddle",
+        "body": "About two miles of trail, shared with riders on horseback, in a park named for a shrub. Walk a hundred metres of it.",
+        "found": "Claimed. It was Manzanita Park."
+      },
+      "a11y": { "label": "Riddle, 1 star", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-gift",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Ted Olson Nature Preserve (park pool): 1973 gift of 10 acres, about 15 today. Fact: docs/play/trails/lore-facts.md Ted Olson Nature Preserve",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "pool:ted-olson-trails", "pick": 1 } },
+      "stars": 2,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "pool:ted-olson-trails", "minM": 100 },
+      "sources": ["https://www.bi-landtrust.org/protected-space/ted-olson-nature-preserve/"],
+      "copy": {
+        "title": "Riddle",
+        "body": "In 1973 a man gave ten acres to the park district so some island land would stay wild. Walk a hundred metres of the preserve that carries his name.",
+        "found": "Claimed. It was the Ted Olson Nature Preserve."
+      },
+      "a11y": { "label": "Riddle, 2 stars", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "riddle-dock",
+      "type": "riddle",
+      "lore": "riddle",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Hidden Cove: the answer is the dataset's trail-hidden-cove-trails network (park null, so no W-PARK credit), the trails-goal stand-in for the Hidden Cove Park facts; the park's shore itself is never an anchor. The marker sits on the neighbouring trail-hidden-cove-loop-trail (chart square 13:5): seeded on the answer it landed in 14:6, Frog Rock's cell, where a riddle outranks lore-frog in treasure weeks (Density). Fact: docs/play/trails/lore-facts.md Hidden Cove Park",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-hidden-cove-loop-trail", "pick": 1 } },
+      "stars": 1,
+      "repeat": "once",
+      "resolve": { "by": "riddle", "answer": "trail:trail-hidden-cove-trails", "minM": 100 },
+      "sources": ["https://www.bainbridgereview.com/?p=42232", "https://en.wikipedia.org/wiki/Port_Madison"],
+      "copy": {
+        "title": "Riddle",
+        "body": "Six acres of Port Madison shore, bought in 2005, with a dock long enough for sailboats. Walk a hundred metres of the trails that share the cove's name.",
+        "found": "Claimed. It was Hidden Cove."
+      },
+      "a11y": { "label": "Riddle, 1 star", "announce": "A riddle. Solve it at home, then walk there to claim it." },
+      "fx": "riddle_marker"
+    },
+    {
+      "id": "kraken-roads",
+      "type": "obstacle",
+      "lore": "kraken",
+      "goals": ["roads"],
+      "hero": true,
+      "priority": 60,
+      "when": { "every": "week", "on": ["thu"], "from": "06:00", "to": "20:00", "days": 4 },
+      "where": {
+        "roads": {
+          "rotate": [
+            "pool:coast-k5",
+            "pool:coast-k2",
+            "pool:coast-k6",
+            "pool:coast-k4",
+            "pool:coast-k7",
+            "pool:coast-k3"
+          ],
+          "epoch": "2026-10-29"
+        }
+      },
+      "bands": [{ "pct": 60, "marks": 60 }, { "pct": 80, "marks": 70 }, { "pct": 95, "marks": 80 }],
+      "repeat": "per_attack",
+      "resolve": { "by": "segments", "minShare": 0.6 },
+      "copy": {
+        "title": "The kraken is ashore",
+        "body": "It's inking {coast}. Walk most of an inked road to send it back.",
+        "found": "You sent it back",
+        "missed": "The kraken slipped away. It'll be back next week."
+      },
+      "a11y": {
+        "label": "Kraken at {coast}",
+        "announce": "Kraken repelled on {place}. {marks} marks when you finish."
+      },
+      "fx": "kraken_attack"
+    },
+    {
+      "id": "kraken-trails",
+      "type": "obstacle",
+      "lore": "kraken",
+      "goals": ["trails"],
+      "hero": true,
+      "priority": 60,
+      "_note": "3 coasts: T5 has no stretch ≥ 100 m on coastline.json (see pools.coast-t4)",
+      "when": { "every": "week", "on": ["thu"], "from": "06:00", "to": "20:00", "days": 4 },
+      "where": { "trails": { "rotate": ["pool:coast-t4", "pool:coast-t2", "pool:coast-t3"], "epoch": "2026-10-29" } },
+      "bands": [{ "pct": 60, "marks": 60 }, { "pct": 80, "marks": 70 }, { "pct": 95, "marks": 80 }],
+      "repeat": "per_attack",
+      "resolve": { "by": "segments", "minShare": 0.6 },
+      "copy": {
+        "title": "The kraken is ashore",
+        "body": "It's inking {coast}. Walk most of an inked stretch to send it back.",
+        "found": "You sent it back",
+        "missed": "The kraken slipped away. It'll be back next week."
+      },
+      "a11y": {
+        "label": "Kraken at {coast}",
+        "announce": "Kraken repelled on {place}. {marks} marks when you finish."
+      },
+      "fx": "kraken_attack"
+    },
+    {
+      "id": "ch-sweep",
+      "type": "challenge",
+      "lore": "challenge",
+      "when": { "every": "week", "on": ["sat"], "from": "00:00", "to": "24:00", "days": 2 },
+      "marks": 100,
+      "repeat": "once",
+      "resolve": { "by": "challenge" },
+      "challenge": { "scope": "solo", "metric": "completed", "target": { "trails": 3, "roads": 5 } },
+      "copy": { "title": "Weekend sweep", "body": "Finish {target} {goal.items} this weekend. Short ones count." },
+      "a11y": { "label": "Weekend sweep", "announce": "Weekend sweep: {progress} of {target}." }
+    },
+    {
+      "id": "ch-climb",
+      "type": "challenge",
+      "lore": "challenge",
+      "goals": ["trails"],
+      "when": { "every": "week", "on": ["mon"], "from": "00:00", "to": "24:00", "days": 7 },
+      "marks": 100,
+      "repeat": "once",
+      "resolve": { "by": "challenge" },
+      "challenge": { "scope": "solo", "metric": "climb", "target": { "trails": 150 } },
+      "copy": { "title": "Uphill week", "body": "Finish trails that climb {target} between them this week." },
+      "a11y": { "label": "Uphill week", "announce": "Uphill week: {progress} of {target} climbed." }
+    },
+    {
+      "id": "ch-parkhop",
+      "type": "challenge",
+      "lore": "challenge",
+      "goals": ["trails"],
+      "when": { "every": "week", "on": ["sat"], "from": "00:00", "to": "24:00", "days": 2 },
+      "marks": 100,
+      "repeat": "once",
+      "resolve": { "by": "challenge" },
+      "challenge": { "scope": "solo", "metric": "parks", "target": { "trails": 3 } },
+      "copy": { "title": "Park hop", "body": "Finish a trail in different parks this weekend. Each park counts once." },
+      "a11y": { "label": "Park hop", "announce": "Park hop: {progress} of {target} parks." }
+    },
+    {
+      "id": "ch-krakenweek",
+      "type": "challenge",
+      "lore": "kraken",
+      "when": { "every": "week", "on": ["thu"], "from": "06:00", "to": "20:00", "days": 4 },
+      "marks": 75,
+      "repeat": "once",
+      "resolve": { "by": "challenge" },
+      "challenge": { "scope": "island", "metric": "stretches_repelled", "minPlayersPerStretch": 3, "retreatMarks": 50 },
+      "copy": { "title": "Kraken week", "body": "Will islanders repel every stretch before Sunday evening?" },
+      "a11y": { "label": "Kraken week", "announce": "{progress} of {target} stretches sent back by islanders." }
+    },
+    {
+      "id": "lore-kraken",
+      "type": "lore",
+      "lore": "kraken",
+      "_note": "tall tale card shown with the weekly attack; view only (anchor = the attacked coast)",
+      "when": { "every": "week", "on": ["thu"], "from": "06:00", "to": "20:00", "days": 4 },
+      "resolve": { "by": "none" },
+      "sources": [
+        "https://www.atlasobscura.com/articles/giant-pacific-octopus-monster-tacoma",
+        "https://wjla.com/news/offbeat/octopus-seattle-scuba-dive-puget-sound-cute-animal-giant-pacific-ocean-des-moines-nate-paradiso-smithsonian-noaa",
+        "https://www.britannica.com/topic/kraken"
+      ],
+      "copy": {
+        "title": "The kraken",
+        "body": "A tall tale, made up for this app. It is inspired by the giant Pacific octopus, the largest octopus species, which is common in Puget Sound. Real ones live 3 to 5 years. Not affiliated with any team."
+      },
+      "a11y": { "label": "The kraken, tall tale", "announce": "The kraken, a tall tale made up for this app." }
+    },
+    {
+      "id": "lore-frog",
+      "type": "lore",
+      "lore": "frog",
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:frog-rock" }, "trails": { "at": "place:frog-rock" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://en.wikipedia.org/wiki/Frog_Rock_(Bainbridge_Island,_Washington)",
+        "https://assets.atlasobscura.com/places/frog-rock-bainbridge-island",
+        "https://www.bainbridgereview.com/?p=104439"
+      ],
+      "copy": {
+        "title": "Frog Rock",
+        "body": "Two stacked granite boulders, painted as a frog by two residents in June 1971 (sources give June 6 and June 7)."
+      },
+      "a11y": { "label": "Frog Rock, island story", "announce": "Frog Rock. 15 marks when you finish." },
+      "fx": "frog_rock"
+    },
+    {
+      "id": "lore-ferry",
+      "type": "lore",
+      "lore": "ferry",
+      "notBefore": "2026-10-26",
+      "_note": "product.md v1 scope ships the ferry lore card (§ 4.6.1 lore-ferry; plan.md lists only the sprite)",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:ferry-anchor" }, "trails": { "at": "place:ferry-anchor" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://en.wikipedia.org/wiki/Seattle%E2%80%93Bainbridge_Island_ferry",
+        "https://en.wikipedia.org/wiki/MV_Tacoma",
+        "https://en.wikipedia.org/wiki/MV_Wenatchee",
+        "https://www.law.cornell.edu/cfr/text/33/83.34"
+      ],
+      "copy": {
+        "title": "The ferry",
+        "body": "Seattle to Bainbridge is about a 35-minute crossing. Jumbo Mark II ferries such as the Tacoma, Wenatchee and Puyallup serve the route. Leaving the dock, a ferry sounds one prolonged blast, as the inland rules require."
+      },
+      "a11y": { "label": "The ferry, island story", "announce": "The ferry. 15 marks when you finish." }
+    },
+    {
+      "id": "lore-mill",
+      "type": "lore",
+      "lore": "history",
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:mill-trails" }, "roads": { "at": "place:mill-road" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://www.historylink.org/File/1053",
+        "https://en.wikipedia.org/wiki/Blakely_Harbor",
+        "https://portblakely.com/news/2020/partnering-on-blakely-harbor-cleanup"
+      ],
+      "copy": {
+        "title": "Port Blakely mill",
+        "body": "Captain William Renton's mill opened in 1864. By 1882 it was the largest on the Pacific Coast. It burned in 1888 and 1907 and closed in the early 1920s (sources say 1922 or 1923). Today a few pilings, a crumbling concrete building and a mill pond remain."
+      },
+      "a11y": {
+        "label": "Port Blakely mill, island story",
+        "announce": "Port Blakely mill. 15 marks when you finish."
+      }
+    },
+    {
+      "id": "lore-memorial",
+      "type": "lore",
+      "lore": "remembrance",
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:memorial-card" }, "trails": { "at": "place:memorial-card" } },
+      "marks": 0,
+      "repeat": "once",
+      "resolve": { "by": "none" },
+      "sources": [
+        "https://www.nps.gov/places/the-bainbridge-island-japanese-american-exclusion-memorial.htm",
+        "https://tclf.org/bainbridge-island-japanese-american-exclusion-memorial",
+        "https://densho.org/?p=4976"
+      ],
+      "copy": {
+        "title": "Nidoto Nai Yoni",
+        "body": "On March 30, 1942, 227 Japanese American islanders were forced from their homes and sent from the Eagledale ferry dock, the first removal under Executive Order 9066. The memorial wall names all 276 islanders of Japanese descent who were excluded. Its words, Nidoto Nai Yoni, mean: Let it not happen again."
+      },
+      "a11y": {
+        "label": "Remembrance",
+        "announce": "Remembrance: the Japanese American Exclusion Memorial.",
+        "reducedMotion": "static_icon"
+      },
+      "_note": "inside its own quiet zone by design: card marker only, a visit stamp with no number, no fx"
+    },
+    {
+      "id": "lore-yama",
+      "type": "lore",
+      "lore": "remembrance",
+      "notBefore": "2026-10-26",
+      "_note": "never marked on the map (looting risk and respect, product S-6); readable in Island stories; stamp only, no marks",
+      "when": { "every": "always" },
+      "marks": 0,
+      "repeat": "once",
+      "resolve": { "by": "none" },
+      "sources": [
+        "https://5dn.org/en/journal/2016/11/21/bainbridge-island-lost-village/",
+        "https://www.historynewsnetwork.org/article/126755",
+        "https://bainbridgereview.com/?p=21059"
+      ],
+      "copy": {
+        "title": "Yama",
+        "body": "Japanese immigrant families who worked at the Port Blakely mill lived in a village called Yama, on mill land above the harbor. The site is on the National Register and is protected, so it is not shown on the map."
+      },
+      "a11y": { "label": "Yama, island story", "announce": "Yama, a village above Blakely Harbor." }
+    },
+    {
+      "id": "lore-helix",
+      "type": "lore",
+      "lore": "history",
+      "enabled": false,
+      "notBefore": "2026-10-26",
+      "_note": "enabled:false while the helix house / observatory exact point is TBC (OD-16). One place serves both goals (landmark snapping, product § 4.0.2)",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:helix-house" }, "roads": { "at": "place:helix-house" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://navy-radio.virhistory.com/commsta/battle.htm",
+        "https://www.bainbridgereview.com/?p=118963",
+        "https://bpastro.org/about/"
+      ],
+      "copy": {
+        "title": "Battle Point helix house",
+        "body": "From the early 1940s this was a Navy radio transmitting station, with an 800 ft tower beside the helix house, which matched transmitters to antennas. It closed in 1959. Volunteers saved the helix house in 1992 and built an observatory on it, now the Battle Point Observatory (renamed in June 2025)."
+      },
+      "a11y": {
+        "label": "Battle Point helix house, island story",
+        "announce": "Battle Point helix house. 15 marks when you finish."
+      }
+    },
+    {
+      "id": "lore-fortward",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:fort-ward-fence" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://en.wikipedia.org/wiki/Fort_Ward_(Washington)",
+        "https://historylink.org/File/9648",
+        "https://historylink.org/File/9699",
+        "https://usncva.org/nsga-bainbridge-island.html"
+      ],
+      "copy": {
+        "title": "Fort Ward batteries",
+        "body": "A coast-artillery post from 1903. Batteries Thornburgh and Vinton held 3-inch guns until 1920; two other batteries stand on private land and are not mapped. From 1939 the Navy's Station S listening post intercepted Japanese naval radio here. The Army fort closed in 1928, the Navy left in 1958, and the park passed to the park district in 2011."
+      },
+      "a11y": {
+        "label": "Fort Ward batteries, island story",
+        "announce": "Fort Ward batteries. 15 marks when you finish."
+      }
+    },
+    {
+      "id": "lore-eagleharbor",
+      "type": "lore",
+      "lore": "history",
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:madrone" }, "trails": { "along": "trail:trail-west-loop-trail", "pick": 1 } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://www.historylink.org/file/8274",
+        "https://revisitwa.org/waypoint/winslow/",
+        "https://en.wikipedia.org/wiki/Winslow_Marine_Railway_and_Shipbuilding_Company"
+      ],
+      "copy": {
+        "title": "Eagle Harbor and Winslow",
+        "body": "The Hall Brothers shipyard moved here from Port Blakely in 1902 and 1903. The town of Madrone became Winslow, after Winslow Hall."
+      },
+      "a11y": {
+        "label": "Eagle Harbor and Winslow, island story",
+        "announce": "Eagle Harbor and Winslow. 15 marks when you finish."
+      }
+    },
+    {
+      "id": "lore-lynwood",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["roads"],
+      "enabled": false,
+      "notBefore": "2026-10-26",
+      "_note": "enabled:false while the Lynwood facts are TBC (OD-16); the copy below avoids the 'first sound-film cinema' claim",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:lynwood" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": ["https://en.wikipedia.org/wiki/Lynwood_Theatre"],
+      "copy": {
+        "title": "Lynwood Center",
+        "body": "Edna and Emmanuel Olson built Lynwood Center. Its theatre opened on July 3, 1936."
+      },
+      "a11y": { "label": "Lynwood Center, island story", "announce": "Lynwood Center. 15 marks when you finish." }
+    },
+    {
+      "id": "lore-strawberry",
+      "type": "lore",
+      "lore": "history",
+      "enabled": false,
+      "notBefore": "2026-10-26",
+      "_note": "enabled:false while the Strawberry Festival's first year is TBC (OD-16: 1948 vs 1950). Respectful text, no trivia; F-LORE only for the place visit",
+      "when": { "every": "always" },
+      "where": { "roads": { "at": "place:strawberry-hill" }, "trails": { "at": "place:strawberry-hill" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://www.bainbridgereview.com/?p=41767",
+        "https://www.bainbridgereview.com/news/strawberry-fest-ripens-anew/",
+        "https://nwasianweekly.com/2026/05/bainbridges-filipino-community-works-through-the-decades-to-help-create-preserve-community/",
+        "https://resourceguide.densho.org/Island%20Roots%20(film)/"
+      ],
+      "copy": {
+        "title": "Strawberry fields",
+        "body": "Japanese American families were known for Bainbridge strawberries. Filipino immigrants came from the late 1920s to work the farms, and during the war many Japanese American farmers left their farms in the care of Filipino American farmhands. The community hall near Strawberry Hill was built in 1928; the Strawberry Festival dates to 1948 (one source says 1950)."
+      },
+      "a11y": {
+        "label": "Strawberry fields, island story",
+        "announce": "Strawberry fields. 15 marks when you finish."
+      }
+    },
+    {
+      "id": "lore-fay",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["roads"],
+      "enabled": false,
+      "notBefore": "2026-10-26",
+      "_note": "armchair only: the park entrance road road-sunrise-drive-northeast-1 is 30 mph and fails roadSafety, so no proximity trigger until the owner picks a Play-safe anchor; enabled:false while the bell's provenance is TBC (OD-16). Park 47.70167, -122.50750",
+      "when": { "every": "always" },
+      "marks": 0,
+      "repeat": "once",
+      "resolve": { "by": "none" },
+      "sources": ["https://en.wikipedia.org/wiki/Fay_Bainbridge_Park", "https://www.wwta.org/sites/fay-bainbridge-sp/"],
+      "copy": {
+        "title": "Fay Bainbridge Park bell",
+        "body": "The state bought the park land in 1944 from the estate of Temple S. Fay and kept the Fay name. The bell is said to have come to the park in 1953 from Port Madison, where it served as the town crier's bell (single source, being checked)."
+      },
+      "a11y": {
+        "label": "Fay Bainbridge Park bell, island story",
+        "announce": "Fay Bainbridge Park bell, an island story."
+      }
+    },
+    {
+      "id": "lore-bloedel",
+      "type": "lore",
+      "lore": "place",
+      "_note": "armchair only: its anchor road road-agate-point-road-northeast is 35 mph; Play never sends anyone to its gate",
+      "notBefore": "2026-10-26",
+      "when": { "every": "always" },
+      "marks": 0,
+      "repeat": "once",
+      "resolve": { "by": "none" },
+      "sources": ["https://bloedelreserve.org/visit"],
+      "copy": {
+        "title": "Bloedel Reserve",
+        "body": "A public garden reserve on the north end, open with timed tickets. Play places nothing inside it."
+      },
+      "a11y": { "label": "Bloedel Reserve, island story", "announce": "Bloedel Reserve, an island story." }
+    },
+    {
+      "id": "lore-gazzam",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Gazzam Lake Preserve main trail. No naming claim (the Gazzam name origin is unconfirmed). The Close trail and Peters Trail facts are kept for riddle-close / riddle-steep. Fact: docs/play/trails/lore-facts.md Gazzam Lake",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-gazzam-lake-main-trail", "pick": 1 } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://www.bi-landtrust.org/protected-space/gazzam-lake-preserve/",
+        "https://www.wta.org/go-hiking/hikes/gazzam-lake-close-beach",
+        "https://www.historylink.org/File/22902"
+      ],
+      "copy": {
+        "title": "Gazzam Lake",
+        "body": "Gazzam Lake Nature Preserve covers about 457 acres, the island's largest nature preserve. At its heart is a 13.5-acre lake where waterfowl rest."
+      },
+      "a11y": { "label": "Gazzam Lake, island story", "announce": "Gazzam Lake. 15 marks when you finish." }
+    },
+    {
+      "id": "lore-fortward-navy",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Fort Ward Park south trailhead (th-b40243), a new angle next to lore-fortward (batteries, Station S): the guns never fired, the Navy years and the park's path. Fact: docs/play/trails/lore-facts.md Fort Ward Park. Note: lore-fortward says \"the Army left in 1958\"; the verified line is that the Navy left in 1958 (owner / research-verifier to reconcile)",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:fort-ward-south" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://www.historylink.org/File/9699",
+        "https://www.historylink.org/File/9648",
+        "https://en.wikipedia.org/wiki/Fort_Ward_(Washington)"
+      ],
+      "copy": {
+        "title": "Fort Ward's quiet guns",
+        "body": "Fort Ward was an Army coast-artillery post from 1903 to 1928. Its guns were removed in 1920 and never fired in anger. The Navy took over in 1938 and left in 1958; the land was a state park from 1960 to 2011, then passed to the park district."
+      },
+      "a11y": {
+        "label": "Fort Ward's quiet guns, island story",
+        "announce": "Fort Ward's quiet guns. 15 marks when you finish."
+      }
+    },
+    {
+      "id": "lore-hallbrothers",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Blakely Harbor Park west trailhead (th-23141f, 5 m from trail-fort-ward-to-blakely-harbor-trail): the shipyard angle, next to lore-mill (the mill) at the harbor trailhead. Fact: docs/play/trails/lore-facts.md Blakely Harbor Park",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:blakely-park-trailhead" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": [
+        "https://www.bi-landtrust.org/protected-space/blakely-harbor/",
+        "https://en.wikipedia.org/wiki/Port_Blakely,_Bainbridge_Island,_Washington"
+      ],
+      "copy": {
+        "title": "Hall Brothers' shipyard",
+        "body": "Beside the Port Blakely mill, the Hall Brothers' yard launched 77 ships between 1881 and 1904. Down on the shore, the skeleton of a generator building still stands."
+      },
+      "a11y": {
+        "label": "Hall Brothers' shipyard, island story",
+        "announce": "Hall Brothers' shipyard. 15 marks when you finish."
+      }
+    },
+    {
+      "id": "lore-moritani",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "armchair only (view, stamp only, 0 marks): Moritani Preserve lies wholly in chart square 7:6, the Winslow cell, where riddle-madrone, the weekly treasure, lore-eagleharbor and lore-ferry already fill maxPlacementsPerCell (3), so a proximity marker here was density-dropped every day (PlaySchedulerGoldenTest). egg-strawberry (hidden, not counted by density) keeps a find on the ground. Stated plainly and briefly, as lore-memorial / lore-yama do. Fact: docs/play/trails/lore-facts.md Moritani Preserve",
+      "when": { "every": "always" },
+      "marks": 0,
+      "repeat": "once",
+      "resolve": { "by": "none" },
+      "sources": ["https://bainbridgereview.com/?p=68802", "https://bijac.org/?p=1143"],
+      "copy": {
+        "title": "Moritani Preserve",
+        "body": "Hyakutaro Moritani came from Hiroshima in 1905 and planted Marshall strawberries here. Sent away in 1942, the family came back after the war and farmed until the 1960s. Only the porch steps remain. The Fletcher Bay Foundation kept the 8.5 acres as a preserve around 2017."
+      },
+      "a11y": { "label": "Moritani Preserve, island story", "announce": "Moritani Preserve, an island story." }
+    },
+    {
+      "id": "lore-battlepoint",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "notBefore": "2026-10-26",
+      "_note": "Battle Point Park loop (trail-battle-point): the park's story at park level; lore-helix (disabled until the observatory point is checked) keeps the helix house itself. Fact: docs/play/trails/lore-facts.md Battle Point Park",
+      "when": { "every": "always" },
+      "where": { "trails": { "along": "trail:trail-battle-point", "pick": 1 } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": ["https://bpastro.org/about/", "https://www.bainbridgereview.com/?p=118963"],
+      "copy": {
+        "title": "Battle Point",
+        "body": "About 90 acres here were cleared in 1941 for a Navy radio transmitter site. It was deactivated in 1959 and passed to the park district in 1972. The concrete Helix House, once slated for demolition, is now the Battle Point Observatory, built by volunteers and renamed in June 2025."
+      },
+      "a11y": { "label": "Battle Point, island story", "announce": "Battle Point. 15 marks when you finish." }
+    },
+    {
+      "id": "lore-sakai",
+      "type": "lore",
+      "lore": "history",
+      "goals": ["trails"],
+      "enabled": false,
+      "notBefore": "2026-10-26",
+      "_note": "enabled:false while the Sakai Park facts are TBC (docs/play/trails/lore-facts.md: secondary sources only, biparks.org unreachable); place sakai-loop carries verify:true (OD-16 pattern). Stated plainly and briefly",
+      "when": { "every": "always" },
+      "where": { "trails": { "at": "place:sakai-loop" } },
+      "marks": 15,
+      "repeat": "once",
+      "resolve": { "by": "proximity", "radiusM": 60 },
+      "sources": ["https://bainbridgereview.com/?p=31487", "https://bijac.org/?p=1233"],
+      "copy": {
+        "title": "Sakai Park",
+        "body": "The Sakai family bought this land in 1935 and farmed berries here before and after 1942. The park district bought about 23 acres in 2015."
+      },
+      "a11y": { "label": "Sakai Park, island story", "announce": "Sakai Park. 15 marks when you finish." }
+    },
+    {
+      "id": "ferry-sprite",
+      "type": "ambient",
+      "lore": "ferry",
+      "when": {
+        "every": "day",
+        "from": "05:00",
+        "to": "23:00",
+        "anchor": { "at": "ferry.depart.bainbridge", "before": "0m", "after": "35m", "pick": "all" }
+      },
+      "where": { "trails": { "at": "place:winslow-waterfront" }, "roads": { "at": "place:winslow-waterfront" } },
+      "resolve": { "by": "none" },
+      "copy": { "title": "Ferry crossing", "body": "" },
+      "a11y": {
+        "label": "Ferry",
+        "announce": "Ferry crossing Eagle Harbor, by the timetable.",
+        "reducedMotion": "static_icon"
+      },
+      "fx": "ferry_crossing"
+    }
+  ]
+}

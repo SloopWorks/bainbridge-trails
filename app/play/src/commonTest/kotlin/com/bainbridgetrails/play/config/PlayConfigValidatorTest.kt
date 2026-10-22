@@ -235,4 +235,65 @@ class PlayConfigValidatorTest {
         val cfg = base.withPool("coast-k1", "road:road-fast-30", goal = Goal.roads)
         assertTrue(PlayConfigValidator.validate(cfg, places = null).isEmpty(), "dataset refs skipped without an index")
     }
+
+    // --- Play trails v1.1 (plan L1-1, D5): climb / parks are solo, trails-only, whole island days ----------------
+
+    private val climb = TestPack.challenge.copy(
+        id = "ch-climb", goals = listOf(Goal.trails), `when` = TestPack.weekly("mon", "00:00", "24:00", 7),
+        challenge = ChallengeSpec(ChallengeScope.solo, ChallengeMetric.climb, target = mapOf(Goal.trails to 150)),
+        copy = Copy("Uphill week", "Finish trails that climb {target} between them this week."), a11y = A11y("Uphill week", "Uphill week."),
+    )
+    private val parkhop = TestPack.challenge.copy(
+        id = "ch-parkhop", goals = listOf(Goal.trails), `when` = TestPack.weekly("sat", "00:00", "24:00", 2),
+        challenge = ChallengeSpec(ChallengeScope.solo, ChallengeMetric.parks, target = mapOf(Goal.trails to 3)),
+        copy = Copy("Park hop", "Finish a trail in different parks this weekend. Each park counts once."), a11y = A11y("Park hop", "Park hop."),
+    )
+
+    @Test
+    fun `climb and parks challenges are valid on trails`() {
+        val errs = errors(base.plus(climb).plus(parkhop))
+        assertTrue(errs.isEmpty(), errs.joinToString("\n"))
+    }
+
+    @Test
+    fun `climb on roads rejected`() {
+        assertOnly(Rule.GOAL_MISMATCH, base.plus(climb.copy(goals = listOf(Goal.trails, Goal.roads))))
+        assertOnly(Rule.GOAL_MISMATCH, base.plus(parkhop.copy(goals = listOf(Goal.roads))))
+        // never an island challenge
+        assertOnly(Rule.PLACEMENT_SHAPE, base.plus(climb.copy(challenge = climb.challenge!!.copy(scope = ChallengeScope.island), marks = 75)))
+    }
+
+    @Test
+    fun `parks window not whole days rejected`() {
+        assertOnly(Rule.SERVER_SUBSET, base.plus(parkhop.copy(`when` = TestPack.weekly("sat", "10:00", "24:00", 2))))
+        assertOnly(Rule.SERVER_SUBSET, base.plus(climb.copy(`when` = TestPack.weekly("mon", "00:00", "20:00", 7))))
+    }
+
+    @Test
+    fun `climb every always rejected`() {
+        // review P2-B: one never-ending occurrence; the phone and the Worker claim per occurrence, so climb / parks recur
+        val errs = errors(base.plus(climb.copy(`when` = Recurrence(every = Every.always))))
+        assertEquals(listOf(Rule.SERVER_SUBSET), errs.map { it.rule }.distinct(), errs.joinToString("\n"))
+        assertTrue(errs.any { "a climb challenge recurs (day, week, month, year or dates), never every: always" in it.message }, errs.joinToString("\n"))
+    }
+
+    @Test
+    fun `parks days over period rejected`() {
+        // review P2-B: `every: day, days: 7` → 7 live occurrences, each claimable on the phone, the Worker credits one
+        val daily = Recurrence(every = Every.day, from = "00:00", to = "24:00", days = 7)
+        val errs = errors(base.plus(parkhop.copy(`when` = daily)))
+        assertEquals(listOf(Rule.SERVER_SUBSET), errs.map { it.rule }.distinct(), errs.joinToString("\n"))
+        assertTrue(errs.any { "a parks challenge's occurrences overlap: days 7 > the 1-day gap between starts (days ≤ the recurrence period)" in it.message }, errs.joinToString("\n"))
+        // two starts a week, two days each: Sat → Sun overlaps; a week's single start with days 7 is fine (ch-climb)
+        assertOnly(Rule.SERVER_SUBSET, base.plus(parkhop.copy(`when` = TestPack.weekly("sat", "00:00", "24:00", 2).copy(on = TestPack.on("sat", "sun")))))
+        assertOnly(Rule.SERVER_SUBSET, base.plus(climb.copy(`when` = TestPack.weekly("mon", "00:00", "24:00", 8))))
+        assertTrue(errors(base.plus(parkhop.copy(`when` = daily.copy(days = 1)))).none { it.rule == Rule.SERVER_SUBSET })
+    }
+
+    @Test
+    fun `roads target on climb rejected`() {
+        assertOnly(Rule.GOAL_MISMATCH, base.plus(climb.copy(challenge = climb.challenge!!.copy(target = mapOf(Goal.trails to 150, Goal.roads to 100)))))
+        assertOnly(Rule.GOAL_MISMATCH, base.plus(climb.copy(challenge = climb.challenge!!.copy(target = null))))
+        assertOnly(Rule.REWARD, base.plus(parkhop.copy(challenge = parkhop.challenge!!.copy(target = mapOf(Goal.trails to 0)))))
+    }
 }

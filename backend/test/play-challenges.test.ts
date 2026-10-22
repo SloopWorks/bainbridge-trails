@@ -102,7 +102,9 @@ describe("kraken aggregates", () => {
     expect(await repelled()).toBe(base + 2);
     // each user's contribution to the island challenge: one stretch of this attack
     for (const u of [a, b]) {
-      expect(await rows("SELECT occ, progress FROM play_progress WHERE user_id = ?", u.userId)).toEqual([
+      // (pack 2026.11.3: the trail's completion also feeds ch-climb's Mon→Mon occurrence, Fairy Dell gain in dm)
+      expect(await rows("SELECT occ, progress FROM play_progress WHERE user_id = ? ORDER BY occ", u.userId)).toEqual([
+        { occ: "ch-climb@2026-10-26", progress: 322 },
         { occ: "ch-krakenweek@2026-10-29", progress: 1 },
       ]);
     }
@@ -396,8 +398,11 @@ describe("challenges", () => {
 
     expect(body.dataset).toBe("trails");
     expect(body.minCount).toBe(5);
-    expect(body.current.map((c) => c.occ)).toEqual(["ch-krakenweek@2026-10-29", "ch-sweep@2026-10-31"]);
-    const [kraken, sw] = body.current;
+    // pack 2026.11.3 adds the trails challenges ch-climb (Mon→Mon) and ch-parkhop (Sat→Mon); their shape is covered by
+    // play-trails-challenges.test.ts
+    expect(body.current.map((c) => c.occ)).toEqual(["ch-climb@2026-10-26", "ch-krakenweek@2026-10-29", "ch-parkhop@2026-10-31", "ch-sweep@2026-10-31"]);
+    const kraken = body.current.find((c) => c.id === "ch-krakenweek");
+    const sw = body.current.find((c) => c.id === "ch-sweep");
     expect(kraken).toMatchObject({
       id: "ch-krakenweek",
       occ: "ch-krakenweek@2026-10-29",

@@ -1,5 +1,6 @@
 package com.bainbridgetrails.data
 
+import com.bainbridgetrails.ui.theme.TrailsEditionCopy
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -177,6 +178,29 @@ class GoalVocabularyGuardTest {
     }
 
     @Test
+    fun everyTrailOnlyKeyExists() {
+        assertEquals(emptyList(), TRAIL_ONLY.filter { it !in entries })
+    }
+
+    /**
+     * docs/play/trails/ux.md § 8: the trails edition's keys ([TrailsEditionCopy]) exist and have no roads twin and no
+     * Roads override: they are composed only on trails (ux § 0) and rendered through `LocalGoal.current` (identity).
+     */
+    @Test
+    fun trailsEditionKeysHaveNoRoadsTwin() {
+        val overridden = GoalVocabulary.Roads.stringOverrides.keys.map { it.key }.toSet() + GoalVocabulary.Roads.pluralOverrides.keys.map { it.key }
+        val problems = TrailsEditionCopy.TEXTS.keys.flatMap { k ->
+            listOfNotNull(
+                "$k is missing".takeIf { k !in entries },
+                "roads_$k exists".takeIf { "roads_$k" in entries },
+                "$k is overridden in GoalVocabulary.Roads".takeIf { k in overridden },
+                "$k says \"trail\" but is not in TRAIL_ONLY".takeIf { entries[k]?.texts.orEmpty().any(trailWord::containsMatchIn) && k !in TRAIL_ONLY },
+            )
+        }
+        if (problems.isNotEmpty()) fail(problems.joinToString("\n"))
+    }
+
+    @Test
     fun trailsVocabularyIsIdentity() {
         assertTrue(GoalVocabulary.Trails.stringOverrides.isEmpty())
         assertTrue(GoalVocabulary.Trails.pluralOverrides.isEmpty())
@@ -199,7 +223,10 @@ class GoalVocabularyGuardTest {
         val TRAIL_ONLY = setOf(
             "detail_trailheads", "detail_trailhead_row", "detail_official_map", "detail_official_map_host",
             "trails_filter_park", "trails_filter_park_all", "trails_filter_park_none", "trails_park_sheet_title",
-            "play_kind_park_complete", // (v2) W-PARKC: parks are trails-only (docs/play/product.md §3.2)
+            "play_kind_park_complete", // W-PARKC (Play trails v1.1): parks are trails-only (docs/play/product.md §3.2)
+            // Trails edition v1.1 (docs/play/trails/ux.md § 8): the § 8 keys whose text says "trail".
+            "play_kind_start_trails", "play_log_mile_what", "play_trail_ms_title", "play_trail_ms_miles",
+            "play_trail_ms_high_title", "play_trail_ms_high_line",
         )
 
         /** docs/play/product.md §7.3 keys marked (goal): each has a `roads_` twin. */

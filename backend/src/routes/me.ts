@@ -101,20 +101,23 @@ export async function deleteUser(env: Env, deps: Deps, user: UserRow): Promise<v
     env.DB.prepare("DELETE FROM user_completed WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM walks_v2 WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM user_metrics WHERE user_id = ?").bind(id), // every dataset
-    // Play (every dataset): claims, week rows, totals. The island stretch aggregate holds counts only, no user.
+    // Play (every dataset): claims, week rows, totals, challenge contributions and the trails ledger (0007). The
+    // island stretch aggregate holds counts only, no user.
     env.DB.prepare("DELETE FROM play_claims WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM play_weeks WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM play_totals WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM play_progress WHERE user_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM play_trail_paid WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM name_reports WHERE reporter_id = ?1 OR target_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id),
     ...snapshotRemove(env, id),
-    env.DB.prepare("DELETE FROM rate_limits WHERE key IN (?1, ?2, ?3, ?4, ?5)").bind(
+    env.DB.prepare("DELETE FROM rate_limits WHERE key IN (?1, ?2, ?3, ?4, ?5, ?6)").bind(
       `cov:trails:${id}`,
       `cov:roads:${id}`,
       `name:${id}`,
       `report:${id}`,
       `hide:${id}`,
+      `playme:${id}`,
     ),
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id),
   ]);

@@ -411,4 +411,59 @@
     <string name="play_whats_on_today">Today</string>
     <string name="play_whats_on_coming">Coming up</string>
     <string name="play_whats_on_empty">A quiet day on the island.</string>
+
+    <!-- Play: trails edition (v1.1), docs/play/trails/ux.md § 8. Trails-only (ux § 0): no roads_ twins; keys whose
+         text says "trail" are on GoalVocabularyGuardTest.TRAIL_ONLY. Render through LocalGoal.current (identity). -->
+    <string name="play_kind_climb">Climb</string>
+    <string name="play_kind_high_ground">High ground</string>
+    <string name="play_kind_start_trails">Trail rewards so far</string>
+    <string name="play_log_climb_what">%1$s climbed</string>
+    <string name="play_log_mile_what">%1$s of trail walked</string>
+    <plurals name="play_results_more">
+        <item quantity="one">+1 more in your Logbook</item>
+        <item quantity="other">+%1$d more in your Logbook</item>
+    </plurals>
+    <string name="play_trail_ms_title">Trail milestones</string>
+    <string name="play_trail_ms_all">All</string>
+    <string name="play_trail_ms_progress">%1$s / %2$s</string>
+    <string name="play_trail_ms_next_a11y">Next: %1$s, %2$s of %3$s</string>
+    <string name="play_trail_ms_earned_a11y">%1$s, earned</string>
+    <string name="play_trail_ms_locked_a11y">%1$s, not yet</string>
+    <string name="play_trail_ms_so_far">So far: %1$s</string>
+    <string name="play_trail_ms_climb">Climb</string>
+    <string name="play_trail_ms_miles">Trail miles</string>
+    <string name="play_trail_ms_parks">Parks</string>
+    <string name="play_trail_ms_parks_title">Parks finished</string>
+    <string name="play_trail_ms_parks_line">%1$d of %2$d finished · %3$d started</string>
+    <string name="play_trail_ms_park_finished">Finished</string>
+    <string name="play_trail_ms_park_started">Started</string>
+    <string name="play_trail_ms_park_not_started">Not yet</string>
+    <string name="play_trail_ms_high">High ground</string>
+    <string name="play_trail_ms_high_title">High-ground trails</string>
+    <string name="play_trail_ms_high_line">%1$d of %2$d trails</string>
+    <!-- L2-4: a High ground row's a11y (ux § 5.2 "Peter's Trail, 302 feet of climb[, earned]"); %2$s = spoken climb -->
+    <string name="play_trail_ms_high_row_a11y">%1$s, %2$s of climb</string>
+    <string name="play_challenge_progress_climb">%1$s of %2$s climbed</string>
+    <!-- plural on the target (%2$d): "0 of 1 park" -->
+    <plurals name="play_challenge_progress_parks">
+        <item quantity="one">%1$d of %2$d park</item>
+        <item quantity="other">%1$d of %2$d parks</item>
+    </plurals>
+    <!-- spoken units (ux § 1): %1$s is the formatted number ("1,207"); quantity one only for "1" -->
+    <plurals name="play_unit_feet_a11y">
+        <item quantity="one">%1$s foot</item>
+        <item quantity="other">%1$s feet</item>
+    </plurals>
+    <plurals name="play_unit_metres_a11y">
+        <item quantity="one">%1$s metre</item>
+        <item quantity="other">%1$s metres</item>
+    </plurals>
+    <plurals name="play_unit_miles_a11y">
+        <item quantity="one">%1$s mile</item>
+        <item quantity="other">%1$s miles</item>
+    </plurals>
+    <plurals name="play_unit_km_a11y">
+        <item quantity="one">%1$s kilometre</item>
+        <item quantity="other">%1$s kilometres</item>
+    </plurals>
 </resources>
