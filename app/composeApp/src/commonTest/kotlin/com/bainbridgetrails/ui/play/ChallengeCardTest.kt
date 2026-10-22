@@ -70,7 +70,7 @@ class ChallengeCardTest {
     fun noCountdownText() {
         val m = ChallengesLogic.model(config, Goal.trails, agenda, server("top", bands), emptyList(), now, nouns)
         val cards = m.solo + m.island
-        assertEquals(setOf("ch-sweep", "ch-krakenweek"), cards.map { it.itemId }.toSet())
+        assertEquals(setOf("ch-sweep", "ch-climb", "ch-parkhop", "ch-krakenweek"), cards.map { it.itemId }.toSet()) // pack 2026.11.3 (L4-2)
         val sweep = cards.single { it.itemId == "ch-sweep" }
         val texts = cards.flatMap { c -> ChallengesLogic.text(c, copy).let { listOfNotNull(it.window, it.progress, it.band) } + c.title + c.body }
         // Windows are days in island time (PP-8, PD-4): never a clock, a duration or "left".

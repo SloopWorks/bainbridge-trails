@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.11.2",
+  "version": "2026.11.3",
   "epoch": "2026-10-29",
   "_note": "Play v1 content pack (docs/play/schedule.md § 4; product.md § 4 is the authority). Edit this file only; run node scripts/build-play-content.mjs (validates, derives, snapshots to data/play/published/, copies into the app and the Worker). Published item ids are immutable: to change an item's when/where/rewards/fx publish a new id and set expires on the old one. enabled:false items wait on an owner check (product OD-16 TBC facts, on-site spots).",
   "minAppBuild": 0,
@@ -1054,6 +1054,32 @@
       "challenge": { "scope": "solo", "metric": "completed", "target": { "trails": 3, "roads": 5 } },
       "copy": { "title": "Weekend sweep", "body": "Finish {target} {goal.items} this weekend. Short ones count." },
       "a11y": { "label": "Weekend sweep", "announce": "Weekend sweep: {progress} of {target}." }
+    },
+    {
+      "id": "ch-climb",
+      "type": "challenge",
+      "lore": "challenge",
+      "goals": ["trails"],
+      "when": { "every": "week", "on": ["mon"], "from": "00:00", "to": "24:00", "days": 7 },
+      "marks": 100,
+      "repeat": "once",
+      "resolve": { "by": "challenge" },
+      "challenge": { "scope": "solo", "metric": "climb", "target": { "trails": 150 } },
+      "copy": { "title": "Uphill week", "body": "Finish trails that climb {target} between them this week." },
+      "a11y": { "label": "Uphill week", "announce": "Uphill week: {progress} of {target} climbed." }
+    },
+    {
+      "id": "ch-parkhop",
+      "type": "challenge",
+      "lore": "challenge",
+      "goals": ["trails"],
+      "when": { "every": "week", "on": ["sat"], "from": "00:00", "to": "24:00", "days": 2 },
+      "marks": 100,
+      "repeat": "once",
+      "resolve": { "by": "challenge" },
+      "challenge": { "scope": "solo", "metric": "parks", "target": { "trails": 3 } },
+      "copy": { "title": "Park hop", "body": "Finish a trail in different parks this weekend. Each park counts once." },
+      "a11y": { "label": "Park hop", "announce": "Park hop: {progress} of {target} parks." }
     },
     {
       "id": "ch-krakenweek",

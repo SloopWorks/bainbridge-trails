@@ -3,6 +3,7 @@ import currentRaw from "../data/play/current.json";
 import v2026_11_0 from "../data/play/2026.11.0.json";
 import v2026_11_1 from "../data/play/2026.11.1.json";
 import v2026_11_2 from "../data/play/2026.11.2.json";
+import v2026_11_3 from "../data/play/2026.11.3.json";
 import tides2026 from "../data/play/tides/9445882-2026.json";
 import tides2027 from "../data/play/tides/9445882-2027.json";
 import tides2028 from "../data/play/tides/9445882-2028.json";
@@ -19,7 +20,7 @@ import tides2029 from "../data/play/tides/9445882-2029.json";
  * `test/play-content.test.ts` lists the directory and fails until it is added; module load fails when
  * `current.json` names a version or tide year that is not imported.
  */
-const PUBLISHED_FILES: unknown[] = [v2026_11_0, v2026_11_1, v2026_11_2];
+const PUBLISHED_FILES: unknown[] = [v2026_11_0, v2026_11_1, v2026_11_2, v2026_11_3];
 const TIDE_FILES: Record<number, unknown> = { 2026: tides2026, 2027: tides2027, 2028: tides2028, 2029: tides2029 };
 
 /** Kept published packs (product § 3.5 `keptConfigs`). */

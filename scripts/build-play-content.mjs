@@ -75,6 +75,9 @@ export const ISLAND = { lat: 47.63, lon: -122.52, tz: "America/Los_Angeles" };
 const TYPES = ["treasure", "egg", "obstacle", "riddle", "challenge", "lore", "creature", "ambient"];
 /** Item types the Worker takes claims for (backend/src/play/claims.ts KIND_TYPE). */
 const CLAIMABLE_TYPES = ["treasure", "egg", "obstacle", "riddle", "challenge", "lore"];
+/** Kotlin `ChallengeMetric` minus the v2 drafts: climb (metres of trail gain) and parks (distinct Play parks) are trails-only (plan D5). */
+export const CHALLENGE_METRICS = ["completed", "stretches_repelled", "climb", "parks"];
+const TRAIL_METRICS = ["climb", "parks"];
 /**
  * Privacy review 2026-10-20 P2-7: the policy says the server never stores the day of a claim, and an occurrence key
  * (`<item>@<start date>`) names its start date, so a claimable occurrence must span at least 4 island days.
@@ -628,6 +631,23 @@ export function derive(pack, idx) {
     doc.segmentSquares = segmentSquares;
     out[g] = doc;
   }
+  return out;
+}
+
+/**
+ * Plan P2-3: the trails table is a published vocabulary. A park name (`parks`) or trail id (`featureGainM` keys) that
+ * the committed `data/play/derived/trails.json` carries may be on a phone's ledger (`park1:<park>`, `parkc:<park>`,
+ * `high:<trail>`) and in `play_progress_keys`, so a regenerated table must still list it. Renames need an alias map,
+ * which is v2; until then the dataset keeps the old name or the owner retires the key by hand.
+ */
+export function derivedContinuityErrors(committed, next) {
+  const out = [];
+  if (!isObj(committed) || !isObj(next)) return out;
+  const gone = (a, b) => a.filter((x) => !b.includes(x)).sort();
+  for (const park of gone(committed.parks ?? [], next.parks ?? []))
+    out.push(`data/play/derived/trails.json: park "${park}" disappeared from the regenerated tables; a published park name must survive (ledger keys name it; an alias map for renames is v2, plan P2-3)`);
+  for (const id of gone(Object.keys(committed.featureGainM ?? {}), Object.keys(next.featureGainM ?? {})))
+    out.push(`data/play/derived/trails.json: trail "${id}" disappeared from the regenerated tables; a published trail id must survive (ledger keys name it; an alias map for renames is v2, plan P2-3)`);
   return out;
 }
 
@@ -1304,7 +1324,7 @@ function checkItem(it, { pack, windows, places, pools, refErr, err }) {
         break;
       }
       unknownKeys(c, ["scope", "metric", "target", "minPlayersPerStretch", "retreatMarks"], `${w}.challenge`, err);
-      if (!["completed", "stretches_repelled"].includes(c.metric)) err(`${w}.challenge.metric: completed|stretches_repelled (no timing metric exists)`);
+      if (!CHALLENGE_METRICS.includes(c.metric)) err(`${w}.challenge.metric: ${CHALLENGE_METRICS.join("|")} (no timing metric exists)`);
       if (c.scope === "solo") {
         if (![50, 100, 150].includes(marks)) err(`${w}.marks: solo challenges pay 50, 100 or 150`);
         if (!(isObj(c.target) && goals.every((g) => Number.isInteger(c.target[g]) && c.target[g] > 0))) err(`${w}.challenge.target: positive integer per goal`);
@@ -1314,6 +1334,17 @@ function checkItem(it, { pack, windows, places, pools, refErr, err }) {
         if (!(Number.isInteger(c.minPlayersPerStretch) && c.minPlayersPerStretch >= 1 && c.minPlayersPerStretch <= 3)) err(`${w}.challenge.minPlayersPerStretch: 1..3 (OD-11)`);
       } else err(`${w}.challenge.scope: solo|island`);
       if (rec && rec.every !== "always" && (clockMin(rec.from) == null || clockMin(rec.to) == null)) err(`${w}.when: the Worker evaluates challenge windows: HH:MM times only`);
+      if (TRAIL_METRICS.includes(c.metric)) {
+        // Play trails v1.1 (plan D5; mirrors PlayConfigValidator.trailChallenge): climb / parks challenges are solo,
+        // trails-only, keyed `trails` only, over whole island days (00:00 → 24:00, unanchored): the phone counts
+        // earlier completions by their Logbook date, the Worker by upload time, and only whole days make them agree.
+        const m = c.metric;
+        if (c.scope !== "solo") err(`${w}.challenge.scope: a ${m} challenge is solo`);
+        if (!deepEqual(goals, ["trails"])) err(`${w}.goals: a ${m} challenge is trails-only, goals must be ["trails"] (was ${JSON.stringify(goals)})`);
+        if (!(isObj(c.target) && deepEqual(Object.keys(c.target), ["trails"]))) err(`${w}.challenge.target: a ${m} challenge's target is keyed trails only (was ${JSON.stringify(c.target)})`);
+        if (rec && rec.every !== "always" && (clockMin(rec.from) !== 0 || clockMin(rec.to) !== 1440 || rec.anchor !== undefined))
+          err(`${w}.when: a ${m} challenge's window is whole island days, 00:00 → 24:00, unanchored (the phone counts by Logbook date)`);
+      }
       break;
     }
     case "lore": {
@@ -1773,6 +1804,9 @@ export function run(argv, { root = ROOT, log = console.log, logErr = console.err
   const derivedText = {};
   if (data.idx) {
     const d = derive(pack, data.idx);
+    const committedTrails = join(root, `${PATHS.derived}/trails.json`);
+    if (existsSync(committedTrails)) for (const e of derivedContinuityErrors(JSON.parse(readFileSync(committedTrails, "utf8")), d.trails)) fail(e);
+    if (problems.length) return report(problems, logErr); // P2-3: never overwrite the committed vocabulary
     for (const g of GOALS) {
       derivedText[g] = formatJson(d[g]);
       const rel = `${PATHS.derived}/${g}.json`;

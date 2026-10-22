@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "goal": "trails",
-  "pack": "2026.11.2",
+  "pack": "2026.11.3",
   "dataset": "2026-10-18+aad9d16e",
   "grid": {
     "lat0": 47.55,
