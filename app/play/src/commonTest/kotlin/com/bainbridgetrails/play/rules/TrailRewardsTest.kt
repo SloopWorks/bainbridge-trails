@@ -163,6 +163,9 @@ class TrailRewardsTest {
         assertTrue(q.none { "ft" in it || "km" in it || "." in it }, "$q")
         assertTrue("mile:1" !in keys(mapOf("s-open" to 1_609.0), emptyList()))
         assertEquals(listOf(1, 5, 10, 15, 20), TrailRewards.mileSteps(24.9))
+        // review P2-A: capped at the Worker's MILE_STEPS (… 55, 60): no mile:65 at 105,000 m
+        assertEquals(listOf(1) + (5..60 step 5), TrailRewards.mileSteps(105_000 / TrailRewards.METRES_PER_MILE))
+        assertEquals(TrailRewards.MILE_STEPS, TrailRewards.mileSteps(1_000.0))
         assertEquals(listOf(100, 250, 500, 750, 1_000, 1_250), TrailRewards.CLIMB_STEPS_M)
         // island: once, by key
         assertEquals(setOf("island"), keys(emptyMap(), emptyList(), island = true))

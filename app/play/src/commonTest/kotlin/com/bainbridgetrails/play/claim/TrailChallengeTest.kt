@@ -122,6 +122,21 @@ class TrailChallengeTest {
     }
 
     @Test
+    fun `last park with two trails, one finished this window → target 2, no claim`() {
+        // review P1-A: the Worker adds P's count to remaining (it keeps no park names), so a park hopped this window
+        // that still has an unfinished trail counts twice; the phone must agree or it claims what the server refuses
+        val before = setOf("t-b", "t-c", "t-e", "t-x") // every park done but Alpha Park (t-a, t-d)
+        val mid = before + "t-a"
+        val p = TrailProgress.of(listOf("t-a"), tables)
+        assertEquals(setOf("Alpha Park"), p.parks)
+        assertEquals(2, TrailRewards.challengeTarget(ChallengeMetric.parks, 3, mid, p, tables))
+        assertTrue(claims(at(sat, 11), listOf("t-a"), completed = mid).none { it.itemId == "ch-parkhop" })
+        // finishing Alpha Park's last trail empties remaining: R = 0 + 1 → target 1, claims
+        assertEquals(1, TrailRewards.challengeTarget(ChallengeMetric.parks, 3, mid + "t-d", TrailProgress.of(listOf("t-a", "t-d"), tables), tables))
+        assertEquals(listOf(hopKey), claims(at(sun, 11), listOf("t-d"), earlier = done(sat, "t-a"), completed = mid + "t-d").map { it.key })
+    }
+
+    @Test
     fun `same park twice counts once`() {
         assertEquals(setOf("Alpha Park", "Beta Park"), TrailProgress.of(listOf("t-a", "t-d", "t-b"), tables).parks)
         assertTrue(claims(at(sat, 11), listOf("t-a", "t-d", "t-b")).none { it.itemId == "ch-parkhop" })

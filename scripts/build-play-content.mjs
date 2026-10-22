@@ -637,8 +637,8 @@ export function derive(pack, idx) {
 /**
  * Plan P2-3: the trails table is a published vocabulary. A park name (`parks`) or trail id (`featureGainM` keys) that
  * the committed `data/play/derived/trails.json` carries may be on a phone's ledger (`park1:<park>`, `parkc:<park>`,
- * `high:<trail>`) and in `play_progress_keys`, so a regenerated table must still list it. Renames need an alias map,
- * which is v2; until then the dataset keeps the old name or the owner retires the key by hand.
+ * `high:<trail>`) and in the Worker's `play_trail_paid`, so a regenerated table must still list it. Renames need an
+ * alias map, which is v2; until then the dataset keeps the old name or the owner retires the key by hand.
  */
 export function derivedContinuityErrors(committed, next) {
   const out = [];
@@ -1194,6 +1194,28 @@ export function claimSpanDays(it, rec, pack) {
   return it.type === "challenge" ? days + (pack.caps?.findGraceDays ?? CAPS.findGraceDays) : days;
 }
 
+/**
+ * Shortest gap in island days between consecutive starts of `rec` over SIM_DAYS from the 1st of the version's month
+ * (mirrors PlayConfigValidator.trailChallenge); null with fewer than two starts or a recurrence other rules reject.
+ */
+function startGap(rec, pack) {
+  const v = VERSION_RE.exec(pack.version ?? "");
+  if (!v) return null;
+  const start = epochDay(`${v[1]}-${v[2]}-01`);
+  let prev = null;
+  let gap = null;
+  try {
+    for (let e = start; e < start + SIM_DAYS; e++) {
+      if (!startsOn(rec, e, pack)) continue;
+      if (prev !== null && (gap === null || e - prev < gap)) gap = e - prev;
+      prev = e;
+    }
+  } catch {
+    return null; // a malformed recurrence: reported by checkRecurrence
+  }
+  return gap;
+}
+
 /** Drops per-square player counts below `min` (P3-8): `{ goal: { "row:col": n } }` → same shape, k-anonymous. */
 export function suppressSmallCounts(counts, min = MIN_SQUARE_PLAYERS) {
   const out = {};
@@ -1338,7 +1360,13 @@ function checkItem(it, { pack, windows, places, pools, refErr, err }) {
         // Play trails v1.1 (plan D5; mirrors PlayConfigValidator.trailChallenge): climb / parks challenges are solo,
         // trails-only, keyed `trails` only, over whole island days (00:00 → 24:00, unanchored): the phone counts
         // earlier completions by their Logbook date, the Worker by upload time, and only whole days make them agree.
+        // They recur (never "always") and never overlap themselves (days ≤ the recurrence period, review P2-B): the
+        // phone would see several live occurrences and claim each, the Worker credits one.
         const m = c.metric;
+        if (rec?.every === "always") err(`${w}.when: a ${m} challenge recurs (day, week, month, year or dates), never every: always`);
+        const gap = rec && rec.every !== "always" ? startGap(rec, pack) : null;
+        if (gap !== null && (rec.days ?? 1) > gap)
+          err(`${w}.when: a ${m} challenge's occurrences overlap: days ${rec.days ?? 1} > the ${gap}-day gap between starts (days ≤ the recurrence period)`);
         if (c.scope !== "solo") err(`${w}.challenge.scope: a ${m} challenge is solo`);
         if (!deepEqual(goals, ["trails"])) err(`${w}.goals: a ${m} challenge is trails-only, goals must be ["trails"] (was ${JSON.stringify(goals)})`);
         if (!(isObj(c.target) && deepEqual(Object.keys(c.target), ["trails"]))) err(`${w}.challenge.target: a ${m} challenge's target is keyed trails only (was ${JSON.stringify(c.target)})`);

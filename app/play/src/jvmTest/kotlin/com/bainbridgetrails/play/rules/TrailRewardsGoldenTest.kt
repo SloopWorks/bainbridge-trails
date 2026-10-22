@@ -70,7 +70,9 @@ class TrailRewardsGoldenTest {
         assertEquals(rules.getValue("steepGainDm").jsonPrimitive.int, TrailRewards.STEEP_DM)
         assertEquals(rules.getValue("metresPerMile").jsonPrimitive.double, TrailRewards.METRES_PER_MILE)
         val mileSteps = rules.getValue("mileSteps").jsonArray.map { it.jsonPrimitive.int }
-        assertEquals(mileSteps, TrailRewards.mileSteps(mileSteps.last().toDouble()))
+        assertEquals(mileSteps, TrailRewards.MILE_STEPS)
+        // review P2-A: the ladder stops at the Worker's last step, however far the walker goes
+        assertEquals(mileSteps, TrailRewards.mileSteps(mileSteps.last() * 2.0))
         val marks = rules.getValue("marks").jsonObject.mapValues { it.value.jsonPrimitive.int }
         val sample = mapOf("climb" to "climb:100", "high_ground" to "high:x", "milestone" to "mile:1", "park_first" to "park1:x", "park_complete" to "parkc:x", "island" to "island")
         for ((kind, key) in sample) {
@@ -104,7 +106,7 @@ class TrailRewardsGoldenTest {
     @Test
     fun `targets and claims of every challenge case`() {
         val cases = golden.getValue("challengeCases").jsonArray.map { it.jsonObject }
-        assertEquals(15, cases.size)
+        assertEquals(17, cases.size)
         for (c in cases) {
             val name = c.getValue("name").jsonPrimitive.content
             val metric = ChallengeMetric.valueOf(c.getValue("metric").jsonPrimitive.content)
@@ -116,6 +118,18 @@ class TrailRewardsGoldenTest {
             val target = TrailRewards.challengeTarget(metric, c.getValue("default").jsonPrimitive.int, strings(c["completed"]).toSet(), progress, tables)
             assertEquals(c.getValue("expectTarget").jsonPrimitive.int, target, "$name: target")
             assertEquals(c.getValue("expectClaim").jsonPrimitive.boolean, TrailRewards.claims(target, progress.value(metric)), "$name: claim")
+        }
+    }
+
+    @Test
+    fun `mile keys of every mile case`() {
+        val cases = golden.getValue("mileCases").jsonArray.map { it.jsonObject }
+        assertEquals(2, cases.size)
+        for (c in cases) {
+            val name = c.getValue("name").jsonPrimitive.content
+            val input = TrailRewardInput(c.getValue("nonQuietCoveredM").jsonPrimitive.double, emptyList(), emptyList(), emptySet(), false)
+            val miles = TrailRewards.qualifying(input, tables).filter { it.startsWith("mile:") }.sortedBy { it.substringAfter(':').toInt() }
+            assertEquals(strings(c["expectMileKeys"]), miles, name)
         }
     }
 }

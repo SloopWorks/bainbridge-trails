@@ -460,7 +460,9 @@ object PlayConfigValidator {
         /**
          * Play trails v1.1 (plan D5): `climb` / `parks` challenges are solo, `goals` exactly `[trails]`, a target keyed
          * `trails` only (> 0; climb in metres), and whole island days (`00:00` → `24:00`): the phone counts earlier
-         * completions by their Logbook date, the Worker by upload time, and only whole days make the two agree.
+         * completions by their Logbook date, the Worker by upload time, and only whole days make the two agree. They
+         * recur (never `every: always`) and never overlap themselves (`days` ≤ the recurrence period, review P2-B).
+         * Mirrored by `scripts/build-play-content.mjs` (same messages).
          */
         fun trailChallenge(p: String, item: Item, rec: Recurrence?) {
             val ch = item.challenge ?: return
@@ -474,11 +476,21 @@ object PlayConfigValidator {
             } else if (target.getValue(Goal.trails) <= 0) {
                 err(Rule.REWARD, "$p.challenge.target", "a $m target must be > 0")
             }
-            if (rec == null || rec.every == Every.always) return
+            if (rec == null) return
+            if (rec.every == Every.always) {
+                return err(Rule.SERVER_SUBSET, "$p.when", "a $m challenge recurs (day, week, month, year or dates), never every: always")
+            }
             val from = rec.from?.let(TimeExpr::parseOrNull)
             val to = rec.to?.let(TimeExpr::parseOrNull)
             if (from != TimeExpr.Clock(0) || to != TimeExpr.Clock(TimeExpr.MINUTES_PER_DAY) || rec.anchor != null) {
                 err(Rule.SERVER_SUBSET, "$p.when", "a $m challenge's window is whole island days, 00:00 → 24:00 (the phone counts by Logbook date)")
+            }
+            // review P2-B: occurrences never overlap (days ≤ the shortest gap between simulated starts), or the phone
+            // sees several live occurrences, claims each, and the Worker credits one
+            val days = rec.days ?: 1
+            val gap = simDates.filter { startsOn(rec, it) }.zipWithNext { a, b -> a.daysUntil(b) }.minOrNull()
+            if (gap != null && days > gap) {
+                err(Rule.SERVER_SUBSET, "$p.when", "a $m challenge's occurrences overlap: days $days > the $gap-day gap between starts (days ≤ the recurrence period)")
             }
         }
 

@@ -270,6 +270,27 @@ class PlayConfigValidatorTest {
     }
 
     @Test
+    fun `climb every always rejected`() {
+        // review P2-B: one never-ending occurrence; the phone and the Worker claim per occurrence, so climb / parks recur
+        val errs = errors(base.plus(climb.copy(`when` = Recurrence(every = Every.always))))
+        assertEquals(listOf(Rule.SERVER_SUBSET), errs.map { it.rule }.distinct(), errs.joinToString("\n"))
+        assertTrue(errs.any { "a climb challenge recurs (day, week, month, year or dates), never every: always" in it.message }, errs.joinToString("\n"))
+    }
+
+    @Test
+    fun `parks days over period rejected`() {
+        // review P2-B: `every: day, days: 7` → 7 live occurrences, each claimable on the phone, the Worker credits one
+        val daily = Recurrence(every = Every.day, from = "00:00", to = "24:00", days = 7)
+        val errs = errors(base.plus(parkhop.copy(`when` = daily)))
+        assertEquals(listOf(Rule.SERVER_SUBSET), errs.map { it.rule }.distinct(), errs.joinToString("\n"))
+        assertTrue(errs.any { "a parks challenge's occurrences overlap: days 7 > the 1-day gap between starts (days ≤ the recurrence period)" in it.message }, errs.joinToString("\n"))
+        // two starts a week, two days each: Sat → Sun overlaps; a week's single start with days 7 is fine (ch-climb)
+        assertOnly(Rule.SERVER_SUBSET, base.plus(parkhop.copy(`when` = TestPack.weekly("sat", "00:00", "24:00", 2).copy(on = TestPack.on("sat", "sun")))))
+        assertOnly(Rule.SERVER_SUBSET, base.plus(climb.copy(`when` = TestPack.weekly("mon", "00:00", "24:00", 8))))
+        assertTrue(errors(base.plus(parkhop.copy(`when` = daily.copy(days = 1)))).none { it.rule == Rule.SERVER_SUBSET })
+    }
+
+    @Test
     fun `roads target on climb rejected`() {
         assertOnly(Rule.GOAL_MISMATCH, base.plus(climb.copy(challenge = climb.challenge!!.copy(target = mapOf(Goal.trails to 150, Goal.roads to 100)))))
         assertOnly(Rule.GOAL_MISMATCH, base.plus(climb.copy(challenge = climb.challenge!!.copy(target = null))))
