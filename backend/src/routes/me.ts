@@ -101,11 +101,14 @@ export async function deleteUser(env: Env, deps: Deps, user: UserRow): Promise<v
     env.DB.prepare("DELETE FROM user_completed WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM walks_v2 WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM user_metrics WHERE user_id = ?").bind(id), // every dataset
-    // Play (every dataset): claims, week rows, totals. The island stretch aggregate holds counts only, no user.
+    // Play (every dataset): claims, week rows, totals, challenge contributions, the trails ledger and contribution
+    // keys (0007). The island stretch aggregate holds counts only, no user.
     env.DB.prepare("DELETE FROM play_claims WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM play_weeks WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM play_totals WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM play_progress WHERE user_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM play_trail_paid WHERE user_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM play_progress_keys WHERE user_id = ?").bind(id),
     env.DB.prepare("DELETE FROM name_reports WHERE reporter_id = ?1 OR target_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id),
     ...snapshotRemove(env, id),

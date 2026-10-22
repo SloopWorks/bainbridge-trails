@@ -4,6 +4,7 @@ import { ApiError, json } from "../http";
 import { challengesBody, playLog } from "../play/challenges";
 import { CLAIM_KINDS, playSummary } from "../play/claims";
 import { CONTENT_BODY, CURRENT, contentEtag, tidesFor } from "../play/config";
+import { TRAIL_KINDS, kindOf } from "../play/trails";
 import { parseDataset } from "../segments";
 
 const CONTENT_CACHE = "public, max-age=300";
@@ -44,18 +45,31 @@ export function playTides(path: string): Response {
  * server's current week), `perKind` = claim counts, `occ` = every claimed occurrence key (re-marked found, never
  * claimed twice), `log` = the server-only credits (W-WEEK, F-RETREAT, C-ISLAND: `{week, kind, marks}`, review P0-2)
  * for the Logbook. No times, no days, no positions. No side effects.
+ * Trails only (v1.1, plan D3): `perKind` also counts the ledger keys of the six trails rules (`climb`, `high_ground`,
+ * `milestone`, `park_first`, `park_complete`, `island`) and the body ends with `paid` = every ledger key, sorted (the
+ * Restored write seeds the phone's `trailPaid` from it). The roads body is unchanged.
  */
 export async function playMe(url: URL, env: Env, deps: Deps, user: UserRow): Promise<Response> {
   const dataset = parseDataset(url.searchParams.get("dataset") ?? undefined);
-  const [summary, claims, log] = await Promise.all([
+  const [summary, claims, log, paid] = await Promise.all([
     playSummary(env, user.id, dataset, deps.now()),
     env.DB.prepare("SELECT occ, kind FROM play_claims WHERE user_id = ? AND dataset = ? ORDER BY occ")
       .bind(user.id, dataset)
       .run<{ occ: string; kind: string }>(),
     playLog(env, user.id, dataset),
+    dataset === "trails"
+      ? env.DB.prepare("SELECT key FROM play_trail_paid WHERE user_id = ? AND dataset = ? ORDER BY key").bind(user.id, dataset).run<{ key: string }>()
+      : null,
   ]);
   const perKind: Record<string, number> = Object.fromEntries(CLAIM_KINDS.map((k) => [k, 0]));
   for (const c of claims.results) if (c.kind in perKind) perKind[c.kind]!++;
+  if (paid) {
+    for (const k of TRAIL_KINDS) perKind[k] = 0;
+    for (const r of paid.results) {
+      const k = kindOf(r.key);
+      if (k !== null) perKind[k]!++;
+    }
+  }
   return json({
     dataset,
     weekId: summary.weekId,
@@ -64,6 +78,7 @@ export async function playMe(url: URL, env: Env, deps: Deps, user: UserRow): Pro
     perKind,
     occ: claims.results.map((c) => c.occ),
     log,
+    ...(paid ? { paid: paid.results.map((r) => r.key) } : {}),
   });
 }
 
