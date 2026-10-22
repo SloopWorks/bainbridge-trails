@@ -218,7 +218,7 @@ class PlayRepository(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            AppLog.e(TAG, "walk marks unavailable: ${e.message}")
+            AppLog.e(TAG, "walk marks unavailable: ${e::class.simpleName}") // never the message (P3-3)
             null
         } ?: return false
         val ctx = walkContext()
@@ -261,12 +261,16 @@ class PlayRepository(
         return tables to input
     }
 
+    /**
+     * [read], or null when it throws. Logs the exception class only (privacy review L2-2 P3-3): a serialization message
+     * can quote the file it failed on (park names, coverage).
+     */
     private suspend fun <T> guarded(what: String, read: suspend () -> T?): T? = try {
         read()
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        AppLog.e(TAG, "$what unavailable: ${e.message}")
+        AppLog.e(TAG, "$what unavailable: ${e::class.simpleName}")
         null
     }
 
@@ -306,12 +310,34 @@ class PlayRepository(
     /** The trails start was skipped by [deferTrailStart]; the next successful [restore] runs it ([creditTrails]). */
     @Volatile private var trailStartDeferred = false
 
-    /** The deferred trails start alone (after the account's paid keys were seeded): one attempt, idempotent. */
-    private suspend fun creditTrails() {
+    /**
+     * Bumped by [forgetAccount] (sign-out, phone wipe): a `/v1/play/me` reply requested under an earlier account is
+     * dropped ([restore], privacy review L2-2 P2-2 / P3-2).
+     */
+    @Volatile private var accountEpoch = 0
+
+    /**
+     * Sign-out (AppGraph's auth listener) and "Also delete … on this phone" ([PlayFiles.wipe]), privacy review L2-2
+     * P2-2 / P3-2: forget what this process learned from the account's `/v1/play/me` ([meApplied], a deferred trails
+     * start, the foreground re-fetch time), so the next account defers its trails start until its own `paid` keys are
+     * read, and drop any reply still in flight. Play on or off.
+     */
+    fun forgetAccount() {
+        accountEpoch++
+        meApplied = false
+        trailStartDeferred = false
+        lastAccountSync = null
+    }
+
+    /**
+     * The deferred trails start alone (after the account's paid keys were seeded): one attempt, idempotent. Writes
+     * nothing when the store was cleared since [generation] was read.
+     */
+    private suspend fun creditTrails(generation: Int) {
         val (tables, input) = trailSnapshot() ?: return
         val qualifying = TrailRewards.qualifying(input, tables)
         val today = IslandTime.dateOf(clock().now())
-        store.update { st ->
+        store.updateIf(generation) { st ->
             if (st.trailsStarted || deferTrailStart(st)) st else st.with(TrailStart.onEnable(goal, st.trailLedger(), qualifying, today, newId))
         }
     }
@@ -546,37 +572,81 @@ class PlayRepository(
      * next Play upload), and **only that update** adds the account's `paid` keys to [PlayState.trailPaid]. One
      * addition (orchestrator ruling, v1.1 → v1 → v1.1): a restored Logbook whose trails start has not run takes the
      * account's `paid` keys too, before the trails start pays anything; a start deferred for it runs right after.
+     * Adversarial review P1-B: that seed also catches up, in one `start_trails` entry ([LogCopy.trailCatchUp]), the
+     * marks of `paid` keys the earlier Restored entry did not hold (the server paid them later), capped at what the
+     * Logbook lacks of `me.total`, so its total meets the server's.
+     *
+     * Privacy review L2-2: `paid` is filtered and capped ([accountPaid], trails only, P2-1); a reply that lands after
+     * a sign-out, an account switch ([forgetAccount]) or the phone wipe ([PlayStateStore.clear]) writes nothing (P2-2).
      */
     suspend fun restore(): Boolean {
         if (!running || !signedIn()) return false
         val client = api ?: return false
+        val generation = store.generation
+        val account = accountEpoch
         val me = (client.playMe() as? ApiResult.Ok)?.value ?: return false
-        lastAccountSync = Clock.System.now()
+        val serverPaid = if (goal == Goal.trails) accountPaid(me.paid) else emptySet()
         val today = IslandTime.dateOf(clock().now())
+        var applied = false
         var wrote = false
-        store.update { st ->
+        store.updateIf(generation) { st ->
+            if (!signedIn() || accountEpoch != account) return@updateIf st
+            applied = true
             val lb = st.logbook
             val restorable = !lb.hasRestore && lb.entries.all(::restorableEntry)
-            val serverPaid = me.paid.toSet()
             // Server-only credits first (P0-2): a restore then owes only what the account holds beyond them.
             val credited = serverCredits(lb, me.log)
             val localOnly = if (restorable) TrailRewards.paid(st.trailPaid, lb).filter { it !in serverPaid }.sumOf { TrailRewards.marksOf(it) } else 0
             val owed = me.total - credited.total + localOnly
             wrote = restorable && owed > 0
-            val seed = wrote || (goal == Goal.trails && lb.hasRestore && !st.trailsStarted)
             meApplied = true
-            st.copy(
-                found = st.found + me.occ,
-                logbook = if (!wrote) credited else credited.add(LogEntry(newId(), LogKind.restored, LogCopy.what(LogKind.restored), LogCopy.why(LogKind.restored), today, owed, board = BoardState.accepted)),
-                trailPaid = if (seed) st.trailPaid + serverPaid else st.trailPaid,
-            )
+            val found = st.found + me.occ
+            when {
+                wrote -> st.copy(
+                    found = found,
+                    logbook = credited.add(LogEntry(newId(), LogKind.restored, LogCopy.what(LogKind.restored), LogCopy.why(LogKind.restored), today, owed, board = BoardState.accepted)),
+                    trailPaid = st.trailPaid + serverPaid,
+                )
+                goal == Goal.trails && lb.hasRestore && !st.trailsStarted -> {
+                    // P1-B: keys the server paid after the Restored entry was written, up to the Logbook's shortfall.
+                    val later = serverPaid - TrailRewards.paid(st.trailPaid, credited)
+                    val catchUp = minOf(later.sumOf { TrailRewards.marksOf(it) }, maxOf(0, me.total - credited.total))
+                    val line = LogCopy.trailCatchUp
+                    st.copy(
+                        found = found,
+                        logbook = if (catchUp > 0) credited.add(LogEntry(newId(), LogKind.start_trails, line.what!!, line.why, today, catchUp)) else credited,
+                        trailPaid = st.trailPaid + serverPaid,
+                    )
+                }
+                else -> st.copy(found = found, logbook = credited)
+            }
         }
+        if (!applied) {
+            AppLog.i(TAG, "account summary dropped (signed out, account changed or wiped while it loaded)")
+            return false
+        }
+        lastAccountSync = Clock.System.now()
         if (wrote) AppLog.i(TAG, "Logbook restored from the account")
         if (trailStartDeferred) {
             trailStartDeferred = false
-            creditTrails()
+            creditTrails(generation)
         }
         return wrote
+    }
+
+    /**
+     * The account's `paid` keys the phone accepts (privacy review L2-2 P2-1): trails rule keys only
+     * ([TrailRewards.kindOf], a non-blank suffix, at most [MAX_PAID_KEY_LENGTH] chars), at most [MAX_PAID] of them.
+     */
+    private fun accountPaid(paid: List<String>): Set<String> {
+        val out = LinkedHashSet<String>()
+        for (k in paid) {
+            if (out.size >= MAX_PAID) break
+            if (k.length > MAX_PAID_KEY_LENGTH || TrailRewards.kindOf(k) == null) continue
+            if (k != TrailRewards.ISLAND && k.substringAfter(':', "").isBlank()) continue
+            out += k
+        }
+        return out
     }
 
     /** An entry a restorable Logbook may hold: the opt-in's own (P1-7), never a walk's. */
@@ -613,14 +683,15 @@ class PlayRepository(
      *
      * Trails (plan D4): [TrailStart] runs right after, in the same update, reading paid there — unless
      * [deferTrailStart] holds (then the next successful [restore] runs it). Trail input unavailable: it waits for the
-     * next turn-on or the next walk ([WalkMarks] runs it when it has not run).
+     * next turn-on or the next walk ([WalkMarks] runs it when it has not run). The store cleared since [generation]
+     * was read (the phone wipe, P2-2): nothing is written ([Credit.marks] null).
      */
-    private suspend fun creditOnce(): Credit? {
+    private suspend fun creditOnce(generation: Int): Credit? {
         val derived = guarded("start balance") { walkDerived() } ?: return null
         val trails = trailSnapshot()?.let { (tables, input) -> TrailRewards.qualifying(input, tables) }
         val today = IslandTime.dateOf(clock().now())
         var credited: Int? = null
-        store.update { st ->
+        store.updateIf(generation) { st ->
             var next = st.copy(logbook = StartBalance.onEnable(st.logbook, derived, today, newId), derivedBase = DerivedBase.of(derived))
             if (trails != null) {
                 if (deferTrailStart(st)) trailStartDeferred = true
@@ -635,13 +706,16 @@ class PlayRepository(
     /**
      * Every turn-on: restore first (so a reinstall never gets a start balance on top), then the starting balance. While
      * the Logbook still has none (PF1-1), an unavailable input is retried a few times on this start (the dataset or the
-     * coverage snapshot can still be loading right after opt-in); the next start tries again.
+     * coverage snapshot can still be loading right after opt-in); the next start tries again. A phone wipe during the
+     * turn-on (privacy review L2-2 P2-2) ends it: nothing it read before the wipe is written after it.
      */
     private suspend fun onTurnedOn(): Int? {
+        val generation = store.generation
         restore()
         var attempt = 0
         while (true) {
-            creditOnce()?.let { return it.marks }
+            if (store.generation != generation) return null
+            creditOnce(generation)?.let { return it.marks }
             val lb = store.state.value.logbook
             if (lb.hasStartBalance || lb.hasRestore || attempt >= START_BALANCE_RETRY_MS.size) return null
             delay(START_BALANCE_RETRY_MS[attempt++])
@@ -742,6 +816,15 @@ class PlayRepository(
 
         /** Start-balance retries on one start while its input is unavailable (PF1-1). */
         private val START_BALANCE_RETRY_MS = longArrayOf(2_000L, 5_000L, 15_000L)
+
+        /**
+         * At most this many account `paid` keys reach the ledger (privacy review L2-2 P2-1). The trails dataset's real
+         * key space (climb / mile steps, one `high:` per trail, two per park, the island) is well under it.
+         */
+        const val MAX_PAID = 1_000
+
+        /** Longest account `paid` key accepted (P2-1): `high:<trailId>` and `parkc:<park name>` fit easily. */
+        const val MAX_PAID_KEY_LENGTH = 96
 
         /** The foreground account re-fetch's minimum interval (P0-2). */
         const val ACCOUNT_SYNC_MS = 10 * 60_000L

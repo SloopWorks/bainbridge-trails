@@ -1,6 +1,8 @@
 package com.bainbridgetrails.play
 
+import com.bainbridgetrails.data.DataFixtures
 import com.bainbridgetrails.net.ApiClient
+import com.bainbridgetrails.testEnv
 import com.bainbridgetrails.net.CoverageUpload
 import com.bainbridgetrails.net.PlayClaimDto
 import com.bainbridgetrails.net.PlayWalkClaimsDto
@@ -30,13 +32,15 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
  * Play trails v1.1 G0 (plan § 3 G0, brief § 4 AC 1, AC 7, D7, D8): the roads client path does what `main` (2aee859)
  * did. The `client` section of `../../data/play/golden/roads-guard.json` (read by path from the Gradle test working
  * directory, like [PlayFixtures]) was captured on a worktree of 2aee859: this test writes the section when the file
- * has none (no Gradle flag reaches commonTest), and asserts against it otherwise. The other sections belong to
+ * has none (no Gradle flag reaches commonTest), and asserts against it otherwise. Under CI (env `CI` set, privacy review
+ * L2-2 P3-1) a missing section fails instead of being captured from the code under test. The other sections belong to
  * `backend/test/play-roads-guard.test.ts` and `:play`'s `RoadsGuardTest`.
  *
  * Pinned: roads `WalkMarks.apply` entries after a start balance (W-COV / W-DONE / W-SQUARE differences plus a visit
@@ -52,16 +56,37 @@ class RoadsGuardTest {
     private val date = LocalDate(2026, 10, 29)
     private val walkUuid = "3f2a1b4c-5d6e-4f70-8192-a3b4c5d6e7f8"
 
-    private fun read(): JsonObject = SystemFileSystem.source(golden).buffered().use { json.parseToJsonElement(it.readString()).jsonObject }
+    private fun read(): JsonObject = read(golden)
+
+    private fun read(path: Path): JsonObject = SystemFileSystem.source(path).buffered().use { json.parseToJsonElement(it.readString()).jsonObject }
+
+    /**
+     * [path]'s content with its `client` section: captured from this code when absent (a developer capture on main),
+     * except under CI ([ci] = env `CI`), where a missing section is a failure (P3-1).
+     */
+    private fun withClient(path: Path, ci: String?): JsonObject {
+        val stored = read(path)
+        if ("client" in stored) return stored
+        check(ci.isNullOrBlank() || ci == "false") { "$path has no `client` section: capture it on a worktree of main, never under CI" }
+        SystemFileSystem.sink(path).buffered().use { it.writeString(json.encodeToString(JsonObject.serializer(), JsonObject(stored + ("client" to section()))) + "\n") }
+        return read(path)
+    }
+
+    @Test
+    fun `capture mode fails under CI`() {
+        val dir = DataFixtures.tmpDir("roads-guard")
+        val copy = Path(dir, "roads-guard.json")
+        val bare = JsonObject(read() - "client")
+        SystemFileSystem.sink(copy).buffered().use { it.writeString(json.encodeToString(JsonObject.serializer(), bare)) }
+        assertFailsWith<IllegalStateException> { withClient(copy, ci = "true") }
+        assertTrue("client" !in read(copy), "nothing captured under CI")
+        assertTrue("client" in withClient(copy, ci = null), "a developer run captures")
+    }
 
     @Test
     fun `roads walk marks, upload key sets and v1 state equal main`() {
         assertTrue(SystemFileSystem.exists(golden), "$golden missing: capture the server and :play sections on main first")
-        var stored = read()
-        if ("client" !in stored) {
-            SystemFileSystem.sink(golden).buffered().use { it.writeString(json.encodeToString(JsonObject.serializer(), JsonObject(stored + ("client" to section()))) + "\n") }
-            stored = read()
-        }
+        val stored = withClient(golden, testEnv("CI"))
         val client = stored["client"]!!.jsonObject
         val now = section()
         assertEquals(client["walkMarks"], now["walkMarks"], "roads WalkMarks drifted from main (roads-guard.json `client.walkMarks`)")

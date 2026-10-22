@@ -2,6 +2,8 @@ package com.bainbridgetrails.play
 
 import com.bainbridgetrails.coverage.Fix
 import com.bainbridgetrails.data.DataFixtures
+import com.bainbridgetrails.log.AppLog
+import com.bainbridgetrails.net.ApiClient
 import com.bainbridgetrails.net.FakeServer
 import com.bainbridgetrails.net.Reply
 import com.bainbridgetrails.play.config.Goal
@@ -15,12 +17,20 @@ import com.bainbridgetrails.play.rules.TrailRewards
 import com.bainbridgetrails.play.rules.WalkDerived
 import com.bainbridgetrails.play.schedule.DerivedGoal
 import com.bainbridgetrails.tracking.SessionSummary
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -160,7 +170,14 @@ class PlayRestoreTest {
             """"occ":${occ.joinToString(",", "[", "]") { "\"$it\"" }},"paid":${paid.joinToString(",", "[", "]") { "\"$it\"" }}}""",
     )
 
-    private fun TestScope.trailsRepo(claims: PlayClaimQueue? = null): PlayRepository {
+    /** Thrown by the walk-derived and trail-input reads when set (the log-line test, P3-3). */
+    private var readFailure: Exception? = null
+
+    private fun TestScope.trailsRepo(
+        claims: PlayClaimQueue? = null,
+        api: ApiClient = server.client(token = { "tok" }),
+        statePath: String = "$trailsDir/trails-state.json",
+    ): PlayRepository {
         val d = StandardTestDispatcher(testScheduler)
         val content = PlayContentRepository(
             api = server.client(token = { "tok" }), dir = trailsDir, bundled = { PlayFixtures.pack },
@@ -170,11 +187,11 @@ class PlayRestoreTest {
         return PlayRepository(
             scope = backgroundScope, goal = Goal.trails, clock = { clock }, content = content,
             places = { PlayFixtures.EmptyPlaces }, derived = { DerivedGoal.decode(PlayFixtures.read("derived-trails.json")) },
-            store = PlayStateStore("$trailsDir/trails-state.json", d), track = MutableStateFlow<List<Fix>>(emptyList()), compute = d,
-            api = server.client(token = { "tok" }), claims = claims,
-            signedIn = { signedIn }, walkDerived = { derived }, newId = { "t-${++n}" },
+            store = PlayStateStore(statePath, d), track = MutableStateFlow<List<Fix>>(emptyList()), compute = d,
+            api = api, claims = claims,
+            signedIn = { signedIn }, walkDerived = { readFailure?.let { throw it }; derived }, newId = { "t-${++n}" },
             walkContext = { WalkContext(names = TrailFixtures.names) },
-            trailTables = { TrailFixtures.tables }, trailInput = { trailsInput },
+            trailTables = { TrailFixtures.tables }, trailInput = { readFailure?.let { throw it }; trailsInput },
         )
     }
 
@@ -292,5 +309,143 @@ class PlayRestoreTest {
         val qualifying = TrailRewards.qualifying(TrailFixtures.bothDoneIsland, TrailFixtures.tables)
         assertEquals(marks(qualifying - serverPaid.toSet()), trailMarks(st.logbook))
         r.stop()
+    }
+
+    // --- privacy review L2-2 (P2-1, P2-2, P3-2, P3-3) and adversarial review P1-B --------------------------------------
+
+    private fun quoted(keys: List<String>) = keys.joinToString(",", "[", "]") { "\"$it\"" }
+
+    /** P2-1: `paid` is filtered (trails rule keys, at most 96 chars) and capped before it reaches the ledger. */
+    @Test
+    fun `account paid keys are validated and capped`() = runTest {
+        val junk = listOf("", "climb", "climb:", "bogus:1", "island:x", "island2", "../../etc/passwd", "climb:" + "9".repeat(200), "park1:   ")
+        val flood = (0 until 100_000).map { "mile:$it" }
+        server.on("GET /v1/play/me", trailsMe(5_000, paid = serverPaid + junk + flood))
+        trailsInput = null // the trails start does not run: trailPaid is exactly the seed
+        val r = trailsRepo()
+        r.start() // reinstall, signed in: the Restored write seeds paid
+        r.awaitStartBalance() // the turn-on (restore first) is over
+        val paid = r.store.state.value.trailPaid
+        assertTrue(r.store.state.value.logbook.hasRestore)
+        assertTrue(paid.containsAll(serverPaid), "valid keys are kept")
+        assertTrue(paid.none { it in junk }, "junk dropped: ${paid.filter { it in junk }}")
+        assertTrue(paid.all { TrailRewards.kindOf(it) != null && it.length <= PlayRepository.MAX_PAID_KEY_LENGTH })
+        assertTrue(paid.size <= PlayRepository.MAX_PAID, "capped: ${paid.size}")
+        r.stop()
+    }
+
+    @Test
+    fun `roads never stores account paid keys`() = runTest {
+        server.on(
+            "GET /v1/play/me",
+            Reply.json("""{"dataset":"roads","weekId":"2026-10-26","total":2410,"week":0,"occ":[],"paid":${quoted(serverPaid + "island")}}"""),
+        )
+        val r = repo()
+        r.start()
+        r.awaitStartBalance() // the turn-on (restore first) is over
+        assertTrue(r.store.state.value.logbook.hasRestore)
+        assertEquals(emptySet(), r.store.state.value.trailPaid, "trails only")
+        r.stop()
+    }
+
+    /** P2-2: a `/me` reply that lands after "also delete ... on this phone" (and the sign-out) writes nothing. */
+    @Test
+    fun `restore in flight across a wipe and sign-out resurrects nothing`() = runTest {
+        val root = DataFixtures.tmpDir("play-restore-wipe")
+        val privateDir = "$root/private"
+        val statePath = PlayFiles.statePath(privateDir, Goal.trails)
+        val gate = CompletableDeferred<Unit>()
+        val body = trailsMe(5_000).body
+        val engine = MockEngine { req ->
+            if (req.url.encodedPath == "/v1/play/me") gate.await()
+            respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }
+        val api = ApiClient(engine, baseUrl = { "http://test.local/" }, token = { "tok" }, timeouts = false)
+        val r = trailsRepo(api = api, statePath = statePath)
+        r.start() // the turn-on's restore waits on the reply
+        runCurrent()
+        signedIn = false // account deleted: signed out, then the phone wipe
+        PlayFiles.wipe(privateDir, "$root/app/play", repo = r, currentClaims = null, io = StandardTestDispatcher(testScheduler))
+        gate.complete(Unit)
+        assertEquals(null, r.awaitStartBalance(), "the turn-on started before the wipe writes nothing")
+        runCurrent()
+        assertEquals(PlayState(), r.store.state.value)
+        assertFalse(SystemFileSystem.exists(Path(statePath)), "no state file after the wipe")
+        r.stop()
+    }
+
+    /** P3-2: sign-out (no wipe) resets the `/me` flags, so account B's trails start waits for B's own `paid`. */
+    @Test
+    fun `account switch without a wipe defers the trails start again`() = runTest {
+        server.on("GET /v1/play/me", trailsMe(5_000))
+        trailsInput = null // A: the trails input is not ready, so the trails start does not run
+        val r = trailsRepo()
+        r.start()
+        r.awaitStartBalance() // the turn-on (restore first) is over
+        assertTrue(r.store.state.value.logbook.hasRestore, "A's /me applied")
+        assertFalse(r.store.state.value.trailsStarted)
+
+        signedIn = false
+        r.forgetAccount() // AppGraph's sign-out listener
+        signedIn = true // B signs in with /me unreachable
+        server.on("GET /v1/play/me", Reply.offline)
+        trailsInput = TrailFixtures.bothDoneIsland
+        r.stop()
+        r.start()
+        r.awaitStartBalance() // the turn-on (restore first) is over
+        val st = r.store.state.value
+        assertFalse(st.trailsStarted, "deferred: B's paid keys are unknown")
+        assertTrue(st.logbook.entries.none { it.kind == LogKind.start_trails || it.kind in TrailRewards.KINDS })
+        r.stop()
+    }
+
+    /**
+     * Adversarial review P1-B: a Logbook restored before the server paid more trails keys (v1 Restored, then Worker
+     * 0007, then the upgrade) catches the difference up in one `start_trails` entry on the seed, so its total meets
+     * `me.total`.
+     */
+    @Test
+    fun `restored Logbook catches up trails keys the server paid later`() = runTest {
+        val later = listOf("climb:100", "park1:${TrailFixtures.MORITANI}")
+        server.on("GET /v1/play/me", trailsMe(3_000 + 100, paid = later))
+        trailsInput = null // only the seed and its catch-up
+        val r = trailsRepo()
+        v1Restored(r) // a Restored entry worth the v1 total (3,000)
+        r.start()
+        r.awaitStartBalance() // the turn-on (restore first) is over
+        val st = r.store.state.value
+        assertEquals(3_100, st.logbook.total, "the Logbook total meets me.total")
+        assertTrue(st.trailPaid.containsAll(later))
+        val catchUp = st.logbook.entries.single { it.kind == LogKind.start_trails }
+        assertEquals(LogCopy.trailCatchUp.what, catchUp.what)
+        assertEquals(100, catchUp.marks)
+        assertEquals(1, st.logbook.entries.count { it.kind == LogKind.restored }, "no second restore")
+
+        // A re-fetch adds nothing.
+        r.restore()
+        assertEquals(st.logbook, r.store.state.value.logbook)
+        r.stop()
+    }
+
+    /** P3-3: an unreadable input logs its exception class only (a serialization message may quote file content). */
+    @Test
+    fun `read failures log the exception class only`() = runTest {
+        val lines = mutableListOf<String>()
+        val saved = AppLog.sink
+        AppLog.sink = AppLog.Sink { _, _, message -> lines += message }
+        try {
+            signedIn = false
+            readFailure = IllegalStateException("Unexpected JSON token at offset 9: \"Moritani Preserve\" 47.6213,-122.5521")
+            val r = trailsRepo()
+            r.start()
+            runCurrent()
+            r.stop()
+        } finally {
+            AppLog.sink = saved
+        }
+        val failures = lines.filter { "unavailable" in it }
+        assertTrue(failures.isNotEmpty(), "the failure is logged: $lines")
+        assertTrue(failures.all { it.endsWith("IllegalStateException") }, "$failures")
+        assertTrue(lines.none { "Moritani" in it || "47.62" in it || "offset" in it }, "$lines")
     }
 }

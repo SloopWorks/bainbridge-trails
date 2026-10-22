@@ -19,8 +19,9 @@ import kotlin.test.assertEquals
  * Play trails v1.1 AC 7, plan D8 (review P1-6): the coverage upload contract is main's (2aee859). Ledger keys never
  * leave the phone: (a) every class reachable from `CoverageUpload`'s serial descriptor has exactly the element names G0
  * captured on main (`data/play/golden/roads-guard.json` `client.upload`); (b) the fixed upload fixture serializes
- * byte-equal to main's bytes; (c) the two Play DTOs' source span in `PlayDtos.kt` equals main's. The stage's verify also
- * runs `git diff --exit-code 2aee859 -- …/net/ApiDtos.kt`.
+ * byte-equal to main's bytes; (c) the source spans of the upload DTOs equal main's: `PlayClaimDto` / `PlayWalkClaimsDto`
+ * in `PlayDtos.kt` and `WalkDto` / `CoverageUpload` in `ApiDtos.kt` (privacy review L2-2 P2-3: the `ApiDtos.kt` pin was
+ * a manual `git diff`; it is a test now).
  */
 class UploadContractTest {
     private val golden = Path("../../data/play/golden/roads-guard.json")
@@ -92,6 +93,14 @@ class UploadContractTest {
         assertEquals(MAIN_SPAN, src.substring(start, end), "PlayClaimDto / PlayWalkClaimsDto changed (AC 7, D8)")
     }
 
+    @Test
+    fun `coverage upload DTO source equals main`() {
+        val src = SystemFileSystem.source(Path("src/commonMain/kotlin/com/bainbridgetrails/net/ApiDtos.kt")).buffered().use { it.readString() }
+        val start = src.indexOf("@Serializable\ndata class WalkDto(")
+        val end = src.indexOf("\n)\n", src.indexOf("data class CoverageUpload(")) + 3
+        assertEquals(API_MAIN_SPAN, src.substring(start, end), "WalkDto / CoverageUpload changed (AC 7, D8)")
+    }
+
     private companion object {
         /** `PlayDtos.kt` at 2aee859, lines 94–104. */
         const val MAIN_SPAN = "@Serializable\n" +
@@ -104,6 +113,28 @@ class UploadContractTest {
             "    val claims: List<PlayClaimDto> = emptyList(),\n" +
             "    val dayKey: String? = null,\n" +
             "    val hints: Map<String, Int>? = null,\n" +
+            ")\n"
+
+        /** `ApiDtos.kt` at 2aee859, lines 56–75. */
+        const val API_MAIN_SPAN = "@Serializable\n" +
+            "data class WalkDto(val id: String, val durationS: Long)\n" +
+            "\n" +
+            "/** `PUT /v1/coverage`. [segments] = `CoverageState.encode()` form (or a bit subset of it). */\n" +
+            "@Serializable\n" +
+            "data class CoverageUpload(\n" +
+            "    val datasetVersion: String,\n" +
+            "    val tickM: Int = 5,\n" +
+            "    val segments: Map<String, String>,\n" +
+            "    val walks: List<WalkDto> = emptyList(),\n" +
+            "    /** RD-7: \"roads\" for the roads goal; null (omitted) = the server default, trails. [ApiClient] sets it. */\n" +
+            "    val dataset: String? = null,\n" +
+            "    /**\n" +
+            "     * Play (docs/play/product.md §3.10, PD-3): the content-pack version the claims below were evaluated against.\n" +
+            "     * Null (omitted) whenever [play] is: with Play off the body is byte-identical to the pure upload (PF0-2).\n" +
+            "     */\n" +
+            "    val playConfig: String? = null,\n" +
+            "    /** One element per walk of [walks] that has Play claims; null (omitted) with Play off or nothing to claim. */\n" +
+            "    val play: List<PlayWalkClaimsDto>? = null,\n" +
             ")\n"
     }
 }
