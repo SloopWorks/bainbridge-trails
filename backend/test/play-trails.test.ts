@@ -67,6 +67,7 @@ interface Golden {
   };
   cases: GoldenCase[];
   challengeCases: ChallengeCase[];
+  mileCases: { name: string; nonQuietCoveredM: number; expectMileKeys: string[] }[];
 }
 
 const golden = JSON.parse(Object.values(GOLDEN_FILES)[0]!) as Golden;
@@ -123,6 +124,7 @@ describe("trails-rewards golden (parity with Kotlin TrailRewards)", () => {
   it("the golden carries the G0 cases", () => {
     expect(golden.cases.length).toBeGreaterThanOrEqual(20);
     expect(golden.challengeCases.length).toBeGreaterThanOrEqual(10);
+    expect(golden.mileCases.length).toBeGreaterThanOrEqual(1);
   });
 
   describe("golden inputs and keys equal Kotlin", () => {
@@ -145,11 +147,21 @@ describe("trails-rewards golden (parity with Kotlin TrailRewards)", () => {
   describe("challenge targets (D5)", () => {
     for (const c of golden.challengeCases) {
       it(c.name, () => {
-        const progress = typeof c.progress === "number" ? c.progress : c.progress.parks;
+        // the count, as production passes it (`personalTarget`: the Worker keeps no park names, review P1-A)
+        const progress = typeof c.progress === "number" ? c.progress : c.progress.parks.length;
         const target = challengeTarget(c.metric, c.default, c.completed, progress, TABLES);
         expect(target).toBe(c.expectTarget);
-        const value = typeof progress === "number" ? progress : progress.length;
-        expect(target > 0 && value >= target).toBe(c.expectClaim);
+        expect(target > 0 && progress >= target).toBe(c.expectClaim);
+      });
+    }
+  });
+
+  describe("mile ladder cap (review P2-A)", () => {
+    for (const c of golden.mileCases) {
+      it(c.name, () => {
+        const keys = qualifyingKeys({ nonQuietCoveredM: c.nonQuietCoveredM, touchedTrails: [], touchedParks: [] }, [], false, TABLES);
+        const miles = [...keys].filter((k) => k.startsWith("mile:")).sort((a, b) => +a.slice(5) - +b.slice(5));
+        expect(miles).toEqual(c.expectMileKeys);
       });
     }
   });

@@ -306,6 +306,25 @@ test("rejects parks window not whole days", () => {
   assert.deepEqual(errorsOf(sweep).filter((e) => /whole island days/.test(e)), []);
 });
 
+test("rejects climb every always", () => {
+  // review P2-B: one never-ending occurrence; the phone and the Worker claim per occurrence, so climb / parks recur
+  hasError(itemErrors(trailChallenge("climb", { when: { every: "always" } })), /ch-test-climb\.when: a climb challenge recurs \(day, week, month, year or dates\), never every: always/);
+});
+
+test("rejects parks days over period", () => {
+  // review P2-B: `every: day, days: 7` → 7 live occurrences, each claimable on the phone, the Worker credits one
+  const daily = { every: "day", from: "00:00", to: "24:00", days: 7 };
+  hasError(
+    itemErrors(trailChallenge("parks", { when: daily })),
+    /ch-test-parks\.when: a parks challenge's occurrences overlap: days 7 > the 1-day gap between starts \(days ≤ the recurrence period\)/,
+  );
+  // two starts a week, two days each: Sat → Sun overlaps; one weekly start over 8 days overlaps the next
+  hasError(itemErrors(trailChallenge("parks", { when: { every: "week", on: ["sat", "sun"], from: "00:00", to: "24:00", days: 2 } })), /a parks challenge's occurrences overlap: days 2 > the 1-day gap/);
+  hasError(itemErrors(trailChallenge("climb", { when: { every: "week", on: ["mon"], from: "00:00", to: "24:00", days: 8 } })), /a climb challenge's occurrences overlap: days 8 > the 7-day gap/);
+  // a day at a time is fine (the claim-span rule may still object; the overlap rule does not)
+  assert.deepEqual(itemErrors(trailChallenge("parks", { when: { ...daily, days: 1 } })).filter((e) => /overlap/.test(e)), []);
+});
+
 test("rejects unknown metric", () => {
   for (const metric of ["timing", "squares_lifted", "new_metres", "", undefined]) {
     hasError(itemErrors(trailChallenge("climb", { challenge: { scope: "solo", metric, target: { trails: 1 } } })), /ch-test-climb\.challenge\.metric: completed\|stretches_repelled\|climb\|parks \(no timing metric exists\)/);

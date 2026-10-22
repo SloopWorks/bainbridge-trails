@@ -101,16 +101,14 @@ object TrailRewards {
     /** Same-walk row order (ux § 3: high ground, park first, park complete, climb, milestone, island). */
     private val ROW_ORDER = listOf(LogKind.high_ground, LogKind.park_first, LogKind.park_complete, LogKind.climb, LogKind.milestone, LogKind.island)
 
-    /** The W-MILE ladder up to [miles]: 1, then every 5 (the `Milestones` distance ladder, RP-8). */
-    fun mileSteps(miles: Double): List<Int> {
-        val out = ArrayList<Int>()
-        var step = 1
-        while (step <= miles + EPS) {
-            out += step
-            step = if (step == 1) 5 else step + 5
-        }
-        return out
-    }
+    /**
+     * W-MILE steps, statute miles: 1, then every 5 up to 60 (the `Milestones` distance ladder, RP-8). Equal to the
+     * Worker's `MILE_STEPS` (review P2-A): a step past 60 would pay on the phone and never on the server.
+     */
+    val MILE_STEPS: List<Int> = listOf(1) + (5..60 step 5)
+
+    /** The W-MILE steps reached at [miles]. */
+    fun mileSteps(miles: Double): List<Int> = MILE_STEPS.filter { it <= miles + EPS }
 
     /**
      * The rules' inputs from raw [coverage] (`segmentId → coveredM`, summed in its iteration order), the sticky
@@ -203,8 +201,10 @@ object TrailRewards {
     /**
      * The personal target (brief Q3, plan D5): `min(default, R)` with R = remaining(completed) + P, [default] in the
      * compare unit ([compareTarget]). climb: remaining = Σ dm of non-quiet trails ∉ [completed]; parks: remaining =
-     * |{Play parks with a non-quiet trail ∉ [completed]} ∪ P's parks|. Every completion inside the window moves value
-     * from remaining to P, so R is "what remained at the window start". 0 → no card, no claim.
+     * |{Play parks with a non-quiet trail ∉ [completed]}| + |P's parks|, added, not unioned: the Worker keeps a count
+     * only (`trails.ts` `challengeTarget`, D12), so a park hopped this window that still has an unfinished trail
+     * counts twice on both sides (review P1-A). Every completion inside the window moves value from remaining to P,
+     * so R is "what remained at the window start" (parks: at least that). 0 → no card, no claim.
      */
     fun challengeTarget(metric: ChallengeMetric, default: Int, completed: Set<String>, progress: TrailProgress, tables: TrailTables): Int =
         when (metric) {
@@ -213,9 +213,8 @@ object TrailRewards {
                 min(default, remaining + progress.climbDm)
             }
             ChallengeMetric.parks -> {
-                val remaining = HashSet(progress.parks)
-                for ((p, members) in tables.parkMembers) if (members.any { it !in completed }) remaining += p
-                min(default, remaining.size)
+                val remaining = tables.parkMembers.count { (_, members) -> members.any { it !in completed } }
+                min(default, remaining + progress.parks.size)
             }
             else -> default
         }
