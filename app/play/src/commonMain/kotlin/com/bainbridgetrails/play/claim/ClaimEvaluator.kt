@@ -4,6 +4,7 @@ package com.bainbridgetrails.play.claim
 
 import com.bainbridgetrails.play.config.ChallengeMetric
 import com.bainbridgetrails.play.config.ChallengeScope
+import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.config.Item
 import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.PlayConfig
@@ -12,7 +13,11 @@ import com.bainbridgetrails.play.geo.GeoMath
 import com.bainbridgetrails.play.geo.GeoPoint
 import com.bainbridgetrails.play.geo.QuietZones
 import com.bainbridgetrails.play.rules.LogKind
+import com.bainbridgetrails.play.rules.Logbook
 import com.bainbridgetrails.play.rules.Marks
+import com.bainbridgetrails.play.rules.TrailProgress
+import com.bainbridgetrails.play.rules.TrailRewards
+import com.bainbridgetrails.play.rules.TrailTables
 import com.bainbridgetrails.play.schedule.DayPlan
 import com.bainbridgetrails.play.schedule.FeatureRef
 import com.bainbridgetrails.play.schedule.Occurrence
@@ -24,6 +29,7 @@ import com.bainbridgetrails.play.schedule.SegRef
 import com.bainbridgetrails.play.time.IslandTime
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.plus
 import kotlinx.serialization.Serializable
 import kotlin.math.hypot
@@ -104,6 +110,19 @@ data class WalkDone(val walkId: String, val endedAt: Long, val completed: Int) {
 }
 
 /**
+ * What the solo `climb` / `parks` challenges (`ch-climb`, `ch-parkhop`; plan D5) read at Finish: the trails [tables],
+ * the sticky [completed] set after this walk, the features [thisWalk] completed first, and the [logbook], whose
+ * `complete` entries dated inside a window are that window's earlier completions (no timestamp is persisted; the
+ * validator keeps these windows whole island days).
+ */
+data class TrailChallengeInput(
+    val tables: TrailTables,
+    val completed: Set<String>,
+    val thisWalk: Collection<String>,
+    val logbook: Logbook,
+)
+
+/**
  * The claim pass of one walk. [stretchShares]: the walked share (0..1) of every kraken stretch the walk touched,
  * by placement key, for the attack sheet ("50 % walked — 60 % repels it", PF7-2).
  */
@@ -141,8 +160,8 @@ class ClaimEvaluator(val config: PlayConfig, private val places: PlaceIndex) {
      * ([islandDates]). [found]: keys already claimed (never claimed or listed again: idempotent per walk and content);
      * [hints]: hints used per riddle item; [sensed]: keys [SensingTracker] sensed live, listed as unclaimed when the
      * kept fixes no longer reach them ([droppedVehicle] > 0 → vehicle, else accuracy). With [walkEnd], the solo
-     * `completed` challenges this walk reaches ([challenges]: [completedThisWalk] over the [earlier] walks) join the
-     * claims, sorted by key.
+     * `completed` challenges this walk reaches ([challenges]: [completedThisWalk] over the [earlier] walks) and, with
+     * [trails], the `climb` / `parks` challenges ([trailChallenges]) join the claims, sorted by key.
      */
     fun evaluate(
         kept: List<GatedFix>,
@@ -154,6 +173,7 @@ class ClaimEvaluator(val config: PlayConfig, private val places: PlaceIndex) {
         walkEnd: Instant? = null,
         completedThisWalk: Int = 0,
         earlier: List<WalkDone> = emptyList(),
+        trails: TrailChallengeInput? = null,
     ): ClaimResult {
         val walk = Walk(found, hints)
         plans.forEach(walk::addPlan)
@@ -161,8 +181,34 @@ class ClaimEvaluator(val config: PlayConfig, private val places: PlaceIndex) {
         val result = walk.result(sensed, droppedVehicle)
         if (walkEnd == null) return result
         val known = result.claims.mapTo(HashSet()) { it.key }
-        val challenges = challenges(plans, walkEnd, completedThisWalk, earlier, found).filter { it.key !in known }
+        val trailClaims = trails?.let { trailChallenges(plans, walkEnd, it, found) }.orEmpty()
+        val challenges = (challenges(plans, walkEnd, completedThisWalk, earlier, found) + trailClaims).filter { it.key !in known }
         return if (challenges.isEmpty()) result else result.copy(claims = (result.claims + challenges).sortedBy { it.key })
+    }
+
+    /**
+     * Solo `climb` / `parks` challenges (`ch-climb`, `ch-parkhop`; brief § 2, plan D5) of the trails plans, for the walk
+     * that finished at [walkEnd]: per occurrence active then and not in [found], P = [TrailProgress] of this walk's
+     * completions plus the Logbook `complete` entries dated inside the window; target =
+     * [TrailRewards.challengeTarget] (pack target metres → dm for climb); claimed when P ≥ target > 0 — no
+     * "prior < target" gate (review P2-6): a walk claims an occurrence another walk already reached but never claimed.
+     */
+    internal fun trailChallenges(plans: List<DayPlan>, walkEnd: Instant, input: TrailChallengeInput, found: Set<String> = emptySet()): List<Claim> {
+        val out = ArrayList<Claim>()
+        val seen = HashSet<String>()
+        for (plan in plans) for (o in plan.occurrences) {
+            if (plan.goal != Goal.trails || o.type != ItemType.challenge || !seen.add(o.key) || o.key in found || !o.activeAt(walkEnd)) continue
+            val item = live(o.itemId) ?: continue
+            val spec = item.challenge ?: continue
+            if (spec.scope != ChallengeScope.solo || (spec.metric != ChallengeMetric.climb && spec.metric != ChallengeMetric.parks)) continue
+            val packTarget = spec.target?.get(Goal.trails) ?: continue
+            val progress = TrailProgress.of(windowCompletions(o, walkEnd, input.thisWalk, input.logbook), input.tables)
+            val target = TrailRewards.challengeTarget(spec.metric, TrailRewards.compareTarget(spec.metric, packTarget), input.completed, progress, input.tables)
+            if (TrailRewards.claims(target, progress.value(spec.metric))) {
+                out += Claim(o.key, item.id, ClaimKind.challenge, IslandTime.weekId(walkEnd), Marks.found(item), null, walkEnd)
+            }
+        }
+        return out.sortedBy { it.key }
     }
 
     /**
@@ -606,6 +652,22 @@ class ClaimEvaluator(val config: PlayConfig, private val places: PlaceIndex) {
         const val DEFAULT_RADIUS_M = 20
         const val DEFAULT_MIN_M = 100
         private const val EPS = 1e-9
+
+        /**
+         * The features completed inside [o]'s window (plan D5 "client P"): [thisWalk] when [walkEnd] is inside it, plus
+         * the [logbook]'s `complete` entries whose island date is a window day (a date counts when its 00:00 is inside
+         * the window: climb / parks windows are whole days, validated).
+         */
+        fun windowCompletions(o: Occurrence, walkEnd: Instant?, thisWalk: Collection<String>, logbook: Logbook): Set<String> {
+            val out = LinkedHashSet<String>()
+            if (walkEnd != null && o.activeAt(walkEnd)) out += thisWalk
+            for (e in logbook.entries) {
+                if (e.kind != LogKind.complete) continue
+                val id = e.contentId ?: continue
+                if (o.activeAt(IslandTime.instantOf(e.date, LocalTime(0, 0)))) out += id
+            }
+            return out
+        }
 
         /** The island dates a walk from [fromMs] to [toMs] touches: the day plans [evaluate] needs. */
         fun islandDates(fromMs: Long, toMs: Long): List<LocalDate> {

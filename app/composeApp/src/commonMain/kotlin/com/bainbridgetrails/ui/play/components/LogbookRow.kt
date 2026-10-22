@@ -87,6 +87,9 @@ fun LogKind.labelRes(): StringResource = when (this) {
     LogKind.start_balance -> Res.string.play_kind_start_balance
     LogKind.restored -> Res.string.play_kind_restored
     LogKind.visit -> Res.string.play_kind_visit
+    // Play trails v1.1 placeholders (plan P1-10): L2-3 swaps in play_kind_climb / play_kind_high_ground / play_kind_start_trails.
+    LogKind.climb, LogKind.high_ground -> Res.string.play_kind_milestone
+    LogKind.start_trails -> Res.string.play_kind_start_balance
 }
 
 /** The art tile's glyph for a kind (placeholder art, ux § 7.2 #4). */

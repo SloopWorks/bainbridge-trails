@@ -362,6 +362,7 @@ object PlayConfigValidator {
             }
             if (item.count !in 1..20) err(Rule.COUNT, "$p.count", "count ${item.count} out of 1..20")
             resolve(p, item)
+            trailChallenge(p, item, rec)
             rewards(p, item)
             copy(p, item)
             for (fx in listOfNotNull(item.fx) + item.variants.mapNotNull { it.fx }) {
@@ -453,6 +454,31 @@ object PlayConfigValidator {
                 if (item.challenge == null) err(Rule.PLACEMENT_SHAPE, "$p.challenge", "challenge items need a challenge spec")
             } else if (item.challenge != null) {
                 err(Rule.PLACEMENT_SHAPE, "$p.challenge", "only challenge items carry a challenge spec")
+            }
+        }
+
+        /**
+         * Play trails v1.1 (plan D5): `climb` / `parks` challenges are solo, `goals` exactly `[trails]`, a target keyed
+         * `trails` only (> 0; climb in metres), and whole island days (`00:00` → `24:00`): the phone counts earlier
+         * completions by their Logbook date, the Worker by upload time, and only whole days make the two agree.
+         */
+        fun trailChallenge(p: String, item: Item, rec: Recurrence?) {
+            val ch = item.challenge ?: return
+            if (ch.metric != ChallengeMetric.climb && ch.metric != ChallengeMetric.parks) return
+            val m = ch.metric.name
+            if (ch.scope != ChallengeScope.solo) err(Rule.PLACEMENT_SHAPE, "$p.challenge.scope", "a $m challenge is solo")
+            if (item.goals != listOf(Goal.trails)) err(Rule.GOAL_MISMATCH, "$p.goals", "a $m challenge is trails-only, goals must be [trails], was ${item.goals}")
+            val target = ch.target
+            if (target == null || target.keys != setOf(Goal.trails)) {
+                err(Rule.GOAL_MISMATCH, "$p.challenge.target", "a $m challenge's target is keyed trails only, was $target")
+            } else if (target.getValue(Goal.trails) <= 0) {
+                err(Rule.REWARD, "$p.challenge.target", "a $m target must be > 0")
+            }
+            if (rec == null || rec.every == Every.always) return
+            val from = rec.from?.let(TimeExpr::parseOrNull)
+            val to = rec.to?.let(TimeExpr::parseOrNull)
+            if (from != TimeExpr.Clock(0) || to != TimeExpr.Clock(TimeExpr.MINUTES_PER_DAY) || rec.anchor != null) {
+                err(Rule.SERVER_SUBSET, "$p.when", "a $m challenge's window is whole island days, 00:00 → 24:00 (the phone counts by Logbook date)")
             }
         }
 

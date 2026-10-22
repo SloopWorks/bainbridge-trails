@@ -83,4 +83,20 @@ class LogbookTest {
         val restored = Logbook().add(LogEntry("r", LogKind.restored, "Restored from your account", "", tue, 2_410))
         assertEquals(restored, StartBalance.onEnable(restored, derived, tue, newId))
     }
+
+    @Test
+    fun `trails kinds appended, not walkDerived, not found`() {
+        // D7: stored keywords are the names; v1.1 appends after the v1 kinds (visit was last in v1)
+        assertEquals(listOf(LogKind.visit, LogKind.climb, LogKind.high_ground, LogKind.start_trails), LogKind.entries.takeLast(4))
+        for (k in listOf(LogKind.climb, LogKind.high_ground, LogKind.start_trails)) {
+            assertFalse(k.walkDerived, "$k is not W-COV/W-DONE/W-SQUARE: StartBalance's catch-up must not count it")
+            assertFalse(k.found, "$k is not under the daily found cap")
+        }
+        val e = LogEntry("c", LogKind.climb, "250 m climbed", LogCopy.why(LogKind.climb), tue, 50, walkId = "w1", contentId = "climb:250")
+        val log = Logbook().add(e)
+        assertEquals(log, log.add(e.copy(id = "c2", walkId = "w2")), "dedupe by (kind, contentId)")
+        val json = Json.encodeToString(Logbook.serializer(), log)
+        assertEquals(log, Json.decodeFromString(Logbook.serializer(), json))
+        assertTrue("\"kind\":\"climb\"" in json, json)
+    }
 }

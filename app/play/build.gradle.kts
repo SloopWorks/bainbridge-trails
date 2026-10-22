@@ -52,5 +52,7 @@ tasks.named<Test>("jvmTest") {
         fileTree("../../data/play") { include("play-content.json", "ferry-timetable.json", "derived/*.json", "golden/*.json", "tides/*.json", "published/*.json") },
         fileTree("../../docs/play") { include("e2e-ids.env") },
         fileTree("../composeApp/src/commonMain/composeResources/files/play") { include("play-content.json") },
+        // TrailRewardsGoldenTest: counted segment lengths and trail membership the parity fixture was computed from
+        fileTree("../../backend/src/data") { include("segments.json") },
     ).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("playDataFiles")
 }
