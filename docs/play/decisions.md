@@ -397,7 +397,7 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
   `mile:<mi>`, `high:<trailId>`, `park1:<park>`, `parkc:<park>`, `island`, never re-derived; the key is also the
   Logbook `contentId`, so **paid** = `trailPaid` ∪ the `contentId`s of Logbook entries of the six kinds, owed =
   qualifying − paid. Server: additive `0007_play_trails.sql` — `play_trail_paid(user_id, dataset, key, marks)`,
-  `play_totals.trail_marks`, `play_progress_keys` (below); inserts `ON CONFLICT DO NOTHING` before the totals upsert,
+  `play_totals.trail_marks` (no other table; see D12); inserts `ON CONFLICT DO NOTHING` before the totals upsert,
   allowed on the no-change upload path. `GET /v1/play/me?dataset=trails` gains the six kinds in `perKind` and
   `paid: string[]`; the roads body stays byte-identical. A dataset that drops a trail lowers nothing; one that adds a
   trail pays only keys not yet paid.
@@ -422,11 +422,14 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
     `stale_config` for every claim naming it (→ `local_only`) while its `play` block still settles the walk rows; a
     pre-Play Worker leaves rows `pending`. After deploy + 0007 the first Play upload inserts every qualifying key and
     totals converge. Until then the Logbook total exceeds the server total.
-  - **D12** `play_progress_keys(user_id, dataset, occ, key)` is **kept**, an explicit deviation from "no place in new
-    tables": a row (user, `ch-parkhop@<Saturday>`, park) is coarser than the place-and-week occurrence keys
-    `play_claims` already retains (OD-21); purged by the cron once the occurrence's grace ends; deleted with the
-    account. Final privacy ruling in W5; the named fallback is per-upload distinct parks (a park hit on two walks
-    counts twice).
+  - **D12** `play_progress_keys` was planned as a deviation ("a park per challenge weekend") and **reversed** by the
+    privacy-security-reviewer's early pass (`trails/reviews/2026-10-21-privacy-l3-1.md`, ESCALATE: a row is place + a
+    sub-week window, finer than the week the policy promises; the 7 single-trail parks pin a trail). Ruling 2026-10-21:
+    the table is dropped from 0007; `ch-parkhop` progress = distinct Play parks among the trails newly completed in
+    **one upload** (one occurrence per P1-1), counted into `play_progress`. Nothing new is stored. Bounded overcount
+    accepted: two different trails of one park completed in two separate uploads in one window count twice (worst
+    case: an easier +100 solo challenge). The ledger `play_trail_paid` needs one privacy-policy clause (OD-19 draft
+    in `docs/legal/privacy-policy.md`, owner sign-off before deploy).
   - **P1-1** One upload contributes to **at most one occurrence per challenge item**: the one active at `now`, else
     the latest still in grace. Consequence: a walk synced late, after the next occurrence opened, counts toward the
     new one on the server while the client counted it by its Logbook date; the two can differ until the next walk.
@@ -445,7 +448,7 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
 - **Owner items (not in this work item).** Worker deploy + `npm run migrate:remote` of 0007, after the OD-19
   privacy-paragraph sign-off (D11 holds until then). Once the Worker serves 2026.11.3, v1 clients reject the whole
   pack (`coerceInputValues = false`, last good kept); Shipyard-only today. Alias map v2 (P2-3). OD-21 retention
-  governs `play_trail_paid` / `play_progress_keys` like `play_claims`.
+  governs `play_trail_paid` like `play_claims`.
 - **Consequence.** Trails players with Play on earn the six rules and the two challenges from the first walk or the
   turn-on; nothing new leaves the phone; roads is unchanged. Proof: `TrailRewardsTest`, `TrailRewardsGoldenTest`,
   `TrailStartTest`, `LogKindCompatTest`, `TrailChallengeTest`, `UploadContractTest`, `RoadsGuardTest` (both modules),

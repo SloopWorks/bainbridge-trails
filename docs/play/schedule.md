@@ -1197,11 +1197,7 @@ CREATE TABLE play_trail_paid (     -- trails only: climb:<m> | mile:<mi> | high:
   PRIMARY KEY (user_id, dataset, key)
 ) WITHOUT ROWID;
 ALTER TABLE play_totals ADD COLUMN trail_marks INTEGER NOT NULL DEFAULT 0;  -- = SUM(play_trail_paid.marks); total adds it
-CREATE TABLE play_progress_keys (  -- ch-parkhop: one row per (occurrence, park); purged after the occurrence's grace
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  dataset TEXT NOT NULL, occ TEXT NOT NULL, key TEXT NOT NULL,
-  PRIMARY KEY (user_id, dataset, occ, key)
-) WITHOUT ROWID;
+-- (a `play_progress_keys` table was planned and dropped before any apply: PD-26 D12)
 ```
 
 Ledger rows derive from coverage bits and completions only (no time, day or position); inserts are
@@ -1264,8 +1260,8 @@ Timed races, the `race` item type, the `play_races` / `play_race_entries` tables
 - **Solo, trails only (v1.1, PD-26):** `ch-climb` (`climb`, Mon → Mon, 150 m = 1,500 dm) and `ch-parkhop` (`parks`,
   Sat → Mon, 3 parks). Same claim shape; the server evaluates them from the upload's Play completions (quiet trails
   and Pritchard Park add nothing), one upload contributes to **at most one occurrence per item** (the one active at
-  `now`, else the latest still in grace), park keys are kept in `play_progress_keys` (§ 7.2) and mirrored into
-  `play_progress` so bands equal distinct parks, and the claim is accepted when progress ≥ the personal target
+  `now`, else the latest still in grace), park-hop progress = the distinct parks of that upload's new completions added
+  to `play_progress` (nothing else stored; a park reached in two separate uploads counts twice, PD-26 D12), and the claim is accepted when progress ≥ the personal target
   (`min(default, remaining)`). `/challenges` returns the personal target when signed in (default otherwise), climb
   `progress` / `target` in decimetres, and omits an item whose remaining is 0 for that user.
 - **Island** (`ch-krakenweek`): the server increments `play_attack_stretches.repelled_by` once per distinct user

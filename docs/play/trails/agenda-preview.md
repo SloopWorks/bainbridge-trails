@@ -1,86 +1,162 @@
-# Play agenda preview — pack 2026.11.2 (Trails edition v1.1)
+# Play agenda preview — pack 2026.11.3 (Trails edition v1.1, L4-2)
 
-Generated with `node scripts/build-play-content.mjs --agenda 2026-10-29` and `--agenda 2026-11-12` (two 14-day
-windows = the next 4 weeks from the pack epoch). Island time; daylight = civil dawn–dusk. For the PR body.
-Roads-only rows (`kraken-roads`, `treasure-weekly-roads`) are unchanged from 2026.11.1 and listed for completeness.
-The ferry sprite (ambient, every day 05:00–23:00 on each Bainbridge departure) is elided from the cells.
+The four trails weeks **2026-10-26 → 2026-11-23**, straight from the regenerated device-side golden
+`app/play/src/jvmTest/resources/golden/agenda-trails.tsv` (`PlaySchedulerGoldenTest`; regenerate with
+`cd app && ./gradlew :play:jvmTest -Pplay.updateGolden=true`). Island time; `resolvable` = window ∩ civil daylight ∩
+playHours (∩ tide ≤ 2.44 m for the kraken); `view` = never sensed (challenge and lore cards); placements `=` repeat
+the previous row of the same occurrence. For the PR body (plan AC 5).
 
-The new trails items are all `every: "always"` (permanent), so they appear in the "Always on" list, never in the dated
-rows. Nothing dated was added: no new windows, no new hero, no change to the kraken rotation or `ch-sweep`.
+New in 2026.11.3: **`ch-climb`** ("Uphill week", `every: week, on: [mon], 00:00 → 24:00, days 7`, solo, metric `climb`,
+target `{trails: 150}` m, 100 marks) and **`ch-parkhop`** ("Park hop", `ch-sweep`'s window `on: [sat], days 2`, solo,
+metric `parks`, target `{trails: 3}`, 100 marks). Both are trails-only, whole-day, unanchored (plan D5; the Node and
+Kotlin validators both enforce it). The e2e fixed instant Sat 2026-10-31 10:00 PT sits inside `ch-climb@2026-10-26`
+(Mon 10-26 00:00 → Mon 11-02 00:00) and `ch-parkhop@2026-10-31` (Sat 10-31 00:00 → Mon 11-02 00:00).
+`agenda-roads.tsv` differs from main 2aee859 only in its header's pack version; `e2e-ids.env` likewise (treasure ids
+unchanged: `treasure-weekly-trails@2026-10-26#00` = `trail-farm-trail-north`).
 
-## Week 1–2: 2026-10-29 → 2026-11-11
+## Occurrence keys, weeks of 2026-10-26 and 2026-10-31
 
-| date | daylight | starts |
+| item | occurrence | window (island time) |
 |---|---|---|
-| 2026-10-29 thu | 07:17–18:28 | kraken-roads 06:00 → 11-01 20:00 → coast-k5 · kraken-trails 06:00 → 11-01 20:00 → coast-t4 · ch-krakenweek 06:00 → 11-01 20:00 · lore-kraken 06:00 → 11-01 20:00 |
-| 2026-10-30 fri | 07:19–18:27 | — |
-| 2026-10-31 sat | 07:20–18:25 | ch-sweep 00:00 → 11-01 24:00 |
-| 2026-11-01 sun | 06:22–17:24 | — |
-| 2026-11-02 mon | 06:23–17:22 | treasure-weekly-trails 05:00 → 11-08 24:00 · treasure-weekly-roads 05:00 → 11-08 24:00 |
-| 2026-11-03 tue | 06:25–17:21 | — |
-| 2026-11-04 wed | 06:26–17:20 | — |
-| 2026-11-05 thu | 06:27–17:18 | kraken-roads 06:00 → 11-08 20:00 → coast-k2 · kraken-trails 06:00 → 11-08 20:00 → coast-t2 · ch-krakenweek 06:00 → 11-08 20:00 · lore-kraken 06:00 → 11-08 20:00 |
-| 2026-11-06 fri | 06:29–17:17 | — |
-| 2026-11-07 sat | 06:30–17:16 | ch-sweep 00:00 → 11-08 24:00 |
-| 2026-11-08 sun | 06:32–17:14 | — |
-| 2026-11-09 mon | 06:33–17:13 | treasure-weekly-trails 05:00 → 11-15 24:00 · treasure-weekly-roads 05:00 → 11-15 24:00 |
-| 2026-11-10 tue | 06:34–17:12 | — |
-| 2026-11-11 wed | 06:36–17:11 | — |
+| `ch-climb` | `ch-climb@2026-10-26` | 2026-10-26T00:00-07:00 → 2026-11-02T00:00-08:00 |
+| `ch-parkhop` | `ch-parkhop@2026-10-31` | 2026-10-31T00:00-07:00 → 2026-11-02T00:00-08:00 |
+| `ch-sweep` | `ch-sweep@2026-10-31` | 2026-10-31T00:00-07:00 → 2026-11-02T00:00-08:00 |
 
-## Week 3–4: 2026-11-12 → 2026-11-25
+## Dated rows 2026-10-26 → 2026-11-23 (134 rows)
 
-| date | daylight | starts |
-|---|---|---|
-| 2026-11-12 thu | 06:37–17:10 | kraken-roads 06:00 → 11-15 20:00 → coast-k6 · kraken-trails 06:00 → 11-15 20:00 → coast-t3 · ch-krakenweek 06:00 → 11-15 20:00 · lore-kraken 06:00 → 11-15 20:00 |
-| 2026-11-13 fri | 06:39–17:09 | — |
-| 2026-11-14 sat | 06:40–17:07 | ch-sweep 00:00 → 11-15 24:00 |
-| 2026-11-15 sun | 06:41–17:06 | — |
-| 2026-11-16 mon | 06:43–17:05 | treasure-weekly-trails 05:00 → 11-22 24:00 · treasure-weekly-roads 05:00 → 11-22 24:00 |
-| 2026-11-17 tue | 06:44–17:04 | — |
-| 2026-11-18 wed | 06:46–17:04 | — |
-| 2026-11-19 thu | 06:47–17:03 | kraken-roads 06:00 → 11-22 20:00 → coast-k4 · kraken-trails 06:00 → 11-22 20:00 → coast-t4 · ch-krakenweek 06:00 → 11-22 20:00 · lore-kraken 06:00 → 11-22 20:00 |
-| 2026-11-20 fri | 06:48–17:02 | — |
-| 2026-11-21 sat | 06:50–17:01 | ch-sweep 00:00 → 11-22 24:00 |
-| 2026-11-22 sun | 06:51–17:00 | — |
-| 2026-11-23 mon | 06:52–17:00 | treasure-weekly-trails 05:00 → 11-29 24:00 · treasure-weekly-roads 05:00 → 11-29 24:00 |
-| 2026-11-24 tue | 06:53–16:59 | — |
-| 2026-11-25 wed | 06:55–16:58 | — |
-
-## Always on (33)
-
-egg-ladybug, egg-madrone, egg-station-s, **egg-strawberry, egg-fivemasts, egg-toejam, egg-hilltop, egg-coastline,
-egg-chillyhilly**, riddle-frog, riddle-bond, riddle-fairy, riddle-madrone, riddle-monroe, **riddle-roof, riddle-steep,
-riddle-close, riddle-manzanita, riddle-gift, riddle-dock**, lore-frog, lore-ferry, lore-mill, lore-memorial, lore-yama,
-lore-fortward, lore-eagleharbor, lore-bloedel, **lore-gazzam, lore-fortward-navy, lore-hallbrothers, lore-moritani,
-lore-battlepoint** (bold = new in 2026.11.2).
-
-## Disabled (8)
-
-egg-fairydoor, egg-helix, egg-marquee, lore-helix, lore-lynwood, lore-strawberry, lore-fay (unchanged drafts),
-**lore-sakai** (new; facts TBC, see `content.md`).
-
-## Device-side placements (from `app/play/src/jvmTest/resources/golden/agenda-trails.tsv`, regenerated)
-
-| item | placement (seeded point, chart square) |
-|---|---|
-| egg-strawberry | trail-hayano-trail/seg-005083 47.62557,-122.52806 [7:6] |
-| egg-fivemasts | trail-fort-ward-to-blakely-harbor-trail/seg-004516 47.59321,-122.52411 [4:6] |
-| egg-toejam | trail-nutes-trail/seg-000719 47.58398,-122.51018 [3:7] |
-| egg-hilltop | trail-hilltop-trail/seg-006866 47.65541,-122.55316 [10:4] |
-| egg-coastline | trail-hawley-cove-trail/seg-000327 47.62694,-122.50379 [7:7] |
-| egg-chillyhilly | trail-sunny-hill-trail/seg-001142 47.58947,-122.51236 [3:7] |
-| riddle-roof | trail-nutes-pond-trails/seg-000628 47.58328,-122.50956 [3:7] |
-| riddle-steep | trail-peters-trail/seg-006869 47.60947,-122.55589 [5:4] |
-| riddle-close | trail-close-trail/seg-007363 47.62502,-122.57198 [7:3] |
-| riddle-manzanita | park:Manzanita Park 47.68621,-122.54799 [13:4] |
-| riddle-gift | park:Ted Olson Nature Preserve 47.67100,-122.51800 [12:6] |
-| riddle-dock | trail-hidden-cove-loop-trail/seg-005816 47.68815,-122.53515 [13:5] |
-| lore-gazzam | trail-gazzam-lake-main-trail/seg-007186 47.61051,-122.56460 [6:3] |
-| lore-fortward-navy | place:fort-ward-south [2:6] |
-| lore-hallbrothers | place:blakely-park-trailhead [4:6] |
-| lore-moritani | view only (armchair card, no placement) |
-| lore-battlepoint | trail-battle-point/seg-007627 47.66098,-122.57964 [11:2] |
-
-Density (`maxPlacementsPerCell: 3`): the regenerated trails golden has exactly the same `density-dropped` rows as
-2026.11.1 (lore-ferry 284 days, lore-eagleharbor 48 days); no new item displaces a published one and none of the new
-items is ever dropped. `agenda-roads.tsv` differs only in its header's pack version.
+| date | occ | start | end | resolvable | placements |
+|---|---|---|---|---|---|
+| 2026-10-26 | `ch-climb@2026-10-26` | 2026-10-26T00:00-07:00 | 2026-11-02T00:00-08:00 | view | - |
+| 2026-10-26 | `treasure-weekly-trails@2026-10-26` | 2026-10-26T05:00-07:00 | 2026-11-02T00:00-08:00 | 07:13-18:33 | #00 trail-farm-trail-north/seg-005627 sea_glass 47.67917,-122.53187 [12:5]; #01 trail-grand-forest-east-trail/seg-006291 sea_glass 47.65270,-122.54567 [10:4]; #02 trail-old-mill-trail/seg-005531 sea_glass 47.61001,-122.53696 [6:5]; #03 trail-westwood-link-trail/seg-007389 sea_glass 47.62402,-122.57326 [7:3]; #04 trail-taylor-trail/seg-000600 sea_glass 47.60408,-122.51176 [5:7]; #05 trail-schel-chelb-trail/seg-006807 sea_glass 47.60537,-122.55121 [5:4]; #06 trail-fort-ward-trail-2/seg-004645 sea_glass 47.59150,-122.52541 [4:6]; #07 trail-horseshoe-trail/seg-006183 agate 47.70836,-122.54308 [15:5]; #08 trail-morgan-road-path/seg-004507 agate 47.66836,-122.52419 [11:6]; #09 trail-grand-forest-north-loop-trail/seg-006901 agate 47.66195,-122.55714 [11:4]; #10 trail-mcredmond-trail/seg-006008 glass_float 47.65407,-122.53820 [10:5]; #11 trail-nutes-to-sunny-hill-trail/seg-001053 ships_bell 47.58472,-122.51176 [3:7] |
+| 2026-10-27 | `ch-climb@2026-10-26` | 2026-10-26T00:00-07:00 | 2026-11-02T00:00-08:00 | view | = |
+| 2026-10-27 | `treasure-weekly-trails@2026-10-26` | 2026-10-26T05:00-07:00 | 2026-11-02T00:00-08:00 | 07:15-18:31 | = |
+| 2026-10-28 | `ch-climb@2026-10-26` | 2026-10-26T00:00-07:00 | 2026-11-02T00:00-08:00 | view | = |
+| 2026-10-28 | `treasure-weekly-trails@2026-10-26` | 2026-10-26T05:00-07:00 | 2026-11-02T00:00-08:00 | 07:16-18:30 | = |
+| 2026-10-29 | `ch-climb@2026-10-26` | 2026-10-26T00:00-07:00 | 2026-11-02T00:00-08:00 | view | = |
+| 2026-10-29 | `treasure-weekly-trails@2026-10-26` | 2026-10-26T05:00-07:00 | 2026-11-02T00:00-08:00 | 07:17-18:28 | = |
+| 2026-10-29 | `ch-krakenweek@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | view | - |
+| 2026-10-29 | `kraken-trails@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | 13:31-14:36 | #0 stretch:trail-fairy-dell-trail 47.67096,-122.57797 [12:2]; #1 stretch:trail-schel-chelb-trail 47.60457,-122.55114 [5:4] |
+| 2026-10-29 | `lore-kraken@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | view | - |
+| 2026-10-30 | `ch-climb@2026-10-26` | 2026-10-26T00:00-07:00 | 2026-11-02T00:00-08:00 | view | = |
+| 2026-10-30 | `treasure-weekly-trails@2026-10-26` | 2026-10-26T05:00-07:00 | 2026-11-02T00:00-08:00 | 07:19-18:27 | = |
+| 2026-10-30 | `ch-krakenweek@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | view | = |
+| 2026-10-30 | `kraken-trails@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | - | = |
+| 2026-10-30 | `lore-kraken@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | view | = |
+| 2026-10-31 | `ch-climb@2026-10-26` | 2026-10-26T00:00-07:00 | 2026-11-02T00:00-08:00 | view | = |
+| 2026-10-31 | `treasure-weekly-trails@2026-10-26` | 2026-10-26T05:00-07:00 | 2026-11-02T00:00-08:00 | 07:20-18:25 | = |
+| 2026-10-31 | `ch-krakenweek@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | view | = |
+| 2026-10-31 | `kraken-trails@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | 07:20-08:10 | = |
+| 2026-10-31 | `lore-kraken@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | view | = |
+| 2026-10-31 | `ch-parkhop@2026-10-31` | 2026-10-31T00:00-07:00 | 2026-11-02T00:00-08:00 | view | - |
+| 2026-10-31 | `ch-sweep@2026-10-31` | 2026-10-31T00:00-07:00 | 2026-11-02T00:00-08:00 | view | - |
+| 2026-11-01 | `ch-climb@2026-10-26` | 2026-10-26T00:00-07:00 | 2026-11-02T00:00-08:00 | view | = |
+| 2026-11-01 | `treasure-weekly-trails@2026-10-26` | 2026-10-26T05:00-07:00 | 2026-11-02T00:00-08:00 | 06:22-17:24 | = |
+| 2026-11-01 | `ch-krakenweek@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | view | = |
+| 2026-11-01 | `kraken-trails@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | 06:22-08:10,15:33-17:24 | = |
+| 2026-11-01 | `lore-kraken@2026-10-29` | 2026-10-29T06:00-07:00 | 2026-11-01T20:00-08:00 | view | = |
+| 2026-11-01 | `ch-parkhop@2026-10-31` | 2026-10-31T00:00-07:00 | 2026-11-02T00:00-08:00 | view | = |
+| 2026-11-01 | `ch-sweep@2026-10-31` | 2026-10-31T00:00-07:00 | 2026-11-02T00:00-08:00 | view | = |
+| 2026-11-02 | `ch-climb@2026-11-02` | 2026-11-02T00:00-08:00 | 2026-11-09T00:00-08:00 | view | - |
+| 2026-11-02 | `treasure-weekly-trails@2026-11-02` | 2026-11-02T05:00-08:00 | 2026-11-09T00:00-08:00 | 06:23-17:22 | #00 trail-hidden-cove-loop-trail/seg-005816 sea_glass 47.68845,-122.53445 [13:5]; #01 trail-battle-point-equestrial-trail/seg-007601 sea_glass 47.66693,-122.57893 [11:2]; #02 trail-creek-to-305-trail/seg-001792 sea_glass 47.63703,-122.51589 [8:6]; #03 trail-gazzam-lake-main-trail/seg-007330 sea_glass 47.62376,-122.56917 [7:3]; #04 trail-grand-forest-to-miller-connection/seg-007154 sea_glass 47.65055,-122.56351 [10:3]; #05 trail-tani-creek-trail/seg-004982 sea_glass 47.59594,-122.52817 [4:6]; #06 trail-battle-point/seg-007430 sea_glass 47.65894,-122.57884 [10:2]; #07 trail-opal-ridge-trail/seg-007050 agate 47.61915,-122.56164 [6:3]; #08 trail-blakely-to-eagledale-trail/seg-003484 agate 47.60565,-122.52101 [5:6]; #09 trail-kojima-trail/seg-006781 agate 47.62538,-122.55173 [7:4]; #10 trail-lower-fort-ward-trail/seg-005166 glass_float 47.58537,-122.52942 [3:6]; #11 trail-veterane-trail/seg-007325 glass_float 47.60899,-122.56973 [5:3] |
+| 2026-11-03 | `ch-climb@2026-11-02` | 2026-11-02T00:00-08:00 | 2026-11-09T00:00-08:00 | view | = |
+| 2026-11-03 | `treasure-weekly-trails@2026-11-02` | 2026-11-02T05:00-08:00 | 2026-11-09T00:00-08:00 | 06:25-17:21 | = |
+| 2026-11-04 | `ch-climb@2026-11-02` | 2026-11-02T00:00-08:00 | 2026-11-09T00:00-08:00 | view | = |
+| 2026-11-04 | `treasure-weekly-trails@2026-11-02` | 2026-11-02T05:00-08:00 | 2026-11-09T00:00-08:00 | 06:26-17:20 | = |
+| 2026-11-05 | `ch-climb@2026-11-02` | 2026-11-02T00:00-08:00 | 2026-11-09T00:00-08:00 | view | = |
+| 2026-11-05 | `treasure-weekly-trails@2026-11-02` | 2026-11-02T05:00-08:00 | 2026-11-09T00:00-08:00 | 06:27-17:18 | = |
+| 2026-11-05 | `ch-krakenweek@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | view | - |
+| 2026-11-05 | `kraken-trails@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | 06:27-10:58,16:47-17:18 | #0 stretch:trail-fort-ward-trail-fort-ward-park 47.58084,-122.52633 [3:6]; #1 stretch:trail-lower-fort-ward-trail 47.58543,-122.52946 [3:6] |
+| 2026-11-05 | `lore-kraken@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | view | - |
+| 2026-11-06 | `ch-climb@2026-11-02` | 2026-11-02T00:00-08:00 | 2026-11-09T00:00-08:00 | view | = |
+| 2026-11-06 | `treasure-weekly-trails@2026-11-02` | 2026-11-02T05:00-08:00 | 2026-11-09T00:00-08:00 | 06:29-17:17 | = |
+| 2026-11-06 | `ch-krakenweek@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | view | = |
+| 2026-11-06 | `kraken-trails@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | 06:29-11:27,17:04-17:17 | = |
+| 2026-11-06 | `lore-kraken@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | view | = |
+| 2026-11-07 | `ch-climb@2026-11-02` | 2026-11-02T00:00-08:00 | 2026-11-09T00:00-08:00 | view | = |
+| 2026-11-07 | `treasure-weekly-trails@2026-11-02` | 2026-11-02T05:00-08:00 | 2026-11-09T00:00-08:00 | 06:30-17:16 | = |
+| 2026-11-07 | `ch-krakenweek@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | view | = |
+| 2026-11-07 | `kraken-trails@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | 06:39-11:52 | = |
+| 2026-11-07 | `lore-kraken@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | view | = |
+| 2026-11-07 | `ch-parkhop@2026-11-07` | 2026-11-07T00:00-08:00 | 2026-11-09T00:00-08:00 | view | - |
+| 2026-11-07 | `ch-sweep@2026-11-07` | 2026-11-07T00:00-08:00 | 2026-11-09T00:00-08:00 | view | - |
+| 2026-11-08 | `ch-climb@2026-11-02` | 2026-11-02T00:00-08:00 | 2026-11-09T00:00-08:00 | view | = |
+| 2026-11-08 | `treasure-weekly-trails@2026-11-02` | 2026-11-02T05:00-08:00 | 2026-11-09T00:00-08:00 | 06:32-17:14 | = |
+| 2026-11-08 | `ch-krakenweek@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | view | = |
+| 2026-11-08 | `kraken-trails@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | 08:02-12:14 | = |
+| 2026-11-08 | `lore-kraken@2026-11-05` | 2026-11-05T06:00-08:00 | 2026-11-08T20:00-08:00 | view | = |
+| 2026-11-08 | `ch-parkhop@2026-11-07` | 2026-11-07T00:00-08:00 | 2026-11-09T00:00-08:00 | view | = |
+| 2026-11-08 | `ch-sweep@2026-11-07` | 2026-11-07T00:00-08:00 | 2026-11-09T00:00-08:00 | view | = |
+| 2026-11-09 | `ch-climb@2026-11-09` | 2026-11-09T00:00-08:00 | 2026-11-16T00:00-08:00 | view | - |
+| 2026-11-09 | `treasure-weekly-trails@2026-11-09` | 2026-11-09T05:00-08:00 | 2026-11-16T00:00-08:00 | 06:33-17:13 | #00 trail-cambridge-crest-trail/seg-005669 sea_glass 47.69043,-122.53356 [14:5]; #01 trail-moss-garden/seg-006297 sea_glass 47.70660,-122.54644 [15:4]; #02 trail-fort-ward-trail-fort-ward-park/seg-004730 sea_glass 47.58456,-122.52497 [3:6]; #03 trail-springridge-trail/seg-007335 sea_glass 47.62781,-122.56953 [7:3]; #04 trail-manzanita-trail/seg-006777 sea_glass 47.68417,-122.55087 [13:4]; #05 trail-koura-to-yukio-trail/seg-006572 sea_glass 47.66593,-122.54789 [11:4]; #06 trail-gazzam-lake-loop-trail/seg-007147 sea_glass 47.61963,-122.56612 [6:3]; #07 trail-gazzam-to-veterane/seg-007391 agate 47.60722,-122.57459 [5:3]; #08 trail-north-loop-trail/seg-002692 agate 47.63936,-122.51947 [8:6]; #09 trail-nutes-trail/seg-000719 agate 47.58392,-122.51016 [3:7]; #10 trail-oddfellows-trail/seg-004983 glass_float 47.59809,-122.52970 [4:6]; #11 trail-bristle-ridge-trail/seg-001021 glass_float 47.59904,-122.51218 [4:7] |
+| 2026-11-10 | `ch-climb@2026-11-09` | 2026-11-09T00:00-08:00 | 2026-11-16T00:00-08:00 | view | = |
+| 2026-11-10 | `treasure-weekly-trails@2026-11-09` | 2026-11-09T05:00-08:00 | 2026-11-16T00:00-08:00 | 06:34-17:12 | = |
+| 2026-11-11 | `ch-climb@2026-11-09` | 2026-11-09T00:00-08:00 | 2026-11-16T00:00-08:00 | view | = |
+| 2026-11-11 | `treasure-weekly-trails@2026-11-09` | 2026-11-09T05:00-08:00 | 2026-11-16T00:00-08:00 | 06:36-17:11 | = |
+| 2026-11-12 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-12 | `ch-climb@2026-11-09` | 2026-11-09T00:00-08:00 | 2026-11-16T00:00-08:00 | view | = |
+| 2026-11-12 | `treasure-weekly-trails@2026-11-09` | 2026-11-09T05:00-08:00 | 2026-11-16T00:00-08:00 | 06:37-17:10 | = |
+| 2026-11-12 | `ch-krakenweek@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | view | - |
+| 2026-11-12 | `kraken-trails@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | - | #0 stretch:trail-west-loop-trail 47.62232,-122.52054 [7:6]; #1 stretch:trail-west-loop-trail-3 47.62562,-122.53020 [7:5]; #2 stretch:trail-waypoint-woods-trail 47.62383,-122.51353 [7:7] |
+| 2026-11-12 | `lore-kraken@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | view | - |
+| 2026-11-13 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-13 | `ch-climb@2026-11-09` | 2026-11-09T00:00-08:00 | 2026-11-16T00:00-08:00 | view | = |
+| 2026-11-13 | `treasure-weekly-trails@2026-11-09` | 2026-11-09T05:00-08:00 | 2026-11-16T00:00-08:00 | 06:39-17:09 | = |
+| 2026-11-13 | `ch-krakenweek@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | view | = |
+| 2026-11-13 | `kraken-trails@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | - | = |
+| 2026-11-13 | `lore-kraken@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | view | = |
+| 2026-11-14 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-14 | `ch-climb@2026-11-09` | 2026-11-09T00:00-08:00 | 2026-11-16T00:00-08:00 | view | = |
+| 2026-11-14 | `treasure-weekly-trails@2026-11-09` | 2026-11-09T05:00-08:00 | 2026-11-16T00:00-08:00 | 06:40-17:07 | = |
+| 2026-11-14 | `ch-krakenweek@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | view | = |
+| 2026-11-14 | `kraken-trails@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | 14:52-15:50 | = |
+| 2026-11-14 | `lore-kraken@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | view | = |
+| 2026-11-14 | `ch-parkhop@2026-11-14` | 2026-11-14T00:00-08:00 | 2026-11-16T00:00-08:00 | view | - |
+| 2026-11-14 | `ch-sweep@2026-11-14` | 2026-11-14T00:00-08:00 | 2026-11-16T00:00-08:00 | view | - |
+| 2026-11-15 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-15 | `ch-climb@2026-11-09` | 2026-11-09T00:00-08:00 | 2026-11-16T00:00-08:00 | view | = |
+| 2026-11-15 | `treasure-weekly-trails@2026-11-09` | 2026-11-09T05:00-08:00 | 2026-11-16T00:00-08:00 | 06:41-17:06 | = |
+| 2026-11-15 | `ch-krakenweek@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | view | = |
+| 2026-11-15 | `kraken-trails@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | 06:41-07:01,15:02-17:06 | = |
+| 2026-11-15 | `lore-kraken@2026-11-12` | 2026-11-12T06:00-08:00 | 2026-11-15T20:00-08:00 | view | = |
+| 2026-11-15 | `ch-parkhop@2026-11-14` | 2026-11-14T00:00-08:00 | 2026-11-16T00:00-08:00 | view | = |
+| 2026-11-15 | `ch-sweep@2026-11-14` | 2026-11-14T00:00-08:00 | 2026-11-16T00:00-08:00 | view | = |
+| 2026-11-16 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-16 | `ch-climb@2026-11-16` | 2026-11-16T00:00-08:00 | 2026-11-23T00:00-08:00 | view | - |
+| 2026-11-16 | `treasure-weekly-trails@2026-11-16` | 2026-11-16T05:00-08:00 | 2026-11-23T00:00-08:00 | 06:43-17:05 | #00 trail-ted-olson-nature-preserve/seg-002633 sea_glass 47.67091,-122.51958 [12:6]; #01 trail-manzanita-park/seg-006758 sea_glass 47.68220,-122.55067 [13:4]; #02 trail-south-loop-trail/seg-002636 sea_glass 47.63769,-122.51987 [8:6]; #03 trail-lower-veterane-trail/seg-007380 sea_glass 47.60769,-122.57275 [5:3]; #04 trail-hilltop-trail/seg-006424 sea_glass 47.65542,-122.54761 [10:4]; #05 trail-hayano-trail/seg-005009 sea_glass 47.62571,-122.52760 [7:6]; #06 trail-arbor-trail/seg-006755 sea_glass 47.70755,-122.55030 [15:4]; #07 trail-liz-orr-meditation-trail/seg-005950 agate 47.62822,-122.53649 [7:5]; #08 trail-farm-trail-south/seg-005619 agate 47.67383,-122.53188 [12:5]; #09 trail-cave-ave-to-curtis-loop-trail/seg-001252 agate 47.62933,-122.51277 [7:7]; #10 trail-fort-ward-trail/seg-004478 glass_float 47.59551,-122.52396 [4:6]; #11 trail-close-trail/seg-007516 glass_float 47.62843,-122.57692 [7:2] |
+| 2026-11-17 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-17 | `ch-climb@2026-11-16` | 2026-11-16T00:00-08:00 | 2026-11-23T00:00-08:00 | view | = |
+| 2026-11-17 | `treasure-weekly-trails@2026-11-16` | 2026-11-16T05:00-08:00 | 2026-11-23T00:00-08:00 | 06:44-17:04 | = |
+| 2026-11-18 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-18 | `ch-climb@2026-11-16` | 2026-11-16T00:00-08:00 | 2026-11-23T00:00-08:00 | view | = |
+| 2026-11-18 | `treasure-weekly-trails@2026-11-16` | 2026-11-16T05:00-08:00 | 2026-11-23T00:00-08:00 | 06:46-17:04 | = |
+| 2026-11-19 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-19 | `ch-climb@2026-11-16` | 2026-11-16T00:00-08:00 | 2026-11-23T00:00-08:00 | view | = |
+| 2026-11-19 | `treasure-weekly-trails@2026-11-16` | 2026-11-16T05:00-08:00 | 2026-11-23T00:00-08:00 | 06:47-17:03 | = |
+| 2026-11-19 | `ch-krakenweek@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | view | - |
+| 2026-11-19 | `kraken-trails@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | 06:47-09:23,15:38-17:03 | #0 stretch:trail-fairy-dell-trail 47.67096,-122.57797 [12:2]; #1 stretch:trail-schel-chelb-trail 47.60457,-122.55114 [5:4] |
+| 2026-11-19 | `lore-kraken@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | view | - |
+| 2026-11-20 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-20 | `ch-climb@2026-11-16` | 2026-11-16T00:00-08:00 | 2026-11-23T00:00-08:00 | view | = |
+| 2026-11-20 | `treasure-weekly-trails@2026-11-16` | 2026-11-16T05:00-08:00 | 2026-11-23T00:00-08:00 | 06:48-17:02 | = |
+| 2026-11-20 | `ch-krakenweek@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | view | = |
+| 2026-11-20 | `kraken-trails@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | 06:48-09:48,15:52-17:02 | = |
+| 2026-11-20 | `lore-kraken@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | view | = |
+| 2026-11-21 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-21 | `ch-climb@2026-11-16` | 2026-11-16T00:00-08:00 | 2026-11-23T00:00-08:00 | view | = |
+| 2026-11-21 | `treasure-weekly-trails@2026-11-16` | 2026-11-16T05:00-08:00 | 2026-11-23T00:00-08:00 | 06:50-17:01 | = |
+| 2026-11-21 | `ch-krakenweek@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | view | = |
+| 2026-11-21 | `kraken-trails@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | 06:50-10:11,16:10-17:01 | = |
+| 2026-11-21 | `lore-kraken@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | view | = |
+| 2026-11-21 | `ch-parkhop@2026-11-21` | 2026-11-21T00:00-08:00 | 2026-11-23T00:00-08:00 | view | - |
+| 2026-11-21 | `ch-sweep@2026-11-21` | 2026-11-21T00:00-08:00 | 2026-11-23T00:00-08:00 | view | - |
+| 2026-11-22 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-22 | `ch-climb@2026-11-16` | 2026-11-16T00:00-08:00 | 2026-11-23T00:00-08:00 | view | = |
+| 2026-11-22 | `treasure-weekly-trails@2026-11-16` | 2026-11-16T05:00-08:00 | 2026-11-23T00:00-08:00 | 06:51-17:00 | = |
+| 2026-11-22 | `ch-krakenweek@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | view | = |
+| 2026-11-22 | `kraken-trails@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | 06:51-10:31,16:34-17:00 | = |
+| 2026-11-22 | `lore-kraken@2026-11-19` | 2026-11-19T06:00-08:00 | 2026-11-22T20:00-08:00 | view | = |
+| 2026-11-22 | `ch-parkhop@2026-11-21` | 2026-11-21T00:00-08:00 | 2026-11-23T00:00-08:00 | view | = |
+| 2026-11-22 | `ch-sweep@2026-11-21` | 2026-11-21T00:00-08:00 | 2026-11-23T00:00-08:00 | view | = |
+| 2026-11-23 | `density-dropped` | — | — | — | lore-ferry@2026-10-26 |
+| 2026-11-23 | `ch-climb@2026-11-23` | 2026-11-23T00:00-08:00 | 2026-11-30T00:00-08:00 | view | - |
+| 2026-11-23 | `treasure-weekly-trails@2026-11-23` | 2026-11-23T05:00-08:00 | 2026-11-30T00:00-08:00 | 06:52-17:00 | #00 trail-sound-to-olympics-trail-2/seg-004394 sea_glass 47.65554,-122.52344 [10:6]; #01 trail-fairy-dell-trail/seg-007549 sea_glass 47.66781,-122.57807 [11:2]; #02 trail-ihland-way-trail/seg-003552 sea_glass 47.63400,-122.52213 [8:6]; #03 trail-knudsen-trail/seg-007331 sea_glass 47.62347,-122.57172 [7:3]; #04 trail-west-loop-trail/seg-003473 sea_glass 47.62217,-122.52108 [7:6]; #05 trail-forest-to-sky-trail/seg-007419 sea_glass 47.65821,-122.57473 [10:3]; #06 trail-waypoint-woods-trail/seg-001491 sea_glass 47.62390,-122.51394 [7:7]; #07 trail-west-loop-trail-4/seg-005730 agate 47.62617,-122.53380 [7:5]; #08 trail-sakai-forest-learning-trail/seg-005291 agate 47.64848,-122.52977 [9:6]; #09 trail-main-loop-trail/seg-006448 agate 47.65285,-122.54743 [10:4]; #10 trail-hidden-cove-trails/seg-005203 glass_float 47.69284,-122.52926 [14:6]; #11 trail-fort-ward-fence-line-trail/seg-004861 ships_bell 47.58868,-122.52737 [3:6] |
