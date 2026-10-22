@@ -12,8 +12,13 @@ import com.bainbridgetrails.play.claim.ClaimKind
 import com.bainbridgetrails.play.claim.ClaimResult
 import com.bainbridgetrails.play.claim.GatedFix
 import com.bainbridgetrails.play.claim.GatedSummary
+import com.bainbridgetrails.play.claim.TrailChallengeInput
 import com.bainbridgetrails.play.claim.WalkDone
+import com.bainbridgetrails.play.config.ChallengeMetric
+import com.bainbridgetrails.play.config.ChallengeScope
+import com.bainbridgetrails.play.config.ChallengeSpec
 import com.bainbridgetrails.play.config.Goal
+import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.config.PlayConfig
 import com.bainbridgetrails.play.fx.FxSpec
 import com.bainbridgetrails.play.geo.GeoPoint
@@ -24,11 +29,17 @@ import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Logbook
 import com.bainbridgetrails.play.rules.Marks
 import com.bainbridgetrails.play.rules.StartBalance
+import com.bainbridgetrails.play.rules.TrailProgress
+import com.bainbridgetrails.play.rules.TrailRewardInput
+import com.bainbridgetrails.play.rules.TrailRewards
+import com.bainbridgetrails.play.rules.TrailStart
+import com.bainbridgetrails.play.rules.TrailTables
 import com.bainbridgetrails.play.rules.WalkDerived
 import com.bainbridgetrails.play.schedule.ActiveItem
 import com.bainbridgetrails.play.schedule.DayPlan
 import com.bainbridgetrails.play.schedule.DerivedGoal
 import com.bainbridgetrails.play.schedule.Gate
+import com.bainbridgetrails.play.schedule.Occurrence
 import com.bainbridgetrails.play.schedule.PlaceIndex
 import com.bainbridgetrails.play.schedule.PlayAgenda
 import com.bainbridgetrails.play.schedule.PlayContext
@@ -110,6 +121,10 @@ class PlayRepository(
     private val walkContext: suspend () -> WalkContext = { WalkContext() },
     /** The goal's derived table (map fog, kraken stretches); read once. */
     private val derivedSource: suspend () -> PlayDerived = { PlayDerived.Empty },
+    /** Play trails v1.1 (plan D6): the trails rules' tables; null on roads or while the dataset is unavailable. */
+    private val trailTables: suspend () -> TrailTables? = { null },
+    /** The trails rules' input of the current coverage snapshot ([SnapshotMarks.trails]); null on roads / unknown. */
+    private val trailInput: suspend () -> TrailRewardInput? = { null },
     private val newId: () -> String = { Uuid.random().toString() },
 ) {
     private val worker = compute.limitedParallelism(1)
@@ -210,13 +225,95 @@ class PlayRepository(
         val date = IslandTime.dateOf(if (endedAtMs > 0) Instant.fromEpochMilliseconds(endedAtMs) else clock().now())
         val visited = WalkMarks.visitedZones(kept, ctx.quietZones)
         val completed = newlyCompleted.filter { it !in ctx.quietFeatures }
-        fun next(st: PlayState) = WalkMarks.apply(st, goal, sessionId, date, after, completed, { ctx.names[it] ?: it }, visited, newId)
+        // Trails (plan D4, P1-8): this walk's snapshot runs the trails start when it has not run, then pays new keys.
+        val trailWalk = trailSnapshot()?.let { (tables, input) -> TrailWalk(tables, input) }
+        fun next(st: PlayState): PlayState {
+            val deferred = trailWalk != null && deferTrailStart(st)
+            if (deferred) trailStartDeferred = true
+            return WalkMarks.apply(st, goal, sessionId, date, after, completed, { ctx.names[it] ?: it }, visited, newId, trailWalk.takeUnless { deferred })
+        }
         val before = store.load()
         // Queue first (as the claim pass does): a crash before the Logbook write leaves the walk carried, not lost.
         val expired = if (WalkMarks.hasPending(next(before).logbook, sessionId)) queue.add(QueuedPlay(sessionId, version, walkMarks = true)) else emptyList()
         var wrote = false
-        store.update { st -> next(st).let { n -> n.copy(logbook = PlayClaims.settle(n.logbook, expired)) }.also { wrote = it.logbook != st.logbook } }
+        store.update { st -> next(st).let { n -> n.copy(logbook = WalkMarks.settle(n.logbook, expired)) }.also { wrote = it.logbook != st.logbook } }
         return wrote
+    }
+
+    // --- Play trails v1.1 (plan D1, D4, D5, D6) ------------------------------------------------------------------------
+
+    /**
+     * The trails rules' tables (plan D6): null on roads, or while the dataset or the derived table is unavailable. The
+     * Me › Trail milestones model (L2-4) reads it with [trailRewardInput], off composition.
+     */
+    suspend fun trailRewardTables(): TrailTables? = if (goal != Goal.trails) null else guarded("trail tables") { trailTables() }
+
+    /**
+     * The trails rules' input of the current coverage snapshot ([TrailRewardInput]: non-quiet covered metres, touched
+     * trails and parks, the sticky completed set, island whole); null on roads or unknown. Reads coverage from disk.
+     */
+    suspend fun trailRewardInput(): TrailRewardInput? = if (goal != Goal.trails) null else guarded("trail input") { trailInput() }
+
+    /** Tables and input together, or null. */
+    private suspend fun trailSnapshot(): Pair<TrailTables, TrailRewardInput>? {
+        val tables = trailRewardTables() ?: return null
+        val input = trailRewardInput() ?: return null
+        return tables to input
+    }
+
+    private suspend fun <T> guarded(what: String, read: suspend () -> T?): T? = try {
+        read()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLog.e(TAG, "$what unavailable: ${e.message}")
+        null
+    }
+
+    /**
+     * The `climb` / `parks` challenges (`ch-climb`, `ch-parkhop`; plan D5) among [occurrences], keyed by occurrence key,
+     * for the Challenges cards, the chip count and What's On (L2-3): progress P (the Logbook's `complete` entries dated
+     * inside the window) and the personal target over the current sticky completed set. A status with
+     * [TrailChallengeStatus.hidden] (target 0) shows no card, no chip count and no What's On row. Empty on roads.
+     */
+    suspend fun trailChallenges(occurrences: List<Occurrence>): Map<String, TrailChallengeStatus> {
+        if (goal != Goal.trails || occurrences.none { it.type == ItemType.challenge }) return emptyMap()
+        val config = content.load()?.config ?: return emptyMap()
+        val (tables, input) = trailSnapshot() ?: return emptyMap()
+        val logbook = store.load().logbook
+        val items = config.items.associateBy { it.id }
+        val out = LinkedHashMap<String, TrailChallengeStatus>()
+        for (o in occurrences) {
+            if (o.type != ItemType.challenge) continue
+            val spec = items[o.itemId]?.challenge ?: continue
+            TrailChallengeStatus.of(spec, o, tables, input.completed, logbook)?.let { out[o.key] = it }
+        }
+        return out
+    }
+
+    /**
+     * Orchestrator ruling (v1.1 → v1 → v1.1, L1-1 finding): a Logbook restored from the account whose trails start has
+     * not run yet holds the server's trail marks inside its Restored entry, so the trails start must not pay a key
+     * before the account's `paid` keys are in [PlayState.trailPaid]. Signed in and no `/v1/play/me` applied in this
+     * process yet → defer (until [restore] succeeds). Read inside `store.update` (serialized with [restore]'s seed).
+     */
+    private fun deferTrailStart(st: PlayState): Boolean =
+        goal == Goal.trails && !st.trailsStarted && st.logbook.hasRestore && !meApplied && signedIn()
+
+    /** A `/v1/play/me` body was applied to the state in this process (set inside [restore]'s update). */
+    @Volatile private var meApplied = false
+
+    /** The trails start was skipped by [deferTrailStart]; the next successful [restore] runs it ([creditTrails]). */
+    @Volatile private var trailStartDeferred = false
+
+    /** The deferred trails start alone (after the account's paid keys were seeded): one attempt, idempotent. */
+    private suspend fun creditTrails() {
+        val (tables, input) = trailSnapshot() ?: return
+        val qualifying = TrailRewards.qualifying(input, tables)
+        val today = IslandTime.dateOf(clock().now())
+        store.update { st ->
+            if (st.trailsStarted || deferTrailStart(st)) st else st.with(TrailStart.onEnable(goal, st.trailLedger(), qualifying, today, newId))
+        }
     }
 
     private val _claimResults = MutableStateFlow<Map<String, ClaimResult>>(emptyMap())
@@ -256,7 +353,8 @@ class PlayRepository(
     /**
      * The marks of the start balance this start credited ("Your walks so far", the `play_start_balance` snackbar), or
      * null: none was due (credited once ever, or restored), the input never became ready, Play is off, or it was
-     * already reported (an off/on faster than the gate keeps the same start: no second snackbar).
+     * already reported (an off/on faster than the gate keeps the same start: no second snackbar). Trails (review P2-5,
+     * ux § 6): the sum of the `start_balance`, `start_trails` and `island` entries this turn-on wrote.
      */
     suspend fun awaitStartBalance(): Int? {
         val d = turnedOn ?: return null
@@ -357,10 +455,14 @@ class PlayRepository(
      * for the walk's coverage upload, with the week id as `dayKey` when the walk earned W-DAY. Solo `completed`
      * challenges (`ch-sweep`, branch review round 1 P0-1) are counted over this walk's newly completed, non-quiet
      * features plus the earlier walks of [PlayState.walks]. Idempotent per (session, content): found keys never claim
-     * again, and a re-run walk never counts itself as an earlier one.
+     * again, and a re-run walk never counts itself as an earlier one. Trails (plan D5): the solo `climb` / `parks`
+     * challenges read the trails tables, the sticky completed set after this walk and the Logbook's dated completions
+     * ([TrailChallengeInput]).
      */
     suspend fun claimWalk(sessionId: String, kept: List<GatedFix>, summary: GatedSummary): ClaimResult? {
         val queue = claims ?: return null
+        // climb / parks challenges (plan D5): the trails tables and the sticky completed set after this walk.
+        val trailSnap = trailSnapshot()
         val pass = withContext(worker) {
             val state = content.load() ?: return@withContext null
             val config = state.config
@@ -377,7 +479,10 @@ class PlayRepository(
             val completed = summary.newlyCompleted.distinct().count { it !in quiet }
             val walkEnd = Instant.fromEpochMilliseconds(to)
             val earlier = user.walks.filter { it.walkId != sessionId }
-            val result = ev.evaluate(kept, plans, user.found, user.hints, _sensed.value, summary.droppedVehicle, walkEnd, completed, earlier)
+            val trails = trailSnap?.let { (tables, input) ->
+                TrailChallengeInput(tables, input.completed, summary.newlyCompleted.distinct().filter { it !in quiet }, user.logbook)
+            }
+            val result = ev.evaluate(kept, plans, user.found, user.hints, _sensed.value, summary.droppedVehicle, walkEnd, completed, earlier, trails)
             val endDate = IslandTime.dateOf(walkEnd)
             val day = endDate.takeIf { Marks.isWalkingDay(to - from, summary.matchedM) && !user.logbook.hasDay(it) }
             Pass(config, result, day, user.hints, WalkDone(sessionId, to, completed).takeIf { completed > 0 }, plans)
@@ -402,7 +507,7 @@ class PlayRepository(
             }
             store.update { st ->
                 val next = PlayClaims.record(st, sessionId, claimed, pass.day, foundPerDay, ::title, newId)
-                next.copy(logbook = PlayClaims.settle(next.logbook, expired), walks = withWalk(next.walks, pass.walk))
+                next.copy(logbook = WalkMarks.settle(next.logbook, expired), walks = withWalk(next.walks, pass.walk))
             }
             AppLog.i(TAG, "walk claimed ${claimed.size} items${if (pass.day != null) " + walking day" else ""} (pending)")
         } else if (pass.walk != null) {
@@ -426,7 +531,7 @@ class PlayRepository(
      */
     suspend fun claimPart(walkIdBySession: Map<String, String>, walksInThisUpload: Set<String>): PlayPart? =
         claims?.part(walkIdBySession, walksInThisUpload) { settled ->
-            store.update { it.copy(logbook = PlayClaims.settle(it.logbook, settled)) }
+            store.update { it.copy(logbook = WalkMarks.settle(it.logbook, settled)) }
         }
 
     /**
@@ -434,6 +539,13 @@ class PlayRepository(
      * claimed occurrence key found and, when this phone's Logbook holds nothing but (at most) the starting balance —
      * a reinstall, a new device, or an opt-in made while signed out — writes one "Restored from your account" entry
      * that brings the Logbook total to the server total. Never twice. True when it wrote the entry.
+     *
+     * Play trails v1.1 (plan D3, review P0-1, P1-7): the opt-in entries (`start_balance`, `start_trails`, an `island`
+     * with no walk) keep a Logbook restorable; the Restored entry then owes `me.total − credited.total + Σ marks(the
+     * locally start-paid trails keys the account has not paid)` (those stay paid here and the server pays them on the
+     * next Play upload), and **only that update** adds the account's `paid` keys to [PlayState.trailPaid]. One
+     * addition (orchestrator ruling, v1.1 → v1 → v1.1): a restored Logbook whose trails start has not run takes the
+     * account's `paid` keys too, before the trails start pays anything; a start deferred for it runs right after.
      */
     suspend fun restore(): Boolean {
         if (!running || !signedIn()) return false
@@ -444,19 +556,32 @@ class PlayRepository(
         var wrote = false
         store.update { st ->
             val lb = st.logbook
-            val restorable = !lb.hasRestore && lb.entries.all { it.kind == LogKind.start_balance }
+            val restorable = !lb.hasRestore && lb.entries.all(::restorableEntry)
+            val serverPaid = me.paid.toSet()
             // Server-only credits first (P0-2): a restore then owes only what the account holds beyond them.
             val credited = serverCredits(lb, me.log)
-            val owed = me.total - credited.total
+            val localOnly = if (restorable) TrailRewards.paid(st.trailPaid, lb).filter { it !in serverPaid }.sumOf { TrailRewards.marksOf(it) } else 0
+            val owed = me.total - credited.total + localOnly
             wrote = restorable && owed > 0
+            val seed = wrote || (goal == Goal.trails && lb.hasRestore && !st.trailsStarted)
+            meApplied = true
             st.copy(
                 found = st.found + me.occ,
                 logbook = if (!wrote) credited else credited.add(LogEntry(newId(), LogKind.restored, LogCopy.what(LogKind.restored), LogCopy.why(LogKind.restored), today, owed, board = BoardState.accepted)),
+                trailPaid = if (seed) st.trailPaid + serverPaid else st.trailPaid,
             )
         }
         if (wrote) AppLog.i(TAG, "Logbook restored from the account")
+        if (trailStartDeferred) {
+            trailStartDeferred = false
+            creditTrails()
+        }
         return wrote
     }
+
+    /** An entry a restorable Logbook may hold: the opt-in's own (P1-7), never a walk's. */
+    private fun restorableEntry(e: LogEntry): Boolean =
+        e.kind == LogKind.start_balance || e.kind == LogKind.start_trails || (e.kind == LogKind.island && e.walkId == null)
 
     /** When the account summary was last applied ([restore]); the foreground re-fetch waits [ACCOUNT_SYNC_MS]. */
     @Volatile private var lastAccountSync: Instant? = null
@@ -482,24 +607,27 @@ class PlayRepository(
     /**
      * The opt-in starting balance (product § 3.6.4, PF1-2), one attempt: "Your walks so far" once ever, from the current
      * snapshot; later turn-ons add only walk-derived marks earned while Play was off; nothing after a restore
-     * ([StartBalance]). Idempotent. [Credit.marks] = a start balance entry this call wrote; null = the walk-derived
-     * input is not available (yet).
+     * ([StartBalance]). Idempotent. [Credit.marks] = the start balance entries this call wrote, summed (review P2-5:
+     * `start_balance` + `start_trails` + `island`, one PlayWake number); null = the walk-derived input is not
+     * available (yet).
+     *
+     * Trails (plan D4): [TrailStart] runs right after, in the same update, reading paid there — unless
+     * [deferTrailStart] holds (then the next successful [restore] runs it). Trail input unavailable: it waits for the
+     * next turn-on or the next walk ([WalkMarks] runs it when it has not run).
      */
     private suspend fun creditOnce(): Credit? {
-        val derived = try {
-            walkDerived()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppLog.e(TAG, "start balance unavailable: ${e.message}")
-            null
-        } ?: return null
+        val derived = guarded("start balance") { walkDerived() } ?: return null
+        val trails = trailSnapshot()?.let { (tables, input) -> TrailRewards.qualifying(input, tables) }
         val today = IslandTime.dateOf(clock().now())
         var credited: Int? = null
         store.update { st ->
-            val after = StartBalance.onEnable(st.logbook, derived, today, newId)
-            credited = after.entries.drop(st.logbook.entries.size).firstOrNull { it.kind == LogKind.start_balance }?.marks
-            st.copy(logbook = after, derivedBase = DerivedBase.of(derived))
+            var next = st.copy(logbook = StartBalance.onEnable(st.logbook, derived, today, newId), derivedBase = DerivedBase.of(derived))
+            if (trails != null) {
+                if (deferTrailStart(st)) trailStartDeferred = true
+                else next = next.with(TrailStart.onEnable(goal, next.trailLedger(), trails, today, newId))
+            }
+            credited = next.logbook.entries.drop(st.logbook.entries.size).filter { it.kind in START_KINDS }.takeIf { it.isNotEmpty() }?.sumOf { it.marks }
+            next
         }
         return Credit(credited)
     }
@@ -618,6 +746,9 @@ class PlayRepository(
         /** The foreground account re-fetch's minimum interval (P0-2). */
         const val ACCOUNT_SYNC_MS = 10 * 60_000L
 
+        /** The turn-on's start balance entries whose marks [awaitStartBalance] reports, summed (P2-5, ux § 6). */
+        private val START_KINDS = setOf(LogKind.start_balance, LogKind.start_trails, LogKind.island)
+
         /** `GET /v1/play/me` `log` kinds the Logbook mirrors (server-only credits, P0-2). */
         private val SERVER_KINDS = mapOf("week" to LogKind.week, "retreat" to LogKind.retreat, "island_challenge" to LogKind.island_challenge)
 
@@ -633,6 +764,33 @@ class PlayRepository(
                 """{"station":"${PlayContentRepository.STATION}","datum":"MLLW","units":"cm","year":$y,"t0":"$y-01-01T00:00Z","source":"debug-override","e":[$events]}"""
             }
             return TideTable.parse(*texts.toTypedArray())
+        }
+    }
+}
+
+/**
+ * A `climb` / `parks` challenge occurrence as the cards show it (Play trails v1.1, plan D5; L2-3): [progress] P and the
+ * personal [target] in the compare unit — climb in integer **decimetres**, parks as a count. [hidden] (target 0: nothing
+ * left to climb or no park left to start) → no card, no chip count, no What's On row, no claim.
+ */
+data class TrailChallengeStatus(val metric: ChallengeMetric, val progress: Int, val target: Int) {
+    val hidden: Boolean get() = target <= 0
+
+    /** P reached the target (the claim rule, P2-6; the card's "done" also follows the occurrence being found). */
+    val reached: Boolean get() = TrailRewards.claims(target, progress)
+
+    companion object {
+        /**
+         * [o]'s status from its item's challenge [spec]: P = the [logbook]'s `complete` entries dated inside the window
+         * ([ClaimEvaluator.windowCompletions]); target = [TrailRewards.challengeTarget] over the sticky [completed] set.
+         * Null unless a solo `climb` / `parks` challenge with a trails target.
+         */
+        fun of(spec: ChallengeSpec, o: Occurrence, tables: TrailTables, completed: Set<String>, logbook: Logbook): TrailChallengeStatus? {
+            if (spec.scope != ChallengeScope.solo || (spec.metric != ChallengeMetric.climb && spec.metric != ChallengeMetric.parks)) return null
+            val packTarget = spec.target?.get(Goal.trails) ?: return null
+            val progress = TrailProgress.of(ClaimEvaluator.windowCompletions(o, null, emptyList(), logbook), tables)
+            val target = TrailRewards.challengeTarget(spec.metric, TrailRewards.compareTarget(spec.metric, packTarget), completed, progress, tables)
+            return TrailChallengeStatus(spec.metric, progress.value(spec.metric), target)
         }
     }
 }
@@ -725,5 +883,30 @@ object SnapshotMarks {
         val completed = progress.snapshot(state, sticky).trails
             .count { it.status == com.bainbridgetrails.coverage.TrailStatus.COMPLETE && progress.counts(it.trailId) && it.trailId !in quietFeatures }
         return Marks.walkDerived(goal, metres, completed, squares.size)
+    }
+
+    /**
+     * Play trails v1.1 (plan D6): the six trails rules' input of the same snapshot ([TrailRewards.inputs]): raw covered
+     * metres of [tables]' counted segments (`{segId: coveredM}`, dataset order), the completed set (sticky or by
+     * coverage, counted), and W-ISLAND = island fraction ≥ 1 − 1e-9 (`AppGraph.Celebration.islandWhole`).
+     */
+    fun trails(
+        dataset: com.bainbridgetrails.coverage.Dataset,
+        index: com.bainbridgetrails.coverage.SegmentIndex,
+        state: com.bainbridgetrails.coverage.CoverageState,
+        sticky: Set<String>,
+        tables: TrailTables,
+    ): TrailRewardInput {
+        val coverage = LinkedHashMap<String, Double>()
+        for (id in tables.segmentLengthM.keys) {
+            val c = state.coveredM(index, id)
+            if (c > 0.0) coverage[id] = c
+        }
+        val progress = com.bainbridgetrails.coverage.Progress(dataset, index, com.bainbridgetrails.coverage.CoverageParams())
+        val snapshot = progress.snapshot(state, sticky)
+        val completed = snapshot.trails
+            .filter { it.status == com.bainbridgetrails.coverage.TrailStatus.COMPLETE && progress.counts(it.trailId) }
+            .mapTo(LinkedHashSet()) { it.trailId }
+        return TrailRewards.inputs(coverage, completed, com.bainbridgetrails.graph.AppGraph.Celebration.islandWhole(snapshot.islandFraction), tables)
     }
 }

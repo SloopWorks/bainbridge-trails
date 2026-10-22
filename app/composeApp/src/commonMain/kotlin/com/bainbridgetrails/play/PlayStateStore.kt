@@ -6,6 +6,7 @@ import com.bainbridgetrails.play.claim.WalkDone
 import com.bainbridgetrails.play.config.Goal
 import com.bainbridgetrails.play.rules.BoardState
 import com.bainbridgetrails.play.rules.Logbook
+import com.bainbridgetrails.play.rules.TrailLedger
 import com.bainbridgetrails.play.schedule.PlayUserState
 import com.bainbridgetrails.play.time.IslandTime
 import kotlinx.coroutines.CoroutineDispatcher
@@ -43,7 +44,22 @@ data class PlayState(
      * input of solo `completed` challenges (`ch-sweep`). Kept [WalkDone.KEEP_MS]; the walk id is opaque on disk.
      */
     val walks: List<WalkDone> = emptyList(),
+    /**
+     * Play trails v1.1 device ledger (plan D1): trails rule keys (`climb:<m>`, `mile:<mi>`, `high:<trailId>`,
+     * `park1:<park>`, `parkc:<park>`, `island`) paid outside a per-key Logbook row — folded into a `start_trails`
+     * entry, or seeded from the account's `paid` on a restore. Paid = this ∪ the trails-kind Logbook `contentId`s
+     * ([com.bainbridgetrails.play.rules.TrailRewards.paid]). Keys only: no time, no place beyond a park name.
+     */
+    val trailPaid: Set<String> = emptySet(),
+    /** The trails start ([com.bainbridgetrails.play.rules.TrailStart]) ran on this phone (plan D4). */
+    val trailsStarted: Boolean = false,
 ) {
+    /** The trails ledger view ([TrailLedger]) of this state. */
+    fun trailLedger(): TrailLedger = TrailLedger(logbook, trailPaid, trailsStarted)
+
+    /** This state with [ledger]'s Logbook, paid keys and start flag. */
+    fun with(ledger: TrailLedger): PlayState = copy(logbook = ledger.logbook, trailPaid = ledger.trailPaid, trailsStarted = ledger.trailsStarted)
+
     /** The scheduler's view. A solve counts from the start of its island day. */
     fun userState(): PlayUserState = PlayUserState(
         resolved = solved.mapNotNull { (id, d) ->
