@@ -144,6 +144,9 @@ object AppGraph {
 
             /** True when this walk took the island from not whole to whole (island fractions, 0..1). */
             fun islandReached(before: Double, after: Double): Boolean = before < WHOLE && after >= WHOLE
+
+            /** The island is whole at [fraction] (0..1): W-ISLAND (Play trails v1.1, plan D6). */
+            fun islandWhole(fraction: Double): Boolean = fraction >= WHOLE
         }
     }
 
@@ -258,6 +261,10 @@ object AppGraph {
             val derivedTable = scope.async(Dispatchers.Default, CoroutineStart.LAZY) {
                 readResourceOrNull("files/play/derived-${goal.name}.json")?.let(PlayDerived::parse)
             }
+            // Play trails v1.1 (plan D6): the six trails rules' tables over the counted dataset; null on roads.
+            val trailTables = scope.async(Dispatchers.Default, CoroutineStart.LAZY) {
+                derivedTable.await()?.trailTables(datasets.await().dataset)
+            }
             return PlayRepository(
                 scope = scope,
                 goal = goal,
@@ -280,6 +287,8 @@ object AppGraph {
                     WalkContext(d.quietZones, d.quietFeatures, datasets.await().dataset.trails.associate { it.id to it.name })
                 },
                 derivedSource = { derivedTable.await() ?: PlayDerived.Empty },
+                trailTables = { trailTables.await() },
+                trailInput = { trailTables.await()?.let { snapshotTrails(it) } },
             )
         }
 
@@ -299,6 +308,17 @@ object AppGraph {
                     CoverageStore.writeLock.withLock { CoverageStore(trackingDir).let { it.load() to it.completedIds() } }
                 }
                 SnapshotMarks.of(goal, data.dataset, data.index, state, sticky, derived)
+            }
+        }
+
+        /** The trails rules' input of the current local coverage (Play trails v1.1, plan D6): same read as [snapshotMarks]. */
+        private suspend fun snapshotTrails(tables: com.bainbridgetrails.play.rules.TrailTables): com.bainbridgetrails.play.rules.TrailRewardInput {
+            val data = datasets.await()
+            return withContext(Dispatchers.Default) {
+                val (state, sticky) = withContext(Dispatchers.IO) {
+                    CoverageStore.writeLock.withLock { CoverageStore(trackingDir).let { it.load() to it.completedIds() } }
+                }
+                SnapshotMarks.trails(data.dataset, data.index, state, sticky, tables)
             }
         }
 
