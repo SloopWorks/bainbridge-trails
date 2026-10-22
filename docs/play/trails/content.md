@@ -1,4 +1,4 @@
-# Trails edition v1.1 — content pack 2026.11.2
+# Trails edition v1.1 — content pack 2026.11.3
 
 Lane L4 (content author) for [`brief.md`](brief.md) § 2 Content, AC 1 and AC 5. Facts come only from
 [`lore-facts.md`](lore-facts.md), hedged as written there; placements are dataset refs the validator resolves
