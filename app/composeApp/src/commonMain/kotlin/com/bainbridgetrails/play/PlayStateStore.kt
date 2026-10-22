@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.serialization.Serializable
+import kotlin.concurrent.Volatile
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -130,21 +131,36 @@ class PlayStateStore(
         return _state.value
     }
 
-    suspend fun update(change: (PlayState) -> PlayState): PlayState = mutex.withLock {
+    /**
+     * Bumped by [clear] (privacy review L2-2 P2-2): work that read [generation] before a network wait writes through
+     * [updateIf], so a reply that lands after "Also delete … on this phone" never brings the old account's data back.
+     */
+    @Volatile var generation: Int = 0
+        private set
+
+    suspend fun update(change: (PlayState) -> PlayState): PlayState = mutex.withLock { updateLocked(change) }
+
+    /** [update], unless [clear] ran since [generation] was read: then nothing is read or written and the result is null. */
+    suspend fun updateIf(generation: Int, change: (PlayState) -> PlayState): PlayState? = mutex.withLock {
+        if (generation != this.generation) null else updateLocked(change)
+    }
+
+    private suspend fun updateLocked(change: (PlayState) -> PlayState): PlayState {
         val next = change(loadLocked())
         if (next != _state.value) {
             _state.value = next
             withContext(io) { persist(next) }
         }
-        next
+        return next
     }
 
     /**
      * Forgets everything on this phone ("Also delete … on this phone", product § 3.10): the in-memory state is reset
      * (so no later write brings the old Logbook back) and the state file, its walk-id map and any pre-move file are
-     * deleted.
+     * deleted. [generation] moves on, so an [updateIf] begun before this writes nothing.
      */
     suspend fun clear() = mutex.withLock {
+        generation++
         loaded = true
         walkIds = emptyMap()
         retired.clear()
@@ -226,7 +242,7 @@ object PlayFiles {
     /**
      * "Also delete … on this phone" (privacy review 2026-10-21 P0-1, product § 3.10): every goal's state (in memory
      * through [repo] when it exists, Play on or off), the claim queue of every dataset profile ([currentClaims] through
-     * its lock), and this process's claim results. With no repository (Play never on in this process) the files go
+     * its lock), and this process's claim results and account flags ([PlayRepository.forgetAccount]). With no repository (Play never on in this process) the files go
      * directly.
      */
     suspend fun wipe(
@@ -246,5 +262,6 @@ object PlayFiles {
             queue.clear()
         }
         repo?.forgetClaimResults()
+        repo?.forgetAccount()
     }
 }

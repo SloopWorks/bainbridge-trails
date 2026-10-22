@@ -347,9 +347,14 @@ object AppGraph {
         internal fun startRemote() {
             auth.addListener(SessionListener(sync, profile, onAuthChanged = { leaderboard.onAuthChanged() }, clearPhone = { wipeLocalProgress() }))
             // Play on while signing in: restore the Logbook from the account (product § 3.6.5). Off: nothing.
+            // Signing out (Play on or off, if ever built): forget the account's /me flags (privacy review L2-2 P3-2).
             auth.addListener(object : AuthListener {
                 override suspend fun onSignedIn(response: AuthResponse) {
                     playOrNull?.restore()
+                }
+
+                override suspend fun onSignedOut(deleted: Boolean, wipeLocal: Boolean) {
+                    playGate.created?.forgetAccount()
                 }
             })
             scope.launch {

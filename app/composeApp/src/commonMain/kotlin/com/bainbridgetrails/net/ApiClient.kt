@@ -130,9 +130,9 @@ class ApiClient(
     suspend fun playTides(year: Int): ApiResult<String> =
         call(HttpMethod.Get, "/v1/play/tides/$year", RawText, auth = false, maxBytes = MAX_PLAY_BODY_BYTES)
 
-    /** `GET /v1/play/me?dataset=` (bearer). */
+    /** `GET /v1/play/me?dataset=` (bearer). A body over [MAX_PLAY_BODY_BYTES] is refused unread (privacy review L2-2 P2-1). */
     suspend fun playMe(): ApiResult<PlayMeDto> =
-        call(HttpMethod.Get, "/v1/play/me?dataset=${dataset()}", PlayMeDto.serializer())
+        call(HttpMethod.Get, "/v1/play/me?dataset=${dataset()}", PlayMeDto.serializer(), maxBytes = MAX_PLAY_BODY_BYTES)
 
     /** `GET /v1/play/challenges?dataset=` (public; with the bearer, `progress` and `you` are the caller's). */
     suspend fun playChallenges(): ApiResult<PlayChallengesDto> =
@@ -255,7 +255,7 @@ class ApiClient(
     companion object {
         private const val TAG = "api"
 
-        /** Cap on a Play content pack or tide year body (privacy review 2026-10-21 P2-4): over it = refused. */
+        /** Cap on a Play content pack, tide year or `/v1/play/me` body (privacy review 2026-10-21 P2-4, L2-2 P2-1): over it = refused. */
         const val MAX_PLAY_BODY_BYTES = 2 * 1024 * 1024
 
         /** The server's default dataset (api.md "Datasets"). */

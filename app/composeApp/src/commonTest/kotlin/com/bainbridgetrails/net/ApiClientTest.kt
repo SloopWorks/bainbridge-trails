@@ -160,6 +160,18 @@ class ApiClientTest {
         assertFalse(e.isRetryable)
     }
 
+    /** Privacy review L2-2 P2-1: `/v1/play/me` is capped like the pack and tides; a body over the cap is refused unread. */
+    @Test
+    fun playMeBodyOverTheCapIsADecodeError() = runTest {
+        val pad = "\"climb:1\",".repeat(ApiClient.MAX_PLAY_BODY_BYTES / 10 + 1)
+        server.on("GET /v1/play/me", Reply.json("""{"dataset":"trails","total":1,"paid":[$pad"island"]}"""))
+        val e = assertIs<ApiError.Decode>(server.client(token = { "t" }).playMe().errorOrNull())
+        assertTrue(e.message.contains("too large"), e.message)
+        // Under the cap the same shape decodes.
+        server.on("GET /v1/play/me", Reply.json("""{"dataset":"trails","total":1,"paid":["climb:1","island"]}"""))
+        assertEquals(listOf("climb:1", "island"), assertIs<ApiResult.Ok<PlayMeDto>>(server.client(token = { "t" }).playMe()).value.paid)
+    }
+
     @Test
     fun noContentResponses() = runTest {
         server.on("DELETE /v1/me", Reply.noContent)
