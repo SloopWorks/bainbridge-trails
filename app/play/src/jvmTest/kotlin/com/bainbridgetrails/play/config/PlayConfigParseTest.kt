@@ -60,6 +60,18 @@ class PlayConfigParseTest {
     }
 
     @Test
+    fun `climb and parks parse`() {
+        val solo = "\"metric\": \"completed\""
+        assertTrue(solo in example)
+        for ((word, metric) in listOf("climb" to ChallengeMetric.climb, "parks" to ChallengeMetric.parks)) {
+            val c = ok(example.replace(solo, "\"metric\": \"$word\""))
+            assertEquals(metric, c.items.single { it.id == "ch-sweep" }.challenge!!.metric)
+        }
+        // still no timing metric (PD-4)
+        assertEquals(Rule.PARSE, rejected(example.replace(solo, "\"metric\": \"pace\"")).single().rule)
+    }
+
+    @Test
     fun schema2Rejected() {
         val errs = rejected(example.replaceFirst("\"schema\": 1", "\"schema\": 2"))
         assertEquals(Rule.SCHEMA, errs.single().rule)

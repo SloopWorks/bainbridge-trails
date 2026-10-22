@@ -50,10 +50,33 @@ object LogCopy {
         // No marks.
         LogKind.stamp to LogLine(null, "Riddle solved"),
         LogKind.visit to LogLine(null, "A quiet place. No marks here."),
+        // Trails rules (Play trails v1.1, ux § 2.2): park/trail rows name their subject; climb / milestone persist the
+        // step in its stored unit ([climbWhat], [mileWhat]) and the row re-renders it in the user's units.
+        LogKind.park_first to LogLine(null, "First new ground in this park"),
+        LogKind.park_complete to LogLine(null, "Every trail in this park finished"),
+        LogKind.milestone to LogLine(null, "Distance across all your walks"),
+        LogKind.island to LogLine("The whole island", "All of the island's trails walked"),
+        LogKind.climb to LogLine(null, "Climb on trails you've finished"),
+        LogKind.high_ground to LogLine(null, "A steep trail, finished"),
+        LogKind.start_trails to LogLine("Trail rewards so far", "Climb, trail miles, parks and high ground already walked"),
     )
 
     /** The start balance's later catch-up: walk-derived marks earned while Play was off (a `coverage` entry). */
     val catchUp = LogLine("Walks while Play was off", "New coverage, completions and squares")
+
+    /**
+     * A later `start_trails` entry: trails keys owed on a turn-on after the first (plan D4). Neutral wording (review
+     * P2-8; ux § 6's "while Play was off" is wrong after a restore or a walk finalized during the turn-on).
+     */
+    val trailCatchUp = LogLine("Trail rewards caught up", "Trail rewards owed from earlier walks")
+
+    /** W-CLIMB step [m] (metres) as persisted: "250 m climbed", "1,250 m climbed". */
+    fun climbWhat(m: Int): String = "${grouped(m)} m climbed"
+
+    /** W-MILE step [mi] (statute miles) as persisted: "10 mi of trail walked". */
+    fun mileWhat(mi: Int): String = "${grouped(mi)} mi of trail walked"
+
+    private fun grouped(n: Int): String = n.toString().reversed().chunked(3).joinToString(",").reversed()
 
     /** Remembrance visit wording per quiet zone id (product §4.6.3 "Visited the Exclusion Memorial"); null = no stamp. */
     private val VISIT_WHAT = mapOf(

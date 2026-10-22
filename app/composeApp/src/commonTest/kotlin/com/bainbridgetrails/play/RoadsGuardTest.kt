@@ -127,17 +127,20 @@ class RoadsGuardTest {
                 put("json", ApiClient.json.encodeToString(CoverageUpload.serializer(), upload))
             },
         )
-        put("v1LogKinds", JsonArray(LogKind.entries.map { JsonPrimitive(it.name) }))
+        put("v1LogKinds", JsonArray(v1Kinds.map { JsonPrimitive(it.name) }))
         put("v1State", stateJson.encodeToString(PlayState.serializer(), state()))
     }
 
-    /** One entry of every kind, plus every other v1 field set (walk ids opaque, as on disk). */
+    /** The v1 kinds (main 2aee859 ended at `visit`); v1.1 appends after them (D7). */
+    private val v1Kinds = LogKind.entries.filter { it.ordinal <= LogKind.visit.ordinal }
+
+    /** One entry of every v1 kind, plus every other v1 field set (walk ids opaque, as on disk). */
     private fun state(): PlayState = PlayState(
         found = setOf("egg-madrone@2026-10-26", "treasure-weekly-roads@2026-10-26#00"),
         solved = mapOf("riddle-frog" to "2026-10-27"),
         hints = mapOf("riddle-frog" to 1),
         logbook = Logbook(
-            LogKind.entries.mapIndexed { i, kind ->
+            v1Kinds.mapIndexed { i, kind ->
                 LogEntry(
                     id = "e$i",
                     kind = kind,
