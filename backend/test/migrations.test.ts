@@ -13,7 +13,19 @@ const count = async (sql: string, ...args: unknown[]) => (await one<{ n: number 
 const upTo0003 = all.filter((m) => m.name < "0004");
 const play0005 = all.filter((m) => m.name.startsWith("0005_"));
 const play0006 = all.filter((m) => m.name.startsWith("0006_"));
-const PLAY_OBJECTS = ["play_attack_stretches", "play_claims", "play_claims_week", "play_progress", "play_progress_occ", "play_totals", "play_weeks"];
+const play0007 = all.filter((m) => m.name.startsWith("0007_"));
+const upTo0006 = all.filter((m) => m.name < "0007");
+const PLAY_OBJECTS = [
+  "play_attack_stretches",
+  "play_claims",
+  "play_claims_week",
+  "play_progress",
+  "play_progress_keys",
+  "play_progress_occ",
+  "play_totals",
+  "play_trail_paid",
+  "play_weeks",
+];
 
 /** Every schema object (table, index) and its SQL, except D1/SQLite internals. */
 async function schemaOf(db: D1Database): Promise<Map<string, string>> {
@@ -31,6 +43,7 @@ describe("migration 0003 (dataset scope) and 0004 cleanup", () => {
       "0003_dataset_scope.sql",
       "0005_play.sql",
       "0006_play_challenges.sql",
+      "0007_play_trails.sql",
     ]);
     await applyD1Migrations(db, all.slice(0, 2));
     await db.batch([
@@ -165,7 +178,8 @@ describe("migration 0005 (play)", () => {
     expect(PLAY_OBJECTS.every((n) => after.has(n))).toBe(true);
     // no Play statement names a table or column that 0004 drops or clears
     expect(play0006.map((m) => m.name)).toEqual(["0006_play_challenges.sql"]);
-    const sql = [...play0005, ...play0006].flatMap((m) => m.queries).join("\n");
+    expect(play0007.map((m) => m.name)).toEqual(["0007_play_trails.sql"]);
+    const sql = [...play0005, ...play0006, ...play0007].flatMap((m) => m.queries).join("\n");
     for (const t of ["walks ", "walks(", "leaderboard_snapshot ", "trail_stats_snapshot", "snapshot_meta ", "island_m", "coverage_rev", "walk_count"]) {
       expect(sql).not.toContain(t);
     }
@@ -202,5 +216,74 @@ describe("migration 0005 (play)", () => {
     expect(await one("SELECT marks FROM play_claims WHERE user_id = 'p2'")).toEqual({ marks: 20 });
     expect(await one("SELECT total FROM play_totals WHERE user_id = 'p2'")).toEqual({ total: 20 });
     expect(await one("SELECT walk_id FROM walks_v2 WHERE user_id = 'p2'")).toEqual({ walk_id: "w9" });
+  });
+});
+
+describe("migration 0007 (play trails)", () => {
+  // its own scratch database, built to 0006 first: the 0005 tests above already applied every migration to theirs
+  const db = env.MIGRATION_DB_TRAILS;
+  const one = async <T>(sql: string, ...args: unknown[]) => (await db.prepare(sql).bind(...args).first<T>())!;
+  const schema = () => schemaOf(db);
+
+  it("0007 applies after 0006, additive only", async () => {
+    await applyD1Migrations(db, upTo0006);
+    await db.batch([
+      db.prepare("INSERT INTO users (id, provider, sub, anon_name) VALUES ('t1', 'dev', 'ts1', 'Calm Otter 31') ON CONFLICT DO NOTHING"),
+      // a totals row the 0006-era Worker wrote
+      db.prepare(
+        "INSERT INTO play_totals (user_id, dataset, cov_marks, derived_marks, found_marks, week_marks, total) VALUES ('t1', 'trails', 10, 125, 20, 15, 170) ON CONFLICT DO NOTHING",
+      ),
+    ]);
+    const before = await schema();
+    await applyD1Migrations(db, all);
+    const after = await schema();
+    // every object that existed is unchanged, except play_totals, which gained the defaulted column
+    for (const [name, sql] of before) {
+      if (name === "play_totals") continue;
+      expect(after.get(name)).toBe(sql);
+    }
+    expect(after.get("play_totals")).toContain("trail_marks INTEGER NOT NULL DEFAULT 0");
+    expect(after.get("play_totals")!.replace(/,\s*trail_marks INTEGER NOT NULL DEFAULT 0/, "")).toBe(before.get("play_totals"));
+    expect([...after.keys()].filter((n) => !before.has(n)).sort()).toEqual(["play_progress_keys", "play_trail_paid"]);
+    // the existing row keeps its values and reads 0 trail marks
+    expect(await one("SELECT cov_marks, derived_marks, found_marks, week_marks, trail_marks, total FROM play_totals WHERE user_id = 't1'")).toEqual({
+      cov_marks: 10,
+      derived_marks: 125,
+      found_marks: 20,
+      week_marks: 15,
+      trail_marks: 0,
+      total: 170,
+    });
+    // the Worker still serving during the deploy (0006-era totals upsert, no trail_marks) keeps working
+    await db
+      .prepare(
+        `INSERT INTO play_totals (user_id, dataset, cov_marks, derived_marks, found_marks, week_marks, total)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?3 + ?4 + ?5 + ?6)
+         ON CONFLICT (user_id, dataset) DO UPDATE SET
+           cov_marks = MAX(cov_marks, excluded.cov_marks), derived_marks = MAX(derived_marks, excluded.derived_marks),
+           found_marks = found_marks + excluded.found_marks, week_marks = week_marks + excluded.week_marks,
+           total = MAX(cov_marks, excluded.cov_marks) + MAX(derived_marks, excluded.derived_marks)
+                 + found_marks + excluded.found_marks + week_marks + excluded.week_marks`,
+      )
+      .bind("t1", "trails", 12, 125, 0, 0)
+      .run();
+    expect(await one("SELECT total, trail_marks FROM play_totals WHERE user_id = 't1'")).toEqual({ total: 172, trail_marks: 0 });
+    // the new tables take rows, dedupe by key and enforce the dataset check
+    await db.batch([
+      db.prepare("INSERT INTO play_trail_paid VALUES ('t1', 'trails', 'park1:Gazzam Lake Preserve', 50) ON CONFLICT DO NOTHING"),
+      db.prepare("INSERT INTO play_trail_paid VALUES ('t1', 'trails', 'park1:Gazzam Lake Preserve', 50) ON CONFLICT DO NOTHING"),
+      db.prepare("INSERT INTO play_progress_keys VALUES ('t1', 'trails', 'ch-parkhop@2026-10-31', 'Gazzam Lake Preserve') ON CONFLICT DO NOTHING"),
+      db.prepare("INSERT INTO play_progress_keys VALUES ('t1', 'trails', 'ch-parkhop@2026-10-31', 'Gazzam Lake Preserve') ON CONFLICT DO NOTHING"),
+    ]);
+    expect(await one("SELECT COUNT(*) AS n, SUM(marks) AS marks FROM play_trail_paid WHERE user_id = 't1'")).toEqual({ n: 1, marks: 50 });
+    expect(await one("SELECT COUNT(*) AS n FROM play_progress_keys WHERE user_id = 't1'")).toEqual({ n: 1 });
+    await expect(db.prepare("INSERT INTO play_trail_paid VALUES ('t1', 'rivers', 'island', 1000)").run()).rejects.toThrow(/CHECK constraint failed/);
+    await expect(db.prepare("INSERT INTO play_progress_keys VALUES ('t1', 'rivers', 'x@2026-10-31', 'k')").run()).rejects.toThrow(
+      /CHECK constraint failed/,
+    );
+    // rows go with the user (ON DELETE CASCADE)
+    await db.prepare("DELETE FROM users WHERE id = 't1'").run();
+    expect(await one("SELECT COUNT(*) AS n FROM play_trail_paid")).toEqual({ n: 0 });
+    expect(await one("SELECT COUNT(*) AS n FROM play_progress_keys")).toEqual({ n: 0 });
   });
 });

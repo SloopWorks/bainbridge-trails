@@ -15,7 +15,11 @@ export default defineConfig(async () => {
         main: "./src/index.ts",
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
-          d1Databases: { MIGRATION_DB: "migration-test-db", MIGRATION_DB_PLAY: "migration-play-test-db" },
+          d1Databases: {
+            MIGRATION_DB: "migration-test-db",
+            MIGRATION_DB_PLAY: "migration-play-test-db",
+            MIGRATION_DB_TRAILS: "migration-trails-test-db",
+          },
           bindings: {
             TEST_MIGRATIONS: migrations,
             CLEANUP_QUERIES: cleanup,

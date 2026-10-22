@@ -65,8 +65,15 @@ const rows = async <T>(sql: string, ...args: unknown[]) => (await env.DB.prepare
 const squaresOf = (segIds: string[]) =>
   new Set(segIds.flatMap((s) => (derivedTrails.segmentSquares as Record<string, string[]>)[s] ?? [])).size;
 
-/** W-COV + W-DONE + W-SQUARE of fully covering the rotary trail (trails goal: 1 mark / 10 m, +100, +25 per square). */
-const ROTARY_WALK_MARKS = Math.floor(30.8 / 10) + 100 + 25 * squaresOf([ROTARY_SEG]);
+/**
+ * W-COV + W-DONE + W-SQUARE of fully covering the rotary trail (trails goal: 1 mark / 10 m, +100, +25 per square), plus
+ * the v1.1 trails ledger (L3-1): the first segment in Rotary Park pays `park1:Rotary Park` (+50; a several-trail park,
+ * so no `parkc`; gain 0 m, 30.8 m: no climb, no mile).
+ */
+const ROTARY_WALK_MARKS = Math.floor(30.8 / 10) + 100 + 25 * squaresOf([ROTARY_SEG]) + 50;
+const ROTARY_PAID = ["park1:Rotary Park"];
+/** `/v1/play/me` `perKind` of a trails user with no claims and only the rotary ledger key. */
+const ROTARY_PER_KIND = { climb: 0, high_ground: 0, milestone: 0, park_first: 1, park_complete: 0, island: 0 };
 
 describe("claims on PUT /v1/coverage", () => {
   it("accepted with server-derived marks", async () => {
@@ -96,9 +103,10 @@ describe("claims on PUT /v1/coverage", () => {
       weekId: WEEK,
       total: p.total,
       week: p.week,
-      perKind: { treasure: 1, egg: 1, riddle: 0, ink: 0, lore: 0, challenge: 0 },
+      perKind: { treasure: 1, egg: 1, riddle: 0, ink: 0, lore: 0, challenge: 0, ...ROTARY_PER_KIND },
       occ: [EGG, TREASURE0],
       log: [], // only server-only credits (W-WEEK, F-RETREAT, C-ISLAND)
+      paid: ROTARY_PAID, // trails only (L3-1): the ledger keys
     });
     const roads = await (await h.call("GET", "/v1/play/me?dataset=roads", { token })).json();
     expect(roads).toMatchObject({ dataset: "roads", total: 0, week: 0, occ: [] });
@@ -430,7 +438,7 @@ describe("claims on PUT /v1/coverage", () => {
     const res = await h.call("PUT", "/v1/coverage", { token, body });
     expect(res.status).toBe(422);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe("implausible");
-    for (const t of ["play_claims", "play_weeks", "play_totals"]) {
+    for (const t of ["play_claims", "play_weeks", "play_totals", "play_trail_paid"]) {
       expect(await rows(`SELECT * FROM ${t} WHERE user_id = ?`, userId)).toEqual([]);
     }
   });
@@ -467,6 +475,7 @@ describe("claims on PUT /v1/coverage", () => {
     expect(Object.keys(JSON.parse(pure2Text) as object)).not.toContain("play");
     expect(pure2Text.includes('"play"')).toBe(false);
     expect(await rows("SELECT * FROM play_totals WHERE user_id = ?", userId)).toEqual([]);
+    expect(await rows("SELECT * FROM play_trail_paid WHERE user_id = ?", userId)).toEqual([]);
   });
 
   it("50 claims per upload cap", async () => {
@@ -488,11 +497,11 @@ describe("claims on PUT /v1/coverage", () => {
 
   it("deletion cascades play rows", async () => {
     await playOf(await syncPlay(trailFull(ROTARY), (w) => [{ walkId: w, claims: [claim(TREASURE0, "treasure")], dayKey: WEEK }]));
-    for (const t of ["play_claims", "play_weeks", "play_totals"]) {
+    for (const t of ["play_claims", "play_weeks", "play_totals", "play_trail_paid"]) {
       expect((await rows(`SELECT * FROM ${t} WHERE user_id = ?`, userId)).length).toBe(1);
     }
     expect((await h.call("DELETE", "/v1/me", { token })).status).toBe(204);
-    for (const t of ["play_claims", "play_weeks", "play_totals"]) {
+    for (const t of ["play_claims", "play_weeks", "play_totals", "play_trail_paid"]) {
       expect(await rows(`SELECT * FROM ${t} WHERE user_id = ?`, userId)).toEqual([]);
     }
   });
@@ -575,8 +584,10 @@ describe("review round 1", () => {
       weeks: await rows("SELECT * FROM play_weeks WHERE user_id = ?", userId),
       totals: await rows("SELECT * FROM play_totals WHERE user_id = ?", userId),
       progress: await rows("SELECT * FROM play_progress WHERE user_id = ?", userId),
+      ledger: await rows("SELECT * FROM play_trail_paid WHERE user_id = ? ORDER BY key", userId),
     });
     const before = await snapshot();
+    expect(before.ledger.map((r) => (r as { key: string }).key)).toEqual(ROTARY_PAID);
     // same walk, same coverage, new claims + a dayKey: nothing new is credited
     const p = await playOf(
       await syncPlay(trailFull(ROTARY), (w) => [{ walkId: w, claims: [claim(TREASURE0, "treasure"), claim(EGG, "egg")], dayKey: WEEK }], { walkId }),

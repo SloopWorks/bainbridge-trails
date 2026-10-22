@@ -148,7 +148,7 @@ a name longer than 24 chars) → 47 adjectives × 47 nouns × NN 10–99. The cl
 ### `DELETE /v1/me`
 
 Deletes the account and **all** server data in every dataset (coverage, trail/road fractions, completions,
-metrics, walk ids, Play claims / week rows / totals, sessions, reports by/against, leaderboard rows); revokes the Apple token when configured. `204`. Local data is the
+metrics, walk ids, Play claims / week rows / totals / challenge contributions / trails ledger, sessions, reports by/against, leaderboard rows); revokes the Apple token when configured. `204`. Local data is the
 client's decision (D12). Signing in again creates a fresh account.
 
 Public web page for store listings: `GET /delete-account` (HTML, no `/v1`).
@@ -432,6 +432,15 @@ Only when signed in **and** Play is on. Two optional body fields next to the cov
   (`floor(non-quiet covered m / 10)` trails, `/ 25` roads), W-DONE (+100 / +25 per completed non-quiet feature) and
   W-SQUARE (+25 per chart square) from the merged coverage and credits `max(previous, new)` (this is also the
   opt-in starting balance).
+- Trails rules (v1.1, trails goal only; `docs/play/trails/brief.md` § 2): on the same uploads the server also derives
+  W-CLIMB (`climb:<m>`, steps 100 / 250 / 500 / 750 / 1,000 / 1,250 m of Σ gain of completed non-quiet trails, +50
+  each), W-STEEP (`high:<trailId>`, a completed non-quiet trail with gain ≥ 40.0 m, +50), W-MILE (`mile:<mi>`, 1 then
+  every 5 up to 60 mi of non-quiet covered metres, +50 each), W-PARK1 (`park1:<park>`, first non-quiet coverage in a
+  Play park, +50), W-PARKC (`parkc:<park>`, every non-quiet trail of the park complete, +150) and W-ISLAND (`island`,
+  +1,000). Each key is paid once, by value (`play_trail_paid`, migration 0007): a dataset update never lowers or
+  re-pays; `total` includes them (`play_totals.trail_marks`). The first Play upload pays every key already earned
+  (the server side of the start balance); an upload without `play` touches nothing. Quiet segments here are the
+  derived `quietSegments` (quiet trails + segments touching a quiet zone). Roads uploads are unchanged.
 
 ### `GET /v1/play/me?dataset=trails|roads`
 
@@ -456,6 +465,12 @@ No side effects.
 `occ` = every claimed occurrence key, sorted (re-mark them found; never claim them again). It includes the rows the
 daily cron credits: `kraken-<goal>@<Thursday>` (kind `ink`, no `#n`) = F-RETREAT for that attack and
 `ch-krakenweek@<Thursday>` (kind `challenge`) = C-ISLAND.
+
+`dataset=trails` only (v1.1): `perKind` also carries the six trails rules, as ledger key counts
+(`"climb": 2, "high_ground": 1, "milestone": 3, "park_first": 4, "park_complete": 1, "island": 0`), and the body
+ends with `"paid": ["climb:100", "climb:250", "high:trail-peters-trail", "mile:1", …]` = every trails rule key the
+server has paid, sorted. On the Restored write the phone adds them to its `trailPaid` so no key is paid twice. The
+roads body is unchanged (no `paid`, six claim kinds).
 
 `log` = every credit only the daily cron pays (never claimed by the phone), for the Logbook: `kind` `week` = W-WEEK
 of a closed kept week (`week` = that week's id; a week closed as not kept is not listed), `retreat` = F-RETREAT and

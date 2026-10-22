@@ -20,6 +20,7 @@ import {
   weekId,
   weekIdAt,
 } from "./recurrence";
+import { owedKeys } from "./trails";
 
 /**
  * Play claims on `PUT /v1/coverage` (schedule.md § 7.2, product § 3.5, § 3.6.3, § 3.10; PD-2, PD-3).
@@ -61,6 +62,10 @@ import {
  *     stretch per attack) and 1 to the user's `ch-krakenweek@<Thursday>` contribution;
  *   - the trails / roads this upload newly completed add to the user's contribution of every solo `completed`
  *     challenge occurrence that takes contributions now (window start → window end + 2 days).
+ * Trails rules (v1.1, `trails.ts`, plan D2): whenever `play` is present on a trails upload, the keys the merged
+ * coverage + sticky completions qualify for minus the ledger (`play_trail_paid`) are inserted (`ON CONFLICT DO
+ * NOTHING`) before the totals upsert, which folds `SUM(marks)` of the ledger into `trail_marks` and `total`. Idempotent
+ * and derived, so it also runs on the no-change path; an upload without `play` touches no Play table (PF0).
  */
 
 export const MAX_CLAIMS_PER_UPLOAD = 50;
@@ -204,6 +209,10 @@ export interface ClaimContext {
   newlyCompleted?: readonly string[];
   /** Stored challenge contributions of this user (only the occurrences the upload claims). */
   progress?: ReadonlyMap<string, number>;
+  /** Trails rules: every key the merged coverage, completions and island metres qualify for (absent for roads). */
+  trailQualifying?: ReadonlySet<string>;
+  /** Trails rules: keys already in the ledger (`play_trail_paid`). */
+  trailPaid?: ReadonlySet<string>;
 }
 
 export interface ClaimInsert {
@@ -230,6 +239,8 @@ export interface Evaluation {
   progress: Map<string, number>;
   /** Accepted new `ink` claims: the stretch occurrence and the island challenge occurrence it contributes to. */
   stretches: { occ: string; island: string | null }[];
+  /** Trails rules: ledger keys to pay now (`qualifying − paid`, sorted) with their marks. */
+  trailKeys: { key: string; marks: number }[];
 }
 
 const isMonday = (d: string): boolean => !Number.isNaN(epochDay(d)) && weekId(d) === d;
@@ -373,6 +384,7 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
     dayMarks: 0,
     progress: completionProgress(ctx.dataset, ctx.now, ctx.newlyCompleted ?? []),
     stretches: [],
+    trailKeys: owedKeys(ctx.trailQualifying ?? new Set(), ctx.trailPaid ?? new Set()),
   };
   const week = (w: string): WeekState => {
     let d = ev.weekDelta.get(w);
@@ -444,17 +456,20 @@ export function evaluatePlay(play: PlayUpload, ctx: ClaimContext): Evaluation {
   return ev;
 }
 
-/** Stored claims and week rows the evaluation needs (two indexed reads). */
+/**
+ * Stored claims, week rows and challenge contributions the evaluation needs (indexed reads), plus the trails ledger
+ * (`play_trail_paid`, trails only: roads has no trails rules).
+ */
 export async function loadPlayState(
   env: Env,
   userId: string,
   dataset: Dataset,
   play: PlayUpload,
   now: number,
-): Promise<{ existing: Set<string>; existingZero: Set<string>; weeks: Map<string, WeekState>; progress: Map<string, number> }> {
+): Promise<{ existing: Set<string>; existingZero: Set<string>; weeks: Map<string, WeekState>; progress: Map<string, number>; trailPaid: Set<string> }> {
   const { occs, weeks } = playKeys(play, now);
   const challengeOccs = [...new Set(play.elements.flatMap((e) => e.claims.filter((c) => c.kind === "challenge").map((c) => c.id)))];
-  const [claims, weekRows, progressRows] = await Promise.all([
+  const [claims, weekRows, progressRows, paidRows] = await Promise.all([
     occs.length === 0
       ? { results: [] as { occ: string; marks: number }[] }
       : env.DB.prepare("SELECT occ, marks FROM play_claims WHERE user_id = ?1 AND dataset = ?2 AND occ IN (SELECT value FROM json_each(?3))")
@@ -472,12 +487,16 @@ export async function loadPlayState(
       : env.DB.prepare("SELECT occ, progress FROM play_progress WHERE user_id = ?1 AND dataset = ?2 AND occ IN (SELECT value FROM json_each(?3))")
           .bind(userId, dataset, JSON.stringify(challengeOccs))
           .run<{ occ: string; progress: number }>(),
+    dataset !== "trails"
+      ? { results: [] as { key: string }[] }
+      : env.DB.prepare("SELECT key FROM play_trail_paid WHERE user_id = ?1 AND dataset = ?2").bind(userId, dataset).run<{ key: string }>(),
   ]);
   return {
     existing: new Set(claims.results.map((r) => r.occ)),
     existingZero: new Set(claims.results.filter((r) => r.marks === 0).map((r) => r.occ)),
     weeks: new Map(weekRows.results.map((r) => [r.week, { dayKeys: r.day_keys, found: r.found_marks }])),
     progress: new Map(progressRows.results.map((r) => [r.occ, r.progress])),
+    trailPaid: new Set(paidRows.results.map((r) => r.key)),
   };
 }
 
@@ -485,7 +504,8 @@ export async function loadPlayState(
  * The no-change path of `PUT /v1/coverage` (no new coverage, walk or completion) runs its Play statements outside the
  * coverage_rev compare-and-swap, so they must not insert claims or move week / found / day / progress / stretch counts
  * (review P2-14). True by construction (no fresh walk → no claim or dayKey accepted; no completion → no progress);
- * this guards it. Throws (a 500) rather than write unguarded.
+ * this guards it. Throws (a 500) rather than write unguarded. Trails ledger keys (`trailKeys`) are allowed: they are
+ * derived from the stored coverage and idempotent (`ON CONFLICT DO NOTHING`), so the no-change path may pay them.
  */
 export function assertNoPlayWrites(ev: Evaluation): void {
   const moves =
@@ -500,10 +520,12 @@ export function assertNoPlayWrites(ev: Evaluation): void {
 }
 
 /**
- * Statements appended to the coverage batch: new claims (`INSERT … ON CONFLICT DO NOTHING`), week rows, and the
- * totals row (W-COV and W-DONE + W-SQUARE as `max(previous, new)`, found and week marks added). Before the claims:
- * the island counts of new `ink` claims, each guarded by the absence of the claim row it precedes (a distinct user
- * per stretch per attack, even under a concurrent upload), and the challenge contributions.
+ * Statements appended to the coverage batch: new claims (`INSERT … ON CONFLICT DO NOTHING`), week rows, the trails
+ * ledger keys (`ON CONFLICT DO NOTHING`), and the totals row (W-COV and W-DONE + W-SQUARE as `max(previous, new)`,
+ * found and week marks added, `trail_marks` = the ledger's `SUM(marks)` read by the statement itself, so it sees the
+ * keys inserted just before it; D2 / P2-1). Before the claims: the island counts of new `ink` claims, each guarded by
+ * the absence of the claim row it precedes (a distinct user per stretch per attack, even under a concurrent upload),
+ * and the challenge contributions.
  */
 export function playStatements(env: Env, userId: string, dataset: Dataset, ev: Evaluation, walk: WalkDerived): D1PreparedStatement[] {
   const stmts: D1PreparedStatement[] = [];
@@ -535,17 +557,21 @@ export function playStatements(env: Env, userId: string, dataset: Dataset, ev: E
        day_keys = MIN(${MAX_DAY_KEYS_PER_WEEK}, day_keys + excluded.day_keys), found_marks = found_marks + excluded.found_marks`,
   );
   for (const [w, d] of ev.weekDelta) if (d.dayKeys > 0 || d.found > 0) stmts.push(upWeek.bind(userId, dataset, w, d.dayKeys, d.found));
+  const payKey = env.DB.prepare("INSERT INTO play_trail_paid (user_id, dataset, key, marks) VALUES (?1, ?2, ?3, ?4) ON CONFLICT DO NOTHING");
+  for (const k of ev.trailKeys) stmts.push(payKey.bind(userId, dataset, k.key, k.marks));
+  const trailSum = "(SELECT COALESCE(SUM(marks), 0) FROM play_trail_paid WHERE user_id = ?1 AND dataset = ?2)";
   stmts.push(
     env.DB.prepare(
-      `INSERT INTO play_totals (user_id, dataset, cov_marks, derived_marks, found_marks, week_marks, total)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?3 + ?4 + ?5 + ?6)
+      `INSERT INTO play_totals (user_id, dataset, cov_marks, derived_marks, found_marks, week_marks, trail_marks, total)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ${trailSum}, ?3 + ?4 + ?5 + ?6 + ${trailSum})
        ON CONFLICT (user_id, dataset) DO UPDATE SET
          cov_marks = MAX(cov_marks, excluded.cov_marks),
          derived_marks = MAX(derived_marks, excluded.derived_marks),
          found_marks = found_marks + excluded.found_marks,
          week_marks = week_marks + excluded.week_marks,
+         trail_marks = excluded.trail_marks,
          total = MAX(cov_marks, excluded.cov_marks) + MAX(derived_marks, excluded.derived_marks)
-               + found_marks + excluded.found_marks + week_marks + excluded.week_marks`,
+               + found_marks + excluded.found_marks + week_marks + excluded.week_marks + excluded.trail_marks`,
     ).bind(userId, dataset, walk.cov, walk.derived, ev.foundMarks, ev.dayMarks),
   );
   return stmts;
@@ -553,7 +579,7 @@ export function playStatements(env: Env, userId: string, dataset: Dataset, ev: E
 
 export interface PlaySummary {
   weekId: string;
-  /** Server total: W-COV + W-DONE + W-SQUARE + finds + W-DAY (+ W-WEEK, challenges from L3-3). */
+  /** Server total: W-COV + W-DONE + W-SQUARE + finds + W-DAY + W-WEEK + challenges + the trails ledger (`trail_marks`). */
   total: number;
   /** This week's Play marks: finds + W-DAY of the current week id. */
   week: number;

@@ -1,6 +1,7 @@
 import trailsRaw from "../data/play/derived-trails.json";
 import roadsRaw from "../data/play/derived-roads.json";
 import { type Dataset, METAS } from "../segments";
+import type { TrailTables } from "./trails";
 
 /**
  * Per-goal tables derived from the dataset at pack build (`scripts/build-play-content.mjs` → `data/play/derived/`,
@@ -9,6 +10,9 @@ import { type Dataset, METAS } from "../segments";
  * - `stretches` / `coasts`: kraken stretches (`[segmentId, lengthM, shoreM]`) and each coast pool's stretches in pack
  *   pool order; a claim `kraken-<goal>@<Thursday>#n` names stretch `n` of the coast that week's rotation picks.
  * - `segmentSquares`: chart squares (`row:col`) of each included segment (W-SQUARE).
+ * - trails only (v1.1, `trails.ts`): `featureGainM` (→ integer decimetres), `featurePark`, `parks` and the JSON
+ *   `quietSegments` as `trailRules` (W-CLIMB, W-STEEP, W-MILE, W-PARK1, W-PARKC). `quietSegments` below (the v1 set
+ *   `walkDerivedMarks` reads: quiet features' segments) is untouched, so roads and the v1 rules stay as they are (AC 1).
  * They describe the current pack and dataset; claims evaluated against an older kept pack use them too.
  */
 
@@ -24,6 +28,11 @@ interface RawDerived {
   stretches: Record<string, Stretch>;
   coasts: Record<string, { stretches: { id: string; lengthM: number }[] }>;
   segmentSquares: Record<string, string[]>;
+  /** v1.1 trails tables (absent in derived-roads.json). */
+  quietSegments?: string[];
+  featurePark?: Record<string, string>;
+  featureGainM?: Record<string, number>;
+  parks?: string[];
 }
 
 export interface Derived {
@@ -35,6 +44,22 @@ export interface Derived {
   /** Coast pool id (without `pool:`) → stretch ids in claim index order. */
   coasts: Readonly<Record<string, string[]>>;
   segmentSquares: Readonly<Record<string, string[]>>;
+  /** The six trails rules' tables (`trails.ts`); null for roads. */
+  trailRules: TrailTables | null;
+}
+
+/** Trails only: the JSON `featureGainM` / `featurePark` / `parks` / `quietSegments` as `trails.ts` reads them. */
+function trailRulesOf(dataset: Dataset, raw: RawDerived): TrailTables | null {
+  if (dataset !== "trails" || !raw.featureGainM || !raw.featurePark || !raw.parks || !raw.quietSegments) return null;
+  const gainDm: Record<string, number> = {};
+  for (const [t, m] of Object.entries(raw.featureGainM)) gainDm[t] = Math.round(m * 10);
+  return {
+    gainDm,
+    parkOf: raw.featurePark,
+    parks: new Set(raw.parks),
+    quietFeatures: new Set(raw.quietFeatures),
+    quietSegments: new Set(raw.quietSegments),
+  };
 }
 
 function load(dataset: Dataset, raw: RawDerived): Derived {
@@ -51,6 +76,7 @@ function load(dataset: Dataset, raw: RawDerived): Derived {
     stretches: raw.stretches,
     coasts,
     segmentSquares: raw.segmentSquares,
+    trailRules: trailRulesOf(dataset, raw),
   };
 }
 

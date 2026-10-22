@@ -24,6 +24,7 @@ import {
 import { type Evaluation, assertNoPlayWrites, evaluatePlay, loadPlayState, parsePlay, playResponse, playStatements } from "../play/claims";
 import { packByVersion } from "../play/config";
 import { walkDerivedMarks } from "../play/marks";
+import { trailQualifying } from "../play/trails";
 import { LIMITS, rateLimit } from "../ratelimit";
 import { type Dataset, METAS, type SegmentMeta, parseDataset } from "../segments";
 import { type MetricsRow, type UserRow, completedSet, getMetricsRow, islandPct, islandRank, loadCoverage, metricsFor } from "../users";
@@ -247,6 +248,9 @@ export async function putCoverage(request: Request, url: URL, env: Env, deps: De
         weeks: playState.weeks,
         newlyCompleted,
         progress: playState.progress,
+        // trails rules (v1.1): keys the merged coverage, sticky completions and island metres qualify for; roads: none
+        trailQualifying: dataset === "trails" ? trailQualifying(dataset, merged, completed, after.islandM) : undefined,
+        trailPaid: playState.trailPaid,
       });
       playStmts = playStatements(env, user.id, dataset, playEval, walkDerivedMarks(dataset, merged, completed));
     }
