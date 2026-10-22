@@ -36,6 +36,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -163,7 +164,7 @@ class WalkMarksTrailsTest {
 
     // --- climb / parks challenge inputs (plan D5) ------------------------------------------------------------------------
 
-    /** The bundled pack plus `ch-climb` (target [climbM]) and `ch-parkhop` (target 3), as L4-2 will publish them. */
+    /** The bundled pack with `ch-climb` (target [climbM]) and `ch-parkhop` (target 3) replaced by test copies. */
     private fun packWithTrailChallenges(climbM: Int): String {
         val root = Json.parseToJsonElement(PlayFixtures.pack).jsonObject
         val extra = Json.parseToJsonElement(
@@ -174,7 +175,9 @@ class WalkMarksTrailsTest {
                 """"marks":100,"repeat":"once","resolve":{"by":"challenge"},"challenge":{"scope":"solo","metric":"parks","target":{"trails":3}},""" +
                 """"copy":{"title":"Park hop","body":"Finish a trail in different parks this weekend."},"a11y":{"label":"Park hop","announce":"Park hop."}}]""",
         ).jsonArray
-        return JsonObject(root + ("items" to JsonArray(root.getValue("items").jsonArray + extra))).toString()
+        // Pack 2026.11.3 already ships both items (L4-2); drop them first so this test controls the climb target.
+        val base = root.getValue("items").jsonArray.filterNot { it.jsonObject["id"]?.jsonPrimitive?.content in setOf("ch-climb", "ch-parkhop") }
+        return JsonObject(root + ("items" to JsonArray(base + extra))).toString()
     }
 
     @Test
