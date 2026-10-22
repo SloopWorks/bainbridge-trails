@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,11 +18,13 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.play.claim.UnclaimedReason
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.play.fx.FxGlyphImage
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.play_results_header
+import com.bainbridgetrails.resources.play_results_more
 import com.bainbridgetrails.resources.play_results_none
 import com.bainbridgetrails.resources.play_results_total
 import com.bainbridgetrails.resources.play_unclaimed_accuracy
@@ -33,11 +36,14 @@ import com.bainbridgetrails.resources.play_unclaimed_window
 import com.bainbridgetrails.ui.play.components.LogbookRow
 import com.bainbridgetrails.ui.play.components.PlayFormat
 import com.bainbridgetrails.ui.play.components.RankUpLine
+import com.bainbridgetrails.ui.theme.BtTheme
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
  * The results sheet's Play section (ux.md §3.9, PF6): header + total (polite, once), this walk's Logbook lines, the
- * RankUpLine (a line, never a modal), then "Not claimed" with the reason and no number.
+ * RankUpLine (a line, never a modal), then "Not claimed" with the reason and no number. More than 8 lines collapse to 7
+ * + `play_results_more` (trails ux § 3): a plain line, start-aligned with the row text, no chevron, not a button.
  */
 @Composable
 fun ResultsPlaySectionView(section: ResultsPlaySection, modifier: Modifier = Modifier) {
@@ -54,6 +60,18 @@ fun ResultsPlaySectionView(section: ResultsPlaySection, modifier: Modifier = Mod
                 }
             }
             is ResultsPlayItem.Row -> LogbookRow(item.row)
+            is ResultsPlayItem.More -> Row(
+                // Start-aligned with the LogbookRow text: screen inset + the 32dp art tile + the 12dp gap.
+                Modifier.fillMaxWidth().heightIn(min = BtTheme.spacing.minTouch)
+                    .padding(start = BtTheme.spacing.screenH + BtTheme.spacing.playArtTileLog + BtTheme.spacing.md, end = BtTheme.spacing.screenH),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    pluralStringResource(LocalGoal.current.p(Res.plurals.play_results_more), item.count, item.count),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             ResultsPlayItem.None -> Text(stringResource(Res.string.play_results_none), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             is ResultsPlayItem.RankUp -> RankUpLine(item.rank)
             ResultsPlayItem.UnclaimedHeader -> Text(stringResource(Res.string.play_unclaimed_header), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)

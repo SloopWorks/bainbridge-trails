@@ -28,8 +28,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.unit.dp
+import com.bainbridgetrails.play.TrailChallengeStatus
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.play.fx.FxGlyphImage
+import com.bainbridgetrails.play.schedule.PlayAgenda
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.play_challenges_chip
 import com.bainbridgetrails.ui.theme.BtTheme
@@ -130,6 +132,16 @@ fun PlayChipRowLayout(
 }
 
 private val PROBE_SLOTS = listOf("play-full", "play-compact", "challenges-full", "challenges-compact")
+
+/** The ChallengesChip's count (ux.md §2.1; trails ux § 7). */
+object ChallengesChipLogic {
+    /**
+     * This week's challenges ([PlayMarkerLogic.challengesThisWeek]) without the trails `climb` / `parks` occurrences
+     * whose status in [trail] is hidden (nothing left for this player, plan D5). Roads: [trail] is empty.
+     */
+    fun count(agenda: PlayAgenda, trail: Map<String, TrailChallengeStatus>): Int =
+        PlayMarkerLogic.challengesThisWeek(agenda.copy(active = agenda.active.filter { trail[it.occurrence.key]?.hidden != true }))
+}
 
 /** ChallengesChip (ux.md §2.1): pennant + "2 challenges this week" ([compact]: the count only; a11y keeps the phrase). */
 @Composable

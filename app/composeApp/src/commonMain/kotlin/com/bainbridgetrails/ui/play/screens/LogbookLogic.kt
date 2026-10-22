@@ -7,9 +7,16 @@ import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Rank
 import com.bainbridgetrails.play.rules.Ranks
 import com.bainbridgetrails.play.time.IslandTime
+import com.bainbridgetrails.resources.Res
+import com.bainbridgetrails.resources.play_log_climb_what
+import com.bainbridgetrails.resources.play_log_mile_what
 import com.bainbridgetrails.ui.Format
 import com.bainbridgetrails.ui.play.components.PlayFormat
+import com.bainbridgetrails.ui.play.components.TrailRewardFormat
+import com.bainbridgetrails.ui.play.components.TrailValue
+import com.bainbridgetrails.ui.play.record.ResultsPlayLogic
 import kotlinx.datetime.LocalDate
+import org.jetbrains.compose.resources.StringResource
 
 /** What a Logbook line shows at its end (ux.md § 2.6). */
 sealed interface LogTrailing {
@@ -26,6 +33,11 @@ sealed interface LogTrailing {
 /** The line under a Logbook line: [Cap] replaces `why` with `play_log_cap`; [LocalOnly] adds `play_log_local_only`. */
 enum class LogNote { Cap, LocalOnly }
 
+/**
+ * One Logbook line. [what] is the persisted text; [value] (trails `climb` / `milestone` only, trails ux § 2.2) is the
+ * step re-rendered from the entry's `contentId` in the Settings unit, which the row shows through
+ * [LogbookLogic.whatRes] instead of [what] (null: show [what]).
+ */
 data class LogRowModel(
     val id: String,
     val kind: LogKind,
@@ -33,6 +45,7 @@ data class LogRowModel(
     val why: String,
     val trailing: LogTrailing,
     val note: LogNote?,
+    val value: TrailValue? = null,
 )
 
 /** One group under a day header (product § 3.8 display rules). */
@@ -67,24 +80,26 @@ data class LogbookModel(val totals: LogbookTotals, val days: List<LogbookDay>, v
  * The Logbook screen (ux.md § 3.13, product § 3.8, PF11): days newest first; within a day, a walk's entries grouped under
  * that walk, the later walk first; week-close entries their own group; dates only, never a time of day (the model
  * carries island dates; nothing here reads a clock). Entries are append-only, so a later index is a newer entry.
- * Totals always sum every entry (PF11-4), paging only limits what is listed ([limit] newest entries).
+ * Totals always sum every entry (PF11-4), paging only limits what is listed ([limit] newest entries). Inside a walk
+ * group the walk's rule lines follow the results order ([ResultsPlayLogic.WALK_ORDER], trails ux § 2.2); finds keep
+ * their place. [units] re-renders the trails climb / trail-mile lines ([row]).
  */
 object LogbookLogic {
     const val PAGE = 50
 
     private val WEEK_CLOSE = setOf(LogKind.week, LogKind.retreat, LogKind.island_challenge)
 
-    fun model(entries: List<LogEntry>, today: LocalDate, limit: Int = Int.MAX_VALUE): LogbookModel {
+    fun model(entries: List<LogEntry>, today: LocalDate, limit: Int = Int.MAX_VALUE, units: Units? = null): LogbookModel {
         val thisWeek = IslandTime.weekId(today)
         val totals = LogbookTotals.of(entries.sumOf { it.marks }, entries.filter { it.weekId == thisWeek }.sumOf { it.marks })
         val shown = entries.withIndex().toList().takeLast(limit.coerceAtLeast(0))
         val days = shown.groupBy { it.value.date }.entries
             .sortedByDescending { it.key }
-            .map { (date, dayEntries) -> LogbookDay(date, groups(dayEntries)) }
+            .map { (date, dayEntries) -> LogbookDay(date, groups(dayEntries, units)) }
         return LogbookModel(totals, days, more = shown.size < entries.size)
     }
 
-    private fun groups(dayEntries: List<IndexedValue<LogEntry>>): List<LogbookGroup> {
+    private fun groups(dayEntries: List<IndexedValue<LogEntry>>, units: Units?): List<LogbookGroup> {
         val keyed = dayEntries.groupBy { (_, e) ->
             when {
                 e.kind in WEEK_CLOSE && e.walkId == null -> "week"
@@ -95,16 +110,30 @@ object LogbookLogic {
         return keyed.entries
             .sortedByDescending { (_, es) -> es.maxOf { it.index } }
             .map { (key, es) ->
-                val rows = es.sortedBy { it.index }.map { row(it.value) }
+                val logged = es.sortedBy { it.index }.map { it.value }
                 when {
-                    key == "week" -> LogbookGroup.WeekClose(rows)
-                    key.startsWith("walk:") -> LogbookGroup.Walk(key.removePrefix("walk:"), rows)
-                    else -> LogbookGroup.Loose(rows)
+                    key == "week" -> LogbookGroup.WeekClose(logged.map { row(it, units) })
+                    key.startsWith("walk:") -> LogbookGroup.Walk(key.removePrefix("walk:"), inResultsOrder(logged).map { row(it, units) })
+                    else -> LogbookGroup.Loose(logged.map { row(it, units) })
                 }
             }
     }
 
-    fun row(e: LogEntry): LogRowModel {
+    /**
+     * A walk's [logged] entries with its rule lines ([ResultsPlayLogic.WALK_ORDER] kinds) in results order, each in a
+     * slot one of them held; every other line (finds, challenges, visits) keeps its slot.
+     */
+    private fun inResultsOrder(logged: List<LogEntry>): List<LogEntry> {
+        val ruled = logged.filter { it.kind in ResultsPlayLogic.WALK_ORDER }.sortedBy { ResultsPlayLogic.rank(it.kind) }.iterator()
+        return logged.map { if (it.kind in ResultsPlayLogic.WALK_ORDER) ruled.next() else it }
+    }
+
+    /**
+     * [e]'s line. With [units], a trails `climb` (`climb:<m>`) or `milestone` (`mile:<mi>`) entry carries its step
+     * re-rendered from the `contentId` through [TrailRewardFormat] (trails ux § 2.2: "820 ft" for `climb:250` in
+     * miles); an unparseable key, another kind, or no [units] keeps the persisted what. Roads never writes these keys.
+     */
+    fun row(e: LogEntry, units: Units? = null): LogRowModel {
         val localOnly = e.board == BoardState.local_only
         val trailing = when (e.kind) {
             LogKind.visit -> LogTrailing.None
@@ -117,7 +146,26 @@ object LogbookLogic {
             localOnly -> LogNote.LocalOnly
             else -> null
         }
-        return LogRowModel(e.id, e.kind, e.what, e.why, trailing, note)
+        return LogRowModel(e.id, e.kind, e.what, e.why, trailing, note, units?.let { trailValue(e, it) })
+    }
+
+    /** The template a re-rendered what fills with its value: `play_log_climb_what` / `play_log_mile_what`; null otherwise. */
+    fun whatRes(kind: LogKind): StringResource? = when (kind) {
+        LogKind.climb -> Res.string.play_log_climb_what
+        LogKind.milestone -> Res.string.play_log_mile_what
+        else -> null
+    }
+
+    private fun trailValue(e: LogEntry, units: Units): TrailValue? {
+        val key = e.contentId ?: return null
+        val prefix = when (e.kind) {
+            LogKind.climb -> "climb:"
+            LogKind.milestone -> "mile:"
+            else -> return null
+        }
+        if (!key.startsWith(prefix)) return null
+        val step = key.removePrefix(prefix).toIntOrNull()?.takeIf { it > 0 } ?: return null
+        return if (e.kind == LogKind.climb) TrailRewardFormat.climbStep(step.toDouble(), units) else TrailRewardFormat.mileStep(step, units)
     }
 
     /** Day header: "Sun, Nov 1" (date only, PF11-3). */
