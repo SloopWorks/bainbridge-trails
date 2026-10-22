@@ -63,6 +63,7 @@ import com.bainbridgetrails.ui.components.BtIcon
 import com.bainbridgetrails.ui.components.BtIcons
 import com.bainbridgetrails.ui.components.SectionHeader
 import com.bainbridgetrails.ui.play.components.TrailValue
+import com.bainbridgetrails.ui.play.components.spokenValue
 import com.bainbridgetrails.ui.theme.BtTheme
 import org.jetbrains.compose.resources.stringResource
 

@@ -152,14 +152,16 @@ private fun WithPlay(
 
 /**
  * The trails `climb` / `parks` challenge statuses of [agenda]'s challenge occurrences ([ChallengesLogic.trailOccurrences]
- * → `PlayRepository.trailChallenges`, plan D5), re-read when the agenda's challenges or the [logbook] change; empty on
- * roads; null until read for the current occurrences (screens show their loading state, so a hidden card never
- * flashes; a Logbook change keeps the previous statuses while it re-reads).
+ * → `PlayRepository.trailChallenges`, plan D5), re-read when the agenda's challenges or the [logbook]'s `complete`
+ * entries change ([ChallengesLogic.completionKey]; not on every find); empty on roads; null until read for the current
+ * occurrences (screens show their loading state, so a hidden card never flashes; a new completion keeps the previous
+ * statuses while it re-reads).
  */
 @Composable
 fun rememberTrailChallenges(play: PlayRepository, agenda: PlayAgenda?, logbook: Logbook?): Map<String, TrailChallengeStatus>? {
     val occurrences = remember(agenda) { agenda?.let(ChallengesLogic::trailOccurrences).orEmpty() }
-    val read by produceState<Pair<List<Occurrence>, Map<String, TrailChallengeStatus>>?>(null, play, occurrences, logbook) {
+    val completions = remember(logbook) { ChallengesLogic.completionKey(logbook) }
+    val read by produceState<Pair<List<Occurrence>, Map<String, TrailChallengeStatus>>?>(null, play, occurrences, completions) {
         value = occurrences to play.trailChallenges(occurrences)
     }
     return read?.takeIf { it.first == occurrences }?.second

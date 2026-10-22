@@ -115,7 +115,7 @@ private const val SWEEP = "ch-sweep"
 @Composable
 fun ChallengeCard(card: ChallengeCardModel, onClick: (() -> Unit)?, modifier: Modifier = Modifier, detail: Boolean = false) {
     // A climb target is spoken with its unit word ("492 feet"), never "ft" (trails ux § 1, § 7).
-    val spokenTarget = card.climbTarget?.let { pluralStringResource(it.unit.spoken, it.pluralQuantity, it.number) }
+    val spokenTarget = card.climbTarget?.let { spokenValue(it) }
     val text: ChallengeCardText = ChallengesLogic.text(card, rememberCardCopy(card), spokenTarget)
     val title = challengeTitle(card)
     val body = challengeBody(card)
