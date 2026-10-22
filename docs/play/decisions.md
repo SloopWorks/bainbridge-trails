@@ -366,6 +366,93 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
   line beside the pin, or the list). Play off makes no Play query at all. Proof: `MapTapPriorityTest`
   (`trail hit wins outside the figure`, `pin wins inside its figure`, `inked stretch tap is a trail tap`).
 
+## PD-26 Trails edition v1.1: six trails-only rules, two challenges, ledgers by value (plan review round 1)
+- **Status.** ACCEPTED 2026-10-21. Sources: `trails/brief.md` § 2 (owner delegation; Q1–Q5 defaults stand),
+  `trails/ux.md` (ACCEPTED, § 10 binding), the plan `../superpowers/plans/2026-10-21-play-trails-v1-1.md` § 1
+  (D1–D12, rev 2 after `trails/reviews/2026-10-21-round1-plan.md`, FIX-FIRST applied). Precedence unchanged; the plan
+  yields to the specs except for the deviations listed here.
+- **Context.** The owner asked for Play on the trails goal with extra marks for climbing, mileage and parks. PD-15
+  put W-PARK1, W-PARKC, W-ISLAND and the milestones in v2. The brief amends that cut line **for the trails goal
+  only**; PD-2/PD-3 hold: every new mark is a fixed rule, server-derived from accepted coverage plus the sticky
+  completed set, monotone, never from GPS or barometric altitude; quiet trails and Pritchard Park never earn.
+- **Decision (rules, `goals: [trails]` only; roads byte-identical, guarded).**
+
+| id | rule | marks | reachable today (dataset `2026-10-18+aad9d16e`) |
+|---|---|---|---|
+| W-CLIMB | Ladder over Σ `gain_m` of **completed** non-quiet trails (partial coverage adds nothing; trails sharing segments each count their own `gain_m`, brief Q4). Steps keyed in metres: **100, 250, 500, 750, 1,000, 1,250** (1,500 dropped, Q1: non-quiet total is 1,368.8 m). Shown in the user's unit (ft with mi, m with km). | +50 per step | 6 steps = 300 |
+| W-STEEP "High ground" | Completing a non-quiet trail with `gain_m ≥ 40`; once per trail id. | +50 | **10 trails** (Q2: Blakley Cemetery Trail is quiet) = 500 |
+| W-MILE (trails) | Distance ladder 1, 5, 10 … 60 mi on cumulative non-quiet covered metres (W-COV's `coveredM`), `Milestones` math (RP-8); paid steps keyed in **miles**. | +50 per step | 102,964 m = 63.98 mi → **13 steps** = 650 |
+| W-PARK1 | First non-quiet coverage in a Play park (`trails.json` `park` non-null, ≠ Pritchard Park); once per park. | +50 | **19 parks** = 950 |
+| W-PARKC | Every named non-quiet trail in a Play park complete; fires on the walk completing the last one; once per park. | +150 | 19 parks = 2,850 (7 single-trail parks) |
+| W-ISLAND | Island complete (existing `islandReached`); once. | +1,000 | 1,000 |
+
+  Two solo challenges (window-boxed, never timed, `goals: [trails]`, +100 each, existing caps bind; pack
+  **2026.11.3**, D10): **`ch-climb`** metric **`climb`** = Σ `gain_m` of non-quiet trails newly completed inside
+  Mon 00:00 → Mon 00:00 island time, default target 150 m, progress and target carried as integer **decimetres**
+  (`round(gain_m × 10)`; 149.9 m = 1,499 < 1,500); **`ch-parkhop`** metric **`parks`** = distinct Play parks with
+  ≥ 1 new non-quiet completion inside Sat 00:00 → Mon 00:00 (as `ch-sweep`), default target 3. Both windows are
+  whole days (validator). Target (Q3, both sides, D5) = `min(default, remaining + progress)` after the walk/upload;
+  remaining 0 → no card, no chip count, no What's On row, no claim.
+- **Ledgers by value (D1, D2, D3).** Device: `PlayState.trailPaid: Set<String>` + `trailsStarted`; keys `climb:<m>`,
+  `mile:<mi>`, `high:<trailId>`, `park1:<park>`, `parkc:<park>`, `island`, never re-derived; the key is also the
+  Logbook `contentId`, so **paid** = `trailPaid` ∪ the `contentId`s of Logbook entries of the six kinds, owed =
+  qualifying − paid. Server: additive `0007_play_trails.sql` — `play_trail_paid(user_id, dataset, key, marks)`,
+  `play_totals.trail_marks`, `play_progress_keys` (below); inserts `ON CONFLICT DO NOTHING` before the totals upsert,
+  allowed on the no-change upload path. `GET /v1/play/me?dataset=trails` gains the six kinds in `perKind` and
+  `paid: string[]`; the roads body stays byte-identical. A dataset that drops a trail lowers nothing; one that adds a
+  trail pays only keys not yet paid.
+- **Start balance (D4; ux § 6 with one copy deviation).** `TrailStart` runs after `StartBalance` on every turn-on
+  (trails only): owed keys → one `start_trails` entry ("Trail rewards so far" the first time; later catch-ups **what
+  "Trail rewards caught up", why "Trail rewards owed from earlier walks"** instead of ux § 6's "Trail rewards while
+  Play was off"), `island` as its own entry, nothing owed → nothing. A walk finalized during the turn-on restore
+  pays every key once (P1-8). The PlayWake number = start_balance + start_trails + island (P2-5).
+- **Deviations recorded.**
+  - **D6** AC 2's "1,609 m → 1 mi" is one statute mile: **1,609.344 m = `mile:1`**, 1,609.0 m pays nothing; climb
+    compares integer decimetres (99.9 m = 999 < 1,000). W-ISLAND = island fraction ≥ 1 − 1e-9.
+  - **Quiet set (P1-2 ruling).** The new rules take quiet segments from the derived JSON **`quietSegments` on both
+    sides** (server `trails.ts` reads it, as the Kotlin v1 rules already do). v1/roads `walkDerivedMarks` stays untouched
+    for AC 1; the v1 W-COV/W-SQUARE quiet-set drift is a follow-up (`docs/mvp/STATUS.md`), not fixed here.
+  - **D7** Local Play state is **lost on downgrade** (refused, documented): a v1 build cannot decode a v1.1 state file
+    (new Logbook kinds `climb`, `high_ground`, `start_trails`) → empty Play state on that phone, overwritten on its next
+    write; the server total is intact and a signed-in v1.1 turn-on restores it. Shipyard moves forward; a rollback is
+    the owner's call.
+  - **D8** Upload contract unchanged (AC 7): no edit to `ApiDtos.kt` / `PlayWalkClaimsDto` / `PlayClaimDto`; ledger
+    keys never leave the phone (DTO-name, byte and source-span tests).
+  - **D11** Before the owner deploys the Worker: the client runs pack 2026.11.3, so a deployed v1 Worker answers
+    `stale_config` for every claim naming it (→ `local_only`) while its `play` block still settles the walk rows; a
+    pre-Play Worker leaves rows `pending`. After deploy + 0007 the first Play upload inserts every qualifying key and
+    totals converge. Until then the Logbook total exceeds the server total.
+  - **D12** `play_progress_keys(user_id, dataset, occ, key)` is **kept**, an explicit deviation from "no place in new
+    tables": a row (user, `ch-parkhop@<Saturday>`, park) is coarser than the place-and-week occurrence keys
+    `play_claims` already retains (OD-21); purged by the cron once the occurrence's grace ends; deleted with the
+    account. Final privacy ruling in W5; the named fallback is per-upload distinct parks (a park hit on two walks
+    counts twice).
+  - **P1-1** One upload contributes to **at most one occurrence per challenge item**: the one active at `now`, else
+    the latest still in grace. Consequence: a walk synced late, after the next occurrence opened, counts toward the
+    new one on the server while the client counted it by its Logbook date; the two can differ until the next walk.
+    Park-hop progress is mirrored into `play_progress` (+1 per new park key) so bands and `/challenges` = distinct
+    parks (P1-9); `/challenges` returns the personal target when signed in, climb values in dm (P2-7).
+  - **P2-6** `ch-climb` / `ch-parkhop` claim when `P ≥ target > 0` and the occurrence is unclaimed (no `prior <
+    target` gate; `ch-sweep` unchanged).
+  - **P2-3** The pack build fails when a park name or trail id present in the committed derived `trails.json`
+    disappears; an alias map for renames is **v2**.
+  - **Roads guard (D9).** `roads.json` embeds `"pack"`, so the guard is the sha256 of the file without the `"pack":`
+    line (`4ea0afa8…`), and `agenda-roads.tsv` is compared without its header; roads start balance, walk marks,
+    `/me` body and challenge list equal `main` (2aee859) by golden.
+- **Economy (product § 3.2, § 3.7.3).** Trails whole goal ≈ 22,946 + 6,250 (300 + 500 + 650 + 950 + 2,850 + 1,000)
+  ≈ **29,196**; roads stays ≈ 23,286. The asymmetry is accepted: ranks are per goal, there is no cross-goal
+  comparison, the board stays v2 (PD-21); "Keeper of the Chart" (30,000) still needs Play content.
+- **Owner items (not in this work item).** Worker deploy + `npm run migrate:remote` of 0007, after the OD-19
+  privacy-paragraph sign-off (D11 holds until then). Once the Worker serves 2026.11.3, v1 clients reject the whole
+  pack (`coerceInputValues = false`, last good kept); Shipyard-only today. Alias map v2 (P2-3). OD-21 retention
+  governs `play_trail_paid` / `play_progress_keys` like `play_claims`.
+- **Consequence.** Trails players with Play on earn the six rules and the two challenges from the first walk or the
+  turn-on; nothing new leaves the phone; roads is unchanged. Proof: `TrailRewardsTest`, `TrailRewardsGoldenTest`,
+  `TrailStartTest`, `LogKindCompatTest`, `TrailChallengeTest`, `UploadContractTest`, `RoadsGuardTest` (both modules),
+  `backend/test/play-trails*.test.ts`, `play-roads-guard.test.ts`, the shared golden
+  `data/play/golden/trails-rewards.json`.
+- **Resolves:** brief Q1–Q5 (defaults); plan review round 1 P0-1, P1-1 … P1-10, P2-1 … P2-11 as applied in plan rev 2.
+
 ## Status
 
 | doc | status |
@@ -377,3 +464,4 @@ SD-1 … SD-11 (`schedule.md` § 0) and the engine decisions PF-1 … PF-9 are a
 | `ai.md` | ACCEPTED (round 1 findings resolved) |
 | `ux.md` | ACCEPTED 2026-10-20 after the conformance pass (PD-18) |
 | `plan.md` | written 2026-10-20 (PD-17); PD-19, PD-20 recorded |
+| `trails/brief.md`, `trails/ux.md`, `../superpowers/plans/2026-10-21-play-trails-v1-1.md` | v1.1 (trails only): brief intake, ux ACCEPTED, plan rev 2; PD-26 recorded 2026-10-21 |
