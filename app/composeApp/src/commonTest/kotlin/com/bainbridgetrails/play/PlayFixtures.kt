@@ -31,7 +31,7 @@ internal object PlayFixtures {
     fun read(name: String): String = SystemFileSystem.source(Path("$DIR/$name")).buffered().use { it.readString() }
 
     val pack: String by lazy { read("play-content.json") }
-    val bundledVersion: String get() = "2026.11.1"
+    val bundledVersion: String get() = "2026.11.2"
 
     fun tideText(year: Int): String? = runCatching { read("tides/9445882-$year.json") }.getOrNull()
 

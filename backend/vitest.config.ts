@@ -1,5 +1,7 @@
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
+// @ts-expect-error -- untyped Node script (the Worker tsconfig has no Node types); see the file's header
+import { goldenWriteFlag, goldenWriter } from "./test/golden-writer.mjs";
 
 export default defineConfig(async () => {
   const migrations = await readD1Migrations("./migrations");
@@ -23,7 +25,12 @@ export default defineConfig(async () => {
             ADMIN_TOKEN: "test-admin-token-0123456789",
             // a local .dev.vars may carry an e2e clock offset; tests run on the real (injected) clock
             DEV_CLOCK_OFFSET_MS: "0",
+            // Play golden capture (test/play-roads-guard.test.ts): "1" rewrites the golden's server section.
+            PLAY_GOLDEN_WRITE: goldenWriteFlag(),
           },
+          // workerd cannot write the repo: with PLAY_GOLDEN_WRITE=1 a guard test PUTs its golden JSON to this Node-side
+          // binding (test/golden-writer.mjs → data/play/golden/<name>.json). Refused otherwise.
+          serviceBindings: { GOLDEN_WRITER: goldenWriter },
         },
       }),
     ],
