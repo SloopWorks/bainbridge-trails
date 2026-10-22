@@ -52,9 +52,13 @@ import com.bainbridgetrails.data.LocalGoal
 import com.bainbridgetrails.graph.AppGraph
 import com.bainbridgetrails.net.getOrNull
 import com.bainbridgetrails.play.PlayRepository
+import com.bainbridgetrails.play.TrailChallengeStatus
 import com.bainbridgetrails.play.fx.FxArt
 import com.bainbridgetrails.play.fx.FxGlyph
 import com.bainbridgetrails.play.fx.FxGlyphImage
+import com.bainbridgetrails.play.rules.Logbook
+import com.bainbridgetrails.play.schedule.Occurrence
+import com.bainbridgetrails.play.schedule.PlayAgenda
 import com.bainbridgetrails.play.time.IslandTime
 import com.bainbridgetrails.resources.Res
 import com.bainbridgetrails.resources.play_challenge_island
@@ -146,6 +150,21 @@ private fun WithPlay(
     }
 }
 
+/**
+ * The trails `climb` / `parks` challenge statuses of [agenda]'s challenge occurrences ([ChallengesLogic.trailOccurrences]
+ * → `PlayRepository.trailChallenges`, plan D5), re-read when the agenda's challenges or the [logbook] change; empty on
+ * roads; null until read for the current occurrences (screens show their loading state, so a hidden card never
+ * flashes; a Logbook change keeps the previous statuses while it re-reads).
+ */
+@Composable
+fun rememberTrailChallenges(play: PlayRepository, agenda: PlayAgenda?, logbook: Logbook?): Map<String, TrailChallengeStatus>? {
+    val occurrences = remember(agenda) { agenda?.let(ChallengesLogic::trailOccurrences).orEmpty() }
+    val read by produceState<Pair<List<Occurrence>, Map<String, TrailChallengeStatus>>?>(null, play, occurrences, logbook) {
+        value = occurrences to play.trailChallenges(occurrences)
+    }
+    return read?.takeIf { it.first == occurrences }?.second
+}
+
 /** Screen-margin padding (`BtTheme.spacing.screenH`). */
 private val screenPad: Modifier
     @Composable get() = Modifier.padding(horizontal = BtTheme.spacing.screenH)
@@ -191,7 +210,7 @@ fun LogbookScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: () -
         val history by graph.walks.history.collectAsStateWithLifecycle()
         var limit by remember { mutableIntStateOf(LogbookLogic.PAGE) }
         val today = IslandTime.dateOf(AppGraph.playClock.now())
-        val model = remember(state.logbook, limit, today) { LogbookLogic.model(state.logbook.entries, today, limit) }
+        val model = remember(state.logbook, limit, today, settings.units) { LogbookLogic.model(state.logbook.entries, today, limit, settings.units) }
         val distances = remember(history) { history?.walks.orEmpty().associate { it.sessionId to it.distanceM } }
         val walkTemplate = stringResource(Res.string.play_log_walk_group, "%1\$s")
         ListScreen(title, onBack = onBack) {
@@ -331,15 +350,17 @@ fun WhatsOnScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: () -
     WithPlay(graph, title, onBack) { play ->
         val agenda by play.agenda.collectAsStateWithLifecycle()
         val config by play.config.collectAsStateWithLifecycle()
+        val state by play.store.state.collectAsStateWithLifecycle()
         val a = agenda
         val c = config?.config
-        if (a == null || c == null) {
+        val trail = rememberTrailChallenges(play, a, state.logbook)
+        if (a == null || c == null || trail == null) {
             ListScreen(title, onBack = onBack) { item { LoadingState() } }
             return@WithPlay
         }
         val now = AppGraph.playClock.now()
         val zone = remember { TimeZone.currentSystemDefault() }
-        val model = remember(a, c) { WhatsOnLogic.model(a, c, play.goal, now) }
+        val model = remember(a, c, trail) { WhatsOnLogic.model(a, c, play.goal, now, trail) }
         val islandT = stringResource(Res.string.play_island_time, "%1\$s")
         ListScreen(title, onBack = onBack) {
             item(key = "week") {
@@ -402,12 +423,15 @@ fun ChallengesScreen(graph: AppGraph.Installed, settings: AppSettings, onBack: (
         )
         val server by produceState<com.bainbridgetrails.net.PlayChallengesDto?>(null, play) { value = play.challenges()?.getOrNull() }
         val c = config?.config
-        if (c == null) {
+        val trail = rememberTrailChallenges(play, agenda, state.logbook)
+        if (c == null || trail == null) {
             ListScreen(title, onBack = onBack) { item { LoadingState() } }
             return@WithPlay
         }
         val now = AppGraph.playClock.now()
-        val model = remember(agenda, c, server, state.logbook, nouns) { ChallengesLogic.model(c, play.goal, agenda, server, state.logbook.entries, now, nouns) }
+        val model = remember(agenda, c, server, state.logbook, nouns, trail, settings.units) {
+            ChallengesLogic.model(c, play.goal, agenda, server, state.logbook.entries, now, nouns, trail, settings.units)
+        }
         var open by remember { mutableStateOf<ChallengeCardModel?>(null) }
         ListScreen(title, onBack = onBack) {
             if (model.isEmpty) item(key = "empty") { EmptyState(stringResource(Res.string.play_challenges_empty), compact = true) }

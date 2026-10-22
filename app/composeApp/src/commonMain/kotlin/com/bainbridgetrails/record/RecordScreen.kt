@@ -387,9 +387,9 @@ private fun RecordContent(
                         {
                             val st by repo.store.state.collectAsStateWithLifecycle()
                             val results by repo.claimResults.collectAsStateWithLifecycle()
-                            val section = remember(st, results, s.summary.sessionId) {
+                            val section = remember(st, results, s.summary.sessionId, settings.units) {
                                 val items = repo.itemsById()
-                                ResultsPlayLogic.section(s.summary.sessionId, st.logbook, results[s.summary.sessionId], { items[it]?.copy?.title ?: it }, summaryShown = false)
+                                ResultsPlayLogic.section(s.summary.sessionId, st.logbook, results[s.summary.sessionId], { items[it]?.copy?.title ?: it }, summaryShown = false, units = settings.units)
                             }
                             section?.let { ResultsPlaySectionView(it) }
                         }

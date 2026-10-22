@@ -7,6 +7,8 @@ import com.bainbridgetrails.play.rules.LogEntry
 import com.bainbridgetrails.play.rules.LogKind
 import com.bainbridgetrails.play.rules.Logbook
 import com.bainbridgetrails.play.rules.Ranks
+import com.bainbridgetrails.ui.play.PlayStringsXml
+import com.bainbridgetrails.ui.play.components.PlayFormat
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -81,5 +83,59 @@ class ResultsPlaySectionTest {
     @Test
     fun `not shown again after summary_shown`() {
         assertNull(ResultsPlayLogic.section(session, Logbook(earlier + walk), null, { it }, summaryShown = true))
+    }
+
+    // --- Play trails v1.1 (docs/play/trails/ux.md § 3, UX-4) ------------------------------------------------------
+
+    private fun trailWalk(n: Int): List<LogEntry> {
+        val kinds = listOf(LogKind.complete, LogKind.high_ground, LogKind.park_first, LogKind.park_complete, LogKind.climb, LogKind.milestone)
+        return List(n) { i -> e("k$i", kinds[i % kinds.size], 50 + i) }
+    }
+
+    @Test
+    fun `9 entries → 7 rows + "+2 more in your Logbook", total = sum of 9`() {
+        val nine = trailWalk(9)
+        val section = assertNotNull(ResultsPlayLogic.section(session, Logbook(nine), null, { it }, summaryShown = false))
+        assertEquals(nine.sumOf { it.marks }, section.total, "the header total counts every entry")
+        assertEquals(ResultsPlayItem.Header(nine.sumOf { it.marks }), section.items.first())
+        val rows = section.items.filterIsInstance<ResultsPlayItem.Row>()
+        assertEquals(7, rows.size)
+        assertEquals(section.rows.take(7), rows.map { it.row }, "the first 7 in results order")
+        val more = section.items.filterIsInstance<ResultsPlayItem.More>().single()
+        assertEquals(2, more.count)
+        assertEquals(section.items.indexOf(rows.last()) + 1, section.items.indexOf(more), "the more-line follows the rows")
+        assertEquals("+2 more in your Logbook", PlayFormat.fill(PlayStringsXml.pluralForm("play_results_more", more.count), more.count))
+        assertEquals("+1 more in your Logbook", PlayFormat.fill(PlayStringsXml.pluralForm("play_results_more", 1), 1))
+        assertEquals(ResultsPlayLogic.MAX_ROWS, section.items.count { it is ResultsPlayItem.Row || it is ResultsPlayItem.More }, "8 lines: 7 rows + the more-line")
+    }
+
+    @Test
+    fun `8 entries → no more-line`() {
+        val section = assertNotNull(ResultsPlayLogic.section(session, Logbook(trailWalk(8)), null, { it }, summaryShown = false))
+        assertEquals(8, section.items.count { it is ResultsPlayItem.Row })
+        assertTrue(section.items.none { it is ResultsPlayItem.More })
+        // Rank-up and "Not claimed" still follow the more-line (ux § 3).
+        val ten = trailWalk(10)
+        val result = ClaimResult(emptyList(), listOf(Unclaimed("t@1", "treasure-weekly-trails", UnclaimedReason.DARK)), emptyList())
+        val big = assertNotNull(ResultsPlayLogic.section(session, Logbook(earlier + ten), result, { titles[it] ?: it }, summaryShown = false))
+        val more = big.items.indexOfFirst { it is ResultsPlayItem.More }
+        assertTrue(more > 0 && big.items.indexOfFirst { it is ResultsPlayItem.RankUp } > more && big.items.indexOf(ResultsPlayItem.UnclaimedHeader) > more)
+    }
+
+    @Test
+    fun `high_ground before park_first, climb before milestone`() {
+        val logged = listOf(
+            e("mi", LogKind.milestone, 50), e("cl", LogKind.climb, 50), e("pc", LogKind.park_complete, 150), e("p1", LogKind.park_first, 50),
+            e("hg", LogKind.high_ground, 50), e("sq", LogKind.square, 10), e("is", LogKind.island, 1_000), e("co", LogKind.complete, 100),
+            e("cv", LogKind.coverage, 40), e("tr", LogKind.treasure, 25),
+        )
+        val section = assertNotNull(ResultsPlayLogic.section(session, Logbook(logged), null, { it }, summaryShown = false))
+        assertEquals(
+            listOf(
+                LogKind.coverage, LogKind.complete, LogKind.high_ground, LogKind.park_first, LogKind.park_complete, LogKind.climb,
+                LogKind.milestone, LogKind.island, LogKind.square, LogKind.treasure,
+            ),
+            section.rows.map { it.kind },
+        )
     }
 }
