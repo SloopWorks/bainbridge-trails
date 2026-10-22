@@ -275,7 +275,7 @@ describe("trails ledger on PUT /v1/coverage (L3-1)", () => {
   it("upload without play writes no ledger row", async () => {
     await syncOff(trailFull(HAYANO));
     await syncOff(trailFull(TRILLIUM));
-    for (const t of ["play_trail_paid", "play_totals", "play_claims", "play_weeks", "play_progress", "play_progress_keys"]) {
+    for (const t of ["play_trail_paid", "play_totals", "play_claims", "play_weeks", "play_progress"]) {
       expect(await rows(`SELECT * FROM ${t} WHERE user_id = ?`, userId), t).toEqual([]);
     }
     // playConfig alone does not switch Play on either
@@ -384,12 +384,12 @@ describe("trails ledger on PUT /v1/coverage (L3-1)", () => {
     expect(Object.keys(roads.perKind as object)).toEqual(["treasure", "egg", "riddle", "ink", "lore", "challenge"]);
   });
 
-  it("delete removes ledger and progress keys", async () => {
+  it("delete removes ledger and progress", async () => {
     await syncOn(trailFull(HAYANO));
-    await env.DB.prepare("INSERT INTO play_progress_keys VALUES (?, 'trails', 'ch-parkhop@2026-10-31', 'Moritani Preserve')").bind(userId).run();
+    await env.DB.prepare("INSERT INTO play_progress VALUES (?, 'trails', 'ch-parkhop@2026-10-31', 1)").bind(userId).run();
     expect((await ledger()).length).toBe(2);
     expect((await h.call("DELETE", "/v1/me", { token })).status).toBe(204);
-    for (const t of ["play_trail_paid", "play_progress_keys", "play_totals", "play_claims", "play_weeks", "play_progress"]) {
+    for (const t of ["play_trail_paid", "play_totals", "play_claims", "play_weeks", "play_progress"]) {
       expect(await rows(`SELECT * FROM ${t} WHERE user_id = ?`, userId), t).toEqual([]);
     }
   });

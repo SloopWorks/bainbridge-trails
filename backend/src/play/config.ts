@@ -41,6 +41,13 @@ export const PUBLISHED: ReadonlyMap<string, PlayPack> = (() => {
 
 export const packByVersion = (version: string): PlayPack | null => PUBLISHED.get(version) ?? null;
 
+/** The packs a request evaluates against: the current one and the kept versions (`Deps.packs` overrides in tests). */
+export interface PlayPacks {
+  current: PlayPack;
+  byVersion(version: string): PlayPack | null;
+}
+export const PACKS: PlayPacks = { current: CURRENT, byVersion: packByVersion };
+
 export const TIDE_YEARS: readonly number[] = Object.keys(TIDE_FILES).map(Number);
 {
   const named = ((CURRENT as { tides?: { years?: number[] } }).tides?.years ?? []).filter((y) => !TIDE_FILES[y]);
