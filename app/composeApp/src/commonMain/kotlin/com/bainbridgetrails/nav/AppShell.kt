@@ -70,6 +70,7 @@ import com.bainbridgetrails.tracking.RecordingState
 import com.bainbridgetrails.ui.AttributionScreen
 import com.bainbridgetrails.ui.CelebrationScreen
 import com.bainbridgetrails.ui.PrivacyScreen
+import com.bainbridgetrails.ui.ParkFilter
 import com.bainbridgetrails.ui.TrailListQuery
 import com.bainbridgetrails.ui.TrailsListState
 import com.bainbridgetrails.coverage.TrailStatus
@@ -307,6 +308,10 @@ fun AppShell(graph: AppGraph.Installed, settings: AppSettings, launch: SpikeLaun
                     onPlayLogbook = { nav.navigate(LogbookRoute) },
                     onPlayWhatsOn = { nav.navigate(WhatsOnRoute) },
                     onPlayStories = { nav.navigate(IslandStoriesRoute) },
+                    onPlayPark = { park ->
+                        TrailsListState.query = TrailListQuery(park = ParkFilter.Named(park))
+                        nav.selectTab(TrailsRoute)
+                    },
                 )
             }
             composable<TrailDetailRoute> { entry ->
