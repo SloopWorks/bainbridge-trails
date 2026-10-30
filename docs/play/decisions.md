@@ -1,5 +1,13 @@
 # Play decisions (spec review round 1)
 
+## Map clarity override — 2026-10-30
+
+Owner request: show only Bainbridge Island and remove the translucent layer over unwalked areas. Exploration
+fog no longer spawns or renders on live Map or Record, in either edition. This supersedes the live fog visual
+in PD-14 and effects §3.18; its debug showcase remains. Chart-square coverage and W-SQUARE rewards are
+unchanged. Other Play figures and effects remain. The shared base styles hide nearby land with opaque water
+and filter labels to the island. Design/verification: `docs/superpowers/plans/2026-10-30-island-map-cleanup.md`.
+
 Date: 2026-10-20. Resolves the round-1 adversarial review of the Play specs
 (`docs/play/reviews/2026-10-20-round1-specs.md`, verdict NEEDS-RESPEC, 35 findings). Finding ids below are the
 review's numbers (P0 1–7, P1 8–25, P2 26–35).

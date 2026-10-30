@@ -78,6 +78,9 @@ jobs:
       - name: Store metadata limits
         working-directory: .
         run: python3 scripts/check-metadata.py
+      - name: Island map styles
+        working-directory: .
+        run: python3 -m unittest discover -s scripts -p 'test_map_styles.py'
 
   ios:
     runs-on: macos-latest

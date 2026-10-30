@@ -330,7 +330,7 @@ fun MapTab(
     val coastLabel = coast?.let { stringResource(Res.string.play_kraken_coast, it) }
     if (playMarkerArt != null) {
         PlayMapSync(fx, playMarkerArt, playMarkers, playSelected, coastLabel)
-        PlayMapEffectsSync(fx, play, snapshot?.segmentBuckets.orEmpty(), ferry = ferry != null, holdIntros = wake)
+        PlayMapEffectsSync(fx, play, ferry = ferry != null, holdIntros = wake)
     }
 
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }

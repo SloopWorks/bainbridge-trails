@@ -1,5 +1,15 @@
 # Map styles (Task 10)
 
+Update 2026-10-30: all styles now show only Bainbridge. The generator reads the bundled `map-coastline.json` for
+an opaque water-colored exterior mask above the geographic base layers and a continuous shore below labels.
+Every label is filtered with MapLibre `within` against the island polygon. The shore uses a continuous GeoJSON
+line, avoiding tile-edge strokes. Offset ripple copies are removed: they crossed inside narrow inlets.
+Live Play exploration fog is removed
+(see `docs/play/decisions.md`, Map clarity override); coverage colors and chart-square rewards remain.
+Regression command: `python3 -m unittest discover -s scripts -p 'test_map_styles.py'`.
+`scripts/build-coastline.sh` generates both outlines: z12/20m `coastline.json` for the hero and Play, and
+z15/0.5m (archive maximum) `map-coastline.json` for map clipping. Templates are compact generated JSON.
+
 Three MapLibre styles for picking a direction: **Topo**, **Light** (minimal-light), **Dark**.
 The app opens on **Topo** (`MapStyle.Default`); a segmented control at the top switches styles live.
 
@@ -20,9 +30,9 @@ Owner confirmed Topo as the default on 2026-10-18.
    Hillshade plus 5 m contours (25 m index contours, labeled from z14) show why a trail is
    hard. A flat basemap hides that. The relief is what keeps the map from looking generic,
    and the owner listed a generic map as a failure.
-3. **A look of its own.** Concentric "water lines" off the coastline, as on old nautical
-   charts, suit an island and a ferry town. Default basemaps don't do this. It's pure style
-   (line offsets on the land outline) and costs no extra data.
+3. **An island chart.** A continuous fine shoreline on plain water keeps the island readable.
+   Nearby land is hidden. Decorative offset coastlines were removed in the 2026-10-30 cleanup
+   because they crossed inside narrow bays.
 4. **Color-blind check passes** (see below), on both platforms.
 
 Suggested follow-up: use **Dark** automatically when the OS is in dark mode. Offer **Light**
@@ -40,7 +50,7 @@ The hues are the same in all three styles; Dark gets brighter versions.
 | Water / background | `#9EBFC7` | `#FBFCFC` | `#0E1F27` |
 | Woods / parks | `#D4E0C6` | `#E1E6DE` | `#21312A` |
 | Open green (grass, golf) | `#E2E9D7` | `#E4E8E1` | `#22302A` |
-| Coastline / water lines | `#7FA2AB` / `#6F97A2` | `#9DB5BF` | `#2C4450` / `#2E5564` |
+| Coastline | `#7FA2AB` | `#9DB5BF` | `#2C4450` |
 | Contours / labels | `#9C845C` / `#86704C` | (none) | `#5F7A6B` / `#7D978A` |
 | Hillshade | opacity .36→.26 | (none) | opacity .30→.22, brightness max .55 |
 | Roads (minor / major / SR-305) | `#FFFFFF` / `#FFFFFF` / `#F4E7C0`, casing `#C3C7BC` | `#F7F8F6` / `#FFFFFF` / `#FFFFFF` | `#34413B` / `#46544D` / `#56625A` |

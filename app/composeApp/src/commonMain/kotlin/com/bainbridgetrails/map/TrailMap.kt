@@ -174,7 +174,12 @@ fun TrailMap(
     // A tab switch disposes the map; the rendered style is cached per process so coming back shows the map at once
     // (no Loading frame, no template re-read).
     val load by produceState<StyleLoad>(RenderedStyles[style]?.let { StyleLoad.Ready(it) } ?: StyleLoad.Loading, style, dataDir, attempt) {
-        if (value is StyleLoad.Ready) return@produceState
+        // produceState retains its previous value when a key changes. Ready can still be the *old* style;
+        // resolve this request's cache entry, and load its template when absent.
+        RenderedStyles[style]?.let {
+            value = StyleLoad.Ready(it)
+            return@produceState
+        }
         value = try {
             val urls = MapAssets.install(dataDir)
             // Res.readBytes reads on the calling thread (here Main): read and render the template on IO.
