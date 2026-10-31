@@ -27,6 +27,24 @@ FONT_REGULAR = ["Noto Sans Regular"]
 FONT_MEDIUM = ["Noto Sans Medium"]
 FONT_ITALIC = ["Noto Sans Italic"]
 
+# Detailed map outline derived from max-zoom bundled Protomaps earth geometry by build-coastline.sh.
+# Never stroke tiled earth polygons: their artificial tile boundaries look like lines across the water.
+COAST_RINGS = json.loads((OUT.parent / "map-coastline.json").read_text())["rings"]
+
+
+def oriented_ring(ring: list, counterclockwise: bool) -> list:
+    area2 = sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(ring, ring[1:]))
+    return ring if (area2 > 0) == counterclockwise else list(reversed(ring))
+
+
+ISLAND = {"type": "Polygon", "coordinates": [oriented_ring(COAST_RINGS[0], True)]}
+assert len(COAST_RINGS) == 1, "Exterior mask expects one island ring without inland holes"
+# Wider than any permitted camera viewport; regional coordinates avoid antimeridian wrapping.
+EXTERIOR = {"type": "Polygon", "coordinates": [
+    [[-140, 30], [-110, 30], [-110, 60], [-140, 60], [-140, 30]],
+    list(reversed(ISLAND["coordinates"][0])),
+]}
+
 STATUSES = ["not_started", "partway", "nearly_done", "complete"]
 
 COUNTED = ["==", ["get", "included"], True]
@@ -155,6 +173,10 @@ def build(p: dict) -> dict:
     sources = {
         "basemap": {"type": "vector", "url": "{{basemap}}"},
         "trails": {"type": "vector", "url": "{{trails}}"},
+        "island-exterior": {"type": "geojson", "data": EXTERIOR},
+        "island-shore": {"type": "geojson", "data": {
+            "type": "LineString", "coordinates": oriented_ring(COAST_RINGS[0], False),
+        }},
     }
     if p.get("contours"):
         sources["contours"] = {"type": "vector", "url": "{{contours}}"}
@@ -184,21 +206,6 @@ def build(p: dict) -> dict:
         })
 
     L.append(fill("water", "water", p["water"], POLYGON))
-    # Coastline = outline of the land polygons (water-polygon outlines include extract/tile edges).
-    L.append(line("shore", "basemap", "earth", {
-        "line-color": p["shore"],
-        "line-width": interp({10: 0.4, 14: 0.9, 18: 1.6}),
-    }, POLYGON, minzoom=10))
-
-    # Signature: nautical-chart "water lines" - concentric offsets of the coastline into the water.
-    for i, (offset, opacity) in enumerate(p.get("ripples", {}).get("lines", [])):
-        L.append(line(f"shore-ripple-{i}", "basemap", "earth", {
-            "line-color": p["ripples"]["color"],
-            "line-opacity": opacity,
-            "line-width": interp({10: 0.5, 15: 0.8}),
-            "line-offset": interp({10: offset * 0.6, 14: offset, 17: offset * 1.4}),
-        }, POLYGON, minzoom=10))
-
     if p.get("contours"):
         c = p["contours"]
         L.append(line("contour-minor", "contours", "contours", {
@@ -286,6 +293,15 @@ def build(p: dict) -> dict:
         "line-opacity": t.get("mup_bed_opacity", 1.0),
     }, ["all", COUNTED, ["==", ["get", "category"], "multi_use_path"]], minzoom=12))
 
+    # Hide all neighboring geography, terrain and base road lines with fully opaque water, never a veil.
+    # The mask precedes the continuous shore. Offset copies self-intersect in narrow bays, so use one clean edge.
+    L.append({"id": "island-exterior", "type": "fill", "source": "island-exterior",
+              "paint": {"fill-color": p["water"], "fill-opacity": 1}})
+    L.append(line("shore", "island-shore", None, {
+        "line-color": p["shore"],
+        "line-width": interp({10: 0.4, 14: 0.9, 18: 1.6}),
+    }, minzoom=10))
+
     # ---- labels (online glyphs; offline -> labels silently absent, map unaffected) ----------------
     lab = p["labels"]
     if p.get("contours"):
@@ -345,6 +361,11 @@ def build(p: dict) -> dict:
         "paint": {"text-color": lab["place"], "text-halo-color": lab["halo"], "text-halo-width": 1.4},
     })
 
+    # Labels draw above the mask: reject off-island anchors/lines so neighboring names never leak back in.
+    for layer in L:
+        if layer["type"] == "symbol":
+            layer["filter"] = ["all", layer["filter"], ["within", ISLAND]]
+
     return {
         "version": 8,
         "name": f"Bainbridge Trails - {p['name']}",
@@ -372,7 +393,6 @@ TOPO = {
     "contours": {"color": "#9C845C", "minor_opacity": 0.32, "index_opacity": 0.55, "label": "#86704C"},
     "roads": {"casing": "#C3C7BC", "minor": "#FFFFFF", "major": "#FFFFFF", "highway": "#F4E7C0"},
     "ferry": "#5E8691",
-    "ripples": {"color": "#6F97A2", "lines": [(-3.0, 0.75), (-6.5, 0.5), (-11.0, 0.28)]},
     "trails": {
         "status": {"not_started": "#6E6A64", "partway": "#C98A00", "nearly_done": "#E2562A",
                    "complete": "#9B1FA8"},
@@ -396,7 +416,6 @@ MINIMAL_LIGHT = {
     "buildings": "#DEE1DC",
     "roads": {"minor": "#F7F8F6", "major": "#FFFFFF", "highway": "#FFFFFF"},
     "ferry": "#9DB5BF",
-    "ripples": {"color": "#9DB5BF", "lines": [(-4.0, 0.45), (-9.0, 0.22)]},
     "trails": {
         "status": {"not_started": "#66625C", "partway": "#C08300", "nearly_done": "#DE4F22",
                    "complete": "#931B9F"},
@@ -419,7 +438,6 @@ DARK = {
     "contours": {"color": "#5F7A6B", "minor_opacity": 0.22, "index_opacity": 0.4, "label": "#7D978A"},
     "roads": {"minor": "#34413B", "major": "#46544D", "highway": "#56625A"},
     "ferry": "#3D6372",
-    "ripples": {"color": "#2E5564", "lines": [(-3.0, 0.7), (-6.5, 0.42), (-11.0, 0.22)]},
     "trails": {
         "status": {"not_started": "#A9A49B", "partway": "#F0B43C", "nearly_done": "#FF7B47",
                    "complete": "#D45CFF"},
@@ -438,7 +456,8 @@ DARK = {
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     for palette, name in ((TOPO, "topo"), (MINIMAL_LIGHT, "minimal-light"), (DARK, "dark")):
-        text = json.dumps(build(palette), indent=1) + "\n"
+        # Detailed geometry repeats in the label filters: keep generated templates compact.
+        text = json.dumps(build(palette), separators=(",", ":")) + "\n"
         (OUT / f"{name}.json").write_text(text)
         print(f"wrote {OUT.relative_to(ROOT)}/{name}.json ({len(text) // 1024} KB)")
 

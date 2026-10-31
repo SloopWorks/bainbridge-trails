@@ -12,17 +12,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.bainbridgetrails.coverage.TrailStatus
 import com.bainbridgetrails.data.Loadable
 import com.bainbridgetrails.graph.AppGraph
-import com.bainbridgetrails.play.PlayDerived
 import com.bainbridgetrails.play.PlayRepository
 import com.bainbridgetrails.play.config.ItemType
 import com.bainbridgetrails.play.fx.FxHostState
 import com.bainbridgetrails.play.fx.FxRenderer
 import com.bainbridgetrails.play.fx.FxRendererRegistry
 import com.bainbridgetrails.play.fx.FxSpec
-import com.bainbridgetrails.play.fx.effects.ExplorationFog
 import com.bainbridgetrails.play.fx.effects.FerryCrossing
 import com.bainbridgetrails.play.fx.effects.FrogRock
 import com.bainbridgetrails.play.fx.effects.KrakenAttack
@@ -50,10 +47,9 @@ import kotlin.math.sin
 import kotlin.time.Instant
 
 /**
- * The map's ambient Play scene beyond the markers (plan L2-10; effects § 3.1–3.3, § 3.18): exploration fog over every
- * chart square without counted coverage (cut out of quiet zones), each active kraken attack's ink casing + water pool
- * and its lurk, and the ferry. Built from the agenda, the goal's derived table ([PlayDerived]: chart squares, quiet
- * zones) and the dataset's segment lines; pure. A quiet day spawns nothing (product § 4.6.3: no effects).
+ * The map's ambient Play scene beyond the markers: each active kraken attack's ink casing + water pool and its lurk,
+ * and the ferry. Exploration fog is showcase-only (2026-10-30 map cleanup); live geography stays clear regardless
+ * of coverage. Built from the agenda and dataset's segment lines; pure. A quiet day spawns nothing.
  */
 object PlayMapEffects {
     /** Roughly the island's middle: the water side of a shore stretch is away from it. */
@@ -141,20 +137,16 @@ object PlayMapEffects {
     }
 
     /**
-     * Every ambient spec: fog ([covered] = segment ids with any coverage), the attacks' casing + pool + lurk, and the
-     * ferry when [ferry]. Empty on a quiet day.
+     * Every ambient spec: the attacks' casing + pool + lurk and the ferry when [ferry]. Empty on a quiet day.
      */
     fun specs(
         agenda: PlayAgenda?,
-        derived: PlayDerived,
         lines: (String) -> List<GeoPoint>?,
-        covered: Collection<String>,
         ferry: Boolean,
         coast: Coast? = null,
     ): List<FxSpec> {
         if (agenda == null || agenda.day.quietDay) return emptyList()
         val out = ArrayList<FxSpec>()
-        if (derived.squares.isNotEmpty()) out += ExplorationFog.specs(derived.squares, derived.lifted(covered), derived.quietZones.map { it.ring })
         val repelled = repelled(agenda)
         for (attack in attacks(agenda, lines, coast)) {
             val casing = KrakenInk.specs(attack, repelled)
@@ -170,10 +162,6 @@ object PlayMapEffects {
         val repelled = repelled(agenda)
         return attacks(agenda, lines, coast).filter { it.key !in seen }.mapNotNull { KrakenInk.introSpec(it, repelled) }
     }
-
-    /** Covered segment ids of a progress snapshot's buckets (only covered buckets are present). */
-    fun covered(buckets: Map<TrailStatus, List<String>>): Set<String> =
-        buckets.filterKeys { it != TrailStatus.NOT_STARTED }.values.flatMapTo(HashSet()) { it }
 
     private const val M_PER_DEG = 111_195.0
 }
@@ -280,7 +268,7 @@ private fun FxHostState.isLive(id: String): Boolean = liveByKind.values.any { l 
 fun playLiveRegistry(markers: PlayMarkers?, ferry: FerryTimetable?, now: () -> Instant): FxRendererRegistry =
     FxRendererRegistry(
         listOfNotNull<FxRenderer>(
-            ExplorationFog, KrakenLurk, KrakenAttack(), KrakenRecede, FerryCrossing(ferry, now = now),
+            KrakenLurk, KrakenAttack(), KrakenRecede, FerryCrossing(ferry, now = now),
             FrogRock, RiddleMarker(), RiddleLight, TreasureGlint, TreasureFound, markers,
         ),
     )
@@ -293,15 +281,14 @@ fun rememberFerryTimetable(play: PlayRepository?): FerryTimetable? {
 }
 
 /**
- * Keeps [fx]'s ambient scene ([PlayMapEffects.specs]) in step with [play]'s agenda and the coverage snapshot, plays each
+ * Keeps [fx]'s ambient scene ([PlayMapEffects.specs]) in step with [play]'s agenda, plays each
  * attack's intro once per process, and attaches [fx] to [play]'s live find moments (only kinds [fx] can draw).
- * Nothing per frame: specs are rebuilt when the agenda or the covered set changes.
+ * Nothing per frame: specs are rebuilt when the agenda or its geometry changes.
  */
 @Composable
-fun PlayMapEffectsSync(fx: FxHostState?, play: PlayRepository?, buckets: Map<TrailStatus, List<String>>, ferry: Boolean, holdIntros: Boolean = false) {
+fun PlayMapEffectsSync(fx: FxHostState?, play: PlayRepository?, ferry: Boolean, holdIntros: Boolean = false) {
     if (fx == null || play == null) return
     val agenda by play.agenda.collectAsStateWithLifecycle()
-    val derived = produceState(PlayDerived.Empty, play) { value = play.derivedTable() }.value
     val dataset = AppGraph.datasets.state.collectAsStateWithLifecycle().value as? Loadable.Ready
     // Built off Main (AC 9 P3): every segment's coordinates are converted once per dataset.
     val lines = produceState<(String) -> List<GeoPoint>?>({ null }, dataset) {
@@ -311,10 +298,9 @@ fun PlayMapEffectsSync(fx: FxHostState?, play: PlayRepository?, buckets: Map<Tra
             f
         }
     }.value
-    val covered = remember(buckets) { PlayMapEffects.covered(buckets) }
     val coast = produceState<Coast?>(null) { value = PlayMapEffects.loadCoast() }.value ?: return
-    val specs = produceState(emptyList<FxSpec>(), agenda, derived, lines, covered, ferry, coast) {
-        value = withContext(Dispatchers.Default) { PlayMapEffects.specs(agenda, derived, lines, covered, ferry, coast) }
+    val specs = produceState(emptyList<FxSpec>(), agenda, lines, ferry, coast) {
+        value = withContext(Dispatchers.Default) { PlayMapEffects.specs(agenda, lines, ferry, coast) }
     }.value
     val spawned = remember(fx) { HashSet<String>() }
     LaunchedEffect(fx, specs) {

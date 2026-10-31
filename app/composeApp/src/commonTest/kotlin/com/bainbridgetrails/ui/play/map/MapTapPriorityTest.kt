@@ -29,6 +29,18 @@ class MapTapPriorityTest {
     private val pin = PlayHit.Pin("treasure-weekly-trails@2026-10-26#03", MarkerKind.TREASURE)
 
     @Test
+    fun `live map never obscures unwalked areas with exploration fog`() {
+        val now = Instant.parse("2026-10-29T21:00:00Z")
+        val agenda = PlayAgenda(emptyList(), emptyList(), DayInfo(
+            LocalDate(2026, 10, 29), SunDay(null, null, now, null, null), null, null, quietDay = false,
+        ))
+        val scene = PlayMapEffects.specs(agenda, { null }, ferry = true)
+        assertTrue(scene.none { it.kind == "exploration_fog" }, "unwalked map stays clear with Play on")
+        assertTrue(scene.any { it.kind == "ferry_crossing" }, "other ambient effects remain")
+        assertTrue(playLiveRegistry(null, null) { now }["exploration_fog"] == null)
+    }
+
+    @Test
     fun `trail hit wins outside the figure`() {
         val pure = TapResult.Select("trail-grand-forest-west")
         // The tap-rect Play query is not even made when the pure query hit (PF3-5); a pin whose 48 dp hit rect only

@@ -1,5 +1,14 @@
 # MVP status (branch `v1/mvp`, 2026-10-19)
 
+## Map cleanup — 2026-10-30
+
+Brief: show only Bainbridge Island in both editions and remove the translucent patches over unwalked areas.
+Acceptance: surrounding land and its labels are absent in every style; the shoreline has no tile-edge strokes;
+live Map and Record have no exploration fog with Play on; coverage and Play rewards stay intact.
+Shared surface: `composeApp/map` and `ui/play/map` (no Product Atlas IDs). Bounded, reversible client change;
+design-before-build applies, privacy and viability gates do not. Design and implementation plan:
+[`2026-10-30-island-map-cleanup.md`](../superpowers/plans/2026-10-30-island-map-cleanup.md).
+
 Checklist against the MVP backlog in [`product.md` §8](product.md#8-mvp-backlog) (brief item numbers there).
 Verified on the Android emulator (Pixel 9 Pro image, API 37) and the iOS simulator (iPhone 17 Pro) against a
 local `wrangler dev` backend; screenshots in [`screens/`](screens/). Not yet tested on a production backend or

@@ -709,7 +709,7 @@ private fun RecordMap(
     val extra = if (style.isDark) BtExtraDark else BtExtraLight
     val fx = if (fxInputs != null) rememberFxHost(fxInputs, mapController) else null
     val fxOverlay: (@Composable MapOverlayScope.() -> Unit)? = remember(fx) { if (fx != null) ({ FxOverlay(fx) }) else null }
-    if (fx != null) com.bainbridgetrails.ui.play.map.PlayMapEffectsSync(fx, play, buckets, ferry = false)
+    if (fx != null) com.bainbridgetrails.ui.play.map.PlayMapEffectsSync(fx, play, ferry = false)
     // Taps reset FX's 20 s ambient idle stop (PF-2) like camera moves do; no Play = today's interactions.
     val interactions = remember(fx) { if (fx != null) chartInteractions(onTap = { fx.noteInteraction() }) else chartInteractions() }
     WithFxRenderOptions(fx) { renderOptions ->
